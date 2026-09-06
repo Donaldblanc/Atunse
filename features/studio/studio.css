@@ -1,0 +1,11 @@
+/* Studio address, hours and directions. The map is a placeholder shape —
+   swap for a real embed once the address is confirmed. */
+.map{height:180px;border-radius:22px;background:#DDE2EC;position:relative;overflow:hidden;margin-bottom:14px}
+.map .g{position:absolute;inset:0;background:
+  repeating-linear-gradient(0deg,transparent 0 28px,rgba(19,27,63,.07) 28px 29px),
+  repeating-linear-gradient(90deg,transparent 0 36px,rgba(19,27,63,.07) 36px 37px)}
+.map .rd{position:absolute;left:0;right:0;top:56%;height:14px;background:#fff}
+.map .rd2{position:absolute;top:0;bottom:0;left:36%;width:12px;background:#fff}
+.map .pin{position:absolute;left:36%;top:56%;transform:translate(-50%,-100%) rotate(-45deg);
+  width:28px;height:28px;background:var(--marigold);border:3px solid var(--ink);border-radius:50% 50% 50% 0}
+.studio-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}

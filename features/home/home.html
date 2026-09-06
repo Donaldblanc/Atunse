@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · Atunṣe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="home.css">
+</head>
+<body data-screen="home">
+<div class="shell">
+  <header class="hello">
+    <div class="av">AL</div>
+    <div class="who"><span>Good afternoon</span><b>Adedeji</b></div>
+    <a class="icb ico" href="../shop/shop.html" aria-label="Shop"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg></a>
+    <button class="icb ico" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 15V10a6 6 0 1 0-12 0v5l-2 3h16z"/><path d="M10 21h4"/></svg><span class="dot"></span></button>
+  </header>
+
+  <a class="feature" href="../orders/detail.html">
+    <span class="glow"></span>
+    <span class="top"><span class="pill light">IN PROGRESS</span><span class="ord">ATN-2469</span></span>
+    <h3>Nike Dunk Low</h3>
+    <p>Sole whitening. Day 2 of 3.</p>
+    <span class="go">View order <i><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></i></span>
+    <svg class="shoe" viewBox="0 0 200 110" style="color:#3A4EA8"><use href="#shoe"/></svg>
+  </a>
+
+  <div class="invoice-strip">
+    <div class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></div>
+    <div>
+      <b>Invoice ready · $125.00</b>
+      <small>INV-01427 · Air Jordan 1 Mid</small>
+    </div>
+    <a class="rev" href="../invoices/invoice.html">Review</a>
+  </div>
+
+  <div class="pad"><h2 class="sec">Your orders</h2></div>
+  <div class="segs">
+    <button aria-pressed="true">All</button><button>Needs you</button><button>In progress</button><button>Ready</button><button>Completed</button>
+  </div>
+  <div class="pad">
+    <a class="ordercard" href="../invoices/invoice.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#2A3C93"><use href="#shoe"/></svg></span>
+      <span><b>Air Jordan 1 Mid</b><small>ATN-2481 · deep clean, paint</small><span class="pill amber">INVOICE READY</span></span>
+      <span class="arw">›</span>
+    </a>
+    <a class="ordercard" href="../orders/detail.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#5A6BC4"><use href="#shoe"/></svg></span>
+      <span><b>Nike Dunk Low</b><small>ATN-2469 · sole whitening</small><span class="pill indigo">IN PROGRESS</span></span>
+      <span class="arw">›</span>
+    </a>
+    <a class="ordercard" href="../orders/detail.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#1B7A52"><use href="#shoe"/></svg></span>
+      <span><b>New Balance 550</b><small>ATN-2402 · basic clean</small><span class="pill green">PICKED UP 12 AUG</span></span>
+      <span class="arw">›</span>
+    </a>
+  </div>
+
+  <div class="pad" style="display:flex;align-items:center;justify-content:space-between">
+    <h2 class="sec" style="margin-bottom:12px">Care at home</h2>
+    <a class="mini" style="padding:8px 13px;font-size:12.5px" href="../shop/shop.html">View all</a>
+  </div>
+  <div class="rail">
+    <div class="mini-prod"><div class="im"><svg viewBox="0 0 60 60"><rect x="20" y="12" width="20" height="36" rx="5" fill="#2A3C93"/><rect x="25" y="5" width="10" height="8" rx="2" fill="#E9A427"/></svg></div><div class="bd"><b>Cleaning solution</b><small>$18</small></div></div>
+    <div class="mini-prod"><div class="im"><svg viewBox="0 0 60 60"><rect x="8" y="24" width="44" height="13" rx="6.5" fill="#131B3F"/><path d="M14 37v7M21 37v7M28 37v7M35 37v7M42 37v7" stroke="#E9A427" stroke-width="3" stroke-linecap="round"/></svg></div><div class="bd"><b>Soft brush</b><small>$12</small></div></div>
+    <div class="mini-prod"><div class="im"><svg viewBox="0 0 60 60"><path d="M10 36 C10 21 25 15 35 19 L48 25 C53 27 53 36 48 36Z" fill="#E9A427"/></svg></div><div class="bd"><b>Crease guards</b><small>$14</small></div></div>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

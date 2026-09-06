@@ -1,0 +1,8 @@
+/* Care products. Every image here is a placeholder — real photography needed. */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.prod{background:#fff;border:1px solid var(--line2);border-radius:18px;overflow:hidden}
+.prod .im{aspect-ratio:1;background:var(--paper);display:grid;place-items:center}
+.prod .im svg{width:58%}
+.prod .bd{padding:12px 13px 14px}
+.prod b{display:block;font-size:14px;font-weight:600}
+.prod .pr{font-family:Archivo;font-variation-settings:"wght" 750;margin-top:5px;display:block;font-size:15px}

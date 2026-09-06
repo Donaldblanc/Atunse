@@ -1,0 +1,11 @@
+/* Order-scoped thread with DJ. */
+.msgs{padding:8px 18px;display:flex;flex-direction:column;gap:10px}
+.bub{max-width:80%;padding:12px 15px;border-radius:18px;font-size:14.5px;line-height:1.45}
+.bub.them{background:#fff;border:1px solid var(--line2);border-bottom-left-radius:6px;align-self:flex-start}
+.bub.me{background:var(--indigo);color:#fff;border-bottom-right-radius:6px;align-self:flex-end}
+.bub .t{display:block;font-size:11px;opacity:.55;margin-top:6px}
+.daysep{text-align:center;font-size:11.5px;color:var(--mute);margin:6px 0}
+.comp{display:flex;gap:9px;padding:14px 18px;align-items:center}
+.comp input{border-radius:999px}
+.comp button{flex:0 0 50px;height:50px;border-radius:50%;background:var(--ink);border:0;display:grid;place-items:center}
+.comp svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:2}

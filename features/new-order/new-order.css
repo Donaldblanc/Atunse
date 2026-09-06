@@ -1,0 +1,68 @@
+/* The intake flow: category, guided camera, item details, services,
+   drop-off method and confirmation. */
+
+/* step progress, shared by every step in the flow */
+.cprog{display:flex;gap:5px;padding:0 0 18px}
+.cprog i{flex:1;height:3px;border-radius:2px;background:var(--line)}
+.cprog i.on{background:var(--ink)}
+
+/* ---------- guided camera ---------- */
+.cam{background:var(--deep);min-height:calc(100vh - 118px);display:flex;flex-direction:column;color:#fff}
+.cam .cprog{padding:4px 18px 16px}
+.cam .cprog i{background:rgba(255,255,255,.16)}
+.cam .cprog i.on{background:var(--marigold)}
+.ctitle{text-align:center;padding:0 24px 16px}
+.ctitle h2{font-size:23px;font-variation-settings:"wght" 780}
+.ctitle p{color:rgba(255,255,255,.55);font-size:14px;margin-top:7px}
+
+.view{flex:1;margin:0 18px;border-radius:var(--r-lg);background:#171F44;position:relative;
+  display:grid;place-items:center;min-height:270px;overflow:hidden}
+.view .corner{position:absolute;width:34px;height:34px;border:2.5px solid rgba(255,255,255,.5)}
+.view .c1{top:20px;left:20px;border-right:0;border-bottom:0;border-radius:12px 0 0 0}
+.view .c2{top:20px;right:20px;border-left:0;border-bottom:0;border-radius:0 12px 0 0}
+.view .c3{bottom:20px;left:20px;border-right:0;border-top:0;border-radius:0 0 0 12px}
+.view .c4{bottom:20px;right:20px;border-left:0;border-top:0;border-radius:0 0 12px 0}
+.view svg{width:66%}
+
+.thumbrow{display:flex;gap:9px;justify-content:center;padding:16px 18px 8px}
+.thumbrow div{flex:1;max-width:60px;aspect-ratio:1;border-radius:13px;
+  border:1.5px solid rgba(255,255,255,.18);display:grid;place-items:center;
+  font-size:10.5px;color:rgba(255,255,255,.5);text-align:center}
+.thumbrow div.ok{border:0;background:rgba(233,164,39,.18);color:var(--marigold);font-weight:700}
+.thumbrow div.now{border-color:#fff;color:#fff;font-weight:700}
+
+.shut{display:flex;align-items:center;justify-content:center;gap:26px;padding:14px 0 26px}
+.shut .ring{width:74px;height:74px;border-radius:50%;background:transparent;
+  border:3px solid rgba(255,255,255,.4);display:grid;place-items:center}
+.shut .ring i{width:58px;height:58px;border-radius:50%;background:#fff;display:block}
+.shut .side{width:44px;height:44px;border-radius:14px;background:rgba(255,255,255,.1);
+  border:0;display:grid;place-items:center}
+.shut .side svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:1.9}
+
+/* ---------- item details ---------- */
+.hero-item{position:relative;background:linear-gradient(170deg,#E9ECF4,#D9DEEB);
+  padding:26px 18px 46px;text-align:center}
+.hero-item .nav{position:absolute;top:0;left:0;right:0}
+.hero-item svg{width:78%;max-width:330px}
+.sheet{background:var(--paper);border-radius:var(--r-lg) var(--r-lg) 0 0;margin-top:-26px;
+  position:relative;padding:20px 18px 0}
+.idchip{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#fff;
+  border-radius:999px;padding:8px 15px;font-size:13px;font-weight:600;
+  position:absolute;top:-18px;left:50%;transform:translateX(-50%)}
+.idchip svg{width:14px;height:14px;stroke:#fff;fill:none;stroke-width:1.9}
+
+/* ---------- confirmation ---------- */
+.done{text-align:center;padding:34px 22px 8px}
+.tick{width:88px;height:88px;border-radius:50%;background:var(--green-tint);
+  display:grid;place-items:center;margin:0 auto 22px}
+.tick svg{width:40px;height:40px;stroke:var(--green);fill:none;stroke-width:3.2;
+  stroke-linecap:round;stroke-linejoin:round}
+.illus{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:22px;
+  margin:22px 0 14px;text-align:center}
+.illus svg{width:60%;max-width:190px}
+.illus b{display:block;margin-top:14px;font-weight:700;font-size:15px}
+.illus small{color:var(--mute);font-size:13px}
+.track-chip{background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);padding:14px;
+  display:flex;align-items:center;justify-content:center;gap:9px;font-size:14px;
+  font-weight:600;margin-bottom:14px}
+.track-chip svg{width:17px;height:17px;stroke:var(--mute);fill:none;stroke-width:1.9}

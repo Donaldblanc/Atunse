@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drop-off · Atunṣe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="new-order.css">
+</head>
+<body data-screen="method">
+<div class="shell">
+  <nav class="nav">
+    <a class="icb" href="services.html" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="ttl">DROP-OFF &amp; RETURN</div>
+    <div class="spacer"></div>
+  </nav>
+  <div class="pad">
+    <div class="cprog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div>
+    <h1 class="big">How are they<br>reaching us?</h1>
+    <div class="gap"></div>
+
+    <button class="cat" aria-pressed="true" style="display:block">
+      <span class="lft" style="padding:16px"><span class="dot"></span><b>Drop at the studio</b><small>Manhattan · open until 7pm · 2.4 mi</small></span>
+    </button>
+    <button class="cat" aria-pressed="false" style="display:block">
+      <span class="lft" style="padding:16px"><span class="dot"></span><b>We collect from you</b><small>NY, NJ and CT · $15 each way</small></span>
+    </button>
+    <button class="cat" aria-pressed="false" style="display:block">
+      <span class="lft" style="padding:16px"><span class="dot"></span><b>Ship to us</b><small>Prepaid label · you cover the trip in, we cover the way back</small></span>
+    </button>
+
+    <a class="mini wide" style="margin:4px 0 6px" href="../studio/studio.html">
+      <svg viewBox="0 0 24 24"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+      Studio address and hours
+    </a>
+
+    <label for="ret">Getting them back</label>
+    <select id="ret"><option>Pick up at the studio</option><option>Return shipping — included</option><option>We drop off — $15</option></select>
+
+    <label for="when">Turnaround</label>
+    <select id="when"><option>Standard — 72 hours after we receive them</option><option>Rush — ask about availability</option></select>
+
+    <div class="card soft" style="margin-top:18px">
+      <p style="font-size:14px;line-height:1.55">DJ reviews your photos and sends an invoice within 24 hours. Nothing is owed until you approve it.</p>
+    </div>
+    <div class="act">
+      <a class="btn" href="confirmed.html">Place order</a>
+      <a class="orb" href="confirmed.html" aria-label="Place order"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></a>
+    </div>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

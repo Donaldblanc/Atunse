@@ -1,0 +1,21 @@
+/* Invoice / payment details. */
+.invhead{background:#fff;border:1px solid var(--line2);border-radius:var(--r);padding:18px;
+  margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.invhead .no{font-family:Archivo;font-variation-settings:"wght" 750;font-size:19px}
+.invhead .amt{font-family:Archivo;font-variation-settings:"wght" 800;font-size:27px;letter-spacing:-.03em}
+
+/* one approvable service */
+.line{display:flex;align-items:center;gap:12px;padding:13px 0}
+.line + .line{border-top:1px solid var(--line2)}
+.line .bx{width:22px;height:22px;border-radius:7px;background:var(--ink);display:grid;
+  place-items:center;color:#fff;font-size:12px;flex:0 0 22px}
+.line .bx.off{background:#fff;border:1.5px solid var(--line)}
+.line .nm{flex:1;font-size:15px}
+.line .pr{font-weight:600}
+
+.sumrow{display:flex;justify-content:space-between;padding:8px 0;font-size:14.5px;
+  color:var(--mute);align-items:center}
+.sumrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--line)}
+.sumrow span:first-of-type{flex:1;margin-left:9px}
+.sumtot{display:flex;justify-content:space-between;border-top:1px solid var(--line2);
+  margin-top:8px;padding-top:14px;font-family:Archivo;font-variation-settings:"wght" 780;font-size:19px}

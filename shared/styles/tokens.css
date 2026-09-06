@@ -1,0 +1,29 @@
+/* Design tokens. Every colour, radius and width used anywhere else
+   resolves back to something declared here. Change a brand colour once. */
+:root{
+  /* brand */
+  --ink:#131B3F;
+  --deep:#0E1430;
+  --indigo:#2A3C93;
+  --marigold:#E9A427;
+  --green:#1B7A52;
+
+  /* tints — used for status pills and soft callout cards */
+  --indigo-tint:#E8EBF8;
+  --amber-tint:#FCF1DC;
+  --green-tint:#DCEFE5;
+
+  /* surfaces */
+  --paper:#F1F2F6;
+  --line:rgba(19,27,63,.10);
+  --line2:rgba(19,27,63,.07);
+  --mute:rgba(19,27,63,.55);
+
+  /* shape */
+  --r:20px;
+  --r-sm:14px;
+  --r-lg:26px;
+
+  /* the app column. Mobile first: full width until 520px, centred after. */
+  --shell:min(520px,100%);
+}

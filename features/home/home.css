@@ -1,0 +1,71 @@
+/* Home / dashboard. Greeting, the pair currently in the shop, the pending
+   invoice strip, order list and the shop rail. */
+
+.hello{display:flex;align-items:center;gap:12px;padding:16px 18px 14px}
+.hello .av{width:46px;height:46px;border-radius:50%;background:var(--indigo);color:#fff;
+  display:grid;place-items:center;font-family:Archivo;font-variation-settings:"wght" 700;
+  font-size:15px;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--marigold)}
+.hello .who{flex:1}
+.hello .who span{font-size:13px;color:var(--mute)}
+.hello .who b{display:block;font-family:Archivo;font-variation-settings:"wdth" 110,"wght" 750;
+  font-size:20px;letter-spacing:-.02em}
+.hello .ico{position:relative}
+.hello .ico .dot{position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;
+  background:var(--marigold);border:1.5px solid #fff}
+
+/* the pair currently in the shop */
+.feature{margin:0 18px;border-radius:24px;background:linear-gradient(150deg,#1B2653,#0E1430 62%);
+  color:#fff;padding:20px;position:relative;overflow:hidden;display:block}
+.feature .glow{position:absolute;right:-60px;top:-50px;width:200px;height:200px;border-radius:50%;
+  background:rgba(42,60,147,.55);filter:blur(30px)}
+.feature .top{display:flex;justify-content:space-between;align-items:center;position:relative}
+.feature .ord{font-size:12px;color:rgba(255,255,255,.5);letter-spacing:.06em}
+.feature h3{font-size:22px;margin:16px 0 6px;position:relative;max-width:9ch}
+.feature p{color:rgba(255,255,255,.62);font-size:13.5px;position:relative;max-width:22ch}
+.feature .shoe{position:absolute;right:-6px;bottom:14px;width:52%;opacity:.96}
+.feature .go{margin-top:18px;display:inline-flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:999px;
+  padding:9px 9px 9px 18px;color:#fff;font-size:14px;font-weight:600;position:relative}
+.feature .go i{width:30px;height:30px;border-radius:50%;background:var(--marigold);display:grid;place-items:center}
+.feature .go svg{width:15px;height:15px;stroke:var(--ink);fill:none;stroke-width:2.4}
+
+/* pending invoice — deliberately the loudest thing under the fold */
+.invoice-strip{margin:12px 18px 0;background:var(--amber-tint);
+  border:1px solid rgba(233,164,39,.35);border-radius:18px;padding:14px 15px;
+  display:flex;align-items:center;gap:12px}
+.invoice-strip .ic{width:38px;height:38px;border-radius:12px;background:#fff;display:grid;place-items:center;flex:0 0 38px}
+.invoice-strip .ic svg{width:18px;height:18px;stroke:#8A5D00;fill:none;stroke-width:1.9}
+.invoice-strip b{display:block;font-weight:700;font-size:14.5px}
+.invoice-strip small{color:#8A5D00;font-size:12.5px}
+.invoice-strip .rev{margin-left:auto;background:#fff;border:1px solid rgba(233,164,39,.45);
+  border-radius:999px;padding:9px 14px;font-size:13px;font-weight:700;white-space:nowrap;
+  display:flex;align-items:center;gap:6px}
+.invoice-strip .rev::after{content:"";width:6px;height:6px;border-top:2px solid var(--ink);
+  border-right:2px solid var(--ink);transform:rotate(45deg)}
+
+/* status filter strip */
+.segs{display:flex;gap:7px;overflow-x:auto;padding:0 18px 12px}
+.segs::-webkit-scrollbar{display:none}
+.segs button{white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:999px;
+  padding:9px 15px;font-size:13px;font-weight:600}
+.segs button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* order list */
+.ordercard{display:flex;gap:13px;width:100%;text-align:left;background:#fff;
+  border:1px solid var(--line2);border-radius:18px;padding:12px;margin-bottom:11px;align-items:center}
+.ordercard .th{flex:0 0 62px;height:62px;border-radius:14px;background:var(--paper);
+  display:grid;place-items:center;overflow:hidden}
+.ordercard .th svg{width:86%}
+.ordercard b{display:block;font-weight:600;font-size:15px}
+.ordercard small{display:block;color:var(--mute);font-size:12.5px;margin:2px 0 7px}
+.ordercard .arw{margin-left:auto;color:var(--mute);font-size:18px}
+
+/* horizontal shop rail */
+.rail{display:flex;gap:12px;overflow-x:auto;padding:2px 18px 4px;-webkit-overflow-scrolling:touch}
+.rail::-webkit-scrollbar{display:none}
+.mini-prod{flex:0 0 132px;background:#fff;border:1px solid var(--line2);border-radius:16px;overflow:hidden}
+.mini-prod .im{height:100px;background:var(--paper);display:grid;place-items:center}
+.mini-prod .im svg{width:60%}
+.mini-prod .bd{padding:10px 11px}
+.mini-prod b{font-size:13px;font-weight:600;display:block}
+.mini-prod small{font-size:12px;color:var(--mute)}
