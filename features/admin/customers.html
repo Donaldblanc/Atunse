@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customers · Atunṣe admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body data-role="admin" data-screen="customers">
+<div class="shell">
+  <nav class="nav">
+    <div style="flex:1"><h1 class="big" style="font-size:22px">Customers</h1></div>
+    <button class="icb" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></button>
+  </nav>
+  <div class="pad">
+    <input type="text" placeholder="Search by name, phone or order number" aria-label="Search customers">
+    <div class="gap"></div>
+
+    <button class="person">
+      <span class="in">AL</span>
+      <span><b>Adedeji Lawal</b><small>3 orders · last 3 Sept</small></span>
+      <span class="val"><b>$310</b><small>lifetime</small></span>
+    </button>
+    <button class="person">
+      <span class="in">MR</span>
+      <span><b>Marisol Reyes</b><small>1 order · last 5 Sept</small></span>
+      <span class="val"><b>$40</b><small>lifetime</small></span>
+    </button>
+    <button class="person">
+      <span class="in">KT</span>
+      <span><b>Kevin Tran</b><small>2 orders · last 4 Sept</small></span>
+      <span class="val"><b>$130</b><small>lifetime</small></span>
+    </button>
+    <button class="person">
+      <span class="in">AB</span>
+      <span><b>Ama Boateng</b><small>1 order · mail-in · last 4 Sept</small></span>
+      <span class="val"><b>$30</b><small>lifetime</small></span>
+    </button>
+    <button class="person">
+      <span class="in">DO</span>
+      <span><b>Danny Osei</b><small>4 orders · last 5 Sept</small></span>
+      <span class="val"><b>$205</b><small>lifetime</small></span>
+    </button>
+
+    <div class="card soft" style="margin-top:16px">
+      <b style="font-size:14.5px">Bring in your old customers</b>
+      <p class="small" style="margin-top:6px;color:rgba(255,255,255,.75)">Upload the spreadsheet with Name, Phone, Email, City, Last Service and Notes. Duplicates get matched on phone number.</p>
+    </div>
+    <button class="btn light wide" style="margin-bottom:20px">Import a spreadsheet</button>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

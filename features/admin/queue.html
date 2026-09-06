@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue · Atunṣe admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body data-role="admin" data-screen="queue">
+<div class="shell">
+  <nav class="nav">
+    <div style="flex:1">
+      <div class="ttl" style="text-align:left;font-size:11px">SATURDAY 6 SEPT</div>
+      <h1 class="big" style="font-size:22px;margin-top:4px">The queue</h1>
+    </div>
+    <button class="icb" aria-label="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M16 16l4 4"/></svg></button>
+  </nav>
+
+  <div class="pad">
+    <div class="stats">
+      <div class="warn"><b>3</b><span>Need a quote</span></div>
+      <div><b>2</b><span>On the bench</span></div>
+      <div><b>$312</b><span>Deposits unpaid</span></div>
+    </div>
+  </div>
+
+  <div class="segs" style="padding-left:18px;padding-right:18px">
+    <button aria-pressed="true">Needs you</button>
+    <button>In progress</button>
+    <button>Ready</button>
+    <button>Awaiting pair</button>
+    <button>All</button>
+  </div>
+
+  <div class="pad">
+    <a class="job urgent" href="order.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#2A3C93"><use href="#shoe"/></svg></span>
+      <span><b>Adedeji Lawal</b><small>ATN-2481 · AJ1 Mid · deep clean, paint</small><span class="pill amber">NEEDS QUOTE</span></span>
+      <span class="age">2 days<br>waiting</span>
+    </a>
+    <a class="job urgent" href="order.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#8A8371"><use href="#shoe"/></svg></span>
+      <span><b>Marisol Reyes</b><small>ATN-2480 · Dunk Low · sole whitening</small><span class="pill amber">NEEDS QUOTE</span></span>
+      <span class="age">1 day<br>waiting</span>
+    </a>
+    <a class="job" href="order.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#5A6BC4"><use href="#shoe"/></svg></span>
+      <span><b>Kevin Tran</b><small>ATN-2478 · Yeezy 350 · deep clean</small><span class="pill indigo">DEPOSIT UNPAID</span></span>
+      <span class="age">quoted<br>4 Sept</span>
+    </a>
+    <a class="job" href="order.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#6B4A2C"><use href="#shoe"/></svg></span>
+      <span><b>Ama Boateng</b><small>ATN-2477 · AF1 · reglue · mail-in</small><span class="pill grey">AWAITING PAIR</span></span>
+      <span class="age">shipped<br>4 Sept</span>
+    </a>
+    <a class="job" href="order.html">
+      <span class="th"><svg viewBox="0 0 200 110" style="color:#1B7A52"><use href="#shoe"/></svg></span>
+      <span><b>Danny Osei</b><small>ATN-2475 · NB 550 · basic clean</small><span class="pill green">READY FOR PICKUP</span></span>
+      <span class="age">done<br>5 Sept</span>
+    </a>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

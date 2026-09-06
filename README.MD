@@ -1,219 +1,101 @@
-# Atunse
+# Atunṣe v2 prototype
 
-Sneaker cleaning and restoration ordering platform for **RestoredByDJ** (New York, NY).
+Static, feature-sliced mock of the v2 app. No build step, no dependencies.
+Open `index.html` in a browser — it redirects to the home screen.
 
-Customers photograph a pair, pick services, and submit a request. DJ reviews the photos,
-sends a price, and moves the order through the shop. Payment is handled offline in v1 —
-the app tells the customer how to pay and DJ marks it received.
+The black bar across the top is a prototype-only control strip. On the left is a
+**Customer / Admin** toggle that swaps between the two apps; to the right of it,
+the screens belonging to whichever role you're in. Both ship out before any of
+this becomes real code.
 
-> Brand name and legal entity are not the same thing. "Atunṣe" is the customer-facing name;
-> RestoredByDJ is the business. **Open decision:** which one leads on the site header and domain.
-
----
-
-## Status
-
-Pre-development. Prototypes exist, no application code yet.
-
-| Artifact       | Path                      | What it is                                                                               |
-| -------------- | ------------------------- | ---------------------------------------------------------------------------------------- |
-| Sitemap        | `docs/sitemap.md`         | v1 routes, order statuses, admin structure                                               |
-| v1 prototype   | `docs/prototypes/v1.html` | Guest quote flow, mobile-first, launch scope, Accounts, per-item invoicing, studio, shop |
-| Intake answers | `docs/discovery.md`       | Client questionnaire responses                                                           |
+The customer app runs on a light shell, DJ's admin app on a dark one. That isn't
+decoration — with a toggle sitting between the two, nobody should ever have to
+wonder which view they're looking at.
 
 ---
 
-## v1 scope (launch)
-
-Five things, nothing else:
-
-1. **Quote request form** — multi-service, multi-pair, photo upload
-2. **Admin review and quote** — DJ prices the job after seeing photos
-3. **Order status tracking** — nine stages, customer-visible
-4. **Offline payment** — Zelle, Apple Pay or cash; 50% deposit; DJ marks paid
-5. **Email + SMS notifications** on the stages that need customer action
-
-**Deferred to v2:** customer accounts, loyalty rewards, in-app card payment, product shop,
-how-to video library, nonprofit pages, referrals, analytics.
-
-**Deferred by decision, not oversight:** loyalty rewards were cut from v1 to protect the
-launch date. Point rules are still undefined.
-
-### Pricing
-
-| Service                  | Price     | Instant book? |
-| ------------------------ | --------- | ------------- |
-| Basic clean              | $30       | Yes           |
-| Deep clean               | $50       | Yes           |
-| Sole whitening           | from $40  | No — quote    |
-| Paint restoration        | from $50  | No — quote    |
-| Reglue / sole separation | $30       | No — quote    |
-| Complete restoration     | from $100 | No — quote    |
-
-Anything priced "from" submits as a request. DJ confirms the number after inspecting photos.
-Turnaround is **72 hours from intake**, not from submission — word it that way everywhere.
-
-### Order statuses
-
-`request_submitted` → `under_review` → `quote_sent` → `approved` → `awaiting_sneakers`
-→ `in_progress` → `quality_check` → `ready_for_pickup` → `completed`
-
-`cancelled` is reachable from any state.
-
----
-
-## Proposed stack
-
-Not locked. Chosen to keep a solo-operator app cheap and boring.
-
-- **Framework:** Next.js (App Router), TypeScript
-- **Styling:** Tailwind
-- **Database:** Postgres
-- **ORM:** Prisma
-- **File storage:** S3-compatible bucket for sneaker photos
-- **Email:** Resend or Postmark
-- **SMS:** Twilio
-- **Admin auth:** single account, password + TOTP
-- **Hosting:** Vercel
-
-No payment processor in v1. When card payment lands in v2, Stripe.
-
----
-
-## Getting started
-
-```bash
-git clone <repo-url>
-cd atunse
-npm install
-cp .env.example .env.local   # fill in the values below
-npm run db:migrate
-npm run dev
-```
-
-Runs on `http://localhost:3000`. Admin is at `/admin`.
-
-### Environment variables
+## Structure
 
 ```
-DATABASE_URL=
-S3_BUCKET=
-S3_ACCESS_KEY_ID=
-S3_SECRET_ACCESS_KEY=
-S3_REGION=
-RESEND_API_KEY=
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_FROM_NUMBER=
-ADMIN_EMAIL=
-ADMIN_PASSWORD_HASH=
-NEXT_PUBLIC_SITE_URL=
+index.html                    entry point, redirects to home
+
+shared/
+  styles/
+    tokens.css                every colour, radius and width
+    base.css                  reset, typography, layout helpers
+    components.css            anything used by two or more features
+    chrome.css                app shell, top nav, tab bar, screen switcher
+  scripts/
+    sprite.js                 shoe artwork as an SVG sprite
+    screens.js                screen and tab registry
+    shell.js                  builds the nav chrome on every page
+    interactions.js           selection behaviour for the mock
+
+features/
+  home/          home.html                  dashboard
+  new-order/     category.html              pick an item type
+                 capture.html               guided camera
+                 item.html                  brand, size, material, notes
+                 services.html              service selection
+                 method.html                drop-off and return
+                 confirmed.html             order placed
+  orders/        detail.html                drop-off code, items, progress
+  invoices/      invoice.html               line items, approval, deposit
+  studio/        studio.html                address, hours, directions
+  messages/      messages.html              thread with DJ
+  shop/          shop.html                  care products
+
+  admin/         queue.html                 the day's jobs, filtered by state
+                 order.html                 photos, quote builder, status, messaging
+                 customers.html             list, search, spreadsheet import
+                 settings.html              prices, payment handles, hours, notifications
 ```
 
-Photo uploads are customer property — the bucket is private,
-served through signed URLs only.
+Each feature owns its own CSS. Anything shared moves up into
+`shared/styles/components.css` rather than being duplicated.
 
 ---
 
-## Repo layout
+## Conventions
 
-```
-app/
-  (site)/           public marketing pages
-  quote/            the request flow
-  track/[order]/    customer order lookup
-  admin/            DJ's dashboard
-  api/
-components/
-lib/
-  email/            templates and send helpers
-  sms/
-  status.ts         status machine, single source of truth
-prisma/
-  schema.prisma
-docs/
-  sitemap.md
-  discovery.md
-  prototypes/
-public/
-```
+**Adding a screen.** Create `features/<feature>/<name>.html`, set
+`<body data-role="customer|admin" data-screen="my-screen">`, and add an entry
+under that role in `ROLES` in `shared/scripts/screens.js`. The switcher, the tab
+bar and the active states all follow from that one entry.
 
----
+**Roles.** `screens.js` holds two independent screen lists and two tab bars. A
+page declares which app it belongs to with `data-role`, and `admin.css` re-surfaces
+the shared components for the dark shell using `body[data-role="admin"]` — no
+component is forked, only re-skinned. In production this toggle disappears and
+becomes an auth boundary: DJ signs in, customers don't see any of it.
 
-## Data model sketch
+**Paths.** Every page sits exactly one folder deep inside `features/`, so
+`../../shared/...` works everywhere and cross-feature links are `../<feature>/<page>.html`.
+Keep that depth or the paths break.
 
-```
-Order        number, customer, method, return_method, status, turnaround,
-             deposit_cents, total_cents, deposit_paid_at, balance_paid_at
-Item         order_id, category, brand, model, size, material, condition, notes
-Photo        item_id, storage_key, angle
-LineItem     item_id, service, price_cents, state (pending|approved|declined|paid)
-Customer     name, email, phone, address
-Message      order_id, direction, body, sent_at
-StatusEvent  order_id, from, to, changed_at
-```
+**Selection state** uses `aria-pressed` rather than a class, so the styling and
+the accessibility information can't drift apart. `interactions.js` reads it
+generically: `.svc` toggles independently, `.cat`, `.segs` and `.chips` clear
+their siblings first.
 
-Items are separate from orders on purpose. One order can hold several pairs, each with its
-own photos and services, which is what lets a customer approve part of a quote and decline
-the rest.
+**Scripts are classic, not modules,** and load in order: sprite, screens, shell,
+interactions. Browsers refuse to load ES modules over `file://`, and this needs
+to work when someone double-clicks the file.
 
-Existing customer records will be imported from a spreadsheet with these columns:
-`Name, Phone, Email, City, Last Service, Notes`.
+**No build tooling on purpose.** This is a communication artifact for agreeing
+on layout and flow. The real app will be a framework project; treat the CSS here
+as a reference for spacing and hierarchy rather than something to lift wholesale.
 
 ---
 
-## Photo uploads
+## Known placeholders
 
-- Accepted: JPG, JPEG, PNG, HEIC
-- Max 20 MB per file
-- Five angles requested per pair: side, opposite side, sole, heel, damage close-up
-- HEIC needs server-side conversion; browsers won't render it consistently
-
-Bad photos are the main cause of re-quoting. The upload UI should prompt for one angle at a
-time rather than presenting an empty grid.
-
----
-
-## Legal pages
-
-Required before launch. All five must exist and be linked from the request form, with an
-explicit agreement checkbox before submission:
-
-- Privacy policy
-- Terms of service
-- Refund and cancellation policy
-- Shipping and mail-in policy
-- Restoration disclaimer
-
-The disclaimer needs to say plainly that final pricing follows inspection, that severe damage
-and specialty materials may cost more, that results vary, and that restoration does not
-guarantee structural or performance recovery.
-
----
-
-## Open decisions
-
-These block work. Listed roughly in order of how much they hold up.
-
-- [ ] Brand lockup and domain — Atunṣe or RestoredByDJ leading
-- [ ] Is there a physical studio address, or is drop-off arranged per order?
-- [ ] Zelle and Apple Pay handles to display on the invoice
-- [ ] Mail-in: shipping address, and who pays inbound vs return
-- [ ] Launch date — targeting Sept 26
-
-## Content owed by client
-
-- [ ] Logo files and brand colours
-- [ ] 8–12 before/after photos
-- [ ] Service descriptions
-- [ ] FAQ
-- [ ] The five policy documents
-- [ ] Customer spreadsheet for import
-
----
-
-## Contacts
-
-**Owner / approver:** Adedeji Lawal — heathausgroup@gmail.com
-
-Design and functionality sign-off runs through the owner before launch.
+- Every product and shoe image is a hand-drawn SVG. Real photography needed.
+- The studio map is CSS shapes. Swap for a real embed once the address is settled.
+- The payment handle on the invoice reads `[payment handle]` — fill in once the
+  Zelle and Apple Pay details are confirmed. Don't commit a personal number to a
+  public repo.
+- The QR block on the order screen is decorative, not a real encoded code.
+- Admin has no login screen yet. It needs one before anything is deployed
+  anywhere public — right now the toggle is the only thing between the two apps.
+- Customer names and lifetime values in the admin screens are invented.

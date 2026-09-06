@@ -44,3 +44,12 @@
   border-radius:999px;padding:6px 12px;font-size:12.5px;white-space:nowrap}
 .proto-bar a[aria-current="page"]{background:var(--marigold);border-color:var(--marigold);
   color:#000;font-weight:700}
+
+/* --- role toggle (prototype only) ---
+   Sits at the head of the screen switcher. Swaps between the customer app
+   and DJ's admin app; in production this is an auth boundary, not a control. */
+.role-switch{display:flex;gap:2px;background:rgba(255,255,255,.12);border-radius:999px;
+  padding:2px;flex:0 0 auto;margin-right:6px}
+.role-switch a{border:0;background:transparent;color:rgba(255,255,255,.65);
+  border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:700;white-space:nowrap}
+.role-switch a[aria-current="page"]{background:#fff;color:#000}

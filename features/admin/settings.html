@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · Atunṣe admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body data-role="admin" data-screen="settings">
+<div class="shell">
+  <nav class="nav">
+    <div style="flex:1"><h1 class="big" style="font-size:22px">Settings</h1></div>
+    <div class="spacer"></div>
+  </nav>
+  <div class="pad">
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 15h13l3-3-2-5-4 2-3-4-3 4-4-2z"/><path d="M4 19h16"/></svg></span>
+        <b>Services &amp; prices</b>
+      </div>
+      <div class="cbody" style="padding-top:4px">
+        <div class="setrow"><span class="nm"><b>Basic clean</b><small>Books instantly</small></span><input type="text" value="$30" aria-label="Basic clean price"></div>
+        <div class="setrow"><span class="nm"><b>Deep clean</b><small>Books instantly</small></span><input type="text" value="$50" aria-label="Deep clean price"></div>
+        <div class="setrow"><span class="nm"><b>Sole whitening</b><small>Quote required</small></span><input type="text" value="$40+" aria-label="Sole whitening price"></div>
+        <div class="setrow"><span class="nm"><b>Paint restoration</b><small>Quote required</small></span><input type="text" value="$50+" aria-label="Paint restoration price"></div>
+        <div class="setrow"><span class="nm"><b>Reglue &amp; sole repair</b><small>Quote required</small></span><input type="text" value="$30" aria-label="Reglue price"></div>
+        <div class="setrow"><span class="nm"><b>Complete restoration</b><small>Quote required</small></span><input type="text" value="$100+" aria-label="Complete restoration price"></div>
+      </div>
+    </section>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z"/><path d="M3 10h18"/></svg></span>
+        <b>Taking payment</b>
+      </div>
+      <div class="cbody" style="padding-top:4px">
+        <label for="zelle">Zelle</label>
+        <input id="zelle" type="text" placeholder="Phone or email shown on invoices">
+        <label for="applepay">Apple Pay</label>
+        <input id="applepay" type="text" placeholder="Number shown on invoices">
+        <label for="dep">Deposit</label>
+        <select id="dep"><option selected>50% up front</option><option>25% up front</option><option>Paid in full up front</option><option>Nothing up front</option></select>
+      </div>
+    </section>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>
+        <b>Hours &amp; capacity</b>
+      </div>
+      <div class="cbody" style="padding-top:4px">
+        <div class="setrow"><span class="nm"><b>Monday – Friday</b></span><input type="text" value="11–7" aria-label="Weekday hours"></div>
+        <div class="setrow"><span class="nm"><b>Saturday</b></span><input type="text" value="12–6" aria-label="Saturday hours"></div>
+        <div class="setrow"><span class="nm"><b>Taking new orders</b><small>Turn off when the bench is full</small></span><button class="toggle" aria-pressed="true" aria-label="Taking new orders"></button></div>
+      </div>
+    </section>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M18 15V10a6 6 0 1 0-12 0v5l-2 3h16z"/><path d="M10 21h4"/></svg></span>
+        <b>What gets sent</b>
+      </div>
+      <div class="cbody" style="padding-top:4px">
+        <div class="setrow"><span class="nm"><b>Quote is ready</b><small>Email and text</small></span><button class="toggle" aria-pressed="true" aria-label="Quote ready notification"></button></div>
+        <div class="setrow"><span class="nm"><b>Deposit received</b><small>Email and text</small></span><button class="toggle" aria-pressed="true" aria-label="Deposit received notification"></button></div>
+        <div class="setrow"><span class="nm"><b>Every status change</b><small>Email only</small></span><button class="toggle" aria-pressed="true" aria-label="Status change notification"></button></div>
+        <div class="setrow"><span class="nm"><b>Ready for pickup</b><small>Email and text</small></span><button class="toggle" aria-pressed="true" aria-label="Ready for pickup notification"></button></div>
+        <div class="setrow"><span class="nm"><b>Unpaid balance reminder</b><small>Text after 3 days</small></span><button class="toggle" aria-pressed="false" aria-label="Balance reminder"></button></div>
+      </div>
+    </section>
+    <div class="gap"></div>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

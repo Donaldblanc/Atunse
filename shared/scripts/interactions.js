@@ -3,7 +3,8 @@
 
    .svc   multi-select  — toggles independently
    .cat   single-select — clears its siblings first
-   .segs  filter chips  — same, but scoped to the strip */
+   .segs  filter chips  — same, but scoped to the strip
+   .toggle  on/off switch — flips independently (admin settings) */
 function toggle(el){
   el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') !== 'true');
 }
@@ -25,4 +26,7 @@ document.addEventListener('click', e => {
 
   const chip = e.target.closest('.chips button');
   if (chip) return selectOne(chip, 'button');
+
+  const toggleSwitch = e.target.closest('.toggle');
+  if (toggleSwitch) return toggle(toggleSwitch);
 });

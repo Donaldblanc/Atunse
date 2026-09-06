@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job · Atunṣe admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..900&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../shared/styles/tokens.css">
+<link rel="stylesheet" href="../../shared/styles/base.css">
+<link rel="stylesheet" href="../../shared/styles/components.css">
+<link rel="stylesheet" href="../../shared/styles/chrome.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body data-role="admin" data-screen="admin-order">
+<div class="shell">
+  <nav class="nav">
+    <a class="icb" href="queue.html" aria-label="Back to queue"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <div class="ttl">ATN-2481</div>
+    <button class="icb" aria-label="Call customer"><svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z"/></svg></button>
+  </nav>
+  <div class="pad">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+      <div>
+        <h1 class="big">Adedeji Lawal</h1>
+        <p class="small" style="margin-top:6px">Drop-off · submitted 3 Sept · 2 days waiting</p>
+      </div>
+      <span class="pill amber">NEEDS QUOTE</span>
+    </div>
+    <div class="gap"></div>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg></span>
+        <b>What they sent</b><span class="cnt">5</span>
+      </div>
+      <div class="cbody">
+        <div class="shots">
+          <div><svg viewBox="0 0 200 110" style="color:#8A8371"><use href="#shoe"/></svg></div>
+          <div><svg viewBox="0 0 200 110" style="color:#7C7659"><use href="#shoe"/></svg></div>
+          <div><svg viewBox="0 0 200 90"><use href="#sole"/></svg></div>
+          <div class="more">+2</div>
+        </div>
+        <div class="meta" style="margin:14px -16px -16px;border-top:1px solid rgba(255,255,255,.10)">
+          <div><span>ITEM</span><b>Air Jordan 1 Mid</b></div>
+          <div><span>SIZE</span><b>US 10.5 M</b></div>
+          <div><span>MATERIAL</span><b>Leather</b></div>
+          <div><span>CONDITION</span><b>Worn</b></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="card">
+      <p class="small" style="color:rgba(255,255,255,.75);font-size:14px;line-height:1.6">“Creased toe box and yellowing on the sole. There’s a scuff on the left heel that goes through the paint.”</p>
+    </div>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg></span>
+        <b>Build the quote</b>
+      </div>
+      <div class="cbody" style="padding-top:6px">
+        <div class="qline">
+          <span class="nm">Deep clean</span>
+          <input type="text" value="$50.00" aria-label="Deep clean price">
+          <button class="rm" aria-label="Remove deep clean"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <div class="qline">
+          <span class="nm">Paint restoration<br><small class="small">Left heel, colour matched</small></span>
+          <input type="text" value="$75.00" aria-label="Paint restoration price">
+          <button class="rm" aria-label="Remove paint restoration"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        </div>
+        <button class="mini wide" style="margin:12px 0 4px">
+          <svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>Add a service
+        </button>
+        <div class="r" style="border-top:1px solid rgba(255,255,255,.10);margin-top:8px;padding-top:14px">
+          <b style="font-size:17px">Total</b><b style="font-size:17px">$125.00</b>
+        </div>
+        <div class="r"><span class="k">Deposit at 50%</span><b>$62.50</b></div>
+      </div>
+    </section>
+    <div class="act">
+      <button class="btn">Send quote</button>
+      <button class="orb" aria-label="Save without sending"><svg viewBox="0 0 24 24"><path d="M5 5h11l3 3v11H5z"/><path d="M9 5v5h6"/></svg></button>
+    </div>
+
+    <section class="card flush">
+      <div class="chead">
+        <span class="ic"><svg viewBox="0 0 24 24"><path d="M4 12h16"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/></svg></span>
+        <b>Move the job</b>
+      </div>
+      <div class="cbody" style="padding-top:4px">
+        <label for="st">Status</label>
+        <select id="st">
+          <option>Request submitted</option>
+          <option selected>Under review</option>
+          <option>Quote sent</option>
+          <option>Approved</option>
+          <option>Awaiting sneakers</option>
+          <option>In progress</option>
+          <option>Quality check</option>
+          <option>Ready for pickup / shipping</option>
+          <option>Completed</option>
+          <option>Cancelled</option>
+        </select>
+        <label for="pay">Payment</label>
+        <select id="pay">
+          <option selected>Nothing received</option>
+          <option>Deposit received — Zelle</option>
+          <option>Deposit received — Apple Pay</option>
+          <option>Deposit received — cash</option>
+          <option>Paid in full</option>
+        </select>
+        <p class="small" style="margin-top:8px">Payment is offline in v1. Marking it here is what tells the customer their deposit landed.</p>
+        <label for="msg">Message to the customer</label>
+        <textarea id="msg" placeholder="Goes out by text and email, and saves to this job."></textarea>
+        <label for="note">Private note</label>
+        <textarea id="note" style="min-height:60px" placeholder="Only you see this."></textarea>
+      </div>
+    </section>
+    <div class="act"><button class="btn">Save and notify</button></div>
+    <button class="btn light wide" style="margin-bottom:20px">Cancel this order</button>
+  </div>
+</div>
+<script src="../../shared/scripts/sprite.js"></script>
+<script src="../../shared/scripts/screens.js"></script>
+<script src="../../shared/scripts/shell.js"></script>
+<script src="../../shared/scripts/interactions.js"></script>
+</body>
+</html>

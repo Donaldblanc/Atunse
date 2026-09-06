@@ -1,0 +1,108 @@
+/* DJ's side of the app.
+
+   Admin runs on a dark shell. That's not decoration — it's so nobody ever
+   has to wonder which view they're looking at, in a prototype where a toggle
+   sits between the two. The component library is unchanged; this file only
+   re-surfaces it for a dark background. */
+
+body[data-role="admin"] .shell{background:var(--deep);color:#fff}
+body[data-role="admin"] .lede,
+body[data-role="admin"] .small,
+body[data-role="admin"] .r .k{color:rgba(255,255,255,.55)}
+body[data-role="admin"] .nav .ttl{color:rgba(255,255,255,.5)}
+
+body[data-role="admin"] .card{background:#1A2249;border-color:rgba(255,255,255,.10)}
+body[data-role="admin"] .card.soft{background:rgba(233,164,39,.12)}
+body[data-role="admin"] .chead{border-color:rgba(255,255,255,.10)}
+body[data-role="admin"] .chead .ic{background:rgba(255,255,255,.07)}
+body[data-role="admin"] .chead .ic svg{stroke:#fff}
+body[data-role="admin"] .chead .cnt{background:rgba(255,255,255,.09);color:rgba(255,255,255,.65)}
+body[data-role="admin"] .r + .r,
+body[data-role="admin"] .line + .line,
+body[data-role="admin"] .iconrow + .iconrow,
+body[data-role="admin"] .meta div,
+body[data-role="admin"] .itemline{border-color:rgba(255,255,255,.10)}
+body[data-role="admin"] .meta span,
+body[data-role="admin"] .iconrow span{color:rgba(255,255,255,.5)}
+body[data-role="admin"] .itemline .th,
+body[data-role="admin"] .iconrow .ic{background:rgba(255,255,255,.07)}
+body[data-role="admin"] .itemline small{color:rgba(255,255,255,.5)}
+
+body[data-role="admin"] .icb{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.14)}
+body[data-role="admin"] .icb svg{stroke:#fff}
+body[data-role="admin"] input,
+body[data-role="admin"] select,
+body[data-role="admin"] textarea{background:var(--deep);border-color:rgba(255,255,255,.16);color:#fff}
+body[data-role="admin"] label{color:rgba(255,255,255,.8)}
+
+/* primary action is marigold here — the dark pill would vanish on this shell */
+body[data-role="admin"] .btn{background:var(--marigold);color:var(--ink)}
+body[data-role="admin"] .btn.light{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.16)}
+body[data-role="admin"] .orb{background:#fff}
+body[data-role="admin"] .mini{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16);color:#fff}
+body[data-role="admin"] .mini svg{stroke:#fff}
+body[data-role="admin"] .pill.grey{background:rgba(255,255,255,.1);color:rgba(255,255,255,.7)}
+
+body[data-role="admin"] .tabs{background:#1A2249;border-color:rgba(255,255,255,.10)}
+body[data-role="admin"] .tabs svg{stroke:rgba(255,255,255,.5)}
+body[data-role="admin"] .tabs a[aria-current="page"]{background:var(--marigold)}
+body[data-role="admin"] .tabs a[aria-current="page"] svg{stroke:var(--ink)}
+
+/* --- shop-floor numbers --- */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.stats div{background:#1A2249;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px 12px}
+.stats b{display:block;font-family:Archivo;font-variation-settings:"wght" 800;font-size:23px;letter-spacing:-.02em}
+.stats span{font-size:11.5px;color:rgba(255,255,255,.5);line-height:1.3;display:block;margin-top:3px}
+.stats .warn b{color:var(--marigold)}
+
+/* --- queue --- */
+.job{display:flex;gap:13px;width:100%;text-align:left;background:#1A2249;
+  border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:12px;margin-bottom:10px;align-items:center}
+.job .th{flex:0 0 56px;height:56px;border-radius:13px;background:rgba(255,255,255,.06);
+  display:grid;place-items:center;overflow:hidden}
+.job .th svg{width:86%}
+.job b{display:block;font-weight:600;font-size:15px;color:#fff}
+.job small{display:block;color:rgba(255,255,255,.5);font-size:12.5px;margin:2px 0 7px}
+.job .age{margin-left:auto;text-align:right;font-size:11.5px;color:rgba(255,255,255,.4);white-space:nowrap}
+.job.urgent{border-color:rgba(233,164,39,.5)}
+
+/* --- photo grid on a job --- */
+.shots{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.shots div{aspect-ratio:1;border-radius:11px;background:rgba(255,255,255,.06);display:grid;place-items:center;overflow:hidden}
+.shots div svg{width:80%}
+.shots .more{font-size:12px;color:rgba(255,255,255,.5);font-weight:600}
+
+/* --- quote builder --- */
+.qline{display:flex;gap:10px;align-items:center;padding:11px 0}
+.qline + .qline{border-top:1px solid rgba(255,255,255,.10)}
+.qline .nm{flex:1;font-size:15px}
+.qline input{width:104px;padding:10px;text-align:right;border-radius:10px}
+.qline .rm{width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.07);
+  border:0;display:grid;place-items:center;flex:0 0 32px}
+.qline .rm svg{width:14px;height:14px;stroke:rgba(255,255,255,.6);fill:none;stroke-width:2.2}
+
+/* --- customer list --- */
+.person{display:flex;gap:12px;align-items:center;width:100%;text-align:left;
+  background:#1A2249;border:1px solid rgba(255,255,255,.10);border-radius:16px;
+  padding:13px;margin-bottom:9px}
+.person .in{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.09);
+  display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 40px;color:#fff}
+.person b{display:block;font-weight:600;font-size:15px;color:#fff}
+.person small{color:rgba(255,255,255,.5);font-size:12.5px}
+.person .val{margin-left:auto;text-align:right}
+.person .val b{font-family:Archivo;font-variation-settings:"wght" 700;font-size:15px}
+.person .val small{font-size:11.5px}
+
+/* --- settings rows --- */
+.setrow{display:flex;align-items:center;gap:12px;padding:13px 0}
+.setrow + .setrow{border-top:1px solid rgba(255,255,255,.10)}
+.setrow .nm{flex:1}
+.setrow .nm b{display:block;font-weight:600;font-size:15px}
+.setrow .nm small{color:rgba(255,255,255,.5);font-size:12.5px}
+.setrow input{width:96px;padding:10px;text-align:right;border-radius:10px}
+.toggle{width:48px;height:28px;border-radius:999px;background:rgba(255,255,255,.14);
+  border:0;position:relative;flex:0 0 48px}
+.toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;
+  border-radius:50%;background:#fff;transition:transform .15s}
+.toggle[aria-pressed="true"]{background:var(--marigold)}
+.toggle[aria-pressed="true"]::after{transform:translateX(20px)}
