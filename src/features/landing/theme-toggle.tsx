@@ -34,28 +34,26 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      className="theme-toggle"
+      className="theme-switch"
+      data-theme={theme}
       onClick={toggle}
-      aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+      aria-label="Toggle dark mode"
+      aria-pressed={theme === "dark"}
     >
-      {theme === "light" ? (
-        <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+      <span className="theme-switch-knob">
+        <svg className="theme-switch-icon-moon" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+          <path d="M216 152A96 96 0 1 1 104 40a76 76 0 0 0 112 112Z" fill="currentColor" />
+        </svg>
+        <svg className="theme-switch-icon-sun" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+          <circle cx="128" cy="128" r="48" fill="currentColor" />
           <path
-            d="M216 128C216 176.6 176.6 216 128 216C79.4 216 40 176.6 40 128C40 79.4 79.4 40 128 40"
+            d="M128 24v24M128 208v24M24 128h24M208 128h24M56 56l17 17M183 183l17 17M56 200l17-17M183 73l17-17"
             stroke="currentColor"
             strokeWidth="16"
             strokeLinecap="round"
           />
-          <circle cx="128" cy="128" r="40" fill="currentColor" />
         </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
-            fill="currentColor"
-          />
-        </svg>
-      )}
+      </span>
     </button>
   );
 }

@@ -2,6 +2,7 @@ import "@/styles/landing-theme.css";
 import { COMING_SOON_HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
+import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 
 // Generic placeholder for any page/section that isn't built yet (order
 // flow, a standalone Process page, pricing/booking). Linked from SiteNav's
@@ -50,6 +51,7 @@ export default function ComingSoonPage() {
       </main>
 
       <SiteFooter />
+      <MobileTabBar />
     </div>
   );
 }

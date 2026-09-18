@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NavDrawer } from "./nav-drawer";
 import { ThemeToggle } from "./theme-toggle";
 
 // Shared nav across the marketing surface (/ and /coming-soon). "Book a
@@ -18,14 +19,17 @@ export function SiteNav() {
         <Link href="/#gallery">Gallery</Link>
         <Link href="/coming-soon">Process</Link>
         <Link href="/#about">About</Link>
-        <ThemeToggle />
       </div>
-      <Link className="landing-btn-primary" href="/coming-soon">
-        Book a restoration
-        <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-          <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </Link>
+      <div className="landing-nav-actions">
+        <ThemeToggle />
+        <Link className="landing-btn-primary" href="/coming-soon">
+          Book a restoration
+          <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+            <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+        <NavDrawer />
+      </div>
     </nav>
   );
 }
