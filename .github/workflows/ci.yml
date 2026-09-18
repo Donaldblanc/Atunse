@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Real Postgres service container (ADR-0007) — repository/migration
+    # integration tests run against this, not a mock.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: atunse
+          POSTGRES_PASSWORD: atunse
+          POSTGRES_DB: atunse_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U atunse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://atunse:atunse@localhost:5432/atunse_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Integration tests (real Postgres)
+        run: npm run test:integration
