@@ -95,6 +95,12 @@
   color: var(--ink);
 }
 
+.landing-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .landing-btn-primary {
   background: var(--blue);
   color: #fff;
@@ -114,24 +120,60 @@
   background: var(--blue-deep);
 }
 
-/* ---------- theme toggle ---------- */
+/* ---------- theme toggle (sliding switch) ---------- */
 
-.theme-toggle {
+.theme-switch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: #b9bfd4;
+  cursor: pointer;
+  padding: 0;
+  flex: none;
+  transition: background-color 0.2s ease;
+}
+
+.theme-switch[data-theme="dark"] {
+  background: var(--blue);
+}
+
+.theme-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink-soft);
-  transition: border-color 0.15s ease, color 0.15s ease;
+  color: #8a90a6;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.theme-toggle:hover {
-  border-color: var(--blue);
-  color: var(--blue);
+.theme-switch[data-theme="dark"] .theme-switch-knob {
+  transform: translateX(24px);
+  color: #f5a623;
+}
+
+.theme-switch-icon-moon {
+  display: block;
+}
+
+.theme-switch-icon-sun {
+  display: none;
+}
+
+.theme-switch[data-theme="dark"] .theme-switch-icon-moon {
+  display: none;
+}
+
+.theme-switch[data-theme="dark"] .theme-switch-icon-sun {
+  display: block;
 }
 
 /* ---------- hero ---------- */
@@ -1037,5 +1079,273 @@
   }
   .landing-lower {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- mobile app chrome: hamburger drawer + bottom tab bar ---------- */
+
+.landing-hamburger {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.landing-drawer-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 26, 0.45);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.landing-drawer-backdrop[data-open="true"] {
+  display: block;
+  opacity: 1;
+}
+
+.landing-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(80vw, 320px);
+  background: var(--bg);
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  padding: 18px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -12px 0 28px rgba(0, 0, 0, 0.2);
+}
+
+.landing-drawer[data-open="true"] {
+  transform: translateX(0);
+}
+
+.landing-drawer-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.landing-drawer-close {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.landing-drawer nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-drawer nav a {
+  padding: 14px 4px;
+  font-size: 16px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--line);
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+
+.landing-drawer-cta {
+  margin-top: 18px;
+}
+
+.landing-drawer-cta .landing-btn-primary {
+  width: 100%;
+  justify-content: center;
+}
+
+.landing-tabbar {
+  display: none;
+}
+
+.landing-tabbar-spacer {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .landing-navlinks {
+    display: none;
+  }
+  .landing-nav-actions > .landing-btn-primary {
+    display: none;
+  }
+  .landing-hamburger {
+    display: flex;
+  }
+
+  .landing-hero {
+    padding: 32px 20px 28px;
+    gap: 24px;
+  }
+  .landing h1 {
+    font-size: clamp(32px, 9vw, 42px);
+  }
+  .landing-lede {
+    font-size: 15px;
+  }
+  .landing-cta-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+  .landing-cta-row .landing-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .landing-cta-row .landing-link-arrow {
+    justify-content: center;
+  }
+
+  .landing-trust {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px 20px;
+  }
+  .landing-trust-badges {
+    width: 100%;
+  }
+  .landing-trust-marquee {
+    width: 100%;
+    flex: 1;
+  }
+
+  .landing-section-head {
+    padding: 40px 20px 18px;
+  }
+  .landing-section-head h2 {
+    font-size: 24px;
+  }
+  .landing-services {
+    grid-template-columns: 1fr;
+    padding: 0 20px 44px;
+    gap: 14px;
+  }
+
+  .landing-ba-band {
+    padding: 32px 20px 40px;
+  }
+  .landing-ba-head h2 {
+    font-size: 21px;
+  }
+  .landing-ba-card {
+    width: min(84vw, 340px);
+  }
+
+  .landing-lower {
+    padding: 40px 20px 44px;
+    gap: 32px;
+  }
+
+  .landing-cta-banner {
+    margin: 0 20px;
+    padding: 28px 22px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .landing-cta-banner h2 {
+    font-size: 21px;
+  }
+  .landing-cta-banner-tag {
+    text-align: left;
+  }
+
+  .landing-footer {
+    padding: 40px 20px 28px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+  }
+  .landing-footer-links {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .landing-footer-bottom {
+    padding: 0 20px 24px;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .coming-soon-eyebrow {
+    margin-bottom: 18px;
+  }
+  .coming-soon-h1 {
+    font-size: clamp(2.3rem, 11vw, 3.2rem);
+  }
+  .coming-soon-lede {
+    font-size: 16px;
+    margin-top: 20px;
+  }
+  .coming-soon-back-link {
+    padding: 13px 22px;
+    margin-top: 26px;
+  }
+  .coming-soon-hero {
+    padding: 32px 20px 24px;
+    gap: 8px;
+    min-height: auto;
+  }
+  .coming-soon-visual-wrap {
+    min-height: 280px;
+  }
+
+  /* fixed bottom tab bar: Home / Services / Gallery / Book */
+  .landing-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 80;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+    justify-content: space-around;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  .landing-tabbar a,
+  .landing-tabbar button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-size: 10.5px;
+    font-weight: 700;
+    min-width: 56px;
+    min-height: 48px;
+    border-radius: 12px;
+    padding: 4px 6px;
+  }
+  .landing-tabbar a[data-active="true"],
+  .landing-tabbar button[data-active="true"] {
+    color: var(--blue);
+  }
+  .landing-tabbar-spacer {
+    display: block;
+    height: 68px;
   }
 }

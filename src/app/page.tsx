@@ -5,6 +5,7 @@ import { BeforeAfterCarousel } from "@/features/landing/before-after-carousel";
 import { BrandMarquee } from "@/features/landing/brand-marquee";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
+import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 
 // Customer-facing landing page. Light (default) + dark theme via
 // data-theme on #landing-root (src/styles/landing-theme.css), toggled by
@@ -322,6 +323,7 @@ export default function HomePage() {
       </div>
 
       <SiteFooter />
+      <MobileTabBar />
     </div>
   );
 }
