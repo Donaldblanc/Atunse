@@ -123,19 +123,30 @@
 /* ---------- theme toggle (sliding switch) ---------- */
 
 .theme-switch {
+  /* The button is the full 44x44 touch target (WCAG/Apple HIG minimum);
+     the visual pill (.theme-switch-track) is smaller and centered inside. */
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-switch-track {
   position: relative;
   width: 52px;
   height: 28px;
   border-radius: 999px;
-  border: none;
   background: #b9bfd4;
-  cursor: pointer;
-  padding: 0;
-  flex: none;
   transition: background-color 0.2s ease;
 }
 
-.theme-switch[data-theme="dark"] {
+.theme-switch[data-theme="dark"] .theme-switch-track {
   background: var(--blue);
 }
 
@@ -1140,8 +1151,8 @@
 }
 
 .landing-drawer-close {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: none;

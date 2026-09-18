@@ -40,19 +40,21 @@ export function ThemeToggle() {
       aria-label="Toggle dark mode"
       aria-pressed={theme === "dark"}
     >
-      <span className="theme-switch-knob">
-        <svg className="theme-switch-icon-moon" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-          <path d="M216 152A96 96 0 1 1 104 40a76 76 0 0 0 112 112Z" fill="currentColor" />
-        </svg>
-        <svg className="theme-switch-icon-sun" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-          <circle cx="128" cy="128" r="48" fill="currentColor" />
-          <path
-            d="M128 24v24M128 208v24M24 128h24M208 128h24M56 56l17 17M183 183l17 17M56 200l17-17M183 73l17-17"
-            stroke="currentColor"
-            strokeWidth="16"
-            strokeLinecap="round"
-          />
-        </svg>
+      <span className="theme-switch-track">
+        <span className="theme-switch-knob">
+          <svg className="theme-switch-icon-moon" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+            <path d="M216 152A96 96 0 1 1 104 40a76 76 0 0 0 112 112Z" fill="currentColor" />
+          </svg>
+          <svg className="theme-switch-icon-sun" width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+            <circle cx="128" cy="128" r="48" fill="currentColor" />
+            <path
+              d="M128 24v24M128 208v24M24 128h24M208 128h24M56 56l17 17M183 183l17 17M56 200l17-17M183 73l17-17"
+              stroke="currentColor"
+              strokeWidth="16"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
       </span>
     </button>
   );
