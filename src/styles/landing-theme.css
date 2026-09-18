@@ -1010,9 +1010,9 @@
 .landing[data-theme="dark"] .coming-soon-visual-wrap::before {
   content: "";
   position: absolute;
-  inset: 6%;
+  inset: -6%;
   border-radius: 32px;
-  background: radial-gradient(ellipse at center, #eef4ff 0%, #d7e4ff 55%, transparent 78%);
+  background: radial-gradient(ellipse at center, #eef4ff 0%, #d7e4ff 66%, transparent 81%);
   z-index: 0;
 }
 
