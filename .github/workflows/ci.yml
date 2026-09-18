@@ -10,23 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     # Real Postgres service container (ADR-0007) — repository/migration
-    # integration tests run against this, not a mock.
+    # integration tests run against this, not a mock. Credentials are
+    # CI-only (a throwaway container scoped to this job) but still come
+    # from repo secrets rather than being hardcoded in the workflow file.
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: atunse
-          POSTGRES_PASSWORD: atunse
-          POSTGRES_DB: atunse_test
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB }}
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U atunse"
+          --health-cmd "pg_isready -U ${{ secrets.CI_POSTGRES_USER }}"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://atunse:atunse@localhost:5432/atunse_test
+      DATABASE_URL: postgresql://${{ secrets.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.CI_POSTGRES_DB }}
 
     steps:
       - uses: actions/checkout@v4
