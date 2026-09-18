@@ -35,9 +35,24 @@ npm run test:integration # repository/migration tests — needs DATABASE_URL poi
 npm run build
 ```
 
+## API surface (Phase 1)
+- `POST /api/v1/orders` — customer-facing order submission (guest today; ties to an Account once auth is wired)
+- `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
+
+Both `/admin/*` pages and `/api/v1/admin/*` routes are gated by
+`src/middleware.ts`, which delegates the actual decision to
+`checkAdminAccess` in `src/features/accounts/admin-check.ts` — currently a
+fail-closed placeholder (nobody is ever ADMIN) until real auth lands.
+
 ## Verified working (this session)
 - `npm install`, `tsc --noEmit`, `eslint`, `next build` — all clean
+- 21 unit tests passing (Money, Item status pipeline, both use-cases, the admin-access check, and the middleware itself)
+- 3 integration tests passing against real local Postgres, including a transactional idempotency check
 - `prisma migrate dev` applied the first migration successfully
+- End-to-end verified against a real running dev server + database:
+  - `/admin` and `/api/v1/admin/*` both → `307` redirect to `/sign-in` (fails closed, protected from the first deployment)
+  - `POST /api/v1/orders` rejects a missing policy acceptance with `400`
+  - `POST /api/v1/orders` with a valid body persists a real Order + Item and returns `201`
 
-Feature code, API routes, and admin auth each add their own verified-working
-notes in their own PRs — see `docs/SPEC.md`'s "Build sequence" section.
+Admin visual design and real auth each add their own verified-working notes
+in their own PRs — see `docs/SPEC.md`'s "Build sequence" section.
