@@ -11,5 +11,10 @@ export default defineConfig({
   },
   test: {
     exclude: ["**/node_modules/**", "**/*.integration.test.ts", "demo_mock/**"],
+    // The scaffold PR has no test files yet (they land in [2/4]); vitest
+    // treats an empty run as a failure by default, which would fail CI on
+    // this branch alone. Every later branch has real tests, so this has no
+    // effect once [2/4] merges.
+    passWithNoTests: true,
   },
 });

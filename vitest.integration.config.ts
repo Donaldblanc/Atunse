@@ -14,5 +14,8 @@ export default defineConfig({
     include: ["**/*.integration.test.ts"],
     exclude: ["**/node_modules/**", "demo_mock/**"],
     testTimeout: 20_000,
+    // See vitest.config.ts — the scaffold PR has no integration tests yet
+    // either (they land in [2/4]).
+    passWithNoTests: true,
   },
 });
