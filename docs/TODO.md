@@ -2,7 +2,8 @@
 
 ## Housekeeping
 - [ ] Postgres/eslint dev-tooling audit warnings (PostCSS via eslint-config-next) — transitive, dev-only, not runtime-exploitable; revisit when upgrading to Next 15/16 (breaking change, not done now).
-- [ ] Wire a real deploy step into `.github/workflows/release.yml` (staging on `develop`, production on the `v*` tag) once Vercel + Neon are provisioned — see `docs/GIT_WORKFLOW.md` and ADR-0008. Deploy target only, the branching/tagging automation around it is already in place.
+- [ ] Deploys currently run through Vercel's native Git integration (Production Branch = `main`), not through `release.yml`. Gate production behind the `v*` tag `Release` creates instead once there's a real reason to (manual approval gate, stricter control than "Production Branch = main" gives) — full removal/rewire steps in `docs/DEPLOYMENT.md`'s "Future: gate deploys through git-flow" section.
+- [ ] Confirm the Neon Vercel integration (not just a pasted `DATABASE_URL`) is installed so Preview deployments get an isolated database branch instead of sharing one — see `docs/DEPLOYMENT.md`.
 
 ## Still to grill (architecture/design/decisions not yet interviewed)
 - [ ] Multi-admin/staff invite flow — access-control seam exists (ADR-0005: `admin` role, per-use-case checks), but the actual invite/onboarding UX and any role subdivision (staff vs. owner) isn't designed yet.
