@@ -26,7 +26,12 @@ describe("checkAdminAccess", () => {
 
   it("rejects a tampered session cookie", async () => {
     const value = await createSessionCookieValue("acct_1", "ADMIN");
-    const tampered = value.slice(0, -1) + (value.endsWith("a") ? "b" : "a");
+    // Flip a character in the middle of the signature, not the last one —
+    // the last base64url character of a SHA-256 signature encodes spare
+    // padding bits, so some substitutions there decode to the identical
+    // byte string and don't actually change the signature (flaky test).
+    const mid = Math.floor(value.length / 2);
+    const tampered = value.slice(0, mid) + (value[mid] === "a" ? "b" : "a") + value.slice(mid + 1);
     const result = await checkAdminAccess(req("/admin", tampered));
     expect(result.allowed).toBe(false);
   });

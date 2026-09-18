@@ -103,3 +103,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, unit
 tests, migrations, and integration tests against a real Postgres service
 container on every push/PR — see
 [ADR-0007](docs/adr/0007-postgres-and-ci.md).
+
+## Branching & releases
+git-flow: `develop` is the default branch — branch `feature/*` off it, PR
+back into it. `main` only moves via `release/*`/`hotfix/*` branches, tagged
+automatically on merge. Both branches are protected (no direct pushes, CI
+required). Full process in [`docs/GIT_WORKFLOW.md`](docs/GIT_WORKFLOW.md).
