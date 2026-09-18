@@ -1,0 +1,113 @@
+// Phase 0 schema — deliberately narrow (ADR-0012's build-strategy revision).
+// Only what the first vertical slice needs: a guest submits an Order with
+// one Item and photos -> owner quotes -> manual deposit confirmed -> Item
+// completes. Multi-item, Services catalog, Balance Delta, Stripe, and the
+// outbox table are added in Phase 2/3 (see docs/SPEC.md Build sequence).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+}
+
+enum ItemStatus {
+  REQUEST_SUBMITTED
+  UNDER_REVIEW
+  QUOTE_SENT
+  APPROVED
+  AWAITING_SNEAKERS
+  IN_PROGRESS
+  QUALITY_CHECK
+  READY_FOR_PICKUP_SHIPPING
+  COMPLETED
+  CANCELLED
+}
+
+// A person: either a guest (accountId null) or a signed-up Customer/Admin.
+// Guest orders match to an Account later by email/phone (ADR "Account Linking").
+model Account {
+  id        String   @id @default(cuid())
+  role      Role     @default(CUSTOMER)
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+
+  orders Order[]
+
+  @@map("accounts")
+}
+
+// The billing/shipping container (CONTEXT.md: Order). No status of its own —
+// display is always a per-Item breakdown.
+model Order {
+  id        String   @id @default(cuid())
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id])
+
+  // Guest contact info, used for later Account Linking when accountId is null.
+  guestEmail String?
+  guestPhone String?
+
+  policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items Item[]
+
+  @@map("orders")
+}
+
+// One sneaker pair (CONTEXT.md: Item = one pair, not one shoe). Carries its
+// own status through the pipeline, independent of sibling Items.
+model Item {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  brand       String?
+  model       String?
+  description String?
+
+  status ItemStatus @default(REQUEST_SUBMITTED)
+
+  // Money as integer cents (ADR-0012) — never a float.
+  priceCents Int?
+
+  photoKeys String[] // storage keys from the FileStorage adapter (ADR-0004), not URLs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditEntries ItemAuditEntry[]
+
+  @@map("items")
+}
+
+// Every state-changing action on an Item is recorded (ADR-0012: auditability
+// as a domain concern, not an afterthought).
+model ItemAuditEntry {
+  id     String @id @default(cuid())
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id])
+
+  action        String // e.g. "STATUS_TRANSITION", "QUOTE_SENT", "MANUAL_PAYMENT_CONFIRMED"
+  fromStatus    ItemStatus?
+  toStatus      ItemStatus?
+  actorAccountId String? // who did it; null for system actions
+  idempotencyKey String? // set on actions that must be retry-safe (e.g. payment confirmation)
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+
+  @@unique([itemId, idempotencyKey])
+  @@map("item_audit_entries")
+}

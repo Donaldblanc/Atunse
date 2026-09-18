@@ -1,0 +1,153 @@
+Please answer these questions so we can define the MVP web application, customer experience, and internal business workflow.
+
+1. Client & Business Details
+
+1. What is the legal/business name of the company? RestoredByDj
+
+2. What name should appear on the website/web app? Atunṣe
+
+3. What is the company website, if one exists? RestoredByDJ
+
+4. Who is the primary contact for this project? Adedeji Lawal, Owner, heathausgroup@gmail.com, 9175577733
+
+Name, title, email, phone number.
+
+5. Where does the business operate? New York, NY USA
+
+List cities, states, regions, or countries served.
+
+6. What does the business do in 1–2 sentences? RestoredByDJ is a sneaker cleaning and restoration business that helps customers bring worn, dirty, or damaged sneakers back to life. They offer local Tri-State and mail-in services with a 72-hour turnaround.
+
+7. Who is the target customer?Their target customers are sneaker owners, sneaker enthusiasts, collectors, and people who want to restore expensive or favorite shoes instead of replacing them. They mainly target customers in the New York, New Jersey, and Connecticut Tri-State area, as well as people who use their mail-in service.
+
+8. What is the primary problem you want this web app to solve?The primary problem the web app should solve is making the sneaker restoration ordering process simple, organized, and transparent for customers. It should allow customers to easily select multiple services or items, upload photos of their sneakers, describe their restoration needs, receive pricing or approval when necessary, and submit their order/request—all in one place.
+
+It should also help the restoration team manage requests, review complex jobs, communicate with customers, and reduce manual back-and-forth.
+
+9. What is the primary action you want a customer to take on the web app?The primary action should be “Book a Sneaker Cleaning/Restoration” or “Get a Quote.”I’d make “Get a Quote” the main button, where customers can upload photos of their sneakers, select the service they need, and submit their information.
+
+For example: request a service, book an appointment, submit an item, get a quote, make a purchase, etc.
+
+2. Services & Products
+
+10. What services or products should be available at launch? Our services include sneaker cleaning for basic or deep cleaning, sneaker restoration for faded, worn, or damaged sneakers, sole cleaning and whitening, specialized suede and leather care, mail-in cleaning and restoration, and custom quotes where customers can upload photos for a personalized price estimate.
+
+
+
+List each one and include pricing if applicable.
+
+11. How does pricing work?Pricing can be based on the type of service and condition of the sneakers. For RestoredByDJ, I’d recommend offering starting prices for standard cleaning/restoration, while allowing customers to upload photos for a custom quote on heavily damaged or specialty sneakers.
+
+Fixed price, quote/estimate, inspection-based, custom pricing, or another model?
+
+12. What information does the customer need to provide to request or purchase a service?Customers will provide their name and contact information, photos of the sneakers from all sides, brand/model, requested service, condition and issues, drop-off or mail-in preference, shipping address if needed, preferred turnaround time, and payment information when placing the order.
+
+
+
+13. Can customers request multiple services/items in one order? Yes — if you mean your sneaker restoration order form, customers can request multiple services/items in one order.
+
+14. Are there any services or requests that require approval from your team before the customer can proceed? Yes. For a sneaker restoration business, it’s a good idea to require team approval for requests that go beyond standard cleaning or basic paint restoration.
+
+3. Customer Experience
+
+15. Describe the ideal customer journey from landing on the website to completing an order/request.The ideal customer journey starts when someone lands on the website and explores the sneaker cleaning and restoration services, pricing, and examples of completed work. They can easily start an order by selecting their service, uploading photos of their sneakers, providing their contact information and sneaker details, and choosing local drop-off or mail-in service. Customers can also discover and follow my other social media channels, explore my other business ventures and creative endeavors, and stay updated on upcoming products and launches. The website will provide helpful how-to videos and educational content, along with a loyal rewards program where customers can earn and redeem rewards within the network. Visitors will also be introduced to my nonprofit and given opportunities to learn more, get involved, or support its mission. For restoration requests that require approval, the team reviews the project before the customer proceeds. Once approved, the customer reviews the final order and pricing, provides payment information, and submits the order. After completing their purchase, customers remain connected to the brand through social media, rewards, new product releases, educational content, business ventures, and nonprofit initiatives.
+
+16. What customer information should we collect?We’ll collect the customer’s full name, email address, phone number, sneaker photos, brand and model, requested service, description of the work needed, drop-off or mail-in preference, shipping address if applicable, preferred turnaround time, and payment information when placing an order.
+
+
+
+For example: name, email, phone, address, company, billing information, etc.
+
+17. Should customers create an account, or should they be able to complete the process without creating one?Customers should be able to complete an order without creating an account, but they will need an account to receive the full benefits of the platform, including loyalty rewards, order tracking, discounts, and exclusive offers. Customers who place an order as a guest should also be able to create an account later and link their previous orders to it so they can start earning and accessing their benefits.
+
+18. What files, photos, documents, or other information should customers be able to upload?Allowed file types: JPG, JPEG, PNG, and HEIC for photos.You could also allow PDF if customers ever need to upload receipts or other documents, but I’d leave that out unless you actually need it.Recommended: JPG, JPEG, PNG, HEIC — with a 10–20 MB maximum per file.Customers should be able to upload photos of their sneakers from the front, back, sides, and soles, as well as close-up photos of any damage, stains, or areas they want restored. They should also be able to upload reference photos for custom requests when needed.
+
+
+
+19. What should customers be able to see after submitting a request/order? Customers should be able to see their order confirmation, order number, current status, estimated price, estimated completion time, messages and updates, invoice and payment status, shipping and tracking information for mail-in orders, and appointment or drop-off details when applicable.
+
+For example: confirmation, status, estimate, messages, invoice, tracking, appointment details, etc.
+
+4. Business Workflow
+
+20. What happens on your team's side after a customer submits a request? After a customer submits a request, the team receives the order with all submitted details and photos, reviews the sneakers and requested services, provides or confirms the price estimate, and approves any special or complex requests before work begins. The team then communicates with the customer, updates the order status, schedules drop-off or shipping when needed, completes the service, and marks the order as completed once the sneakers are ready for pickup or return shipping.
+
+Describe the process from submission through completion.
+
+21. What statuses should an order/request go through?
+
+Orders should move through the following statuses: Request Submitted, Under Review, Quote Sent, Approved, Awaiting Sneakers, In Progress, Quality Check, Ready for Pickup/Shipping, Completed, or Cancelled.
+
+22. Who on your team needs access to the system, and what should each person be able to do? Me
+
+23. What should your internal/admin dashboard allow your team to do? Everything
+
+For example: view orders, edit customers, update statuses, create estimates, send messages, upload files, process payments, etc.
+
+5. Payments & Communication
+
+24. Do customers need to pay through the web app? If so, when and how? Yes, customers should be able to pay through the web app. A deposit is required when placing an order, with payment options including Apple Pay, Zelle, or Cash. The remaining balance can be paid once the service is completed or before the sneakers are returned. 50% deposit — good for protecting your time and covering supplies.
+
+25. What communications and notifications are required?
+
+Email, SMS, or both? What events should trigger them?The system should use both email and SMS notifications. Customers should be notified when a request is submitted, a quote is ready, approval is required, a deposit is received, sneakers are received, the order status changes, the restoration is completed, the order is ready for pickup or shipping, and tracking information is available. Customers should also receive reminders for appointments, outstanding balances, and important messages from the team.
+
+6. Existing Systems & MVP
+
+26. What software or systems does your business currently use that this web app needs to connect with? N/A
+
+Examples: Stripe, QuickBooks, Shopify, CRM, scheduling software, shipping software, etc.
+
+27. Do you already have customer data that needs to be imported into the new system? Yes
+
+28. What existing website, app, or process are we replacing or improving?N/A
+
+29. Are there specific websites or applications you want this web app to be similar to?N/A
+
+Please provide links and identify what you like about each.
+
+30. What are the 5 features that absolutely must be included in the MVP?
+
+The five must-have MVP features are: 1) Easy online order/request forms with sneaker photos and service selection, 2) Order management and status tracking for both customers and the team, 3) Quote and approval system for custom or complex jobs, 4) 50% deposit and payment options including Apple Pay, Zelle, and Cash, and 5) Customer accounts and loyalty rewards that allow customers to track orders, view order history, earn rewards, and link previous guest orders to their account.
+
+31. What features can wait until a future version?
+
+Features that can wait until a future version include advanced loyalty rewards and network-wide rewards, a full product marketplace, advanced social media integration, a larger library of how-to videos, automated marketing campaigns, referral programs, detailed analytics and reporting, nonprofit features, and advanced customer customization. The MVP should focus on orders, payments, customer accounts, communication, and basic loyalty rewards first.
+
+32. What would make you consider the MVP a success 90 days after launch?The MVP would be considered successful 90 days after launch if customers are consistently submitting orders and requests through the website, completing the required 50% deposits, and returning to use the platform again. Success would also mean reducing manual communication and order management, building a growing customer account and loyalty base, receiving positive customer feedback, and creating a strong foundation for future product launches, how-to content, social media growth, and nonprofit initiatives.
+
+
+
+7. Brand & Content
+
+33. Do you already have a logo, brand guidelines, colors, fonts, photography, or other design assets?Yes, I already have a logo and established branding for the sneaker restoration business, including brand colors and design elements. The website should use the existing branding and maintain a clean, modern, professional look that matches my current social media and other business ventures.
+
+34. Who will provide the website/app copy, service descriptions, images, FAQs, and other content?I will provide the main website and app content, including service descriptions, photos, FAQs, promotions, product information, and information about my other businesses and nonprofit. The system should also make it easy for me to update and add new content as the business grows.
+
+
+
+35. Are there any legal documents or policies we need to include? The website should include a Privacy Policy, Terms of Service, Refund and Cancellation Policy, Shipping and Mail-In Policy, Restoration Disclaimer, and Payment Policy, with customers agreeing to the terms before submitting an order; final pricing is determined after inspection, additional charges may apply for severe damage or specialty materials, results may vary, and restoration does not guarantee structural or performance restoration.
+
+Privacy policy, terms of service, refund policy, service agreement, liability waiver, etc.
+
+8. Project Details
+
+36. Who needs to approve the design and functionality?The business owner, DJ (RestoredByDJ), should approve the website’s final design, services, pricing, policies, and functionality before it goes live.
+
+37. What is your target launch date?Before Summer Over? Or Sept 26?
+
+38. Is there a specific budget range for the MVP? N/A
+
+39. Are there any technical requirements or restrictions we should know about? 
+
+The website should be mobile-friendly, easy to navigate, fast-loading, and secure, with photo uploads, online quote/order requests, payment processing, and mail-in service options. It should also protect customer information and work properly across major browsers and devices.
+
+
+
+40. Is there anything else the web app absolutely needs to do that we haven't covered above?The web app should allow customers to upload sneaker photos, receive a quote, book a service, make payments, and track their order status. It should also provide clear contact information and notifications for order updates, especially for mail-in services.
+
+
+
+
+
+Take your time, this will help accelerate a time to get the mvp to market

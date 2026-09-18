@@ -1,0 +1,88 @@
+# Atunṣe
+
+Sneaker cleaning and restoration ordering + shop-management app for
+**RestoredByDJ** (NYC, serving the NY/NJ/CT Tri-State area and nationwide
+mail-in). Two sides in one app: a customer-facing quote/order funnel, and
+an admin panel the owner (and eventually staff) uses to run every job end
+to end.
+
+Full domain writeup, architecture decisions, and open questions live in
+[`docs/SPEC.md`](docs/SPEC.md) — read that first if you're picking this up
+after a break. `CONTEXT.md` is the domain glossary; `docs/adr/` holds the
+individual architecture decision records; `docs/TODO.md` tracks
+outstanding/deferred work.
+
+> `demo_mock/` is a throwaway static-HTML prototype used to agree on layout
+> and flow early on. It is **not** the basis for this build — see
+> `demo_mock/README.md` for what it is.
+
+## Stack
+Next.js (App Router, TypeScript) · Postgres via Prisma · Vitest · deployed
+to Vercel + Neon. Code is organized by feature, with layers (use-cases →
+repositories → adapters) inside each feature — see
+[ADR-0003](docs/adr/0003-layered-single-app-architecture.md) and
+[ADR-0011](docs/adr/0011-feature-based-organization.md).
+
+## Getting started
+
+```bash
+npm install
+cp .env.example .env        # fill in DATABASE_URL at minimum
+npx prisma migrate dev --name init
+npm run dev                 # http://localhost:3000
+```
+
+First-time local Postgres setup (if you don't already have one running) and
+this machine's existing setup are documented in
+[`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
+
+## Common commands
+
+```bash
+npm run dev                 # start the dev server
+npm run build                # production build
+npm run start                # run the production build
+
+npm run typecheck            # tsc --noEmit
+npm run lint                 # eslint
+
+npm test                     # unit tests — no database required
+npm run test:integration     # repository/migration tests — needs DATABASE_URL pointed at a real Postgres
+
+npm run prisma:generate      # regenerate the Prisma client after a schema change
+npm run prisma:migrate       # create + apply a new migration (dev)
+npm run prisma:migrate:deploy # apply pending migrations (CI/prod)
+```
+
+## Project layout
+
+```
+src/
+  app/
+    layout.tsx               root layout
+    page.tsx                 placeholder home page — Phase 1 order form lands here
+  shared/
+    db/                      Prisma client singleton
+
+prisma/
+  schema.prisma              database schema
+  migrations/                 generated migrations
+
+docs/
+  SPEC.md                    consolidated project summary — start here
+  TODO.md                     outstanding/deferred work
+  LOCAL_SETUP.md               local Postgres + environment setup
+  adr/                        architecture decision records, numbered
+
+CONTEXT.md                    domain glossary
+```
+
+Feature code (`src/features/...`), API routes, and the admin panel land in
+follow-up PRs on top of this scaffold — see `docs/SPEC.md`'s "Build
+sequence" section for the phase plan.
+
+## CI
+GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, unit
+tests, migrations, and integration tests against a real Postgres service
+container on every push/PR — see
+[ADR-0007](docs/adr/0007-postgres-and-ci.md).

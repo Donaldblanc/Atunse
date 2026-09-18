@@ -17,6 +17,8 @@ yarn-error.log*
 # Build output
 dist/
 build/
+.next/
+tsconfig.tsbuildinfo
 
 # Coverage
 coverage/
@@ -25,3 +27,8 @@ coverage/
 .DS_Store
 .vscode/
 *.swp
+
+# Agent/skill tooling — local dev aid, not app source
+.agents/
+.claude/
+skills-lock.json
