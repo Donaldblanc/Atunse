@@ -32,3 +32,5 @@ coverage/
 .agents/
 .claude/
 skills-lock.json
+
+/demo_mock/shared/images
