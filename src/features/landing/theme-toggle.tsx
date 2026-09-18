@@ -1,9 +1,10 @@
 "use client";
 
 // Applies data-theme="dark"/"light" to the nearest .landing wrapper.
-// Defaults to light on first paint (matches landing-theme.css's default,
-// so there's no server/client mismatch), then on mount adopts the system
-// preference or a saved choice, and lets the visitor override manually.
+// Always defaults to light on load (matches landing-theme.css's default,
+// so there's no server/client mismatch) regardless of the visitor's OS
+// color-scheme preference — only an explicit choice from this switch
+// (saved below) overrides that default on a later visit.
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "atunse-landing-theme";
@@ -15,10 +16,7 @@ export function ThemeToggle() {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === "light" || saved === "dark") {
       setTheme(saved);
-      return;
     }
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    setTheme(prefersDark ? "dark" : "light");
   }, []);
 
   useEffect(() => {
