@@ -1,0 +1,24 @@
+name: Branch guard
+
+# main only ever moves via a release/* or hotfix/* branch (git-flow) — this
+# is what actually enforces that, since branch protection alone can't
+# restrict *which* branch a PR is allowed to come from. Wired in as a
+# required status check on main (docs/GIT_WORKFLOW.md).
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR into main comes from release/* or hotfix/*
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [[ "$HEAD_REF" == release/* || "$HEAD_REF" == hotfix/* ]]; then
+            echo "OK: '$HEAD_REF' is an allowed source branch for main."
+          else
+            echo "::error::Branch '$HEAD_REF' cannot merge into main directly. Only release/* and hotfix/* branches may target main — see docs/GIT_WORKFLOW.md. Merge into develop instead."
+            exit 1
+          fi
