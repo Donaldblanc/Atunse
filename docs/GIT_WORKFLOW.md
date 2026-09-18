@@ -83,7 +83,9 @@ never created by hand, so the tag and the shipped code can't drift apart.
 
 ## Deployment
 
-Not wired up yet — see `docs/adr/0008-hosting-and-provider-tiers.md`
-(Vercel + Neon). Once those are provisioned, a deploy step gets added to
-`release.yml` (staging tracks `develop`, production deploys on the `v*`
-tag `Release` creates). Tracked in `docs/TODO.md`.
+Vercel's native Git integration (Vercel + Neon, ADR-0008) — Production
+Branch is `main`, so pushes there (i.e., a `release/*`/`hotfix/*` merge)
+auto-deploy to production; every other branch/PR gets a Preview deployment.
+No deploy step lives in these workflows today. Full setup and the plan for
+later gating production behind the `v*` tag `Release` creates instead:
+`docs/DEPLOYMENT.md`.
