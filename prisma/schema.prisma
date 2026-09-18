@@ -38,6 +38,12 @@ model Account {
   role      Role     @default(CUSTOMER)
   email     String   @unique
   phone     String?
+
+  // Interim in-house credential store (ADR-0005 addendum): null for
+  // guest-derived/customer accounts that haven't set a password yet.
+  // Swappable behind AuthService once a managed provider is chosen.
+  passwordHash String?
+
   createdAt DateTime @default(now())
 
   orders Order[]

@@ -52,6 +52,7 @@ npm run test:integration     # repository/migration tests — needs DATABASE_URL
 npm run prisma:generate      # regenerate the Prisma client after a schema change
 npm run prisma:migrate       # create + apply a new migration (dev)
 npm run prisma:migrate:deploy # apply pending migrations (CI/prod)
+npm run prisma:seed          # create/update the bootstrap admin account (needs ADMIN_EMAIL/ADMIN_PASSWORD)
 ```
 
 ## Project layout
@@ -59,10 +60,26 @@ npm run prisma:migrate:deploy # apply pending migrations (CI/prod)
 ```
 src/
   app/
+    admin/                    admin landing page (guarded by middleware.ts)
+    api/v1/
+      orders/                 POST — customer order submission
+      admin/items/[itemId]/transitions/  POST — admin-only Item status transitions
     layout.tsx               root layout
     page.tsx                 placeholder home page — Phase 1 order form lands here
+  middleware.ts               admin route guard — fail-closed, protected from the first deploy; delegates to features/accounts/admin-check.ts
+  features/
+    orders/
+      domain.ts                Order/Item types, the Item status pipeline
+      deps.ts                  wires the real Prisma repository + notification adapter for use-cases
+      use-cases/                SubmitOrder, TransitionItemStatus, ...
+      repositories/             OrderRepository interface, Prisma + in-memory implementations
+    accounts/
+      authz.ts                 requireRole — per-use-case authorization (ADR-0012)
+      admin-check.ts            the admin-access decision (AdminCheck), unit-tested independently of the middleware runtime
+    notifications/              NotificationService interface + adapters
   shared/
-    db/                      Prisma client singleton
+    money/                     Money value type (integer cents — never a float)
+    db/                        Prisma client singleton
 
 prisma/
   schema.prisma              database schema
@@ -77,9 +94,9 @@ docs/
 CONTEXT.md                    domain glossary
 ```
 
-Feature code (`src/features/...`), API routes, and the admin panel land in
-follow-up PRs on top of this scaffold — see `docs/SPEC.md`'s "Build
-sequence" section for the phase plan.
+The admin panel's visual design and real authentication land in follow-up
+PRs on top of this vertical slice — see `docs/SPEC.md`'s "Build sequence"
+section for the phase plan.
 
 ## CI
 GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, unit
