@@ -21,8 +21,11 @@ jobs:
           POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB }}
         ports: ["5432:5432"]
+        # `options` doesn't support ${{ }} expressions, so this can't
+        # reference the secret username — a plain `pg_isready` still
+        # correctly waits for Postgres to accept connections.
         options: >-
-          --health-cmd "pg_isready -U ${{ secrets.CI_POSTGRES_USER }}"
+          --health-cmd "pg_isready"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
