@@ -30,6 +30,24 @@ export const GALLERY_IMAGES: GalleryImage[] = [
   { key: "gallery-08.jpg", alt: "Restored sneaker, before and after" },
 ];
 
+// Services grid (4 cards) — reuses the same committed gallery photos.
+export const SERVICE_IMAGES: [GalleryImage, GalleryImage, GalleryImage, GalleryImage] = [
+  { key: "gallery-01.jpg", alt: "Sneaker cleaning" },
+  { key: "gallery-02.jpg", alt: "Sneaker restoration" },
+  { key: "gallery-03.jpg", alt: "Sneaker protection" },
+  { key: "gallery-04.jpg", alt: "Custom sneaker work" },
+];
+
+// Before/After band (3 cards) — each photo has "After" baked into its top
+// half and "Before" into its bottom half (see docs/TODO.md: the real
+// pixel-accurate crop into separate files is still a TODO; this uses the
+// same background-position approximation as the mock in the meantime).
+export const BEFORE_AFTER_IMAGES: GalleryImage[] = [
+  { key: "gallery-05.jpg", alt: "Before and after restoration" },
+  { key: "gallery-06.jpg", alt: "Before and after restoration" },
+  { key: "gallery-07.jpg", alt: "Before and after restoration" },
+];
+
 export function getGalleryImageUrl(key: string): string {
   const base = process.env.NEXT_PUBLIC_ASSETS_BASE_URL;
   if (base) {
