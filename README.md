@@ -109,3 +109,8 @@ git-flow: `develop` is the default branch — branch `feature/*` off it, PR
 back into it. `main` only moves via `release/*`/`hotfix/*` branches, tagged
 automatically on merge. Both branches are protected (no direct pushes, CI
 required). Full process in [`docs/GIT_WORKFLOW.md`](docs/GIT_WORKFLOW.md).
+
+## Deployment
+Vercel (Production Branch `main`) + Neon, via Vercel's native Git
+integration — see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for setup and
+how deploys trigger.
