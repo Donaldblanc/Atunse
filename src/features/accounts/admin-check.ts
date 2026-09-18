@@ -1,30 +1,27 @@
 import type { NextRequest } from "next/server";
 import type { Role } from "./authz";
+import { SESSION_COOKIE_NAME, verifySessionCookieValue } from "./session";
 
 export interface AdminCheckResult {
   allowed: boolean;
   role: Role;
+  accountId: string | null;
 }
 
 /**
  * The actual admin-access decision, extracted out of src/middleware.ts so
  * it's unit-testable without spinning up the Next.js middleware runtime.
  *
- * Fail-closed placeholder until a real managed auth provider is wired in
- * (ADR-0005): nobody is ever recognized as ADMIN yet, so /admin and
- * /api/v1/admin/* stay inaccessible rather than trusting an absent
- * session. Swap the body of this function for real session/JWT
- * verification once a provider is chosen — callers (middleware, API
+ * Interim implementation (ADR-0005 addendum): verifies the signed session
+ * cookie set by POST /api/v1/auth/sign-in. Still fails closed — a missing,
+ * expired, tampered, or non-ADMIN session is rejected the same way an
+ * absent session always was. Swap resolveSessionRole's body for a managed
+ * provider's verification once one is chosen; callers (middleware, API
  * routes) don't need to change.
  */
-export function checkAdminAccess(_req: NextRequest): AdminCheckResult {
-  const role = resolveSessionRole(_req);
-  return { allowed: role === "ADMIN", role };
-}
-
-// Isolated so its return type stays `Role` (not narrowed to a literal) —
-// swap the body for real session/JWT verification once a provider (ADR-0005)
-// is chosen. Always "GUEST" today: nobody is ever recognized as ADMIN.
-function resolveSessionRole(_req: NextRequest): Role {
-  return "GUEST";
+export async function checkAdminAccess(req: NextRequest): Promise<AdminCheckResult> {
+  const cookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  const session = await verifySessionCookieValue(cookie);
+  const role: Role = session?.role ?? "GUEST";
+  return { allowed: role === "ADMIN", role, accountId: session?.accountId ?? null };
 }

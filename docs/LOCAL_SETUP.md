@@ -7,10 +7,15 @@
 ## First-time setup
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL at minimum
+cp .env.example .env   # fill in DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 npx prisma migrate dev --name init
 npm run prisma:generate
+npm run prisma:seed     # creates the bootstrap admin account
 ```
+
+Generate `SESSION_SECRET` with `openssl rand -hex 32`. `ADMIN_EMAIL`/
+`ADMIN_PASSWORD` are only read by the seed script (ADR-0005 addendum) —
+sign in at `/sign-in` with them once the app is running.
 
 ## This machine's local Postgres (already set up)
 Installed via Homebrew (`postgresql@14`), running as a background service:
@@ -38,11 +43,14 @@ npm run build
 ## API surface (Phase 1)
 - `POST /api/v1/orders` — customer-facing order submission (guest today; ties to an Account once auth is wired)
 - `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
+- `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
+- `POST /api/v1/auth/sign-out` — clears the session cookie
 
 Both `/admin/*` pages and `/api/v1/admin/*` routes are gated by
 `src/middleware.ts`, which delegates the actual decision to
-`checkAdminAccess` in `src/features/accounts/admin-check.ts` — currently a
-fail-closed placeholder (nobody is ever ADMIN) until real auth lands.
+`checkAdminAccess` in `src/features/accounts/admin-check.ts` — see that
+file's tests (`admin-check.test.ts`, `middleware.test.ts`) for the guard's
+guaranteed behavior.
 
 ## Verified working (this session)
 - `npm install`, `tsc --noEmit`, `eslint`, `next build` — all clean
@@ -53,6 +61,6 @@ fail-closed placeholder (nobody is ever ADMIN) until real auth lands.
   - `/admin` and `/api/v1/admin/*` both → `307` redirect to `/sign-in` (fails closed, protected from the first deployment)
   - `POST /api/v1/orders` rejects a missing policy acceptance with `400`
   - `POST /api/v1/orders` with a valid body persists a real Order + Item and returns `201`
-
-Admin visual design and real auth each add their own verified-working notes
-in their own PRs — see `docs/SPEC.md`'s "Build sequence" section.
+  - `POST /api/v1/auth/sign-in` with the seeded admin's credentials sets a
+    valid session cookie; that cookie then gets a real `200` from `/admin`
+  - a wrong password returns `401` and sets no cookie

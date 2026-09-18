@@ -52,6 +52,7 @@ npm run test:integration     # repository/migration tests — needs DATABASE_URL
 npm run prisma:generate      # regenerate the Prisma client after a schema change
 npm run prisma:migrate       # create + apply a new migration (dev)
 npm run prisma:migrate:deploy # apply pending migrations (CI/prod)
+npm run prisma:seed          # create/update the bootstrap admin account (needs ADMIN_EMAIL/ADMIN_PASSWORD)
 ```
 
 ## Project layout

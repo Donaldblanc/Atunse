@@ -18,7 +18,7 @@ import {
 // gate via the same checkAdminAccess, since a use-case must never trust a
 // route just because middleware let the request through (ADR-0012).
 export async function POST(req: NextRequest, { params }: { params: { itemId: string } }) {
-  const { allowed } = checkAdminAccess(req);
+  const { allowed, accountId } = await checkAdminAccess(req);
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -35,11 +35,9 @@ export async function POST(req: NextRequest, { params }: { params: { itemId: str
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  // Placeholder actor until a real session exists (ADR-0005) — allowed=true
-  // never happens yet (checkAdminAccess is fail-closed), so this ADMIN role
-  // is currently unreachable in practice, matching the use-case's own
-  // requireRole(actingUser, "ADMIN") check.
-  const actingUser = { accountId: null, role: "ADMIN" as const };
+  // accountId comes from the verified session cookie above — recorded on
+  // every audit entry the use-case writes (ADR-0012).
+  const actingUser = { accountId, role: "ADMIN" as const };
 
   try {
     const item = await transitionItemStatus(buildOrderUseCaseDeps(), actingUser, {

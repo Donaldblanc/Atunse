@@ -2,12 +2,13 @@
 
 // Sign-in page, styled with the shared admin design system
 // (src/styles/admin-theme.css) so admin auth and the admin dashboard read
-// as one product. This is a UI shell only: no auth provider is wired yet
-// (ADR-0005 — managed auth provider is still TBD), so submitting shows an
-// explanatory message instead of silently pretending to sign the user in.
+// as one product. Posts to /api/v1/auth/sign-in, the interim credential
+// login (ADR-0005 addendum) — a bootstrap admin account is created via
+// `npm run prisma:seed`. Swap this POST target for a managed provider's
+// flow later without touching the visual shell.
 
 import { Suspense, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SquaresFourIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 
 export default function SignInPage() {
@@ -19,10 +20,45 @@ export default function SignInPage() {
 }
 
 function SignInForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from");
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setError(null);
+
+    const form = new FormData(e.currentTarget);
+    const email = String(form.get("email") ?? "");
+    const password = String(form.get("password") ?? "");
+
+    try {
+      const res = await fetch("/api/v1/auth/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: "Sign-in failed" }));
+        setError(body.error ?? "Sign-in failed");
+        requestAnimationFrame(() => errorRef.current?.focus());
+        return;
+      }
+
+      router.push(from && from.startsWith("/admin") ? from : "/admin");
+      router.refresh();
+    } catch {
+      setError("Couldn't reach the server. Check your connection and try again.");
+      requestAnimationFrame(() => errorRef.current?.focus());
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="auth-shell">
@@ -39,23 +75,14 @@ function SignInForm() {
           {from && from !== "/admin" ? ` You'll be returned to ${from} after signing in.` : null}
         </p>
 
-        {submitted && (
+        {error && (
           <div className="auth-error" role="alert" tabIndex={-1} ref={errorRef}>
             <WarningCircleIcon size={18} weight="fill" aria-hidden="true" />
-            <span>
-              Sign-in isn&apos;t wired up yet — the auth provider is still being chosen (ADR-0005).
-              This screen is a preview of the admin design system.
-            </span>
+            <span>{error}</span>
           </div>
         )}
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            setSubmitted(true);
-            requestAnimationFrame(() => errorRef.current?.focus());
-          }}
-        >
+        <form onSubmit={handleSubmit}>
           <div className="auth-field">
             <label className="auth-label" htmlFor="email">
               Email
@@ -86,8 +113,8 @@ function SignInForm() {
             />
           </div>
 
-          <button type="submit" className="admin-btn auth-submit" data-variant="primary">
-            Sign in
+          <button type="submit" className="admin-btn auth-submit" data-variant="primary" disabled={pending}>
+            {pending ? "Signing in…" : "Sign in"}
           </button>
         </form>
 

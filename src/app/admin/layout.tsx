@@ -7,6 +7,7 @@ import {
   UsersIcon,
   GearIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { SignOutButton } from "./sign-out-button";
 
 // Shared shell for every admin screen (dashboard today; queues/detail
 // screens as they land). Reachable only past src/middleware.ts's AdminCheck
@@ -52,6 +53,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               );
             })}
           </nav>
+
+          <SignOutButton />
 
           <div className="admin-sidebar-footer">
             RestoredByDJ
