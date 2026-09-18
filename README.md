@@ -65,9 +65,15 @@ src/
       orders/                 POST — customer order submission
       admin/items/[itemId]/transitions/  POST — admin-only Item status transitions
     layout.tsx               root layout
-    page.tsx                 placeholder home page — Phase 1 order form lands here
+    page.tsx                 customer landing page — light default, dark toggle (design: scratch/landing-mock.html, not committed)
   middleware.ts               admin route guard — fail-closed, protected from the first deploy; delegates to features/accounts/admin-check.ts
   features/
+    landing/
+      gallery.ts                hero/services/before-after image keys + URL resolver (public/ now, S3/CDN once NEXT_PUBLIC_ASSETS_BASE_URL is set)
+      before-after-carousel.tsx client component: split before/after cards, scroll-snap + prev/next
+      brand-logos.ts             "trusted by" logo list + URL resolver (public/images/brand-logos/ now)
+      brand-marquee.tsx          client component: auto-scrolling logo row, black/white swapped by theme
+      theme-toggle.tsx           client component: light/dark toggle, defaults to system preference
     orders/
       domain.ts                Order/Item types, the Item status pipeline
       deps.ts                  wires the real Prisma repository + notification adapter for use-cases
@@ -80,6 +86,13 @@ src/
   shared/
     money/                     Money value type (integer cents — never a float)
     db/                        Prisma client singleton
+  styles/
+    landing-theme.css           customer landing page design tokens (light + dark)
+    admin-theme.css              admin panel design tokens
+
+public/
+  images/landing/              placeholder gallery photos (dev/local default — see gallery.ts)
+  images/brand-logos/          "trusted by" logo files (dev/local default — see brand-logos.ts)
 
 prisma/
   schema.prisma              database schema
