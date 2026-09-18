@@ -19,6 +19,11 @@ export const HERO_IMAGE: GalleryImage = {
   alt: "Restored Travis Scott Air Jordan 1 Low, before and after cleaning",
 };
 
+export const COMING_SOON_HERO_IMAGE: GalleryImage = {
+  key: "coming-soon-hero.png",
+  alt: "Sneaker restoration in progress",
+};
+
 export const GALLERY_IMAGES: GalleryImage[] = [
   { key: "gallery-01.jpg", alt: "Restored sneaker, before and after" },
   { key: "gallery-02.jpg", alt: "Restored sneaker, before and after" },

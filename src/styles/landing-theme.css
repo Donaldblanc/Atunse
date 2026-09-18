@@ -852,6 +852,175 @@
   outline-offset: 2px;
 }
 
+/* ---------- coming-soon page: exact spec (hero image bakes in the sketch/annotations/progress panel) ---------- */
+
+.coming-soon-main {
+  position: relative;
+  min-height: calc(100vh - 92px);
+  overflow: hidden;
+  background: #fff;
+}
+
+.coming-soon-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(155deg, #fff 0%, #fff 38%, #edf5ff 70%, #fff 100%);
+}
+
+.coming-soon-hero {
+  position: relative;
+  margin: 0 auto;
+  max-width: 1440px;
+  min-height: 730px;
+  display: grid;
+  align-items: center;
+  gap: 32px;
+  padding: 64px 24px;
+}
+
+.coming-soon-copy {
+  position: relative;
+  z-index: 20;
+  max-width: 600px;
+}
+
+.coming-soon-eyebrow {
+  margin: 0 0 28px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  color: #5e78ab;
+}
+
+.coming-soon-h1 {
+  font-size: clamp(3.7rem, 5.5vw, 5.6rem);
+  font-weight: 700;
+  line-height: 0.91;
+  letter-spacing: -0.055em;
+  color: #061b4b;
+  margin: 0;
+}
+
+.coming-soon-h1 span {
+  display: block;
+  color: #075cff;
+}
+
+.coming-soon-lede {
+  margin: 32px 0 0;
+  max-width: 560px;
+  font-size: 19px;
+  line-height: 1.55;
+  color: #405986;
+}
+
+.coming-soon-back-link {
+  margin-top: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  border-radius: 999px;
+  border: 1px solid #c8dcff;
+  background: #fff;
+  padding: 16px 28px;
+  font-weight: 600;
+  color: #113d91;
+  transition: border-color 0.15s ease;
+  min-height: 44px;
+}
+
+.coming-soon-back-link:hover {
+  border-color: #075cff;
+}
+
+.coming-soon-back-link .arrow {
+  font-size: 20px;
+  color: #075cff;
+  line-height: 1;
+}
+
+.coming-soon-visual-wrap {
+  position: relative;
+  display: flex;
+  min-height: 520px;
+  align-items: center;
+  justify-content: center;
+}
+
+.coming-soon-visual-wrap img {
+  height: auto;
+  width: 100%;
+  max-width: 850px;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+@media (min-width: 1024px) {
+  .coming-soon-hero {
+    grid-template-columns: 0.78fr 1.22fr;
+    padding: 64px;
+  }
+}
+
+/* Dark mode: swap the light literal hex values for the dark palette already
+   defined on .landing[data-theme="dark"]. The hero photo is composited with
+   mix-blend-mode: multiply, which needs a light backdrop to read correctly
+   (that's how it drops the photo's white background) — so in dark mode we
+   give it a soft light "spotlight" panel behind it instead of the bare dark
+   page background, rather than dropping the blend mode. */
+.landing[data-theme="dark"] .coming-soon-main {
+  background: var(--bg);
+}
+
+.landing[data-theme="dark"] .coming-soon-bg {
+  background: linear-gradient(155deg, var(--bg) 0%, var(--bg) 38%, var(--bg-panel) 70%, var(--bg) 100%);
+}
+
+.landing[data-theme="dark"] .coming-soon-eyebrow {
+  color: var(--ink-soft);
+}
+
+.landing[data-theme="dark"] .coming-soon-h1 {
+  color: var(--ink);
+}
+
+.landing[data-theme="dark"] .coming-soon-h1 span {
+  color: var(--blue);
+}
+
+.landing[data-theme="dark"] .coming-soon-lede {
+  color: var(--ink-soft);
+}
+
+.landing[data-theme="dark"] .coming-soon-back-link {
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--ink);
+}
+
+.landing[data-theme="dark"] .coming-soon-back-link:hover {
+  border-color: var(--blue);
+}
+
+.landing[data-theme="dark"] .coming-soon-back-link .arrow {
+  color: var(--blue);
+}
+
+.landing[data-theme="dark"] .coming-soon-visual-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border-radius: 32px;
+  background: radial-gradient(ellipse at center, #eef4ff 0%, #d7e4ff 55%, transparent 78%);
+  z-index: 0;
+}
+
+.landing[data-theme="dark"] .coming-soon-visual-wrap img {
+  position: relative;
+  z-index: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .landing * {
     animation-duration: 0.01ms !important;
