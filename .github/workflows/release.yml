@@ -16,7 +16,14 @@ jobs:
   tag-release:
     runs-on: ubuntu-latest
     steps:
+      # fetch-tags: default checkout is shallow and skips tags entirely, so
+      # the "does this tag already exist" check below always says no even
+      # when it does — that's what caused the rejected push in the first
+      # place (tried to (re)create a tag the remote already had).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Read version from package.json
         id: version
