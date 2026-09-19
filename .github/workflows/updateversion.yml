@@ -3,7 +3,7 @@ name: Update package version
 on:
   release:
     types: [published]
-
+  workflow_dispatch:
 permissions:
   contents: write
 
