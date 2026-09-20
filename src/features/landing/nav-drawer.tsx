@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function NavDrawer() {
+export function NavDrawer({ active }: { active?: "about" } = {}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -46,7 +46,9 @@ export function NavDrawer() {
           <Link href="/#services">Services</Link>
           <Link href="/#gallery">Gallery</Link>
           <Link href="/coming-soon">Process</Link>
-          <Link href="/#about">About</Link>
+          <Link href="/about" className={active === "about" ? "active-link" : undefined}>
+            About
+          </Link>
         </nav>
         <div className="landing-drawer-cta">
           <Link className="landing-btn-primary" href="/coming-soon" onClick={() => setOpen(false)}>
