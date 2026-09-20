@@ -64,6 +64,8 @@ src/
     api/v1/
       orders/                 POST — customer order submission
       admin/items/[itemId]/transitions/  POST — admin-only Item status transitions
+    about/page.tsx           About page — DJ's story, principles, NYC skyline mark (design: scratch/landing-mock.html, not committed)
+    coming-soon/page.tsx     placeholder destination for CTAs/nav items without a real page yet
     layout.tsx               root layout
     page.tsx                 customer landing page — light default, dark toggle (design: scratch/landing-mock.html, not committed)
   middleware.ts               admin route guard — fail-closed, protected from the first deploy; delegates to features/accounts/admin-check.ts
@@ -73,7 +75,11 @@ src/
       before-after-carousel.tsx client component: split before/after cards, scroll-snap + prev/next
       brand-logos.ts             "trusted by" logo list + URL resolver (public/images/brand-logos/ now)
       brand-marquee.tsx          client component: auto-scrolling logo row, black/white swapped by theme
-      theme-toggle.tsx           client component: light/dark toggle, defaults to system preference
+      site-nav.tsx               shared nav across /, /coming-soon, /about — accepts active="about" for the underlined nav state
+      site-footer.tsx            shared footer, same active-state prop as site-nav
+      nav-drawer.tsx             client component: mobile hamburger + slide-in drawer (hidden above 640px)
+      mobile-tabbar.tsx          client component: fixed bottom tab bar simulating a native app nav (hidden above 640px)
+      theme-toggle.tsx           client component: sliding light/dark switch — always defaults to light, only an explicit toggle (saved to localStorage) moves it to dark
     orders/
       domain.ts                Order/Item types, the Item status pipeline
       deps.ts                  wires the real Prisma repository + notification adapter for use-cases
