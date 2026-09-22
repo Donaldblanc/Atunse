@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { MapPin, Clock, Tag, Package } from "lucide-react";
 import { useState } from "react";
 
 type BookingMode = "in-person" | "mail-in";
@@ -24,9 +25,7 @@ export function BookingPanel() {
         <>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <path d="M128 224S48 152 48 100a80 80 0 0 1 160 0C208 152 128 224 128 224Z" stroke="currentColor" strokeWidth="16" />
-              </svg>
+              <MapPin size={16} />
             </span>
             <div>
               <strong>NY / NJ / CT locations</strong>
@@ -35,10 +34,7 @@ export function BookingPanel() {
           </div>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path d="M128 76V128L164 152" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-              </svg>
+              <Clock size={16} />
             </span>
             <div>
               <strong>Most pairs ready in 72 hours</strong>
@@ -46,15 +42,7 @@ export function BookingPanel() {
           </div>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path
-                  d="M128 72V184M96 96h48a24 24 0 0 1 0 48h-32a24 24 0 0 0 0 48h56"
-                  stroke="currentColor"
-                  strokeWidth="14"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Tag size={16} />
             </span>
             <div>
               <strong>Pricing from $45</strong>
@@ -72,10 +60,7 @@ export function BookingPanel() {
         <>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <rect x="32" y="72" width="192" height="128" rx="12" stroke="currentColor" strokeWidth="16" />
-                <path d="M32 96L128 152L224 96" stroke="currentColor" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <Package size={16} />
             </span>
             <div>
               <strong>Ships anywhere in the US</strong>
@@ -84,10 +69,7 @@ export function BookingPanel() {
           </div>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path d="M128 76V128L164 152" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-              </svg>
+              <Clock size={16} />
             </span>
             <div>
               <strong>5-10 business days round trip</strong>
@@ -96,15 +78,7 @@ export function BookingPanel() {
           </div>
           <div className="landing-booking-row">
             <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path
-                  d="M128 72V184M96 96h48a24 24 0 0 1 0 48h-32a24 24 0 0 0 0 48h56"
-                  stroke="currentColor"
-                  strokeWidth="14"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <Tag size={16} />
             </span>
             <div>
               <strong>Pricing from $55</strong>

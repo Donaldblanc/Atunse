@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Droplets, Wrench, ShieldCheck, Palette, Clock, MapPin, Truck } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { BEFORE_AFTER_IMAGES, HERO_IMAGE, SERVICE_IMAGES, getGalleryImageUrl } from "@/features/landing/gallery";
 import { BeforeAfterCarousel } from "@/features/landing/before-after-carousel";
@@ -21,60 +22,25 @@ const SERVICES = [
     title: "Cleaning",
     description: "Deep clean for a like-new look.",
     image: SERVICE_IMAGES[0],
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-        <circle cx="152" cy="96" r="38" stroke="currentColor" strokeWidth="14" />
-        <circle cx="88" cy="162" r="24" stroke="currentColor" strokeWidth="14" />
-        <circle cx="178" cy="176" r="15" stroke="currentColor" strokeWidth="14" />
-      </svg>
-    ),
+    icon: <Droplets size={16} aria-hidden="true" />,
   },
   {
     title: "Restoration",
     description: "Repair, repaint, replace.",
     image: SERVICE_IMAGES[1],
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-        <path
-          d="M180 48a44 44 0 0 0-56 56L48 180l28 28 76-76a44 44 0 0 0 56-56l-28 28-28-8-8-28Z"
-          stroke="currentColor"
-          strokeWidth="14"
-          strokeLinejoin="round"
-        />
-      </svg>
-    ),
+    icon: <Wrench size={16} aria-hidden="true" />,
   },
   {
     title: "Protection",
     description: "Premium treatments.",
     image: SERVICE_IMAGES[2],
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-        <path
-          d="M128 32L208 64V120C208 172 176 208 128 224C80 208 48 172 48 120V64L128 32Z"
-          stroke="currentColor"
-          strokeWidth="14"
-          strokeLinejoin="round"
-        />
-        <path d="M96 128l22 22l42-52" stroke="currentColor" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: <ShieldCheck size={16} aria-hidden="true" />,
   },
   {
     title: "Custom Work",
     description: "Color touches & special requests.",
     image: SERVICE_IMAGES[3],
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-        <path
-          d="M188 28c14 14 14 36 0 50l-84 84-46 14 14-46 84-84c14-14 36-14 50 0Z"
-          stroke="currentColor"
-          strokeWidth="14"
-          strokeLinejoin="round"
-        />
-        <path d="M100 156c-4 16-16 28-32 32" stroke="currentColor" strokeWidth="14" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <Palette size={16} aria-hidden="true" />,
   },
 ];
 
@@ -194,10 +160,7 @@ export default function HomePage() {
 
       <div className="landing-trust">
         <div className="landing-trust-item">
-          <svg className="landing-trust-icon" width="18" height="18" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-            <path d="M128 76V128L164 152" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-          </svg>
+          <Clock className="landing-trust-icon" size={18} aria-hidden="true" />
           <span>
             <strong>72-HOUR</strong>
             <br />
@@ -205,14 +168,7 @@ export default function HomePage() {
           </span>
         </div>
         <div className="landing-trust-item">
-          <svg className="landing-trust-icon" width="18" height="18" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path
-              d="M128 224S48 152 48 100a80 80 0 0 1 160 0C208 152 128 224 128 224Z"
-              stroke="currentColor"
-              strokeWidth="16"
-            />
-            <circle cx="128" cy="100" r="24" stroke="currentColor" strokeWidth="16" />
-          </svg>
+          <MapPin className="landing-trust-icon" size={18} aria-hidden="true" />
           <span>
             <strong>NY / NJ / CT</strong>
             <br />
@@ -220,10 +176,7 @@ export default function HomePage() {
           </span>
         </div>
         <div className="landing-trust-item">
-          <svg className="landing-trust-icon" width="18" height="18" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path d="M40 88L128 48L216 88V176L128 216L40 176V88Z" stroke="currentColor" strokeWidth="16" strokeLinejoin="round" />
-            <path d="M40 88L128 128L216 88M128 128V216" stroke="currentColor" strokeWidth="16" strokeLinejoin="round" />
-          </svg>
+          <Truck className="landing-trust-icon" size={18} aria-hidden="true" />
           <span>
             <strong>NATIONWIDE</strong>
             <br />
