@@ -2,6 +2,9 @@ import Link from "next/link";
 import "@/styles/landing-theme.css";
 import { BEFORE_AFTER_IMAGES, HERO_IMAGE, SERVICE_IMAGES, getGalleryImageUrl } from "@/features/landing/gallery";
 import { BeforeAfterCarousel } from "@/features/landing/before-after-carousel";
+import { BookingPanel } from "@/features/landing/booking-panel";
+import { FaqAccordion } from "@/features/landing/faq-accordion";
+import { ReviewsCarousel } from "@/features/landing/reviews-carousel";
 import { BrandMarquee } from "@/features/landing/brand-marquee";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -76,11 +79,72 @@ const SERVICES = [
 ];
 
 const FAQS = [
-  "How does the process work?",
-  "How long does restoration take?",
-  "Where can I drop off my sneakers?",
-  "Do you offer mail-in service?",
-  "What if I'm not happy with the results?",
+  {
+    question: "How does the process work?",
+    answer:
+      "Drop off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+  },
+  {
+    question: "How long does restoration take?",
+    answer: "Most restorations take 5-10 business days depending on the service and current order volume.",
+  },
+  {
+    question: "Where can I drop off my sneakers?",
+    answer: "You can drop off in person at our Newark studio, or ship them to us using a prepaid mail-in label.",
+  },
+  {
+    question: "Do you offer mail-in service?",
+    answer: "Yes, we ship a prepaid label so you can send your sneakers from anywhere in the country.",
+  },
+  {
+    question: "What if I'm not happy with the results?",
+    answer: "Let us know within 7 days of pickup or delivery and we'll make it right at no extra cost.",
+  },
+];
+
+const REVIEWS = [
+  {
+    stars: 5,
+    quote: "Fast turnaround, amazing results, and great communication. Highly recommend Atunṣe!",
+    name: "Jasmine T.",
+    loc: "Newark, NJ",
+    initials: "JT",
+  },
+  {
+    stars: 5,
+    quote: "My Jordan 1s came back looking brand new. DJ walked me through everything before he started.",
+    name: "Marcus O.",
+    loc: "Brooklyn, NY",
+    initials: "MO",
+  },
+  {
+    stars: 5,
+    quote: "Dropped off a pair I thought were done for. Got them back like they just came out of the box.",
+    name: "Priya R.",
+    loc: "Jersey City, NJ",
+    initials: "PR",
+  },
+  {
+    stars: 4,
+    quote: "Great work on a tough yellowing job. Took a little longer than expected but worth the wait.",
+    name: "Aaron K.",
+    loc: "Queens, NY",
+    initials: "AK",
+  },
+  {
+    stars: 5,
+    quote: "Booking was easy and the updates along the way made me trust the process. Will be back.",
+    name: "Devon L.",
+    loc: "Newark, NJ",
+    initials: "DL",
+  },
+  {
+    stars: 5,
+    quote: "Best sneaker restoration in the city, hands down. Attention to detail is unmatched.",
+    name: "Sofia M.",
+    loc: "Manhattan, NY",
+    initials: "SM",
+  },
 ];
 
 export default function HomePage() {
@@ -215,99 +279,11 @@ export default function HomePage() {
       </div>
 
       <div className="landing-lower">
-        <div>
-          <h2>What People Say</h2>
-          <div className="landing-stars" aria-hidden="true">
-            ★★★★★
-          </div>
-          <p className="landing-quote">
-            &ldquo;Fast turnaround, amazing results, and great communication. Highly recommend
-            Atunṣe!&rdquo;
-          </p>
-          <div className="landing-reviewer">
-            <div className="landing-avatar">JT</div>
-            <div>
-              <div className="landing-reviewer-name">Jasmine T.</div>
-              <div className="landing-reviewer-loc">Newark, NJ</div>
-            </div>
-          </div>
-          <div className="landing-review-nav">
-            <button className="landing-review-nav-btn" aria-label="Previous review">
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-            <button className="landing-review-nav-btn" aria-label="Next review">
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        <ReviewsCarousel reviews={REVIEWS} />
 
-        <div>
-          <h2>FAQs</h2>
-          {FAQS.map((question) => (
-            <div className="landing-faq-item" key={question}>
-              <div className="landing-faq-q">
-                {question} <span className="landing-faq-plus">+</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <FaqAccordion faqs={FAQS} />
 
-        <div className="landing-booking" id="process">
-          <h2>Booking &amp; Pricing</h2>
-          <div className="landing-booking-toggle">
-            <button data-active="true">In-Person</button>
-            <button>Mail-In</button>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <path d="M128 224S48 152 48 100a80 80 0 0 1 160 0C208 152 128 224 128 224Z" stroke="currentColor" strokeWidth="16" />
-              </svg>
-            </span>
-            <div>
-              <strong>NY / NJ / CT locations</strong>
-              <span>Drop off at a convenient location</span>
-            </div>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path d="M128 76V128L164 152" stroke="currentColor" strokeWidth="16" strokeLinecap="round" />
-              </svg>
-            </span>
-            <div>
-              <strong>Most pairs ready in 72 hours</strong>
-            </div>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 256 256" fill="none">
-                <circle cx="128" cy="128" r="88" stroke="currentColor" strokeWidth="16" />
-                <path
-                  d="M128 72V184M96 96h48a24 24 0 0 1 0 48h-32a24 24 0 0 0 0 48h56"
-                  stroke="currentColor"
-                  strokeWidth="14"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </span>
-            <div>
-              <strong>Pricing from $45</strong>
-              <span>Final pricing based on condition and service</span>
-            </div>
-          </div>
-          <Link className="landing-btn-primary" href="/coming-soon">
-            View pricing &amp; book now
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-        </div>
+        <BookingPanel />
       </div>
 
       <div className="landing-cta-banner">
