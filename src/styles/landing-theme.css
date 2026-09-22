@@ -736,6 +736,13 @@
   font-size: 14px;
   font-weight: 600;
   gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
 }
 
 .landing-faq-plus {
@@ -749,6 +756,25 @@
   justify-content: center;
   color: var(--ink-soft);
   font-size: 13px;
+  transition: transform 0.2s ease;
+}
+
+.landing-faq-item[data-open="true"] .landing-faq-plus {
+  transform: rotate(45deg);
+}
+
+.landing-faq-a {
+  max-height: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  transition: max-height 0.2s ease, margin-top 0.2s ease;
+}
+
+.landing-faq-item[data-open="true"] .landing-faq-a {
+  max-height: 200px;
+  margin-top: 10px;
 }
 
 .landing-booking {
