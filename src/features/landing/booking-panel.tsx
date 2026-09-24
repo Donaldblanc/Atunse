@@ -49,7 +49,7 @@ export function BookingPanel() {
               <span>Final pricing based on condition and service</span>
             </div>
           </div>
-          <Link className="landing-btn-primary" href="/coming-soon">
+          <Link className="landing-btn-primary" href="/booking">
             View pricing &amp; book now
             <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
               <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
@@ -85,7 +85,7 @@ export function BookingPanel() {
               <span>Includes return shipping, condition-dependent</span>
             </div>
           </div>
-          <Link className="landing-btn-primary" href="/coming-soon">
+          <Link className="landing-btn-primary" href="/booking">
             Request a mail-in label
             <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
               <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
