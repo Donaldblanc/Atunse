@@ -75,8 +75,8 @@ jobs:
           fi
           git checkout -b "$BRANCH" origin/develop
           git merge origin/main --no-edit -m "chore: back-merge main into develop after release" || {
-            echo "::warning::Automatic back-merge has conflicts — resolve manually: git checkout develop && git merge main"
-            exit 0
+            echo "::error::Automatic back-merge has conflicts — resolve manually: git checkout develop && git merge main, push a branch, and open the PR into develop yourself."
+            exit 1
           }
           git push origin "$BRANCH"
           gh pr create --base develop --head "$BRANCH" \
