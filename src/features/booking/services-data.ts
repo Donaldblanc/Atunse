@@ -1,5 +1,4 @@
 import { Crown, Droplet, Palette, Sparkles, SportShoe, type LucideIcon } from "lucide-react";
-import type { ServiceCategoryId } from "@/features/landing/services";
 
 export type BookingService = {
   id: string;
@@ -9,11 +8,15 @@ export type BookingService = {
   priceNote?: string;
   badge?: string;
   icon: LucideIcon;
-  category: ServiceCategoryId;
 };
 
-// Granular SKUs for the booking flow. Each carries a `category` linking it
-// to a landing-page service category (src/features/landing/services.ts).
+// Granular SKUs for the booking flow. Mirrors the services/pricing list on
+// the home page (src/features/landing/services.ts SERVICES) — kept as a
+// separate list since this one carries booking-specific fields (price
+// display strings, badge) the landing SERVICES array doesn't. No
+// compile-time link between the two: a `category` field was tried in
+// #39/#54 but had no real consumer and left "protection" with no mapped
+// SKU, so it was removed rather than kept as dead code.
 export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "standard",
@@ -22,7 +25,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     price: "$30",
     priceNote: "+$10 for Suede",
     icon: SportShoe,
-    category: "cleaning",
   },
   {
     id: "premium",
@@ -32,7 +34,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     priceNote: "+$10 for Suede",
     badge: "MOST POPULAR",
     icon: Crown,
-    category: "cleaning",
   },
   {
     id: "oxidation",
@@ -41,7 +42,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     price: "Midsole from $25+",
     priceNote: "Sole from $40+",
     icon: Sparkles,
-    category: "restoration",
   },
   {
     id: "painting",
@@ -49,7 +49,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     description: "Custom color changes, touch-ups, and dye work to refresh, restore, or transform your shoes.",
     price: "Starting at $40+",
     icon: Palette,
-    category: "custom-work",
   },
   {
     id: "reglue",
@@ -57,7 +56,6 @@ export const BOOKING_SERVICES: BookingService[] = [
     description: "Professional sole separation repair to securely reattach and restore your sneakers.",
     price: "Starting at $50+",
     icon: Droplet,
-    category: "restoration",
   },
 ];
 

@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, Palette, Sparkles, Wrench } from "lucide-react";
+import { Check, ChevronDown, Palette, Sparkles, Wrench } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
+import { ArrowIcon } from "@/features/landing/arrow-icon";
 
 export const metadata = {
   title: "Services & Pricing — Atunṣe",
@@ -130,7 +131,7 @@ export default function ServicesPage() {
             </div>
             <Link className="landing-btn-primary" href={`/booking?service=${plan.serviceId}`}>
               {plan.cta}
-              <ArrowRight size={14} aria-hidden="true" />
+              <ArrowIcon />
             </Link>
           </div>
         ))}
