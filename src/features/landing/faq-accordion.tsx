@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 export type Faq = {
@@ -23,7 +24,10 @@ export function FaqAccordion({ faqs }: { faqs: Faq[] }) {
               aria-expanded={isOpen}
               onClick={() => setOpenIndex(isOpen ? null : index)}
             >
-              {faq.question} <span className="landing-faq-plus" aria-hidden="true">+</span>
+              {faq.question}
+              <span className="landing-faq-plus" aria-hidden="true">
+                <Plus size={13} />
+              </span>
             </button>
             <div className="landing-faq-a">{faq.answer}</div>
           </div>

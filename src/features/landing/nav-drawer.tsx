@@ -51,7 +51,7 @@ export function NavDrawer({ active }: { active?: "about" } = {}) {
           </Link>
         </nav>
         <div className="landing-drawer-cta">
-          <Link className="landing-btn-primary" href="/coming-soon" onClick={() => setOpen(false)}>
+          <Link className="landing-btn-primary" href="/booking" onClick={() => setOpen(false)}>
             Book a restoration
             <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
               <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
