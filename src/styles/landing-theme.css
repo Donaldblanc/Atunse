@@ -3474,7 +3474,11 @@
     align-items: baseline;
     margin-left: 34px;
   }
+  .booking-page-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .booking-page-form-grid {
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
   }
   .booking-page-how-head {
