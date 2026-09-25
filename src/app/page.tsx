@@ -194,7 +194,7 @@ export default function HomePage() {
           <h2>Our Services</h2>
           <p>Everything your sneakers need. Thoughtful care, proven results.</p>
         </div>
-        <Link className="landing-link-arrow" href="/coming-soon">
+        <Link className="landing-link-arrow" href="/services">
           View all services
           <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
             <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />

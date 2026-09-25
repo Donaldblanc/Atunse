@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function SiteFooter({ active }: { active?: "about" } = {}) {
+export function SiteFooter({ active }: { active?: "about" | "services" } = {}) {
   return (
     <>
       <footer className="landing-footer">
@@ -9,7 +9,9 @@ export function SiteFooter({ active }: { active?: "about" } = {}) {
           <span className="landing-brand-tag">RESTORE &amp; REVIVE</span>
         </div>
         <div className="landing-footer-links">
-          <Link href="/#services">Services</Link>
+          <Link href="/services" className={active === "services" ? "active-link" : undefined}>
+            Services
+          </Link>
           <Link href="/#gallery">Gallery</Link>
           <Link href="/coming-soon">Process</Link>
           <Link href="/about" className={active === "about" ? "active-link" : undefined}>

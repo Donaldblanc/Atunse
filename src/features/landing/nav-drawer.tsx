@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function NavDrawer({ active }: { active?: "about" } = {}) {
+export function NavDrawer({ active }: { active?: "about" | "services" } = {}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -43,7 +43,9 @@ export function NavDrawer({ active }: { active?: "about" } = {}) {
           </button>
         </div>
         <nav onClick={() => setOpen(false)}>
-          <Link href="/#services">Services</Link>
+          <Link href="/services" className={active === "services" ? "active-link" : undefined}>
+            Services
+          </Link>
           <Link href="/#gallery">Gallery</Link>
           <Link href="/coming-soon">Process</Link>
           <Link href="/about" className={active === "about" ? "active-link" : undefined}>
