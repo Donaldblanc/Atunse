@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { NAV_LINKS } from "./nav-links";
+import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 
-export function SiteFooter({ active }: { active?: "about" | "services" | "booking" } = {}) {
+export function SiteFooter({ active }: { active?: NavActive } = {}) {
   return (
     <>
       <footer className="landing-footer">
@@ -11,7 +11,7 @@ export function SiteFooter({ active }: { active?: "about" | "services" | "bookin
         </div>
         <div className="landing-footer-links">
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className={link.activeKey === active ? "active-link" : undefined}>
+            <Link key={link.href} href={link.href} className={navLinkClass(link, active)}>
               {link.label}
             </Link>
           ))}

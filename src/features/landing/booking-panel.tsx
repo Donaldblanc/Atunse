@@ -11,6 +11,7 @@ type BookingModeConfig = {
   label: string;
   rows: { icon: LucideIcon; title: string; subtitle?: string }[];
   cta: string;
+  href: string;
 };
 
 const MODES: Record<BookingMode, BookingModeConfig> = {
@@ -22,6 +23,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
       { icon: Tag, title: "Pricing from $45", subtitle: "Final pricing based on condition and service" },
     ],
     cta: "View pricing & book now",
+    href: "/booking?method=pickup",
   },
   "mail-in": {
     label: "Mail-In",
@@ -31,6 +33,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
       { icon: Tag, title: "Pricing from $55", subtitle: "Includes return shipping, condition-dependent" },
     ],
     cta: "Request a mail-in label",
+    href: "/booking?method=mail-in",
   },
 };
 
@@ -43,7 +46,13 @@ export function BookingPanel() {
       <h2>Booking &amp; Pricing</h2>
       <div className="landing-booking-toggle">
         {(Object.keys(MODES) as BookingMode[]).map((key) => (
-          <button key={key} data-active={mode === key} onClick={() => setMode(key)}>
+          <button
+            type="button"
+            key={key}
+            data-active={mode === key}
+            aria-pressed={mode === key}
+            onClick={() => setMode(key)}
+          >
             {MODES[key].label}
           </button>
         ))}
@@ -60,7 +69,7 @@ export function BookingPanel() {
           </div>
         </div>
       ))}
-      <Link className="landing-btn-primary" href="/booking">
+      <Link className="landing-btn-primary" href={config.href}>
         {config.cta}
         <ArrowIcon />
       </Link>

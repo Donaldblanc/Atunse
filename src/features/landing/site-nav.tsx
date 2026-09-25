@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NAV_LINKS } from "./nav-links";
+import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { NavDrawer } from "./nav-drawer";
 import { ThemeToggle } from "./theme-toggle";
 import { BookRestorationCta } from "./book-restoration-cta";
@@ -8,7 +8,7 @@ import { BookRestorationCta } from "./book-restoration-cta";
 // /services, /booking). The "Book a restoration" CTA is hidden while
 // already on the booking flow itself — no point offering to start what
 // you're mid-way through.
-export function SiteNav({ active }: { active?: "about" | "services" | "booking" }) {
+export function SiteNav({ active }: { active?: NavActive }) {
   const isBooking = active === "booking";
   return (
     <nav className="landing-nav">
@@ -18,7 +18,7 @@ export function SiteNav({ active }: { active?: "about" | "services" | "booking" 
       </Link>
       <div className="landing-navlinks">
         {NAV_LINKS.map((link) => (
-          <Link key={link.href} href={link.href} className={link.activeKey === active ? "active-link" : undefined}>
+          <Link key={link.href} href={link.href} className={navLinkClass(link, active)}>
             {link.label}
           </Link>
         ))}

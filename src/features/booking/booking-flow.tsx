@@ -38,6 +38,7 @@ export function BookingFlow() {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
   const requestedService = BOOKING_SERVICES.find((service) => service.id === requestedServiceId);
+  const requestedMethod = searchParams.get("method");
   const [flow, setFlow] = useState<FlowType>(requestedService ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   const [selectedServiceId, setSelectedServiceId] = useState(() => requestedService?.id ?? BOOKING_SERVICES[0]!.id);
@@ -45,7 +46,7 @@ export function BookingFlow() {
   const [activePair, setActivePair] = useState(0);
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
   const [pairs, setPairs] = useState<PairDetails[]>([EMPTY_PAIR, EMPTY_PAIR, EMPTY_PAIR]);
-  const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>("pickup");
+  const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>(requestedMethod === "mail-in" ? "mail-in" : "pickup");
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
