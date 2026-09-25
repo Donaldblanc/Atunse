@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Calendar, Check, Home, ImagePlus, Info, Mail, MapPin, Phone, Shield, Star, Truck, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, Check, ImagePlus, Info, Mail, MapPin, Package, Phone, Shield, Star, Truck, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
@@ -9,7 +9,7 @@ import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 
 type FlowType = "single" | "bundle";
 type Step = "service" | "details" | "schedule" | "review";
-type ScheduleMethod = "pickup" | "drop-off";
+type ScheduleMethod = "pickup" | "mail-in";
 type PairDetails = { brand: string; material: string; notes: string };
 type PickupAddress = { address: string; apt: string; city: string; state: string; zip: string };
 
@@ -45,7 +45,7 @@ export function BookingFlow() {
   const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>("pickup");
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
-  const [dropoffSelection, setDropoffSelection] = useState<PickupSelection | null>(null);
+  const [mailInDate, setMailInDate] = useState("");
 
   const selectedService = BOOKING_SERVICES.find((s) => s.id === selectedServiceId) ?? BOOKING_SERVICES[0]!;
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
@@ -55,7 +55,6 @@ export function BookingFlow() {
   const selectedPrice = isBundle ? selectedBundle.price : selectedService.price;
   const selectedPriceNote = isBundle ? undefined : selectedService.priceNote;
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const scheduleSelection = scheduleMethod === "pickup" ? pickupSelection : dropoffSelection;
 
   function goBack() {
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
@@ -147,8 +146,8 @@ export function BookingFlow() {
             onChangePickupAddress={setPickupAddress}
             pickupSelection={pickupSelection}
             onConfirmPickup={setPickupSelection}
-            dropoffSelection={dropoffSelection}
-            onConfirmDropoff={setDropoffSelection}
+            mailInDate={mailInDate}
+            onChangeMailInDate={setMailInDate}
             onContinue={() => setStep("review")}
           />
         )}
@@ -163,7 +162,8 @@ export function BookingFlow() {
             pairDetails={isBundle ? pairs[0]! : singlePair}
             scheduleMethod={scheduleMethod}
             pickupAddress={pickupAddress}
-            scheduleSelection={scheduleSelection}
+            pickupSelection={pickupSelection}
+            mailInDate={mailInDate}
             onEdit={setStep}
           />
         )}
@@ -468,8 +468,8 @@ function ScheduleStep({
   onChangePickupAddress,
   pickupSelection,
   onConfirmPickup,
-  dropoffSelection,
-  onConfirmDropoff,
+  mailInDate,
+  onChangeMailInDate,
   onContinue,
 }: {
   method: ScheduleMethod;
@@ -478,15 +478,15 @@ function ScheduleStep({
   onChangePickupAddress: (address: PickupAddress) => void;
   pickupSelection: PickupSelection | null;
   onConfirmPickup: (selection: PickupSelection) => void;
-  dropoffSelection: PickupSelection | null;
-  onConfirmDropoff: (selection: PickupSelection) => void;
+  mailInDate: string;
+  onChangeMailInDate: (date: string) => void;
   onContinue: () => void;
 }) {
   return (
     <>
       <div className="booking-page-section-head">
         <p className="booking-page-step-eyebrow">STEP 3 OF 4</p>
-        <h2>Pickup or drop off?</h2>
+        <h2>Pickup or mail in?</h2>
         <p>Choose how you&rsquo;d like to get your sneakers to us.</p>
       </div>
 
@@ -498,77 +498,77 @@ function ScheduleStep({
             <span>We&rsquo;ll collect your sneakers from your address.</span>
           </span>
         </button>
-        <button type="button" className="booking-page-shipping-card" data-active={method === "drop-off"} onClick={() => onSelectMethod("drop-off")}>
-          <Home size={20} aria-hidden="true" />
+        <button type="button" className="booking-page-shipping-card" data-active={method === "mail-in"} onClick={() => onSelectMethod("mail-in")}>
+          <Package size={20} aria-hidden="true" />
           <span>
-            <strong>Drop off</strong>
-            <span>Bring them to our location.</span>
+            <strong>Mail in</strong>
+            <span>We&rsquo;ll send you a prepaid label after checkout.</span>
           </span>
         </button>
       </div>
 
+      <div className="booking-page-section-head booking-page-section-head-tight">
+        <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
+          {method === "pickup" ? "PICKUP ADDRESS" : "SHIPPING ADDRESS"}
+        </p>
+      </div>
+      <div className="booking-page-form-grid">
+        <label className="booking-page-field">
+          <span>Address</span>
+          <input
+            type="text"
+            placeholder="e.g. 123 Main St"
+            value={pickupAddress.address}
+            onChange={(e) => onChangePickupAddress({ ...pickupAddress, address: e.target.value })}
+          />
+        </label>
+        <label className="booking-page-field">
+          <span>Apt, suite, etc. (optional)</span>
+          <input
+            type="text"
+            placeholder="e.g. Apt 4B"
+            value={pickupAddress.apt}
+            onChange={(e) => onChangePickupAddress({ ...pickupAddress, apt: e.target.value })}
+          />
+        </label>
+      </div>
+      <div className="booking-page-form-grid booking-page-form-grid-thirds">
+        <label className="booking-page-field">
+          <span>City</span>
+          <input
+            type="text"
+            placeholder="e.g. New York"
+            value={pickupAddress.city}
+            onChange={(e) => onChangePickupAddress({ ...pickupAddress, city: e.target.value })}
+          />
+        </label>
+        <label className="booking-page-field">
+          <span>State / Province</span>
+          <select
+            value={pickupAddress.state}
+            onChange={(e) => onChangePickupAddress({ ...pickupAddress, state: e.target.value })}
+          >
+            <option value="" disabled>
+              Select
+            </option>
+            <option>NY</option>
+            <option>NJ</option>
+            <option>CT</option>
+          </select>
+        </label>
+        <label className="booking-page-field">
+          <span>Zip / Postal code</span>
+          <input
+            type="text"
+            placeholder="e.g. 10001"
+            value={pickupAddress.zip}
+            onChange={(e) => onChangePickupAddress({ ...pickupAddress, zip: e.target.value })}
+          />
+        </label>
+      </div>
+
       {method === "pickup" ? (
         <>
-          <div className="booking-page-section-head booking-page-section-head-tight">
-            <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
-              PICKUP ADDRESS
-            </p>
-          </div>
-          <div className="booking-page-form-grid">
-            <label className="booking-page-field">
-              <span>Address</span>
-              <input
-                type="text"
-                placeholder="e.g. 123 Main St"
-                value={pickupAddress.address}
-                onChange={(e) => onChangePickupAddress({ ...pickupAddress, address: e.target.value })}
-              />
-            </label>
-            <label className="booking-page-field">
-              <span>Apt, suite, etc. (optional)</span>
-              <input
-                type="text"
-                placeholder="e.g. Apt 4B"
-                value={pickupAddress.apt}
-                onChange={(e) => onChangePickupAddress({ ...pickupAddress, apt: e.target.value })}
-              />
-            </label>
-          </div>
-          <div className="booking-page-form-grid booking-page-form-grid-thirds">
-            <label className="booking-page-field">
-              <span>City</span>
-              <input
-                type="text"
-                placeholder="e.g. New York"
-                value={pickupAddress.city}
-                onChange={(e) => onChangePickupAddress({ ...pickupAddress, city: e.target.value })}
-              />
-            </label>
-            <label className="booking-page-field">
-              <span>State / Province</span>
-              <select
-                value={pickupAddress.state}
-                onChange={(e) => onChangePickupAddress({ ...pickupAddress, state: e.target.value })}
-              >
-                <option value="" disabled>
-                  Select
-                </option>
-                <option>NY</option>
-                <option>NJ</option>
-                <option>CT</option>
-              </select>
-            </label>
-            <label className="booking-page-field">
-              <span>Zip / Postal code</span>
-              <input
-                type="text"
-                placeholder="e.g. 10001"
-                value={pickupAddress.zip}
-                onChange={(e) => onChangePickupAddress({ ...pickupAddress, zip: e.target.value })}
-              />
-            </label>
-          </div>
-
           <div className="booking-page-section-head booking-page-section-head-tight">
             <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
               PICKUP DATE
@@ -586,23 +586,15 @@ function ScheduleStep({
           </div>
         </>
       ) : (
-        <>
-          <div className="booking-page-section-head booking-page-section-head-tight">
-            <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
-              DROP-OFF DATE (OPTIONAL)
-            </p>
-          </div>
-          <PickupDatePicker selection={dropoffSelection} onConfirm={onConfirmDropoff} />
-
-          <div className="booking-page-info-box">
-            <Info size={16} aria-hidden="true" />
-            <span>
-              Our studio is open
-              <br />
-              <strong>10:00 AM &ndash; 6:00 PM, Tue&ndash;Sat.</strong>
+        <div className="booking-page-form-grid">
+          <label className="booking-page-field booking-page-field-icon">
+            <span>Preferred date (optional)</span>
+            <span className="booking-page-input-wrap">
+              <Calendar size={16} aria-hidden="true" />
+              <input type="date" value={mailInDate} onChange={(e) => onChangeMailInDate(e.target.value)} />
             </span>
-          </div>
-        </>
+          </label>
+        </div>
       )}
 
       <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
@@ -622,7 +614,8 @@ function ReviewStep({
   pairDetails,
   scheduleMethod,
   pickupAddress,
-  scheduleSelection,
+  pickupSelection,
+  mailInDate,
   onEdit,
 }: {
   isBundle: boolean;
@@ -633,12 +626,18 @@ function ReviewStep({
   pairDetails: PairDetails;
   scheduleMethod: ScheduleMethod;
   pickupAddress: PickupAddress;
-  scheduleSelection: PickupSelection | null;
+  pickupSelection: PickupSelection | null;
+  mailInDate: string;
   onEdit: (step: Step) => void;
 }) {
-  const scheduleText = scheduleSelection
-    ? `${scheduleSelection.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${scheduleSelection.time}`
-    : "Not scheduled yet";
+  const scheduleText =
+    scheduleMethod === "pickup"
+      ? pickupSelection
+        ? `${pickupSelection.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${pickupSelection.time}`
+        : "Not scheduled yet"
+      : mailInDate
+        ? new Date(`${mailInDate}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+        : "No preferred date selected";
 
   return (
     <>
@@ -697,24 +696,22 @@ function ReviewStep({
           </button>
         </div>
         <div className="booking-page-details-row">
-          {scheduleMethod === "pickup" ? <Truck size={16} aria-hidden="true" /> : <Home size={16} aria-hidden="true" />}
+          {scheduleMethod === "pickup" ? <Truck size={16} aria-hidden="true" /> : <Package size={16} aria-hidden="true" />}
           <span>
-            <strong>{scheduleMethod === "pickup" ? "Pickup" : "Drop off"}</strong>, {scheduleText}
+            <strong>{scheduleMethod === "pickup" ? "Pickup" : "Mail in"}</strong>, {scheduleText}
           </span>
         </div>
-        {scheduleMethod === "pickup" && (
-          <div className="booking-page-details-row">
-            <MapPin size={16} aria-hidden="true" />
-            <span>
-              {pickupAddress.address || "No address entered yet"}
-              {pickupAddress.apt && `, ${pickupAddress.apt}`}
-              <br />
-              {[pickupAddress.city, [pickupAddress.state, pickupAddress.zip].filter(Boolean).join(" ")]
-                .filter(Boolean)
-                .join(", ")}
-            </span>
-          </div>
-        )}
+        <div className="booking-page-details-row">
+          <MapPin size={16} aria-hidden="true" />
+          <span>
+            {pickupAddress.address || "No address entered yet"}
+            {pickupAddress.apt && `, ${pickupAddress.apt}`}
+            <br />
+            {[pickupAddress.city, [pickupAddress.state, pickupAddress.zip].filter(Boolean).join(" ")]
+              .filter(Boolean)
+              .join(", ")}
+          </span>
+        </div>
       </div>
 
       <div className="booking-page-review-card">
