@@ -9,10 +9,10 @@ import { ThemeToggle } from "./theme-toggle";
 export function SiteNav({ active }: { active?: "about" | "services" }) {
   return (
     <nav className="landing-nav">
-      <div className="landing-brand">
+      <Link href="/" className="landing-brand">
         <span className="landing-brand-name">Atunṣe</span>
         <span className="landing-brand-tag">RESTORE &amp; REVIVE</span>
-      </div>
+      </Link>
       <div className="landing-navlinks">
         <Link href="/services" className={active === "services" ? "active-link" : undefined}>
           Services
