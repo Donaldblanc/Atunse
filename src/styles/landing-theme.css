@@ -2180,6 +2180,10 @@
   white-space: nowrap;
 }
 
+.landing[data-theme="dark"] .booking-page-service-price span {
+  color: #b4bcd6;
+}
+
 .booking-page-badge {
   background: var(--blue-deep);
   color: #fff !important;
