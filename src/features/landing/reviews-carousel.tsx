@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowIcon } from "./arrow-icon";
 
 const REVIEW_INTERVAL_MS = 3000;
 
@@ -53,9 +54,7 @@ export function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
           </svg>
         </button>
         <button className="landing-review-nav-btn" aria-label="Next review" onClick={() => step(1)}>
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ArrowIcon size={13} />
         </button>
       </div>
     </div>

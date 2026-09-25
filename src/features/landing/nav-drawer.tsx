@@ -4,8 +4,10 @@
 // inside SiteNav. Hidden above the 640px breakpoint (landing-theme.css).
 import Link from "next/link";
 import { useState } from "react";
+import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
+import { BookRestorationCta } from "./book-restoration-cta";
 
-export function NavDrawer({ active }: { active?: "about" | "services" | "booking" } = {}) {
+export function NavDrawer({ active }: { active?: NavActive } = {}) {
   const [open, setOpen] = useState(false);
   const isBooking = active === "booking";
 
@@ -44,23 +46,15 @@ export function NavDrawer({ active }: { active?: "about" | "services" | "booking
           </button>
         </div>
         <nav onClick={() => setOpen(false)}>
-          <Link href="/services" className={active === "services" ? "active-link" : undefined}>
-            Services
-          </Link>
-          <Link href="/#gallery">Gallery</Link>
-          <Link href="/coming-soon">Process</Link>
-          <Link href="/about" className={active === "about" ? "active-link" : undefined}>
-            About
-          </Link>
+          {NAV_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className={navLinkClass(link, active)}>
+              {link.label}
+            </Link>
+          ))}
         </nav>
         {!isBooking && (
           <div className="landing-drawer-cta">
-            <Link className="landing-btn-primary" href="/booking" onClick={() => setOpen(false)}>
-              Book a restoration
-              <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
+            <BookRestorationCta onClick={() => setOpen(false)} />
           </div>
         )}
       </div>

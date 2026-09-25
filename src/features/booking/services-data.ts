@@ -10,10 +10,13 @@ export type BookingService = {
   icon: LucideIcon;
 };
 
-// Mirrors the services/pricing list on the home page and services page
-// (src/app/page.tsx SERVICES, scratch/landing-mock.html services-page) —
-// kept as a separate copy here since this list carries booking-specific
-// fields (price display strings, badge) the landing SERVICES array doesn't.
+// Granular SKUs for the booking flow. Mirrors the services/pricing list on
+// the home page (src/features/landing/services.ts SERVICES) — kept as a
+// separate list since this one carries booking-specific fields (price
+// display strings, badge) the landing SERVICES array doesn't. No
+// compile-time link between the two: a `category` field was tried in
+// #39/#54 but had no real consumer and left "protection" with no mapped
+// SKU, so it was removed rather than kept as dead code.
 export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "standard",

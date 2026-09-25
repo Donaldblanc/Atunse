@@ -27,7 +27,7 @@ const MONTH_NAMES = [
 const WINDOW_START_MINUTES = 16 * 60 + 30;
 const WINDOW_END_MINUTES = 22 * 60;
 
-function formatDate(date: Date) {
+export function formatDate(date: Date) {
   return `${WEEKDAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 

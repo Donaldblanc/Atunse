@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, Check, ChevronDown, Palette, Sparkles, Wrench } from "lucide-react";
+import { Check, ChevronDown, Palette, Sparkles, Wrench } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
+import { ArrowIcon } from "@/features/landing/arrow-icon";
 
 export const metadata = {
   title: "Services & Pricing — Atunṣe",
@@ -84,10 +86,7 @@ export default function ServicesPage() {
             From everyday cleaning to full restorations, we help bring new life to the sneakers you love.
           </p>
           <div className="landing-cta-row">
-            <Link className="landing-btn-primary" href="/booking">
-              Book a restoration
-              <ArrowRight size={14} aria-hidden="true" />
-            </Link>
+            <BookRestorationCta />
             <a className="services-page-btn-outline" href="#pricing-cleaning">
               See our process
               <ChevronDown size={13} aria-hidden="true" />
@@ -132,7 +131,7 @@ export default function ServicesPage() {
             </div>
             <Link className="landing-btn-primary" href={`/booking?service=${plan.serviceId}`}>
               {plan.cta}
-              <ArrowRight size={14} aria-hidden="true" />
+              <ArrowIcon />
             </Link>
           </div>
         ))}
@@ -181,10 +180,7 @@ export default function ServicesPage() {
           <p className="landing-eyebrow">READY TO RESTORE?</p>
           <h2>Give Your Sneakers a Second Life.</h2>
           <p>Book a restoration today and let&rsquo;s bring back the feeling.</p>
-          <Link className="landing-btn-primary" href="/booking">
-            Book a restoration
-            <ArrowRight size={14} aria-hidden="true" />
-          </Link>
+          <BookRestorationCta />
         </div>
         <div className="landing-about-cta-tagline">
           <span className="rule" />
