@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Calendar, Package, Sparkles, SportShoe } from "lucide-react";
+import { Suspense } from "react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -66,7 +67,9 @@ export default function BookingPage() {
         </div>
       </div>
 
-      <BookingFlow />
+      <Suspense fallback={null}>
+        <BookingFlow />
+      </Suspense>
 
       <div className="landing-section-head booking-page-how-head">
         <div>

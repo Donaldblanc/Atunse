@@ -20,6 +20,7 @@ import {
   Truck,
   User,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import { BOOKING_SERVICES } from "./services-data";
@@ -68,8 +69,12 @@ const SHIPPING_COPY: Record<ShippingMethod, { name: string; desc: string; icon: 
 // (docs/TODO.md) — "Book Now" is presentational, matching every other
 // not-yet-real CTA on the marketing site.
 export function BookingFlow() {
+  const searchParams = useSearchParams();
+  const requestedServiceId = searchParams.get("service");
   const [step, setStep] = useState<Step>("service");
-  const [selectedId, setSelectedId] = useState(BOOKING_SERVICES[0]!.id);
+  const [selectedId, setSelectedId] = useState(
+    () => BOOKING_SERVICES.find((service) => service.id === requestedServiceId)?.id ?? BOOKING_SERVICES[0]!.id,
+  );
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("mail-in");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("zelle");
   const [details, setDetails] = useState<ContactDetails>(EMPTY_DETAILS);

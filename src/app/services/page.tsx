@@ -11,6 +11,7 @@ export const metadata = {
 
 const CLEANING_PLANS = [
   {
+    serviceId: "standard",
     label: "STANDARD CLEAN",
     price: "$30",
     priceNote: "+$10 for Suede",
@@ -27,6 +28,7 @@ const CLEANING_PLANS = [
     badge: undefined as string | undefined,
   },
   {
+    serviceId: "premium",
     label: "PREMIUM CLEAN",
     price: "$50",
     priceNote: "+$10 for Suede",
@@ -128,7 +130,7 @@ export default function ServicesPage() {
                 </div>
               ))}
             </div>
-            <Link className="landing-btn-primary" href="/booking">
+            <Link className="landing-btn-primary" href={`/booking?service=${plan.serviceId}`}>
               {plan.cta}
               <ArrowRight size={14} aria-hidden="true" />
             </Link>
