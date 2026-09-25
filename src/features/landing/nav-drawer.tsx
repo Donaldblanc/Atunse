@@ -4,10 +4,10 @@
 // inside SiteNav. Hidden above the 640px breakpoint (landing-theme.css).
 import Link from "next/link";
 import { useState } from "react";
-import { NAV_LINKS } from "./nav-links";
+import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { BookRestorationCta } from "./book-restoration-cta";
 
-export function NavDrawer({ active }: { active?: "about" | "services" | "booking" } = {}) {
+export function NavDrawer({ active }: { active?: NavActive } = {}) {
   const [open, setOpen] = useState(false);
   const isBooking = active === "booking";
 
@@ -47,7 +47,7 @@ export function NavDrawer({ active }: { active?: "about" | "services" | "booking
         </div>
         <nav onClick={() => setOpen(false)}>
           {NAV_LINKS.map((link) => (
-            <Link key={link.href} href={link.href} className={link.activeKey === active ? "active-link" : undefined}>
+            <Link key={link.href} href={link.href} className={navLinkClass(link, active)}>
               {link.label}
             </Link>
           ))}

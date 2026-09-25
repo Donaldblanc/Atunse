@@ -50,7 +50,7 @@ export function BookingPanel() {
               <span>Final pricing based on condition and service</span>
             </div>
           </div>
-          <Link className="landing-btn-primary" href="/booking">
+          <Link className="landing-btn-primary" href="/booking?method=pickup">
             View pricing &amp; book now
             <ArrowIcon />
           </Link>
@@ -84,7 +84,7 @@ export function BookingPanel() {
               <span>Includes return shipping, condition-dependent</span>
             </div>
           </div>
-          <Link className="landing-btn-primary" href="/booking">
+          <Link className="landing-btn-primary" href="/booking?method=mail-in">
             Request a mail-in label
             <ArrowIcon />
           </Link>
