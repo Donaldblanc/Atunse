@@ -25,7 +25,7 @@
   --bg: #0a0e1a;
   --bg-panel: #10162a;
   --ink: #f5f6fb;
-  --ink-soft: #97a0bd;
+  --ink-soft: #b4bcd6;
   --line: #232c48;
   --card: #131a30;
 }
@@ -2178,10 +2178,6 @@
   font-size: 11.5px;
   color: var(--ink-soft);
   white-space: nowrap;
-}
-
-.landing[data-theme="dark"] .booking-page-service-price span {
-  color: #b4bcd6;
 }
 
 .booking-page-badge {
