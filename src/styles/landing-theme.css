@@ -3469,9 +3469,10 @@
   }
   .booking-page-service-price {
     flex: 1 0 100%;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 4px;
     margin-left: 34px;
   }
   .booking-page-layout {
