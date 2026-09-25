@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NAV_LINKS } from "./nav-links";
 
 export function SiteFooter({ active }: { active?: "about" | "services" | "booking" } = {}) {
   return (
@@ -9,14 +10,11 @@ export function SiteFooter({ active }: { active?: "about" | "services" | "bookin
           <span className="landing-brand-tag">RESTORE &amp; REVIVE</span>
         </div>
         <div className="landing-footer-links">
-          <Link href="/services" className={active === "services" ? "active-link" : undefined}>
-            Services
-          </Link>
-          <Link href="/#gallery">Gallery</Link>
-          <Link href="/coming-soon">Process</Link>
-          <Link href="/about" className={active === "about" ? "active-link" : undefined}>
-            About
-          </Link>
+          {NAV_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className={link.activeKey === active ? "active-link" : undefined}>
+              {link.label}
+            </Link>
+          ))}
           <Link href="/coming-soon">Contact</Link>
         </div>
         <div className="landing-footer-social">

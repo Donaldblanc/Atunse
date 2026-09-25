@@ -1,8 +1,8 @@
-import Link from "next/link";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 
 export const metadata = {
   title: "About — Atunṣe",
@@ -24,12 +24,7 @@ export default function AboutPage() {
             I&rsquo;m DJ, born in Brooklyn and raised in Queens, New York. What started with one pair
             and a necessity turned into a lifelong passion, a craft, and eventually RestoredByDJ.
           </p>
-          <Link className="landing-btn-primary" href="/booking">
-            Book a restoration
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
+          <BookRestorationCta />
           <div className="landing-about-tagline">
             <span className="rule" />
             SAME CULTURE.
@@ -200,12 +195,7 @@ export default function AboutPage() {
           <p className="landing-eyebrow">LET&rsquo;S BRING THEM BACK</p>
           <h2>Your Sneakers Deserve a Second Chapter.</h2>
           <p>Book a restoration today and let&rsquo;s bring back the feeling.</p>
-          <Link className="landing-btn-primary" href="/booking">
-            Book a restoration
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
+          <BookRestorationCta />
         </div>
         <div className="landing-about-cta-tagline">
           <span className="rule" />

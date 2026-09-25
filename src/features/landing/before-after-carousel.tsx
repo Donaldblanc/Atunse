@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import type { BeforeAfterImage } from "./gallery";
 import { getGalleryImageUrl } from "./gallery";
+import { ArrowIcon } from "./arrow-icon";
 
 export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -32,16 +33,12 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
             </svg>
           </button>
           <button className="landing-ba-nav" aria-label="Next" onClick={() => step(1)}>
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowIcon />
           </button>
         </div>
         <a className="landing-ba-more" href="#gallery">
           View more
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ArrowIcon size={13} strokeWidth={26} />
         </a>
       </div>
       <div className="landing-ba-track" ref={trackRef}>
@@ -61,9 +58,7 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
                   <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
                     <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
-                    <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <ArrowIcon size={9} strokeWidth={30} />
                 </div>
               </div>
               <div className="landing-ba-caption">{image.caption}</div>

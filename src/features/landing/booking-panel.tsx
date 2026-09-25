@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MapPin, Clock, Tag, Package } from "lucide-react";
 import { useState } from "react";
+import { ArrowIcon } from "./arrow-icon";
 
 type BookingMode = "in-person" | "mail-in";
 
@@ -51,9 +52,7 @@ export function BookingPanel() {
           </div>
           <Link className="landing-btn-primary" href="/booking">
             View pricing &amp; book now
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowIcon />
           </Link>
         </>
       ) : (
@@ -87,9 +86,7 @@ export function BookingPanel() {
           </div>
           <Link className="landing-btn-primary" href="/booking">
             Request a mail-in label
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowIcon />
           </Link>
         </>
       )}

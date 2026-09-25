@@ -1,4 +1,5 @@
 import { Crown, Droplet, Palette, Sparkles, SportShoe, type LucideIcon } from "lucide-react";
+import type { ServiceCategoryId } from "@/features/landing/services";
 
 export type BookingService = {
   id: string;
@@ -8,12 +9,11 @@ export type BookingService = {
   priceNote?: string;
   badge?: string;
   icon: LucideIcon;
+  category: ServiceCategoryId;
 };
 
-// Mirrors the services/pricing list on the home page and services page
-// (src/app/page.tsx SERVICES, scratch/landing-mock.html services-page) —
-// kept as a separate copy here since this list carries booking-specific
-// fields (price display strings, badge) the landing SERVICES array doesn't.
+// Granular SKUs for the booking flow. Each carries a `category` linking it
+// to a landing-page service category (src/features/landing/services.ts).
 export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "standard",
@@ -22,6 +22,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     price: "$30",
     priceNote: "+$10 for Suede",
     icon: SportShoe,
+    category: "cleaning",
   },
   {
     id: "premium",
@@ -31,6 +32,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     priceNote: "+$10 for Suede",
     badge: "MOST POPULAR",
     icon: Crown,
+    category: "cleaning",
   },
   {
     id: "oxidation",
@@ -39,6 +41,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     price: "Midsole from $25+",
     priceNote: "Sole from $40+",
     icon: Sparkles,
+    category: "restoration",
   },
   {
     id: "painting",
@@ -46,6 +49,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     description: "Custom color changes, touch-ups, and dye work to refresh, restore, or transform your shoes.",
     price: "Starting at $40+",
     icon: Palette,
+    category: "custom-work",
   },
   {
     id: "reglue",
@@ -53,6 +57,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     description: "Professional sole separation repair to securely reattach and restore your sneakers.",
     price: "Starting at $50+",
     icon: Droplet,
+    category: "restoration",
   },
 ];
 
