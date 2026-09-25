@@ -5,8 +5,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function NavDrawer({ active }: { active?: "about" } = {}) {
+export function NavDrawer({ active }: { active?: "about" | "services" | "booking" } = {}) {
   const [open, setOpen] = useState(false);
+  const isBooking = active === "booking";
 
   return (
     <>
@@ -43,21 +44,25 @@ export function NavDrawer({ active }: { active?: "about" } = {}) {
           </button>
         </div>
         <nav onClick={() => setOpen(false)}>
-          <Link href="/#services">Services</Link>
+          <Link href="/services" className={active === "services" ? "active-link" : undefined}>
+            Services
+          </Link>
           <Link href="/#gallery">Gallery</Link>
           <Link href="/coming-soon">Process</Link>
           <Link href="/about" className={active === "about" ? "active-link" : undefined}>
             About
           </Link>
         </nav>
-        <div className="landing-drawer-cta">
-          <Link className="landing-btn-primary" href="/booking" onClick={() => setOpen(false)}>
-            Book a restoration
-            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
-        </div>
+        {!isBooking && (
+          <div className="landing-drawer-cta">
+            <Link className="landing-btn-primary" href="/booking" onClick={() => setOpen(false)}>
+              Book a restoration
+              <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+                <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+          </div>
+        )}
       </div>
     </>
   );
