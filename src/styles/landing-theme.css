@@ -3188,6 +3188,63 @@
   border-width: 5px;
 }
 
+/* ---------- Booking flow switch (single pair vs 3-pair bundle) ---------- */
+
+.booking-page-flow-switch {
+  display: inline-flex;
+  background: var(--bg-panel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+
+.booking-page-flow-switch button {
+  border: none;
+  background: none;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.booking-page-flow-switch button[data-active="true"] {
+  background: var(--blue);
+  color: #fff;
+}
+
+.booking-page-pair-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+
+.booking-page-pair-tabs button {
+  border: none;
+  background: none;
+  padding: 10px 4px;
+  margin-right: 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.booking-page-pair-tabs button[data-active="true"] {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.booking-page-char-count {
+  align-self: flex-end;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+
 .booking-page-how-head {
   padding-top: 40px;
 }

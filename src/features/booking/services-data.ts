@@ -55,3 +55,51 @@ export const BOOKING_SERVICES: BookingService[] = [
     icon: Droplet,
   },
 ];
+
+export type BookingBundle = {
+  id: string;
+  name: string;
+  price: string;
+  perks: string[];
+  icon: LucideIcon;
+};
+
+// 3-pair bundles: an alternate booking flow to BOOKING_SERVICES for
+// customers booking multiple pairs at once (scratch/landing-mock.html's
+// "3-Pair Bundle Flow"). Every bundle includes Premium Clean on all 3
+// pairs with the suede fee waived; perks above that vary by tier.
+export const BOOKING_BUNDLES: BookingBundle[] = [
+  {
+    id: "revival",
+    name: "The Revival Pack",
+    price: "$150",
+    perks: ["Premium Clean (all 3 pairs)", "Suede fee waived", "Priority turnaround", "Oxidation touch-up on 1 pair"],
+    icon: Crown,
+  },
+  {
+    id: "restoration",
+    name: "The Restoration Trio",
+    price: "$175",
+    perks: [
+      "Premium Clean (all 3 pairs)",
+      "Suede fee waived",
+      "Deep sole whitening (all pairs)",
+      "Oxidation midsole on 1 pair",
+    ],
+    icon: Sparkles,
+  },
+  {
+    id: "collector",
+    name: "The Collector’s Triple",
+    price: "$200",
+    perks: [
+      "Premium Clean (all 3 pairs)",
+      "Suede fee waived",
+      "Oxidation midsole (2 pairs)",
+      "Reglue inspection",
+      "Paint/dye touch-up on 1 pair",
+      "VIP turnaround (48–72 hours)",
+    ],
+    icon: Palette,
+  },
+];
