@@ -9,6 +9,9 @@ import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 type FlowType = "single" | "bundle";
 type Step = "service" | "details" | "schedule" | "review";
 type ScheduleMethod = "pickup" | "drop-off";
+type PairDetails = { brand: string; material: string; notes: string };
+
+const EMPTY_PAIR: PairDetails = { brand: "", material: "", notes: "" };
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
@@ -30,6 +33,8 @@ export function BookingFlow() {
   const [selectedServiceId, setSelectedServiceId] = useState(BOOKING_SERVICES[0]!.id);
   const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
   const [activePair, setActivePair] = useState(0);
+  const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
+  const [pairs, setPairs] = useState<PairDetails[]>([EMPTY_PAIR, EMPTY_PAIR, EMPTY_PAIR]);
   const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>("pickup");
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [dropoffSelection, setDropoffSelection] = useState<PickupSelection | null>(null);
@@ -46,6 +51,10 @@ export function BookingFlow() {
 
   function goBack() {
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
+  }
+
+  function changePair(index: number, details: PairDetails) {
+    setPairs((prev) => prev.map((pair, i) => (i === index ? details : pair)));
   }
 
   return (
@@ -110,7 +119,16 @@ export function BookingFlow() {
         )}
 
         {step === "details" && (
-          <DetailsStep isBundle={isBundle} activePair={activePair} onSelectPair={setActivePair} onContinue={() => setStep("schedule")} />
+          <DetailsStep
+            isBundle={isBundle}
+            activePair={activePair}
+            onSelectPair={setActivePair}
+            singlePair={singlePair}
+            onChangeSinglePair={setSinglePair}
+            pairs={pairs}
+            onChangePair={changePair}
+            onContinue={() => setStep("schedule")}
+          />
         )}
 
         {step === "schedule" && (
@@ -132,6 +150,7 @@ export function BookingFlow() {
             price={selectedPrice}
             priceNote={selectedPriceNote}
             Icon={SelectedIcon}
+            pairDetails={isBundle ? pairs[0]! : singlePair}
             scheduleMethod={scheduleMethod}
             scheduleSelection={scheduleSelection}
             onEdit={setStep}
@@ -308,8 +327,17 @@ function ServiceStep({
   );
 }
 
-function PairForm({ pairLabel, brandPlaceholder }: { pairLabel?: string; brandPlaceholder: string }) {
-  const [notes, setNotes] = useState("");
+function PairForm({
+  pairLabel,
+  brandPlaceholder,
+  details,
+  onChange,
+}: {
+  pairLabel?: string;
+  brandPlaceholder: string;
+  details: PairDetails;
+  onChange: (details: PairDetails) => void;
+}) {
   return (
     <>
       {pairLabel && (
@@ -320,11 +348,16 @@ function PairForm({ pairLabel, brandPlaceholder }: { pairLabel?: string; brandPl
       <div className="booking-page-form-grid">
         <label className="booking-page-field">
           <span>Brand / Model</span>
-          <input type="text" placeholder={brandPlaceholder} />
+          <input
+            type="text"
+            placeholder={brandPlaceholder}
+            value={details.brand}
+            onChange={(e) => onChange({ ...details, brand: e.target.value })}
+          />
         </label>
         <label className="booking-page-field">
           <span>Material (optional)</span>
-          <select defaultValue="">
+          <select value={details.material} onChange={(e) => onChange({ ...details, material: e.target.value })}>
             <option value="" disabled>
               Select material
             </option>
@@ -340,11 +373,11 @@ function PairForm({ pairLabel, brandPlaceholder }: { pairLabel?: string; brandPl
           <span>Additional notes (optional)</span>
           <textarea
             maxLength={500}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            value={details.notes}
+            onChange={(e) => onChange({ ...details, notes: e.target.value })}
             placeholder="Tell us anything we should know..."
           />
-          <span className="booking-page-char-count">{notes.length}/500</span>
+          <span className="booking-page-char-count">{details.notes.length}/500</span>
         </label>
         <div className="booking-page-field">
           <span>Upload photos (optional)</span>
@@ -366,11 +399,19 @@ function DetailsStep({
   isBundle,
   activePair,
   onSelectPair,
+  singlePair,
+  onChangeSinglePair,
+  pairs,
+  onChangePair,
   onContinue,
 }: {
   isBundle: boolean;
   activePair: number;
   onSelectPair: (index: number) => void;
+  singlePair: PairDetails;
+  onChangeSinglePair: (details: PairDetails) => void;
+  pairs: PairDetails[];
+  onChangePair: (index: number, details: PairDetails) => void;
   onContinue: () => void;
 }) {
   return (
@@ -391,13 +432,14 @@ function DetailsStep({
             ))}
           </div>
           <PairForm
-            key={activePair}
             pairLabel={`Pair details (${activePair + 1} of 3)`}
             brandPlaceholder="e.g. Nike Air Jordan 1"
+            details={pairs[activePair]!}
+            onChange={(details) => onChangePair(activePair, details)}
           />
         </>
       ) : (
-        <PairForm brandPlaceholder="e.g. Nike Air Force 1" />
+        <PairForm brandPlaceholder="e.g. Nike Air Force 1" details={singlePair} onChange={onChangeSinglePair} />
       )}
 
       <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
@@ -516,6 +558,7 @@ function ReviewStep({
   price,
   priceNote,
   Icon,
+  pairDetails,
   scheduleMethod,
   scheduleSelection,
   onEdit,
@@ -525,6 +568,7 @@ function ReviewStep({
   price: string;
   priceNote: string | undefined;
   Icon: typeof Truck;
+  pairDetails: PairDetails;
   scheduleMethod: ScheduleMethod;
   scheduleSelection: PickupSelection | null;
   onEdit: (step: Step) => void;
@@ -561,12 +605,12 @@ function ReviewStep({
         <div className="booking-page-details-row" style={{ marginTop: 14 }}>
           <User size={16} aria-hidden="true" />
           <span>
-            Brand / Model: <strong>&mdash;</strong>
+            Brand / Model: <strong>{pairDetails.brand || "—"}</strong>
           </span>
         </div>
         <div className="booking-page-details-row">
           <span>
-            Material: <strong>&mdash;</strong>
+            Material: <strong>{pairDetails.material || "—"}</strong>
           </span>
         </div>
         <div className="booking-page-details-row">
@@ -577,7 +621,7 @@ function ReviewStep({
         </div>
         <div className="booking-page-details-row">
           <span>
-            Notes: <strong>No notes</strong>
+            Notes: <strong>{pairDetails.notes || "No notes"}</strong>
           </span>
         </div>
       </div>
