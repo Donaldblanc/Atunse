@@ -11,8 +11,10 @@ type FlowType = "single" | "bundle";
 type Step = "service" | "details" | "schedule" | "review";
 type ScheduleMethod = "pickup" | "drop-off";
 type PairDetails = { brand: string; material: string; notes: string };
+type PickupAddress = { address: string; apt: string; city: string; state: string; zip: string };
 
 const EMPTY_PAIR: PairDetails = { brand: "", material: "", notes: "" };
+const EMPTY_ADDRESS: PickupAddress = { address: "", apt: "", city: "", state: "", zip: "" };
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
@@ -41,6 +43,7 @@ export function BookingFlow() {
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
   const [pairs, setPairs] = useState<PairDetails[]>([EMPTY_PAIR, EMPTY_PAIR, EMPTY_PAIR]);
   const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>("pickup");
+  const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [dropoffSelection, setDropoffSelection] = useState<PickupSelection | null>(null);
 
@@ -140,6 +143,8 @@ export function BookingFlow() {
           <ScheduleStep
             method={scheduleMethod}
             onSelectMethod={setScheduleMethod}
+            pickupAddress={pickupAddress}
+            onChangePickupAddress={setPickupAddress}
             pickupSelection={pickupSelection}
             onConfirmPickup={setPickupSelection}
             dropoffSelection={dropoffSelection}
@@ -157,6 +162,7 @@ export function BookingFlow() {
             Icon={SelectedIcon}
             pairDetails={isBundle ? pairs[0]! : singlePair}
             scheduleMethod={scheduleMethod}
+            pickupAddress={pickupAddress}
             scheduleSelection={scheduleSelection}
             onEdit={setStep}
           />
@@ -458,6 +464,8 @@ function DetailsStep({
 function ScheduleStep({
   method,
   onSelectMethod,
+  pickupAddress,
+  onChangePickupAddress,
   pickupSelection,
   onConfirmPickup,
   dropoffSelection,
@@ -466,6 +474,8 @@ function ScheduleStep({
 }: {
   method: ScheduleMethod;
   onSelectMethod: (method: ScheduleMethod) => void;
+  pickupAddress: PickupAddress;
+  onChangePickupAddress: (address: PickupAddress) => void;
   pickupSelection: PickupSelection | null;
   onConfirmPickup: (selection: PickupSelection) => void;
   dropoffSelection: PickupSelection | null;
@@ -504,13 +514,59 @@ function ScheduleStep({
               PICKUP ADDRESS
             </p>
           </div>
-          <div className="booking-page-picker-row" style={{ cursor: "default" }}>
-            <MapPin size={16} aria-hidden="true" />
-            <span>
-              123 Main St, Apt 4B
-              <br />
-              New York, NY 10001
-            </span>
+          <div className="booking-page-form-grid">
+            <label className="booking-page-field">
+              <span>Address</span>
+              <input
+                type="text"
+                placeholder="e.g. 123 Main St"
+                value={pickupAddress.address}
+                onChange={(e) => onChangePickupAddress({ ...pickupAddress, address: e.target.value })}
+              />
+            </label>
+            <label className="booking-page-field">
+              <span>Apt, suite, etc. (optional)</span>
+              <input
+                type="text"
+                placeholder="e.g. Apt 4B"
+                value={pickupAddress.apt}
+                onChange={(e) => onChangePickupAddress({ ...pickupAddress, apt: e.target.value })}
+              />
+            </label>
+          </div>
+          <div className="booking-page-form-grid booking-page-form-grid-thirds">
+            <label className="booking-page-field">
+              <span>City</span>
+              <input
+                type="text"
+                placeholder="e.g. New York"
+                value={pickupAddress.city}
+                onChange={(e) => onChangePickupAddress({ ...pickupAddress, city: e.target.value })}
+              />
+            </label>
+            <label className="booking-page-field">
+              <span>State / Province</span>
+              <select
+                value={pickupAddress.state}
+                onChange={(e) => onChangePickupAddress({ ...pickupAddress, state: e.target.value })}
+              >
+                <option value="" disabled>
+                  Select
+                </option>
+                <option>NY</option>
+                <option>NJ</option>
+                <option>CT</option>
+              </select>
+            </label>
+            <label className="booking-page-field">
+              <span>Zip / Postal code</span>
+              <input
+                type="text"
+                placeholder="e.g. 10001"
+                value={pickupAddress.zip}
+                onChange={(e) => onChangePickupAddress({ ...pickupAddress, zip: e.target.value })}
+              />
+            </label>
           </div>
 
           <div className="booking-page-section-head booking-page-section-head-tight">
@@ -565,6 +621,7 @@ function ReviewStep({
   Icon,
   pairDetails,
   scheduleMethod,
+  pickupAddress,
   scheduleSelection,
   onEdit,
 }: {
@@ -575,6 +632,7 @@ function ReviewStep({
   Icon: typeof Truck;
   pairDetails: PairDetails;
   scheduleMethod: ScheduleMethod;
+  pickupAddress: PickupAddress;
   scheduleSelection: PickupSelection | null;
   onEdit: (step: Step) => void;
 }) {
@@ -648,9 +706,12 @@ function ReviewStep({
           <div className="booking-page-details-row">
             <MapPin size={16} aria-hidden="true" />
             <span>
-              123 Main St, Apt 4B
+              {pickupAddress.address || "No address entered yet"}
+              {pickupAddress.apt && `, ${pickupAddress.apt}`}
               <br />
-              New York, NY 10001
+              {[pickupAddress.city, [pickupAddress.state, pickupAddress.zip].filter(Boolean).join(" ")]
+                .filter(Boolean)
+                .join(", ")}
             </span>
           </div>
         )}
