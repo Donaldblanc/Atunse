@@ -1,14 +1,10 @@
 "use client";
 
 import { useRef } from "react";
-import type { GalleryImage } from "./gallery";
+import type { BeforeAfterImage } from "./gallery";
 import { getGalleryImageUrl } from "./gallery";
 
-// Each source photo has "After" baked into its top half and "Before" into
-// its bottom half (see gallery.ts / docs/TODO.md — the pixel-accurate crop
-// into separate files is still a TODO). background-size: cover +
-// background-position: top/bottom crops each half without distorting it.
-export function BeforeAfterCarousel({ images }: { images: GalleryImage[] }) {
+export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) {
   const trackRef = useRef<HTMLDivElement>(null);
 
   function step(dir: 1 | -1) {
@@ -50,15 +46,27 @@ export function BeforeAfterCarousel({ images }: { images: GalleryImage[] }) {
       </div>
       <div className="landing-ba-track" ref={trackRef}>
         {images.map((image) => {
-          const url = getGalleryImageUrl(image.key);
+          const beforeUrl = getGalleryImageUrl(image.beforeKey);
+          const afterUrl = getGalleryImageUrl(image.afterKey);
           return (
-            <div className="landing-ba-card" key={image.key}>
-              <div className="landing-ba-half before" style={{ backgroundImage: `url(${url})` }}>
-                <div className="landing-ba-pill">BEFORE</div>
+            <div className="landing-ba-card" key={image.afterKey}>
+              <div className="landing-ba-photo">
+                <div className="landing-ba-half before" style={{ backgroundImage: `url(${beforeUrl})` }}>
+                  <div className="landing-ba-pill">Before</div>
+                </div>
+                <div className="landing-ba-half after" style={{ backgroundImage: `url(${afterUrl})` }}>
+                  <div className="landing-ba-pill">After</div>
+                </div>
+                <div className="landing-ba-handle" aria-hidden="true">
+                  <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
+                    <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
+                    <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
               </div>
-              <div className="landing-ba-half after" style={{ backgroundImage: `url(${url})` }}>
-                <div className="landing-ba-pill">AFTER</div>
-              </div>
+              <div className="landing-ba-caption">{image.caption}</div>
             </div>
           );
         })}

@@ -24,33 +24,29 @@ export const COMING_SOON_HERO_IMAGE: GalleryImage = {
   alt: "Sneaker restoration in progress",
 };
 
-export const GALLERY_IMAGES: GalleryImage[] = [
-  { key: "gallery-01.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-02.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-03.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-04.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-05.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-06.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-07.jpg", alt: "Restored sneaker, before and after" },
-  { key: "gallery-08.jpg", alt: "Restored sneaker, before and after" },
-];
-
-// Services grid (4 cards) — reuses the same committed gallery photos.
+// Services grid (4 cards) — one representative photo per category.
 export const SERVICE_IMAGES: [GalleryImage, GalleryImage, GalleryImage, GalleryImage] = [
-  { key: "gallery-01.jpg", alt: "Sneaker cleaning" },
-  { key: "gallery-02.jpg", alt: "Sneaker restoration" },
-  { key: "gallery-03.jpg", alt: "Sneaker protection" },
-  { key: "gallery-04.jpg", alt: "Custom sneaker work" },
+  { key: "cleaning.jpg", alt: "Sneaker cleaning" },
+  { key: "restoration.jpg", alt: "Sneaker restoration" },
+  { key: "protection.jpg", alt: "Sneaker protection" },
+  { key: "custom-work.jpg", alt: "Custom sneaker work" },
 ];
 
-// Before/After band (3 cards) — each photo has "After" baked into its top
-// half and "Before" into its bottom half (see docs/TODO.md: the real
-// pixel-accurate crop into separate files is still a TODO; this uses the
-// same background-position approximation as the mock in the meantime).
-export const BEFORE_AFTER_IMAGES: GalleryImage[] = [
-  { key: "gallery-05.jpg", alt: "Before and after restoration" },
-  { key: "gallery-06.jpg", alt: "Before and after restoration" },
-  { key: "gallery-07.jpg", alt: "Before and after restoration" },
+export interface BeforeAfterImage {
+  beforeKey: string;
+  afterKey: string;
+  caption: string;
+}
+
+// Before/After band — pixel-accurate before/after crops, one pair per
+// restoration (see public/images/landing/README.txt for how these were cut).
+export const BEFORE_AFTER_IMAGES: BeforeAfterImage[] = [
+  { beforeKey: "converse-weapon-before.jpg", afterKey: "converse-weapon-after.jpg", caption: "Converse Weapon" },
+  { beforeKey: "travis-scott-aj1-low-before.jpg", afterKey: "travis-scott-aj1-low-after.jpg", caption: "Travis Scott x Air Jordan 1 Low" },
+  { beforeKey: "jordan4-offwhite-before.jpg", afterKey: "jordan4-offwhite-after.jpg", caption: 'Air Jordan 4 "Off-White"' },
+  { beforeKey: "jordan11-concord-before.jpg", afterKey: "jordan11-concord-after.jpg", caption: 'Air Jordan 11 "Concord"' },
+  { beforeKey: "bottega-veneta-orbit-before.jpg", afterKey: "bottega-veneta-orbit-after.jpg", caption: "Bottega Veneta Orbit" },
+  { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"' },
 ];
 
 export function getGalleryImageUrl(key: string): string {
