@@ -2,6 +2,7 @@
 
 import { ArrowRight, Check, type LucideIcon } from "lucide-react";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
+import { SERVICES } from "@/features/landing/services";
 
 function ServiceRow({
   Icon,
@@ -86,19 +87,28 @@ export function ServiceStep({
                 onClick={() => onSelectBundle(bundle.id)}
               />
             ))
-          : BOOKING_SERVICES.map((service) => (
-              <ServiceRow
-                key={service.id}
-                Icon={service.icon}
-                name={service.name}
-                subtitle={service.description}
-                price={service.price}
-                priceNote={service.priceNote}
-                badge={service.badge}
-                isActive={service.id === selectedServiceId}
-                onClick={() => onSelectService(service.id)}
-              />
-            ))}
+          : SERVICES.flatMap((category) => {
+              const services = BOOKING_SERVICES.filter((service) => service.category === category.id);
+              if (services.length === 0) return [];
+              return [
+                <p className="booking-page-service-group-label" key={category.id}>
+                  {category.title}
+                </p>,
+                ...services.map((service) => (
+                  <ServiceRow
+                    key={service.id}
+                    Icon={service.icon}
+                    name={service.name}
+                    subtitle={service.description}
+                    price={service.price}
+                    priceNote={service.priceNote}
+                    badge={service.badge}
+                    isActive={service.id === selectedServiceId}
+                    onClick={() => onSelectService(service.id)}
+                  />
+                )),
+              ];
+            })}
       </div>
 
       <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
