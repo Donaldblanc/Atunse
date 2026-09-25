@@ -21,6 +21,7 @@ import {
   User,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import { BOOKING_SERVICES } from "./services-data";
 
 type Step = "service" | "details" | "checkout";
@@ -72,6 +73,7 @@ export function BookingFlow() {
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("mail-in");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cashapp");
   const [details, setDetails] = useState<ContactDetails>(EMPTY_DETAILS);
+  const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const selected = BOOKING_SERVICES.find((service) => service.id === selectedId) ?? BOOKING_SERVICES[0]!;
   const SelectedIcon = selected.icon;
   const FulfillmentIcon = SHIPPING_COPY[shippingMethod].icon;
@@ -297,47 +299,116 @@ export function BookingFlow() {
               </button>
             </div>
 
-            <div className="booking-page-form-grid">
-              <label className="booking-page-field">
-                <span>Address</span>
-                <input ref={addressRef} type="text" placeholder="e.g. 123 Main St" defaultValue={details.address} />
-              </label>
-              <label className="booking-page-field">
-                <span>Apt, suite, etc. (optional)</span>
-                <input ref={aptRef} type="text" placeholder="e.g. Apt 4B" defaultValue={details.apt} />
-              </label>
-            </div>
-            <div className="booking-page-form-grid booking-page-form-grid-thirds">
-              <label className="booking-page-field">
-                <span>City</span>
-                <input ref={cityRef} type="text" placeholder="e.g. New York" defaultValue={details.city} />
-              </label>
-              <label className="booking-page-field">
-                <span>State / Province</span>
-                <select ref={stateRef} defaultValue={details.state || ""}>
-                  <option value="" disabled>
-                    Select
-                  </option>
-                  <option>NY</option>
-                  <option>NJ</option>
-                  <option>CT</option>
-                </select>
-              </label>
-              <label className="booking-page-field">
-                <span>Zip / Postal code</span>
-                <input ref={zipRef} type="text" placeholder="e.g. 10001" defaultValue={details.zip} />
-              </label>
-            </div>
+            {shippingMethod === "mail-in" ? (
+              <>
+                <div className="booking-page-form-grid">
+                  <label className="booking-page-field">
+                    <span>Address</span>
+                    <input ref={addressRef} type="text" placeholder="e.g. 123 Main St" defaultValue={details.address} />
+                  </label>
+                  <label className="booking-page-field">
+                    <span>Apt, suite, etc. (optional)</span>
+                    <input ref={aptRef} type="text" placeholder="e.g. Apt 4B" defaultValue={details.apt} />
+                  </label>
+                </div>
+                <div className="booking-page-form-grid booking-page-form-grid-thirds">
+                  <label className="booking-page-field">
+                    <span>City</span>
+                    <input ref={cityRef} type="text" placeholder="e.g. New York" defaultValue={details.city} />
+                  </label>
+                  <label className="booking-page-field">
+                    <span>State / Province</span>
+                    <select ref={stateRef} defaultValue={details.state || ""}>
+                      <option value="" disabled>
+                        Select
+                      </option>
+                      <option>NY</option>
+                      <option>NJ</option>
+                      <option>CT</option>
+                    </select>
+                  </label>
+                  <label className="booking-page-field">
+                    <span>Zip / Postal code</span>
+                    <input ref={zipRef} type="text" placeholder="e.g. 10001" defaultValue={details.zip} />
+                  </label>
+                </div>
 
-            <div className="booking-page-form-grid">
-              <label className="booking-page-field booking-page-field-icon">
-                <span>Preferred date (optional)</span>
-                <span className="booking-page-input-wrap">
-                  <Calendar size={16} aria-hidden="true" />
-                  <input ref={dateRef} type="date" defaultValue={details.date} />
-                </span>
-              </label>
-            </div>
+                <div className="booking-page-form-grid">
+                  <label className="booking-page-field booking-page-field-icon">
+                    <span>Preferred date (optional)</span>
+                    <span className="booking-page-input-wrap">
+                      <Calendar size={16} aria-hidden="true" />
+                      <input ref={dateRef} type="date" defaultValue={details.date} />
+                    </span>
+                  </label>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="booking-page-pickup-card">
+                  <span className="booking-page-pickup-card-icon" aria-hidden="true">
+                    <Truck size={22} />
+                  </span>
+                  <span>
+                    <strong>Pickup</strong>
+                    <span>We&rsquo;ll collect your sneakers from your address.</span>
+                  </span>
+                </div>
+
+                <div className="booking-page-section-head booking-page-section-head-tight">
+                  <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
+                    PICKUP DATE
+                  </p>
+                </div>
+                <PickupDatePicker selection={pickupSelection} onConfirm={setPickupSelection} />
+
+                <div className="booking-page-info-box">
+                  <Info size={16} aria-hidden="true" />
+                  <span>
+                    Available pickup times are between
+                    <br />
+                    <strong>4:30 PM &ndash; 10:00 PM.</strong>
+                  </span>
+                </div>
+
+                <div className="booking-page-section-head booking-page-section-head-tight">
+                  <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
+                    PICKUP ADDRESS
+                  </p>
+                </div>
+                <div className="booking-page-form-grid">
+                  <label className="booking-page-field">
+                    <span>Address</span>
+                    <input ref={addressRef} type="text" placeholder="e.g. 123 Main St" defaultValue={details.address} />
+                  </label>
+                  <label className="booking-page-field">
+                    <span>Apt, suite, etc. (optional)</span>
+                    <input ref={aptRef} type="text" placeholder="e.g. Apt 4B" defaultValue={details.apt} />
+                  </label>
+                </div>
+                <div className="booking-page-form-grid booking-page-form-grid-thirds">
+                  <label className="booking-page-field">
+                    <span>City</span>
+                    <input ref={cityRef} type="text" placeholder="e.g. New York" defaultValue={details.city} />
+                  </label>
+                  <label className="booking-page-field">
+                    <span>State / Province</span>
+                    <select ref={stateRef} defaultValue={details.state || ""}>
+                      <option value="" disabled>
+                        Select
+                      </option>
+                      <option>NY</option>
+                      <option>NJ</option>
+                      <option>CT</option>
+                    </select>
+                  </label>
+                  <label className="booking-page-field">
+                    <span>Zip / Postal code</span>
+                    <input ref={zipRef} type="text" placeholder="e.g. 10001" defaultValue={details.zip} />
+                  </label>
+                </div>
+              </>
+            )}
 
             <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={goToCheckout}>
               Continue to Checkout

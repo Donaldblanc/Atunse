@@ -2559,6 +2559,316 @@
   font-size: 12.5px;
 }
 
+/* ---------- Pickup date/time picker ---------- */
+
+.booking-page-pickup-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 20px;
+  background: var(--card);
+}
+
+.booking-page-pickup-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.booking-page-pickup-card strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 2px;
+}
+
+.booking-page-pickup-card span span {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.booking-page-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px 14px;
+  background: var(--card);
+  text-align: left;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 14px;
+  min-width: 0;
+}
+
+.booking-page-picker-row svg:first-child {
+  color: var(--ink-soft);
+  flex: none;
+}
+
+.booking-page-picker-row span {
+  flex: 1;
+  min-width: 0;
+}
+
+.booking-page-picker-chevron {
+  color: var(--ink-soft);
+  flex: none;
+}
+
+.booking-page-info-box {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--bg-panel);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.5;
+  margin-bottom: 16px;
+  min-width: 0;
+}
+
+.booking-page-info-box svg {
+  color: var(--blue);
+  flex: none;
+  margin-top: 1px;
+}
+
+.booking-page-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 26, 0.45);
+  z-index: 190;
+}
+
+.booking-page-modal {
+  position: fixed;
+  z-index: 191;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 480px);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
+.booking-page-modal-sheet-handle {
+  display: none;
+}
+
+.booking-page-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.booking-page-modal-head h3 {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.landing[data-theme="dark"] .booking-page-modal-head h3 {
+  color: #fff;
+}
+
+.booking-page-modal-head p {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.booking-page-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.booking-page-calendar-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.booking-page-calendar-nav strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.booking-page-calendar-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.booking-page-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.booking-page-calendar-weekdays span {
+  min-width: 0;
+}
+
+.booking-page-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.booking-page-calendar-day {
+  aspect-ratio: 1;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+}
+
+.booking-page-calendar-day[data-outside="true"] {
+  color: var(--line);
+}
+
+.booking-page-calendar-day[data-disabled="true"] {
+  color: var(--line);
+  pointer-events: none;
+}
+
+.booking-page-calendar-day[data-active="true"] {
+  background: var(--blue);
+  color: #fff;
+  font-weight: 800;
+}
+
+.booking-page-calendar-day:not([data-disabled="true"]):not([data-outside="true"]):hover {
+  background: var(--bg-panel);
+}
+
+.booking-page-time-date-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.booking-page-time-date-row svg {
+  color: var(--ink-soft);
+  flex: none;
+}
+
+.booking-page-time-date-row strong {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.booking-page-time-change-btn {
+  background: none;
+  border: none;
+  color: var(--blue);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.booking-page-time-caption {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.booking-page-time-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.booking-page-time-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px 14px;
+  background: var(--card);
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.booking-page-time-slot[data-active="true"] {
+  border-color: var(--blue);
+  background: var(--bg-panel);
+}
+
+.booking-page-time-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex: none;
+  position: relative;
+}
+
+.booking-page-time-slot[data-active="true"] .booking-page-time-radio {
+  border-color: var(--blue);
+  border-width: 5px;
+}
+
 .booking-page-how-head {
   padding-top: 40px;
 }
@@ -2890,5 +3200,24 @@
   }
   .booking-page-payment-chevron {
     margin-left: auto;
+  }
+  .booking-page-modal {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    transform: none;
+    width: 100%;
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+    padding: 12px 20px 24px;
+  }
+  .booking-page-modal-sheet-handle {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line);
+    margin: 0 auto 14px;
   }
 }
