@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import { PairForm } from "./pair-form";
 import type { PairDetails } from "./booking-types";

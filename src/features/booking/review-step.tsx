@@ -1,6 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Mail, MapPin, Package, Phone, Truck, User } from "lucide-react";
-import type { PickupSelection } from "./pickup-date-picker";
+import { ArrowRight, ImagePlus, Mail, MapPin, Package, Phone, Truck, User, type LucideIcon } from "lucide-react";
+import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
 
 export function ReviewStep({
@@ -20,7 +22,7 @@ export function ReviewStep({
   name: string;
   price: string;
   priceNote: string | undefined;
-  Icon: typeof Truck;
+  Icon: LucideIcon;
   pairDetails: PairDetails;
   scheduleMethod: ScheduleMethod;
   pickupAddress: PickupAddress;
@@ -31,10 +33,10 @@ export function ReviewStep({
   const scheduleText =
     scheduleMethod === "pickup"
       ? pickupSelection
-        ? `${pickupSelection.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${pickupSelection.time}`
+        ? `${formatDate(pickupSelection.date)} · ${pickupSelection.time}`
         : "Not scheduled yet"
       : mailInDate
-        ? mailInDate.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+        ? formatDate(mailInDate.date)
         : "No preferred date selected";
 
   return (
@@ -115,9 +117,8 @@ export function ReviewStep({
       <div className="booking-page-review-card">
         <div className="booking-page-review-head">
           <span>CONTACT</span>
-          <button type="button" className="booking-page-edit-link" onClick={() => onEdit("schedule")}>
-            Edit
-          </button>
+          {/* No step collects name/email/phone yet (docs/TODO.md) — no
+              Edit link until one does; see #55 review. */}
         </div>
         <div className="booking-page-details-row">
           <User size={16} aria-hidden="true" />

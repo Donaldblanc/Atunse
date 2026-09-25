@@ -1,3 +1,5 @@
+"use client";
+
 import { ArrowRight, Info, Package, Truck } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";

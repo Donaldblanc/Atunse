@@ -1,5 +1,55 @@
-import { ArrowRight, Check } from "lucide-react";
+"use client";
+
+import { ArrowRight, Check, type LucideIcon } from "lucide-react";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
+
+function ServiceRow({
+  Icon,
+  name,
+  subtitle,
+  price,
+  priceNote,
+  badge,
+  isActive,
+  onClick,
+}: {
+  Icon: LucideIcon;
+  name: string;
+  subtitle: string;
+  price: string;
+  priceNote?: string;
+  badge?: string;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="booking-page-service-row"
+      data-active={isActive}
+      onClick={onClick}
+      aria-pressed={isActive}
+    >
+      <span className="booking-page-service-check" aria-hidden="true">
+        <Check size={12} />
+      </span>
+      <span className="booking-page-service-icon" aria-hidden="true">
+        <Icon size={20} />
+      </span>
+      <span className="booking-page-service-body">
+        <strong>
+          {name}
+          {badge && <span className="booking-page-badge">{badge}</span>}
+        </strong>
+        <span>{subtitle}</span>
+      </span>
+      <span className="booking-page-service-price">
+        <strong>{price}</strong>
+        {priceNote && <span>{priceNote}</span>}
+      </span>
+    </button>
+  );
+}
 
 export function ServiceStep({
   isBundle,
@@ -23,73 +73,33 @@ export function ServiceStep({
         <p>{isBundle ? "All bundles include 3 pairs, Premium Clean, and Suede fee waived." : "Clean, restore, and bring your sneakers back to life."}</p>
       </div>
 
-      {isBundle ? (
-        <div className="booking-page-service-list">
-          {BOOKING_BUNDLES.map((bundle) => {
-            const Icon = bundle.icon;
-            const isActive = bundle.id === selectedBundleId;
-            return (
-              <button
-                type="button"
+      <div className="booking-page-service-list">
+        {isBundle
+          ? BOOKING_BUNDLES.map((bundle) => (
+              <ServiceRow
                 key={bundle.id}
-                className="booking-page-service-row"
-                data-active={isActive}
+                Icon={bundle.icon}
+                name={bundle.name}
+                subtitle={bundle.perks.join(" · ")}
+                price={bundle.price}
+                isActive={bundle.id === selectedBundleId}
                 onClick={() => onSelectBundle(bundle.id)}
-                aria-pressed={isActive}
-              >
-                <span className="booking-page-service-check" aria-hidden="true">
-                  <Check size={12} />
-                </span>
-                <span className="booking-page-service-icon" aria-hidden="true">
-                  <Icon size={20} />
-                </span>
-                <span className="booking-page-service-body">
-                  <strong>{bundle.name}</strong>
-                  <span>{bundle.perks.join(" · ")}</span>
-                </span>
-                <span className="booking-page-service-price">
-                  <strong>{bundle.price}</strong>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="booking-page-service-list">
-          {BOOKING_SERVICES.map((service) => {
-            const Icon = service.icon;
-            const isActive = service.id === selectedServiceId;
-            return (
-              <button
-                type="button"
+              />
+            ))
+          : BOOKING_SERVICES.map((service) => (
+              <ServiceRow
                 key={service.id}
-                className="booking-page-service-row"
-                data-active={isActive}
+                Icon={service.icon}
+                name={service.name}
+                subtitle={service.description}
+                price={service.price}
+                priceNote={service.priceNote}
+                badge={service.badge}
+                isActive={service.id === selectedServiceId}
                 onClick={() => onSelectService(service.id)}
-                aria-pressed={isActive}
-              >
-                <span className="booking-page-service-check" aria-hidden="true">
-                  <Check size={12} />
-                </span>
-                <span className="booking-page-service-icon" aria-hidden="true">
-                  <Icon size={20} />
-                </span>
-                <span className="booking-page-service-body">
-                  <strong>
-                    {service.name}
-                    {service.badge && <span className="booking-page-badge">{service.badge}</span>}
-                  </strong>
-                  <span>{service.description}</span>
-                </span>
-                <span className="booking-page-service-price">
-                  <strong>{service.price}</strong>
-                  {service.priceNote && <span>{service.priceNote}</span>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              />
+            ))}
+      </div>
 
       <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
         Continue

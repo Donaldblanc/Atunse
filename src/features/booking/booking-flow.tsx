@@ -21,10 +21,11 @@ const STEPS: { key: Step; label: string }[] = [
 
 // Step-indicator subtext for every step but "service", whose subtext is the
 // currently selected service/bundle name (computed at render, not static).
-const STEP_SUBTEXT: Record<Exclude<Step, "service">, string> = {
-  details: "Tell us about your pair",
-  schedule: "Pickup or drop off",
-  review: "Confirm booking",
+// "details" pluralizes in the bundle flow, matching DetailsStep's heading.
+const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
+  details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
+  schedule: () => "Pickup or drop off",
+  review: () => "Confirm booking",
 };
 
 // Four real client-side steps, with two parallel flows: booking a single
@@ -93,7 +94,7 @@ export function BookingFlow() {
           {STEPS.map((s, index) => {
             const isDone = index < stepIndex;
             const isActive = index === stepIndex;
-            const subtext = s.key === "service" ? selectedName : STEP_SUBTEXT[s.key];
+            const subtext = s.key === "service" ? selectedName : STEP_SUBTEXT[s.key](isBundle);
             return (
               <div key={s.key} className="booking-page-step-group">
                 {index > 0 && <div className="booking-page-step-rule" />}
