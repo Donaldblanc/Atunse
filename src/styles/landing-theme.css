@@ -3104,8 +3104,12 @@
   font-weight: 800;
 }
 
-.booking-page-calendar-day:not([data-disabled="true"]):not([data-outside="true"]):hover {
+.booking-page-calendar-day:not([data-disabled="true"]):not([data-outside="true"]):not([data-active="true"]):hover {
   background: var(--bg-panel);
+}
+
+.booking-page-calendar-day[data-active="true"]:hover {
+  background: var(--blue-deep);
 }
 
 .booking-page-time-date-row {
