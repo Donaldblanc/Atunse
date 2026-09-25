@@ -1,95 +1,69 @@
 "use client";
 
 import Link from "next/link";
-import { MapPin, Clock, Tag, Package } from "lucide-react";
+import { MapPin, Clock, Tag, Package, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { ArrowIcon } from "./arrow-icon";
 
 type BookingMode = "in-person" | "mail-in";
 
+type BookingModeConfig = {
+  label: string;
+  rows: { icon: LucideIcon; title: string; subtitle?: string }[];
+  cta: string;
+};
+
+const MODES: Record<BookingMode, BookingModeConfig> = {
+  "in-person": {
+    label: "In-Person",
+    rows: [
+      { icon: MapPin, title: "NY / NJ / CT locations", subtitle: "Drop off at a convenient location" },
+      { icon: Clock, title: "Most pairs ready in 72 hours" },
+      { icon: Tag, title: "Pricing from $45", subtitle: "Final pricing based on condition and service" },
+    ],
+    cta: "View pricing & book now",
+  },
+  "mail-in": {
+    label: "Mail-In",
+    rows: [
+      { icon: Package, title: "Ships anywhere in the US", subtitle: "We email a prepaid shipping label" },
+      { icon: Clock, title: "5-10 business days round trip", subtitle: "Includes transit time both ways" },
+      { icon: Tag, title: "Pricing from $55", subtitle: "Includes return shipping, condition-dependent" },
+    ],
+    cta: "Request a mail-in label",
+  },
+};
+
 export function BookingPanel() {
   const [mode, setMode] = useState<BookingMode>("in-person");
+  const config = MODES[mode];
 
   return (
     <div className="landing-booking" id="process">
       <h2>Booking &amp; Pricing</h2>
       <div className="landing-booking-toggle">
-        <button data-active={mode === "in-person"} onClick={() => setMode("in-person")}>
-          In-Person
-        </button>
-        <button data-active={mode === "mail-in"} onClick={() => setMode("mail-in")}>
-          Mail-In
-        </button>
+        {(Object.keys(MODES) as BookingMode[]).map((key) => (
+          <button key={key} data-active={mode === key} onClick={() => setMode(key)}>
+            {MODES[key].label}
+          </button>
+        ))}
       </div>
 
-      {mode === "in-person" ? (
-        <>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <MapPin size={16} />
-            </span>
-            <div>
-              <strong>NY / NJ / CT locations</strong>
-              <span>Drop off at a convenient location</span>
-            </div>
+      {config.rows.map((row) => (
+        <div className="landing-booking-row" key={row.title}>
+          <span className="landing-booking-icon" aria-hidden="true">
+            <row.icon size={16} />
+          </span>
+          <div>
+            <strong>{row.title}</strong>
+            {row.subtitle && <span>{row.subtitle}</span>}
           </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <Clock size={16} />
-            </span>
-            <div>
-              <strong>Most pairs ready in 72 hours</strong>
-            </div>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <Tag size={16} />
-            </span>
-            <div>
-              <strong>Pricing from $45</strong>
-              <span>Final pricing based on condition and service</span>
-            </div>
-          </div>
-          <Link className="landing-btn-primary" href="/booking">
-            View pricing &amp; book now
-            <ArrowIcon />
-          </Link>
-        </>
-      ) : (
-        <>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <Package size={16} />
-            </span>
-            <div>
-              <strong>Ships anywhere in the US</strong>
-              <span>We email a prepaid shipping label</span>
-            </div>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <Clock size={16} />
-            </span>
-            <div>
-              <strong>5-10 business days round trip</strong>
-              <span>Includes transit time both ways</span>
-            </div>
-          </div>
-          <div className="landing-booking-row">
-            <span className="landing-booking-icon" aria-hidden="true">
-              <Tag size={16} />
-            </span>
-            <div>
-              <strong>Pricing from $55</strong>
-              <span>Includes return shipping, condition-dependent</span>
-            </div>
-          </div>
-          <Link className="landing-btn-primary" href="/booking">
-            Request a mail-in label
-            <ArrowIcon />
-          </Link>
-        </>
-      )}
+        </div>
+      ))}
+      <Link className="landing-btn-primary" href="/booking">
+        {config.cta}
+        <ArrowIcon />
+      </Link>
     </div>
   );
 }
