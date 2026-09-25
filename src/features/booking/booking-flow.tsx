@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Calendar, Check, Home, ImagePlus, Info, Mail, MapPin, Phone, Shield, Star, Truck, User } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
@@ -28,9 +29,13 @@ const STEPS: { key: Step; label: string }[] = [
 // this flow — shown as a static placeholder in the review step, matching
 // scratch/landing-mock.html's "new flow" reference.
 export function BookingFlow() {
+  const searchParams = useSearchParams();
+  const requestedServiceId = searchParams.get("service");
   const [flow, setFlow] = useState<FlowType>("single");
   const [step, setStep] = useState<Step>("service");
-  const [selectedServiceId, setSelectedServiceId] = useState(BOOKING_SERVICES[0]!.id);
+  const [selectedServiceId, setSelectedServiceId] = useState(
+    () => BOOKING_SERVICES.find((service) => service.id === requestedServiceId)?.id ?? BOOKING_SERVICES[0]!.id,
+  );
   const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
   const [activePair, setActivePair] = useState(0);
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
