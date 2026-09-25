@@ -447,7 +447,13 @@
 }
 
 .landing-service-photo {
-  aspect-ratio: 4 / 3;
+  /* These placeholder photos are the same before/after composites used by
+     the gallery carousel (top half "after", bottom half "before" — see
+     gallery.ts). A 4:3 crop reveals just past the halfway point, bleeding
+     into the "Before" label below. Keep this shorter than 8/5 (the ratio
+     at which object-fit: cover starts showing more than the top half) so
+     only the "after" half is ever visible. */
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
 }
