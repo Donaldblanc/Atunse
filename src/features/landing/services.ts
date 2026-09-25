@@ -1,8 +1,10 @@
 import { Droplets, Wrench, ShieldCheck, Palette, type LucideIcon } from "lucide-react";
 import { SERVICE_IMAGES, type GalleryImage } from "./gallery";
 
+export type ServiceCategoryId = "cleaning" | "restoration" | "protection" | "custom-work";
+
 export type ServiceCategory = {
-  id: string;
+  id: ServiceCategoryId;
   title: string;
   description: string;
   image: GalleryImage;
@@ -10,9 +12,9 @@ export type ServiceCategory = {
 };
 
 // Canonical service categories shown on the landing page's Services grid.
-// No compile-time link to src/features/booking/services-data.ts's
-// BOOKING_SERVICES — a `category` field was tried in #39/#54 but had no
-// real consumer, so it was removed (see the comment there).
+// src/features/booking/services-data.ts's BOOKING_SERVICES (granular SKUs)
+// reference these ids via its `category` field, grouping the booking
+// service list under the matching title from here.
 export const SERVICES: ServiceCategory[] = [
   {
     id: "cleaning",
