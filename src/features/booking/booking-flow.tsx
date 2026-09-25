@@ -71,7 +71,7 @@ export function BookingFlow() {
   const [step, setStep] = useState<Step>("service");
   const [selectedId, setSelectedId] = useState(BOOKING_SERVICES[0]!.id);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("mail-in");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cashapp");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("zelle");
   const [details, setDetails] = useState<ContactDetails>(EMPTY_DETAILS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const selected = BOOKING_SERVICES.find((service) => service.id === selectedId) ?? BOOKING_SERVICES[0]!;
@@ -485,60 +485,6 @@ export function BookingFlow() {
             </div>
 
             <div className="booking-page-payment-list">
-              <div className="booking-page-payment-card" data-active={paymentMethod === "cashapp"}>
-                <button type="button" className="booking-page-payment-head" onClick={() => setPaymentMethod("cashapp")}>
-                  <span className="booking-page-payment-radio" aria-hidden="true" />
-                  <span className="booking-page-payment-icon booking-page-payment-icon-cashapp" aria-hidden="true">
-                    $
-                  </span>
-                  <span className="booking-page-payment-label">
-                    <strong>Pay with Cash App</strong>
-                    <span>Send payment securely with Cash App.</span>
-                  </span>
-                  <ChevronDown size={14} className="booking-page-payment-chevron" aria-hidden="true" />
-                </button>
-                {paymentMethod === "cashapp" && (
-                  <div className="booking-page-payment-body">
-                    <div className="booking-page-qr-grid">
-                      <div className="booking-page-qr-box">
-                        <div className="booking-page-qr-placeholder" aria-hidden="true">
-                          <span className="booking-page-payment-icon booking-page-payment-icon-cashapp">$</span>
-                        </div>
-                        <strong>$Atunse</strong>
-                        <button type="button" className="booking-page-tap-copy">
-                          Tap to copy
-                        </button>
-                      </div>
-                      <ol className="booking-page-qr-steps">
-                        <li>
-                          <span>1</span>
-                          <div>
-                            <strong>Open Cash App</strong>
-                            <p>Scan the QR code or search for our Cashtag.</p>
-                          </div>
-                        </li>
-                        <li>
-                          <span>2</span>
-                          <div>
-                            <strong>Send exact amount</strong>
-                            <p>
-                              Send <strong>{displayPrice}</strong> to $Atunse
-                            </p>
-                          </div>
-                        </li>
-                        <li>
-                          <span>3</span>
-                          <div>
-                            <strong>Tap &ldquo;Book Now&rdquo;</strong>
-                            <p>After payment, tap below to confirm your booking.</p>
-                          </div>
-                        </li>
-                      </ol>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="booking-page-payment-card" data-active={paymentMethod === "zelle"}>
                 <button type="button" className="booking-page-payment-head" onClick={() => setPaymentMethod("zelle")}>
                   <span className="booking-page-payment-radio" aria-hidden="true" />
@@ -596,6 +542,60 @@ export function BookingFlow() {
                           </button>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="booking-page-payment-card" data-active={paymentMethod === "cashapp"}>
+                <button type="button" className="booking-page-payment-head" onClick={() => setPaymentMethod("cashapp")}>
+                  <span className="booking-page-payment-radio" aria-hidden="true" />
+                  <span className="booking-page-payment-icon booking-page-payment-icon-cashapp" aria-hidden="true">
+                    $
+                  </span>
+                  <span className="booking-page-payment-label">
+                    <strong>Pay with Cash App</strong>
+                    <span>Send payment securely with Cash App.</span>
+                  </span>
+                  <ChevronDown size={14} className="booking-page-payment-chevron" aria-hidden="true" />
+                </button>
+                {paymentMethod === "cashapp" && (
+                  <div className="booking-page-payment-body">
+                    <div className="booking-page-qr-grid">
+                      <div className="booking-page-qr-box">
+                        <div className="booking-page-qr-placeholder" aria-hidden="true">
+                          <span className="booking-page-payment-icon booking-page-payment-icon-cashapp">$</span>
+                        </div>
+                        <strong>$Atunse</strong>
+                        <button type="button" className="booking-page-tap-copy">
+                          Tap to copy
+                        </button>
+                      </div>
+                      <ol className="booking-page-qr-steps">
+                        <li>
+                          <span>1</span>
+                          <div>
+                            <strong>Open Cash App</strong>
+                            <p>Scan the QR code or search for our Cashtag.</p>
+                          </div>
+                        </li>
+                        <li>
+                          <span>2</span>
+                          <div>
+                            <strong>Send exact amount</strong>
+                            <p>
+                              Send <strong>{displayPrice}</strong> to $Atunse
+                            </p>
+                          </div>
+                        </li>
+                        <li>
+                          <span>3</span>
+                          <div>
+                            <strong>Tap &ldquo;Book Now&rdquo;</strong>
+                            <p>After payment, tap below to confirm your booking.</p>
+                          </div>
+                        </li>
+                      </ol>
                     </div>
                   </div>
                 )}
