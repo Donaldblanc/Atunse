@@ -4,6 +4,7 @@ import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucid
 import { useState } from "react";
 
 export type PickupSelection = { date: Date; time: string };
+export type PickupPickerMode = "datetime" | "date";
 
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -73,9 +74,13 @@ function buildCalendarCells(year: number, month: number) {
 export function PickupDatePicker({
   selection,
   onConfirm,
+  mode = "datetime",
+  label = "pickup",
 }: {
   selection: PickupSelection | null;
   onConfirm: (selection: PickupSelection) => void;
+  mode?: PickupPickerMode;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"calendar" | "time">("calendar");
@@ -116,7 +121,9 @@ export function PickupDatePicker({
     <>
       <button type="button" className="booking-page-picker-row" onClick={openModal}>
         <Calendar size={16} aria-hidden="true" />
-        <span>{selection ? `${formatDate(selection.date)} · ${selection.time}` : "Select a date"}</span>
+        <span>
+          {selection ? (mode === "date" ? formatDate(selection.date) : `${formatDate(selection.date)} · ${selection.time}`) : "Select a date"}
+        </span>
         <ChevronRight size={14} className="booking-page-picker-chevron" aria-hidden="true" />
       </button>
 
@@ -130,7 +137,7 @@ export function PickupDatePicker({
               <>
                 <div className="booking-page-modal-head">
                   <div>
-                    <h3>Select a pickup date</h3>
+                    <h3>Select a {label} date</h3>
                     <p>Choose a date that works best for you. We only show available dates.</p>
                   </div>
                   <button type="button" className="booking-page-modal-close" onClick={() => setOpen(false)} aria-label="Close">
@@ -171,22 +178,32 @@ export function PickupDatePicker({
                   ))}
                 </div>
 
-                <div className="booking-page-info-box">
-                  <Clock size={16} aria-hidden="true" />
-                  <span>
-                    Pickup times are available from
-                    <br />
-                    <strong>4:30 PM &ndash; 10:00 PM.</strong>
-                  </span>
-                </div>
+                {mode === "datetime" && (
+                  <div className="booking-page-info-box">
+                    <Clock size={16} aria-hidden="true" />
+                    <span>
+                      Pickup times are available from
+                      <br />
+                      <strong>4:30 PM &ndash; 10:00 PM.</strong>
+                    </span>
+                  </div>
+                )}
 
                 <button
                   type="button"
                   className="landing-btn-primary booking-page-continue-btn"
                   disabled={!pendingDate}
-                  onClick={() => setView("time")}
+                  onClick={() => {
+                    if (mode === "date") {
+                      if (!pendingDate) return;
+                      onConfirm({ date: pendingDate, time: "" });
+                      setOpen(false);
+                      return;
+                    }
+                    setView("time");
+                  }}
                 >
-                  Next: Select a time
+                  {mode === "date" ? "Confirm date" : "Next: Select a time"}
                   <ArrowRight size={14} aria-hidden="true" />
                 </button>
               </>

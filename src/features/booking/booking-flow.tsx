@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Calendar, Check, ImagePlus, Info, Mail, MapPin, Package, Phone, Shield, Star, Truck, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ImagePlus, Info, Mail, MapPin, Package, Phone, Shield, Star, Truck, User } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
@@ -45,7 +45,7 @@ export function BookingFlow() {
   const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>("pickup");
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
-  const [mailInDate, setMailInDate] = useState("");
+  const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
 
   const selectedService = BOOKING_SERVICES.find((s) => s.id === selectedServiceId) ?? BOOKING_SERVICES[0]!;
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
@@ -478,8 +478,8 @@ function ScheduleStep({
   onChangePickupAddress: (address: PickupAddress) => void;
   pickupSelection: PickupSelection | null;
   onConfirmPickup: (selection: PickupSelection) => void;
-  mailInDate: string;
-  onChangeMailInDate: (date: string) => void;
+  mailInDate: PickupSelection | null;
+  onChangeMailInDate: (selection: PickupSelection) => void;
   onContinue: () => void;
 }) {
   return (
@@ -586,15 +586,14 @@ function ScheduleStep({
           </div>
         </>
       ) : (
-        <div className="booking-page-form-grid">
-          <label className="booking-page-field booking-page-field-icon">
-            <span>Preferred date (optional)</span>
-            <span className="booking-page-input-wrap">
-              <Calendar size={16} aria-hidden="true" />
-              <input type="date" value={mailInDate} onChange={(e) => onChangeMailInDate(e.target.value)} />
-            </span>
-          </label>
-        </div>
+        <>
+          <div className="booking-page-section-head booking-page-section-head-tight">
+            <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
+              PREFERRED DATE (OPTIONAL)
+            </p>
+          </div>
+          <PickupDatePicker selection={mailInDate} onConfirm={onChangeMailInDate} mode="date" label="mail-in" />
+        </>
       )}
 
       <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
@@ -627,7 +626,7 @@ function ReviewStep({
   scheduleMethod: ScheduleMethod;
   pickupAddress: PickupAddress;
   pickupSelection: PickupSelection | null;
-  mailInDate: string;
+  mailInDate: PickupSelection | null;
   onEdit: (step: Step) => void;
 }) {
   const scheduleText =
@@ -636,7 +635,7 @@ function ReviewStep({
         ? `${pickupSelection.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })} · ${pickupSelection.time}`
         : "Not scheduled yet"
       : mailInDate
-        ? new Date(`${mailInDate}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+        ? mailInDate.date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })
         : "No preferred date selected";
 
   return (
