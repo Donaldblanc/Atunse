@@ -4,7 +4,7 @@
  * scratch/landing-mock.html (not committed — kept as the design reference).
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Anton&display=swap");
 
 .landing {
   --blue: #2955ff;
@@ -449,14 +449,16 @@
 .landing-service-photo {
   aspect-ratio: 4 / 3;
   overflow: hidden;
+  background: var(--bg-panel);
   border-radius: 16px 16px 0 0;
 }
 
 .landing-service-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  object-position: top;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 16px 16px 0 0;
   display: block;
 }
 
@@ -534,8 +536,11 @@
 }
 
 .landing-ba-head h2 {
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   font-size: 26px;
-  font-weight: 800;
   margin: 0;
 }
 
@@ -586,15 +591,21 @@
 }
 
 .landing-ba-card {
-  background: #fff;
+  background: #f4f6fb;
   border-radius: 14px;
   overflow: hidden;
   flex: 0 0 auto;
   width: min(80vw, 360px);
   scroll-snap-align: start;
+  padding: 10px 10px 16px;
+}
+
+.landing-ba-photo {
   position: relative;
   display: flex;
   aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .landing-ba-half {
@@ -602,36 +613,65 @@
   height: 100%;
   position: relative;
   background-size: cover;
+  background-position: center;
   background-repeat: no-repeat;
 }
 
-.landing-ba-half.after {
-  background-position: top center;
+.landing-ba-half.before {
+  border-right: 2px solid #fff;
 }
 
-.landing-ba-half.before {
-  background-position: bottom center;
-  border-right: 2px solid #fff;
+.landing-ba-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-shadow: 0 2px 8px rgba(10, 14, 26, 0.3);
 }
 
 .landing-ba-pill {
   position: absolute;
   top: 10px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  background: rgba(10, 14, 26, 0.75);
-  color: #fff;
-  padding: 4px 9px;
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 5px 11px;
   border-radius: 999px;
+  z-index: 2;
 }
 
 .landing-ba-half.before .landing-ba-pill {
   left: 10px;
+  background: #fff;
+  color: #12183a;
 }
 
 .landing-ba-half.after .landing-ba-pill {
   right: 10px;
+  background: var(--blue);
+  color: #fff;
+}
+
+.landing-ba-caption {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #12183a;
+  text-transform: uppercase;
 }
 
 /* ---------- lower grid: reviews / faq / booking ---------- */
