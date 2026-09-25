@@ -33,7 +33,7 @@ const STEPS: { key: Step; label: string }[] = [
 export function BookingFlow() {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
-  const [flow, setFlow] = useState<FlowType>("single");
+  const [flow, setFlow] = useState<FlowType>(requestedServiceId ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   const [selectedServiceId, setSelectedServiceId] = useState(
     () => BOOKING_SERVICES.find((service) => service.id === requestedServiceId)?.id ?? BOOKING_SERVICES[0]!.id,
