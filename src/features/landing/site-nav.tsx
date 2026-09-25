@@ -3,10 +3,14 @@ import { NavDrawer } from "./nav-drawer";
 import { ThemeToggle } from "./theme-toggle";
 
 // Shared nav across the marketing surface (/, /coming-soon, /about,
-// /services). "Process" still points at /coming-soon — there's no real
-// process page yet (docs/TODO.md). Gallery is a real in-page anchor on
-// the home page, so it routes through "/" first when viewed elsewhere.
-export function SiteNav({ active }: { active?: "about" | "services" }) {
+// /services, /booking). "Process" still points at /coming-soon — there's
+// no real process page yet (docs/TODO.md). Gallery is a real in-page
+// anchor on the home page, so it routes through "/" first when viewed
+// elsewhere. The "Book a restoration" CTA is hidden while already on the
+// booking flow itself — no point offering to start what you're mid-way
+// through.
+export function SiteNav({ active }: { active?: "about" | "services" | "booking" }) {
+  const isBooking = active === "booking";
   return (
     <nav className="landing-nav">
       <Link href="/" className="landing-brand">
@@ -25,12 +29,14 @@ export function SiteNav({ active }: { active?: "about" | "services" }) {
       </div>
       <div className="landing-nav-actions">
         <ThemeToggle />
-        <Link className="landing-btn-primary" href="/booking">
-          Book a restoration
-          <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </Link>
+        {!isBooking && (
+          <Link className="landing-btn-primary" href="/booking">
+            Book a restoration
+            <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
+              <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+        )}
         <NavDrawer active={active} />
       </div>
     </nav>

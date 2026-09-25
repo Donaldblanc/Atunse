@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function SiteFooter({ active }: { active?: "about" | "services" } = {}) {
+export function SiteFooter({ active }: { active?: "about" | "services" | "booking" } = {}) {
   return (
     <>
       <footer className="landing-footer">

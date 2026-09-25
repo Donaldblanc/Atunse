@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { ArrowRight, Calendar, Package, Sparkles, SportShoe } from "lucide-react";
+import { Calendar, Package, Sparkles, SportShoe } from "lucide-react";
 import { Suspense } from "react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
@@ -37,7 +36,7 @@ const HOW_IT_WORKS = [
 export default function BookingPage() {
   return (
     <div className="landing" id="landing-root">
-      <SiteNav />
+      <SiteNav active="booking" />
 
       <div className="landing-about-hero booking-page-hero">
         <div>
@@ -93,18 +92,7 @@ export default function BookingPage() {
         })}
       </div>
 
-      <div className="landing-about-cta">
-        <div>
-          <p className="landing-eyebrow">READY TO GET STARTED?</p>
-          <h2>Your sneakers. My craft. One pair at a time.</h2>
-          <Link className="landing-btn-primary" href="/booking">
-            Book a restoration
-            <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </div>
-      </div>
-
-      <SiteFooter />
+      <SiteFooter active="booking" />
       <MobileTabBar />
     </div>
   );
