@@ -15,7 +15,7 @@ export interface GalleryImage {
 }
 
 export const HERO_IMAGE: GalleryImage = {
-  key: "hero.jpg",
+  key: "hero-travis-scott-aj1-low.png",
   alt: "Restored Travis Scott Air Jordan 1 Low, before and after cleaning",
 };
 
