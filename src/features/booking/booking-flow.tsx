@@ -24,7 +24,7 @@ const STEPS: { key: Step; label: string }[] = [
 // "details" pluralizes in the bundle flow, matching DetailsStep's heading.
 const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
   details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
-  schedule: () => "Pickup or drop off",
+  schedule: () => "Pickup or mail in",
   review: () => "Confirm booking",
 };
 
@@ -205,7 +205,7 @@ export function BookingFlow() {
         <div className="booking-page-summary-feature">
           <Truck size={18} aria-hidden="true" />
           <span>
-            <strong>Pickup or drop off</strong>
+            <strong>Pickup or mail in</strong>
             Convenient options at scheduling.
           </span>
         </div>
