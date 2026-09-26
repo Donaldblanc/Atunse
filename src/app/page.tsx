@@ -33,11 +33,8 @@ const FAQS = [
   },
   {
     question: "How do I get my sneakers to you?",
-    answer: "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us using a prepaid mail-in label.",
-  },
-  {
-    question: "Do you offer mail-in service?",
-    answer: "Yes, we ship a prepaid label so you can send your sneakers from anywhere in the country.",
+    answer:
+      "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the country using a prepaid mail-in label.",
   },
   {
     question: "What if I'm not happy with the results?",

@@ -18,7 +18,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
   "in-person": {
     label: "In-Person",
     rows: [
-      { icon: MapPin, title: "NY / NJ / CT locations", subtitle: "Drop off at a convenient location" },
+      { icon: MapPin, title: "NY / NJ / CT locations", subtitle: "We'll collect from your address" },
       { icon: Clock, title: "Most pairs ready in 72 hours" },
       { icon: Tag, title: "Pricing from $45", subtitle: "Final pricing based on condition and service" },
     ],
