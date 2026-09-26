@@ -21,9 +21,7 @@ export default function AboutPage() {
             <span>A Higher Purpose.</span>
           </h1>
           <p className="landing-lede">
-            <strong>WHAT DOES ATUNṢE MEAN?</strong>
-            <br />
-            Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration &mdash; the idea of
+            Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration: the idea of
             taking something worn, damaged, or overlooked and making it right again.
           </p>
           <BookRestorationCta />
