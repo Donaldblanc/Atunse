@@ -674,6 +674,14 @@
   text-transform: uppercase;
 }
 
+.landing-ba-service-line {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+}
+
 /* ---------- lower grid: reviews / faq / booking ---------- */
 
 .landing-lower {
@@ -1593,6 +1601,19 @@
   margin: 0 auto;
 }
 
+.services-page-turnaround-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  background: var(--bg-panel);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
 .services-page-section-head h2 {
   font-size: 30px;
   font-weight: 800;
@@ -2176,6 +2197,12 @@
   color: transparent;
 }
 
+/* Single-pair services are additive (a customer can pick more than one),
+   so they render as checkboxes; bundles stay a single radio-style pick. */
+.booking-page-service-check--checkbox {
+  border-radius: 6px;
+}
+
 .booking-page-service-row[data-active="true"] .booking-page-service-check {
   background: var(--blue);
   border-color: var(--blue);
@@ -2296,6 +2323,14 @@
   font-size: 12px;
   font-weight: 400;
   cursor: pointer;
+  background: none;
+  width: 100%;
+}
+
+.booking-page-dropzone[data-drag-over="true"] {
+  border-color: var(--blue);
+  background: var(--bg-panel);
+  color: var(--blue);
 }
 
 .booking-page-continue-btn {
@@ -3354,6 +3389,14 @@
   display: none;
 }
 
+.landing-mobile-book-bar {
+  display: none;
+}
+
+.landing-mobile-book-bar-spacer {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .landing-navlinks {
     display: none;
@@ -3524,6 +3567,27 @@
   .landing-tabbar-spacer {
     display: block;
     height: 68px;
+  }
+
+  /* Persistent "Book Now" bar, stacked directly above the tab bar. */
+  .landing-mobile-book-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 68px;
+    z-index: 79;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--line);
+  }
+  .landing-mobile-book-bar .landing-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  .landing-mobile-book-bar-spacer {
+    display: block;
+    height: 62px;
   }
 
   .landing-about-hero {
