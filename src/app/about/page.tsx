@@ -21,8 +21,10 @@ export default function AboutPage() {
             <span>A Higher Purpose.</span>
           </h1>
           <p className="landing-lede">
-            I&rsquo;m DJ, born in Brooklyn and raised in Queens, New York. What started with one pair
-            and a necessity turned into a lifelong passion, a craft, and eventually RestoredByDJ.
+            <strong>WHAT DOES ATUNṢE MEAN?</strong>
+            <br />
+            Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration &mdash; the idea of
+            taking something worn, damaged, or overlooked and making it right again.
           </p>
           <BookRestorationCta />
           <div className="landing-about-tagline">
