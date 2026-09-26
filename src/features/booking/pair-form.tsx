@@ -1,10 +1,13 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import type { PairDetails } from "./booking-types";
 
 // Shared brand/material/notes/photos form, used by DetailsStep for both a
-// single pair and each tab of a 3-pair bundle.
+// single pair and each tab of a 3-pair bundle. Photos are required (at
+// least one) — DetailsStep's Continue button checks details.photos.length
+// before advancing.
 export function PairForm({
   pairLabel,
   brandPlaceholder,
@@ -16,6 +19,15 @@ export function PairForm({
   details: PairDetails;
   onChange: (details: PairDetails) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  function addPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    onChange({ ...details, photos: [...details.photos, ...imageFiles] });
+  }
+
   return (
     <>
       {pairLabel && (
@@ -58,15 +70,41 @@ export function PairForm({
           <span className="booking-page-char-count">{details.notes.length}/500</span>
         </label>
         <div className="booking-page-field">
-          <span>Upload photos (optional)</span>
-          <div className="booking-page-dropzone">
+          <span>Upload photos (required)</span>
+          <button
+            type="button"
+            className="booking-page-dropzone"
+            data-drag-over={isDragOver}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              addPhotos(e.dataTransfer.files);
+            }}
+          >
             <ImagePlus size={22} aria-hidden="true" />
             <span>
-              Drag &amp; drop photos here
-              <br />
-              or click to upload
+              {details.photos.length > 0
+                ? `${details.photos.length} photo${details.photos.length === 1 ? "" : "s"} selected`
+                : "Drag & drop photos here or click to upload"}
             </span>
-          </div>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              addPhotos(e.target.files);
+              e.target.value = "";
+            }}
+          />
         </div>
       </div>
     </>
