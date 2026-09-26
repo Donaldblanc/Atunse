@@ -2310,6 +2310,20 @@
   color: var(--ink-soft);
 }
 
+.booking-page-form-warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b45309;
+  margin: 10px 0 0;
+}
+
+.landing[data-theme="dark"] .booking-page-form-warning {
+  color: #fbbf24;
+}
+
 .booking-page-dropzone {
   border: 1px dashed var(--line);
   border-radius: 10px;
@@ -3588,6 +3602,13 @@
   .landing-mobile-book-bar-spacer {
     display: block;
     height: 62px;
+  }
+  /* [hidden] alone loses to the display:flex/block rules above on
+     specificity, so it wouldn't actually hide the bar while the page's
+     own hero CTA is in view — this makes the JS-driven hide effective. */
+  .landing-mobile-book-bar[hidden],
+  .landing-mobile-book-bar-spacer[hidden] {
+    display: none;
   }
 
   .landing-about-hero {

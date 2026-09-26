@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, Check, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Check, TriangleAlert, type LucideIcon } from "lucide-react";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
 
@@ -74,7 +75,9 @@ export function ServiceStep({
   onSelectBundle: (id: string) => void;
   onContinue: () => void;
 }) {
+  const [attempted, setAttempted] = useState(false);
   const canContinue = isBundle || selectedServiceIds.length > 0;
+  const showWarning = attempted && !canContinue;
 
   return (
     <>
@@ -132,13 +135,24 @@ export function ServiceStep({
       <button
         type="button"
         className="landing-btn-primary booking-page-continue-btn"
-        onClick={onContinue}
-        disabled={!canContinue}
-        title={canContinue ? undefined : "Select at least one service to continue"}
+        onClick={() => {
+          if (!canContinue) {
+            setAttempted(true);
+            return;
+          }
+          onContinue();
+        }}
+        aria-describedby={showWarning ? "service-step-warning" : undefined}
       >
         Continue
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {showWarning && (
+        <p className="booking-page-form-warning" id="service-step-warning" role="status" aria-live="polite">
+          <TriangleAlert size={14} aria-hidden="true" />
+          Select at least one service to continue.
+        </p>
+      )}
     </>
   );
 }

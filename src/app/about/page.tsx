@@ -25,7 +25,7 @@ export default function AboutPage() {
             Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration: the idea of
             taking something worn, damaged, or overlooked and making it right again.
           </p>
-          <BookRestorationCta />
+          <BookRestorationCta topCta />
           <div className="landing-about-tagline">
             <span className="rule" />
             SAME CULTURE.
