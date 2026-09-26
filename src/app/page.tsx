@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { Droplets, Wrench, ShieldCheck, Palette, Clock, MapPin, Truck } from "lucide-react";
+import { Clock, MapPin, Truck } from "lucide-react";
 import "@/styles/landing-theme.css";
-import { BEFORE_AFTER_IMAGES, HERO_IMAGE, SERVICE_IMAGES, getGalleryImageUrl } from "@/features/landing/gallery";
+import { BEFORE_AFTER_IMAGES, HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
+import { SERVICES } from "@/features/landing/services";
+import { ArrowIcon } from "@/features/landing/arrow-icon";
+import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 import { BeforeAfterCarousel } from "@/features/landing/before-after-carousel";
 import { BookingPanel } from "@/features/landing/booking-panel";
 import { FaqAccordion } from "@/features/landing/faq-accordion";
@@ -17,32 +20,6 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 // choice, inside SiteNav). Order submission isn't built yet — CTAs that
 // don't have a real destination route to /coming-soon instead of a dead
 // "#" (docs/TODO.md), matching ADR-0005/SPEC.md's Phase 1 status.
-const SERVICES = [
-  {
-    title: "Cleaning",
-    description: "Deep clean for a like-new look.",
-    image: SERVICE_IMAGES[0],
-    icon: <Droplets size={16} aria-hidden="true" />,
-  },
-  {
-    title: "Restoration",
-    description: "Repair, repaint, replace.",
-    image: SERVICE_IMAGES[1],
-    icon: <Wrench size={16} aria-hidden="true" />,
-  },
-  {
-    title: "Protection",
-    description: "Premium treatments.",
-    image: SERVICE_IMAGES[2],
-    icon: <ShieldCheck size={16} aria-hidden="true" />,
-  },
-  {
-    title: "Custom Work",
-    description: "Color touches & special requests.",
-    image: SERVICE_IMAGES[3],
-    icon: <Palette size={16} aria-hidden="true" />,
-  },
-];
 
 const FAQS = [
   {
@@ -131,17 +108,10 @@ export default function HomePage() {
             favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
-            <Link className="landing-btn-primary" href="/booking">
-              Book a restoration
-              <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
+            <BookRestorationCta />
             <a className="landing-link-arrow" href="#gallery">
               View the gallery
-              <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ArrowIcon size={13} strokeWidth={26} />
             </a>
           </div>
         </div>
@@ -196,21 +166,19 @@ export default function HomePage() {
         </div>
         <Link className="landing-link-arrow" href="/services">
           View all services
-          <svg width="13" height="13" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-            <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="26" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ArrowIcon size={13} strokeWidth={26} />
         </Link>
       </div>
       <div className="landing-services">
         {SERVICES.map((service) => (
-          <div className="landing-service-card" key={service.title}>
+          <div className="landing-service-card" key={service.id}>
             <div className="landing-service-photo-wrap">
               <div className="landing-service-photo">
                 {/* eslint-disable-next-line @next/next/no-img-element -- external/S3-resolved URL, not a static import next/image can optimize */}
                 <img src={getGalleryImageUrl(service.image.key)} alt={service.image.alt} />
               </div>
               <div className="landing-service-badge" aria-hidden="true">
-                {service.icon}
+                <service.icon size={16} aria-hidden="true" />
               </div>
             </div>
             <div className="landing-service-body">
@@ -218,9 +186,7 @@ export default function HomePage() {
               <p>{service.description}</p>
               <span className="landing-service-link">
                 Learn more
-                <svg width="11" height="11" viewBox="0 0 256 256" fill="none" aria-hidden="true">
-                  <path d="M92 48L164 128L92 208" stroke="currentColor" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <ArrowIcon size={11} strokeWidth={28} />
               </span>
             </div>
           </div>
