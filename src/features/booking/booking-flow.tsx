@@ -6,16 +6,28 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { PickupSelection } from "./pickup-date-picker";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
-import { EMPTY_ADDRESS, EMPTY_PAIR, type FlowType, type PairDetails, type PickupAddress, type ScheduleMethod, type Step } from "./booking-types";
+import {
+  EMPTY_ADDRESS,
+  EMPTY_CONTACT,
+  EMPTY_PAIR,
+  type ContactInfo,
+  type FlowType,
+  type PairDetails,
+  type PickupAddress,
+  type ScheduleMethod,
+  type Step,
+} from "./booking-types";
 import { ServiceStep } from "./service-step";
 import { DetailsStep } from "./details-step";
 import { ScheduleStep } from "./schedule-step";
+import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
   { key: "details", label: "Details" },
   { key: "schedule", label: "Schedule" },
+  { key: "contact", label: "Your Info" },
   { key: "review", label: "Review" },
 ];
 
@@ -24,17 +36,66 @@ const STEPS: { key: Step; label: string }[] = [
 // "details" pluralizes in the bundle flow, matching DetailsStep's heading.
 const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
   details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
-  schedule: () => "Pickup or drop off",
+  schedule: () => "Pickup or mail in",
+  contact: () => "Contact details",
   review: () => "Confirm booking",
 };
 
-// Four real client-side steps, with two parallel flows: booking a single
-// pair's service, or a 3-pair bundle (each pair gets its own detail tab).
-// There's no real order-submission flow yet (docs/TODO.md) — "Confirm
-// Booking" is presentational, matching every other not-yet-real CTA on
-// the marketing site. Contact info (name/email/phone) isn't collected in
-// this flow — shown as a static placeholder in the review step, matching
-// scratch/landing-mock.html's "new flow" reference.
+const RUSH_FEE = 20;
+const SUEDE_FEE = 10;
+
+// Single-pair services are additive — a customer can select Standard
+// Clean, Oxidation Restoration, and Painting all on the same pair — so
+// price/name/note are computed over the whole selected set, not one
+// service. Only services with `suedeFee: true` (Standard/Premium Clean)
+// carry the flat +$10 Suede fee, and it's only real when the customer
+// actually picked Suede as the pair's material, not just a disclaimer
+// note that never changed the price. Range-priced services (e.g.
+// "Starting at $40+") contribute their leading number to the running
+// total and force a trailing "+" on it, since the real total is
+// condition-dependent. Each service's own priceNote (e.g. Oxidation's
+// "Sole from $40+") is preserved alongside the suede/rush notes rather
+// than being dropped.
+function computeMultiServicePricing(
+  services: { name: string; price: string; priceNote?: string; suedeFee?: boolean }[],
+  material: string,
+  rush: boolean,
+) {
+  if (services.length === 0) return { name: "No service selected", price: "$0", priceNote: undefined as string | undefined };
+
+  const name = services.map((s) => s.name).join(" + ");
+  const anyNonFlat = services.some((s) => !/^\$\d+$/.test(s.price));
+  const hasSuedeFee = services.some((s) => s.suedeFee);
+  const suedeApplies = hasSuedeFee && material === "Suede";
+  const baseTotal = services.reduce((sum, s) => {
+    const match = s.price.match(/\d+/);
+    return sum + (match ? parseInt(match[0], 10) : 0);
+  }, 0);
+  const total = baseTotal + (suedeApplies ? SUEDE_FEE : 0) + (rush ? RUSH_FEE : 0);
+
+  // Services with suedeFee carry a priceNote that just restates the fee
+  // ("+$10 for Suede") — that's superseded by the generated suede note
+  // below, so exclude those specifically rather than string-matching the
+  // note's wording (which could drift independently of the flag).
+  const ownNotes = services.filter((s) => !s.suedeFee).map((s) => s.priceNote).filter((n): n is string => Boolean(n));
+  const notes = [
+    ...ownNotes,
+    hasSuedeFee ? (suedeApplies ? `Includes +$${SUEDE_FEE} Suede fee` : `+$${SUEDE_FEE} for Suede`) : null,
+    rush ? `+$${RUSH_FEE} rush` : null,
+  ].filter((n): n is string => Boolean(n));
+
+  return {
+    name,
+    price: `$${total}${total > 0 && anyNonFlat ? "+" : ""}`,
+    priceNote: notes.length > 0 ? notes.join(" · ") : undefined,
+  };
+}
+
+// Five real client-side steps, with two parallel flows: booking a single
+// pair's additive service selection, or a 3-pair bundle (each pair gets
+// its own detail tab). There's no real order-submission flow yet
+// (docs/TODO.md) — "Confirm Booking" is presentational, matching every
+// other not-yet-real CTA on the marketing site.
 export function BookingFlow() {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
@@ -42,7 +103,16 @@ export function BookingFlow() {
   const requestedMethod = searchParams.get("method");
   const [flow, setFlow] = useState<FlowType>(requestedService ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
-  const [selectedServiceId, setSelectedServiceId] = useState(() => requestedService?.id ?? BOOKING_SERVICES[0]!.id);
+  // Cleaning is single-select (Standard vs Premium — never both on one
+  // pair); restoration/custom-work services are additive add-ons, so
+  // they're tracked separately and can combine freely with each other
+  // and with the chosen cleaning tier.
+  const [selectedCleaningId, setSelectedCleaningId] = useState<string | null>(() =>
+    requestedService?.category === "cleaning" ? requestedService.id : null,
+  );
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(() =>
+    requestedService && requestedService.category !== "cleaning" ? [requestedService.id] : [],
+  );
   const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
   const [activePair, setActivePair] = useState(0);
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
@@ -51,18 +121,31 @@ export function BookingFlow() {
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
+  const [contact, setContact] = useState<ContactInfo>(EMPTY_CONTACT);
+  const [rush, setRush] = useState(false);
 
-  const selectedService = BOOKING_SERVICES.find((s) => s.id === selectedServiceId) ?? BOOKING_SERVICES[0]!;
+  const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
+  const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
   const isBundle = flow === "bundle";
-  const SelectedIcon = isBundle ? selectedBundle.icon : selectedService.icon;
-  const selectedName = isBundle ? selectedBundle.name : selectedService.name;
-  const selectedPrice = isBundle ? selectedBundle.price : selectedService.price;
-  const selectedPriceNote = isBundle ? undefined : selectedService.priceNote;
+  const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
+  const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
+    ? computeMultiServicePricing([selectedBundle], "", rush)
+    : computeMultiServicePricing(selectedServices, singlePair.material, rush);
   const stepIndex = STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
+  }
+
+  function toggleService(id: string) {
+    const service = BOOKING_SERVICES.find((s) => s.id === id);
+    if (!service) return;
+    if (service.category === "cleaning") {
+      setSelectedCleaningId((prev) => (prev === id ? null : id));
+    } else {
+      setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+    }
   }
 
   function changePair(index: number, details: PairDetails) {
@@ -115,8 +198,8 @@ export function BookingFlow() {
         {step === "service" && (
           <ServiceStep
             isBundle={isBundle}
-            selectedServiceId={selectedServiceId}
-            onSelectService={setSelectedServiceId}
+            selectedServiceIds={selectedServiceIds}
+            onToggleService={toggleService}
             selectedBundleId={selectedBundleId}
             onSelectBundle={setSelectedBundleId}
             onContinue={() => setStep("details")}
@@ -146,6 +229,16 @@ export function BookingFlow() {
             onConfirmPickup={setPickupSelection}
             mailInDate={mailInDate}
             onChangeMailInDate={setMailInDate}
+            onContinue={() => setStep("contact")}
+          />
+        )}
+
+        {step === "contact" && (
+          <ContactStep
+            contact={contact}
+            onChangeContact={setContact}
+            rush={rush}
+            onChangeRush={setRush}
             onContinue={() => setStep("review")}
           />
         )}
@@ -162,6 +255,7 @@ export function BookingFlow() {
             pickupAddress={pickupAddress}
             pickupSelection={pickupSelection}
             mailInDate={mailInDate}
+            contact={contact}
             onEdit={setStep}
           />
         )}
@@ -190,7 +284,7 @@ export function BookingFlow() {
 
         <div className="booking-page-summary-total">
           <span>Estimated total</span>
-          <strong>{selectedPrice.includes("+") ? selectedPrice : `${selectedPrice}+`}</strong>
+          <strong>{selectedPrice === "$0" ? selectedPrice : selectedPrice.includes("+") ? selectedPrice : `${selectedPrice}+`}</strong>
         </div>
         <p className="booking-page-summary-caption">Final pricing may vary based on condition.</p>
 
@@ -205,7 +299,7 @@ export function BookingFlow() {
         <div className="booking-page-summary-feature">
           <Truck size={18} aria-hidden="true" />
           <span>
-            <strong>Pickup or drop off</strong>
+            <strong>Pickup or mail in</strong>
             Convenient options at scheduling.
           </span>
         </div>

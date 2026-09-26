@@ -14,7 +14,7 @@ export function SiteNav({ active }: { active?: NavActive }) {
     <nav className="landing-nav">
       <Link href="/" className="landing-brand">
         <span className="landing-brand-name">Atunṣe</span>
-        <span className="landing-brand-tag">RESTORE &amp; REVIVE</span>
+        <span className="landing-brand-tag">POWERED BY RESTOREDBYDJ</span>
       </Link>
       <div className="landing-navlinks">
         {NAV_LINKS.map((link) => (
