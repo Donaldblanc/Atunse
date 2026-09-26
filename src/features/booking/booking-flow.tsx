@@ -73,7 +73,11 @@ function computeMultiServicePricing(
   }, 0);
   const total = baseTotal + (suedeApplies ? SUEDE_FEE : 0) + (rush ? RUSH_FEE : 0);
 
-  const ownNotes = services.map((s) => s.priceNote).filter((n): n is string => Boolean(n) && n !== "+$10 for Suede");
+  // Services with suedeFee carry a priceNote that just restates the fee
+  // ("+$10 for Suede") — that's superseded by the generated suede note
+  // below, so exclude those specifically rather than string-matching the
+  // note's wording (which could drift independently of the flag).
+  const ownNotes = services.filter((s) => !s.suedeFee).map((s) => s.priceNote).filter((n): n is string => Boolean(n));
   const notes = [
     ...ownNotes,
     hasSuedeFee ? (suedeApplies ? `Includes +$${SUEDE_FEE} Suede fee` : `+$${SUEDE_FEE} for Suede`) : null,
