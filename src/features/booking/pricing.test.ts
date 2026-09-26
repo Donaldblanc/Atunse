@@ -14,7 +14,7 @@ describe("computeMultiServicePricing", () => {
   });
 
   it("prices a single flat service with no material or rush", () => {
-    const result = computeMultiServicePricing([standardClean], "Leather", false);
+    const result = computeMultiServicePricing([standardClean], "", false);
     expect(result.name).toBe("Standard Clean");
     expect(result.price).toBe("$30");
     expect(result.priceNote).toBe("+$10 for Suede");
@@ -31,7 +31,8 @@ describe("computeMultiServicePricing", () => {
 
   it("never applies the suede fee to a service without suedeFee: true", () => {
     const result = computeMultiServicePricing([oxidation], "Suede", false);
-    expect(result.price).not.toContain("$10");
+    expect(result.price).toBe("$25+");
+    expect(result.priceNote).toBe("Sole from $40+");
   });
 
   it("adds the rush fee on top of the base price", () => {
@@ -66,15 +67,20 @@ describe("computeMultiServicePricing", () => {
   it("drops a suedeFee service's own priceNote in favor of the generated suede note (no duplicate)", () => {
     const result = computeMultiServicePricing([standardClean], "Suede", false);
     expect(result.priceNote).toBe("Includes +$10 Suede fee");
-    expect(result.priceNote?.match(/Suede/g)).toHaveLength(1);
+  });
+
+  it("charges the suede fee once even when several selected services carry it", () => {
+    const result = computeMultiServicePricing([standardClean, premiumClean], "Suede", false);
+    expect(result.price).toBe(`$${30 + 50 + SUEDE_FEE}`);
+    expect(result.priceNote).toBe(`Includes +$${SUEDE_FEE} Suede fee`);
   });
 
   it("appends a trailing '+' only when a range-priced service is in the mix", () => {
     const allFlat = computeMultiServicePricing([standardClean, premiumClean], "Canvas", false);
-    expect(allFlat.price).not.toContain("+");
+    expect(allFlat.price).toBe("$80");
 
     const withRange = computeMultiServicePricing([standardClean, oxidation], "Canvas", false);
-    expect(withRange.price).toContain("+");
+    expect(withRange.price).toBe("$55+");
   });
 
   it("prices a bundle the same way a flat-priced service prices, rush included", () => {
