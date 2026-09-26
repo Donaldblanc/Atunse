@@ -113,7 +113,7 @@ export default function AboutPage() {
             <span className="landing-timeline-dot" />
             <div className="landing-timeline-year">2019</div>
             <strong>Growing the Craft</strong>
-            <p>Started taking on pairs for friends, family, and my community.</p>
+            <p>I started taking on pairs for friends, family, and my community.</p>
           </div>
           <div className="landing-timeline-item">
             <span className="landing-timeline-dot" />
