@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowRight, Sparkles, TriangleAlert } from "lucide-react";
 import type { ContactInfo } from "./booking-types";
+import { formatList } from "./format-list";
 
 // Captures the order's contact info — previously nowhere in this flow,
 // which meant the review step always showed a hardcoded "John Doe" /
@@ -20,12 +22,14 @@ export function ContactStep({
   onChangeRush: (rush: boolean) => void;
   onContinue: () => void;
 }) {
+  const [attempted, setAttempted] = useState(false);
   const missingFields = [
     !contact.name.trim() && "name",
     !contact.email.trim() && "email",
     !contact.phone.trim() && "phone",
   ].filter((f): f is string => Boolean(f));
   const isValid = missingFields.length === 0;
+  const showWarning = attempted && !isValid;
 
   return (
     <>
@@ -93,16 +97,22 @@ export function ContactStep({
       <button
         type="button"
         className="landing-btn-primary booking-page-continue-btn"
-        onClick={onContinue}
-        disabled={!isValid}
+        onClick={() => {
+          if (!isValid) {
+            setAttempted(true);
+            return;
+          }
+          onContinue();
+        }}
+        aria-describedby={showWarning ? "contact-step-warning" : undefined}
       >
         Continue to review
         <ArrowRight size={14} aria-hidden="true" />
       </button>
-      {!isValid && (
-        <p className="booking-page-form-warning">
+      {showWarning && (
+        <p className="booking-page-form-warning" id="contact-step-warning" role="status" aria-live="polite">
           <TriangleAlert size={14} aria-hidden="true" />
-          Please enter your {missingFields.join(", ")} to continue.
+          Please enter your {formatList(missingFields)} to continue.
         </p>
       )}
     </>
