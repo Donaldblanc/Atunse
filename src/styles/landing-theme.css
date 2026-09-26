@@ -2197,6 +2197,12 @@
   color: transparent;
 }
 
+/* Single-pair services are additive (a customer can pick more than one),
+   so they render as checkboxes; bundles stay a single radio-style pick. */
+.booking-page-service-check--checkbox {
+  border-radius: 6px;
+}
+
 .booking-page-service-row[data-active="true"] .booking-page-service-check {
   background: var(--blue);
   border-color: var(--blue);
