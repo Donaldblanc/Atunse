@@ -20,7 +20,7 @@ export default function AboutPage() {
             More Than Sneakers.
             <span>A Higher Purpose.</span>
           </h1>
-          <p className="landing-lede">
+          <p className="landing-lede landing-about-meaning">
             <strong>WHAT DOES ATUNṢE MEAN?</strong>
             <br />
             Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration &mdash; the idea of
