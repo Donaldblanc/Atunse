@@ -26,6 +26,7 @@ tracked elsewhere are marked; everything else is new.
 - [ ] **Photo dropzone nits** (`src/features/booking/pair-form.tsx`): a drop that misses the dropzone itself still makes the browser open the file (a window-level `dragover`/`drop` guard would cover that); there's also no per-photo remove control, so a wrongly picked photo can't be removed short of reloading the page and losing the whole booking.
 
 ## Still to grill (architecture/design/decisions not yet interviewed)
+- [ ] **Return leg for Pickup orders.** There is no in-person drop-off (2026-09-26). Pickup and Mail-In are the only Fulfillment Methods, so decide how finished sneakers get back to a Pickup customer (return delivery? same time window as pickup?). Then rename the `READY_FOR_PICKUP_SHIPPING` Item status (`prisma/schema.prisma`, `CONTEXT.md` Status Pipeline), since "Pickup" now means the shop collecting from the customer. Needs a migration.
 - [ ] Multi-admin/staff invite flow — access-control seam exists (ADR-0005: `admin` role, per-use-case checks), but the actual invite/onboarding UX and any role subdivision (staff vs. owner) isn't designed yet.
 
 - [ ] Stripe integration for card/Apple Pay payments — build behind a feature toggle (off by default until ready to enable in production). Zelle/Cash manual confirmation (ADR-0002) works independently and is not gated by this toggle.

@@ -28,6 +28,7 @@ basis for this build.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
 - **Photo retention**: sneaker condition photos are retained indefinitely; accessible only to the owner/admin and the Account that owns the Order.
+- **Fulfillment Method**: exactly two, **Pickup** (the shop collects from the customer's address, NY/NJ/CT only) and **Mail-In** (nationwide). **There is no in-person drop-off** (resolved 2026-09-26). The original `docs/notes.txt` answers mention drop-off; that is superseded. Open: how finished sneakers return to Pickup customers, and renaming the "Ready for Pickup/Shipping" status to match (see `CONTEXT.md` open questions).
 - **Loyalty rewards**: dropped from MVP entirely (was ambiguous between must-have and deferred in the original notes — resolved to "not in MVP"). Accounts still track order history without any points system at launch.
 
 ## Architecture decisions (full text in docs/adr/)
