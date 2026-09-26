@@ -26,19 +26,16 @@ const FAQS = [
   {
     question: "How does the process work?",
     answer:
-      "Drop off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+      "Schedule a pickup or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
   },
   {
     question: "How long does restoration take?",
     answer: "Most restorations take 5-10 business days depending on the service and current order volume.",
   },
   {
-    question: "Where can I drop off my sneakers?",
-    answer: "You can drop off in person at our Newark studio, or ship them to us using a prepaid mail-in label.",
-  },
-  {
-    question: "Do you offer mail-in service?",
-    answer: "Yes, we ship a prepaid label so you can send your sneakers from anywhere in the country.",
+    question: "How do I get my sneakers to you?",
+    answer:
+      "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the country using a prepaid mail-in label.",
   },
   {
     question: "What if I'm not happy with the results?",
@@ -143,7 +140,7 @@ export default function HomePage() {
           <span>
             <strong>NY / NJ / CT</strong>
             <br />
-            Local drop-off
+            Local pickup
           </span>
         </div>
         <div className="landing-trust-item">
