@@ -67,6 +67,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Without this, the merge commit below fails with "empty ident
+          # name" on every run. Before PR #58 that failure was swallowed as
+          # a silent no-op (exit 0) — exactly what happened for the 0.2.0
+          # and 0.2.1 releases: develop never actually got backfilled.
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin develop
           BRANCH="chore/back-merge-$(git rev-parse --short HEAD)"
           if git diff --quiet origin/develop main -- .; then
