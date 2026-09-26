@@ -1,3 +1,5 @@
+[Update 2026-09-26: there is no in-person drop-off service. The only Fulfillment Methods are Pickup (the shop collects from the customer's address, NY/NJ/CT) and Mail-In (nationwide). Answers below that mention drop-off (Q12, Q15, Q16, Q19, Q20) are superseded on that point. See CONTEXT.md and docs/SPEC.md. The answers are otherwise kept verbatim as the client's original record.]
+
 Please answer these questions so we can define the MVP web application, customer experience, and internal business workflow.
 
 1. Client & Business Details
