@@ -3397,6 +3397,9 @@
     width: 100%;
     justify-content: center;
   }
+  .landing-trust-item span {
+    text-align: center;
+  }
   .landing-trust-badges {
     width: 100%;
   }
