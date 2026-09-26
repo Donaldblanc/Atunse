@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, TriangleAlert, type LucideIcon } from "lucide-react";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
 
@@ -134,11 +134,16 @@ export function ServiceStep({
         className="landing-btn-primary booking-page-continue-btn"
         onClick={onContinue}
         disabled={!canContinue}
-        title={canContinue ? undefined : "Select at least one service to continue"}
       >
         Continue
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {!canContinue && (
+        <p className="booking-page-form-warning">
+          <TriangleAlert size={14} aria-hidden="true" />
+          Select at least one service to continue.
+        </p>
+      )}
     </>
   );
 }

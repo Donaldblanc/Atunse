@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, TriangleAlert } from "lucide-react";
 import { PairForm } from "./pair-form";
 import type { PairDetails } from "./booking-types";
 
@@ -23,7 +23,13 @@ export function DetailsStep({
   onChangePair: (index: number, details: PairDetails) => void;
   onContinue: () => void;
 }) {
-  const photosMet = isBundle ? pairs.every((pair) => pair.photos.length > 0) : singlePair.photos.length > 0;
+  const missingPairs = isBundle
+    ? pairs.map((pair, i) => (pair.photos.length === 0 ? i + 1 : null)).filter((n): n is number => n !== null)
+    : [];
+  const photosMet = isBundle ? missingPairs.length === 0 : singlePair.photos.length > 0;
+  const missingMessage = isBundle
+    ? `Upload at least one photo for Pair ${missingPairs.join(", ")} to continue.`
+    : "Upload at least one photo to continue.";
 
   return (
     <>
@@ -58,11 +64,16 @@ export function DetailsStep({
         className="landing-btn-primary booking-page-continue-btn"
         onClick={onContinue}
         disabled={!photosMet}
-        title={photosMet ? undefined : "Upload at least one photo per pair to continue"}
       >
         Continue to schedule
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {!photosMet && (
+        <p className="booking-page-form-warning">
+          <TriangleAlert size={14} aria-hidden="true" />
+          {missingMessage}
+        </p>
+      )}
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, TriangleAlert } from "lucide-react";
 import type { ContactInfo } from "./booking-types";
 
 // Captures the order's contact info — previously nowhere in this flow,
@@ -20,7 +20,12 @@ export function ContactStep({
   onChangeRush: (rush: boolean) => void;
   onContinue: () => void;
 }) {
-  const isValid = Boolean(contact.name.trim() && contact.email.trim() && contact.phone.trim());
+  const missingFields = [
+    !contact.name.trim() && "name",
+    !contact.email.trim() && "email",
+    !contact.phone.trim() && "phone",
+  ].filter((f): f is string => Boolean(f));
+  const isValid = missingFields.length === 0;
 
   return (
     <>
@@ -90,11 +95,16 @@ export function ContactStep({
         className="landing-btn-primary booking-page-continue-btn"
         onClick={onContinue}
         disabled={!isValid}
-        title={isValid ? undefined : "Name, email, and phone are required"}
       >
         Continue to review
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {!isValid && (
+        <p className="booking-page-form-warning">
+          <TriangleAlert size={14} aria-hidden="true" />
+          Please enter your {missingFields.join(", ")} to continue.
+        </p>
+      )}
     </>
   );
 }
