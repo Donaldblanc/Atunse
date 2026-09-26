@@ -109,7 +109,7 @@ export default function HomePage() {
             favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
-            <BookRestorationCta />
+            <BookRestorationCta topCta />
             <a className="landing-link-arrow" href="#gallery">
               View the gallery
               <ArrowIcon size={13} strokeWidth={26} />

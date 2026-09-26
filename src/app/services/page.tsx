@@ -87,7 +87,7 @@ export default function ServicesPage() {
             From everyday cleaning to full restorations, we help bring new life to the sneakers you love.
           </p>
           <div className="landing-cta-row">
-            <BookRestorationCta />
+            <BookRestorationCta topCta />
             <a className="services-page-btn-outline" href="#pricing-cleaning">
               See our process
               <ChevronDown size={13} aria-hidden="true" />

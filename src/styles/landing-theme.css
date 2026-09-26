@@ -3582,6 +3582,13 @@
     display: block;
     height: 62px;
   }
+  /* [hidden] alone loses to the display:flex/block rules above on
+     specificity, so it wouldn't actually hide the bar while the page's
+     own hero CTA is in view — this makes the JS-driven hide effective. */
+  .landing-mobile-book-bar[hidden],
+  .landing-mobile-book-bar-spacer[hidden] {
+    display: none;
+  }
 
   .landing-about-hero {
     padding: 32px 20px 36px;
