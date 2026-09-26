@@ -3393,6 +3393,10 @@
     align-items: flex-start;
     padding: 18px 20px;
   }
+  .landing-trust-item {
+    width: 100%;
+    justify-content: center;
+  }
   .landing-trust-badges {
     width: 100%;
   }
