@@ -13,6 +13,7 @@ import { BrandMarquee } from "@/features/landing/brand-marquee";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 
 // Customer-facing landing page. Light (default) + dark theme via
 // data-theme on #landing-root (src/styles/landing-theme.css), toggled by
@@ -154,7 +155,7 @@ export default function HomePage() {
           </span>
         </div>
         <div className="landing-trust-badges">
-          <span className="landing-trust-label">TRUSTED BY SNEAKER ENTHUSIASTS</span>
+          <span className="landing-trust-label">BRANDS WE RESTORE</span>
           <BrandMarquee />
         </div>
       </div>
@@ -218,6 +219,7 @@ export default function HomePage() {
       </div>
 
       <SiteFooter />
+      <MobileBookBar />
       <MobileTabBar />
     </div>
   );

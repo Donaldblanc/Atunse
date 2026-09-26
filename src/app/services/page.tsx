@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Check, ChevronDown, Palette, Sparkles, Wrench } from "lucide-react";
+import { Check, ChevronDown, Clock, Palette, Sparkles, Wrench } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 import { ArrowIcon } from "@/features/landing/arrow-icon";
 
@@ -111,6 +112,10 @@ export default function ServicesPage() {
         <p className="landing-eyebrow">CLEANING SERVICES</p>
         <h2>Sneaker cleaning pricing.</h2>
         <p>Two levels of care. The same attention to detail.</p>
+        <span className="services-page-turnaround-badge">
+          <Clock size={13} aria-hidden="true" />
+          72-hour turnaround
+        </span>
       </div>
       <div className="services-page-grid">
         {CLEANING_PLANS.map((plan) => (
@@ -140,6 +145,10 @@ export default function ServicesPage() {
       <div className="services-page-restoration-head">
         <p className="eyebrow-label">RESTORATION SERVICES</p>
         <p className="sub">Specialized care for a like-new look.</p>
+        <span className="services-page-turnaround-badge">
+          <Clock size={13} aria-hidden="true" />
+          5&ndash;10 business day turnaround
+        </span>
       </div>
       <div className="services-page-restoration-grid">
         {RESTORATION_SERVICES.map((service) => {
@@ -200,6 +209,7 @@ export default function ServicesPage() {
       </div>
 
       <SiteFooter active="services" />
+      <MobileBookBar />
       <MobileTabBar />
     </div>
   );
