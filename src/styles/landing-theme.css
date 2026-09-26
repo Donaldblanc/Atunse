@@ -233,13 +233,6 @@
   margin: 0 0 26px;
 }
 
-.landing-about-meaning {
-  text-align: center;
-  max-width: 46ch;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .landing-cta-row {
   display: flex;
   align-items: center;
