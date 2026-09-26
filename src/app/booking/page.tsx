@@ -17,8 +17,8 @@ const HOW_IT_WORKS = [
     icon: Calendar,
   },
   {
-    title: "Drop off or send your pair",
-    description: "Bring it to our location or ship it to us with the provided instructions.",
+    title: "Schedule a pickup or mail it in",
+    description: "We collect it from your address in NY/NJ/CT, or you ship it to us with the provided instructions.",
     icon: Package,
   },
   {
@@ -47,7 +47,7 @@ export default function BookingPage() {
           </h1>
           <p className="landing-lede">
             A simple booking process to get your sneakers cleaned, restored, and back in rotation.
-            Tell us what you need, ship or drop off your pair, and we&rsquo;ll take care of the rest.
+            Tell us what you need, schedule a pickup or ship us your pair, and we&rsquo;ll take care of the rest.
           </p>
         </div>
         <div className="landing-about-cta-tagline">

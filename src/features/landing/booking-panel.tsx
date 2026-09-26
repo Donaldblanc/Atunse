@@ -5,7 +5,7 @@ import { MapPin, Clock, Tag, Package, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { ArrowIcon } from "./arrow-icon";
 
-type BookingMode = "in-person" | "mail-in";
+type BookingMode = "pickup" | "mail-in";
 
 type BookingModeConfig = {
   label: string;
@@ -15,10 +15,10 @@ type BookingModeConfig = {
 };
 
 const MODES: Record<BookingMode, BookingModeConfig> = {
-  "in-person": {
-    label: "In-Person",
+  pickup: {
+    label: "Pickup",
     rows: [
-      { icon: MapPin, title: "NY / NJ / CT locations", subtitle: "Drop off at a convenient location" },
+      { icon: MapPin, title: "NY / NJ / CT pickup", subtitle: "We'll collect from your address" },
       { icon: Clock, title: "Most pairs ready in 72 hours" },
       { icon: Tag, title: "Pricing from $45", subtitle: "Final pricing based on condition and service" },
     ],
@@ -38,7 +38,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
 };
 
 export function BookingPanel() {
-  const [mode, setMode] = useState<BookingMode>("in-person");
+  const [mode, setMode] = useState<BookingMode>("pickup");
   const config = MODES[mode];
 
   return (

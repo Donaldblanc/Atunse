@@ -2,6 +2,7 @@ import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 
 export const metadata = {
@@ -21,10 +22,10 @@ export default function AboutPage() {
             <span>A Higher Purpose.</span>
           </h1>
           <p className="landing-lede">
-            I&rsquo;m DJ, born in Brooklyn and raised in Queens, New York. What started with one pair
-            and a necessity turned into a lifelong passion, a craft, and eventually RestoredByDJ.
+            Atunṣe is a Yoruba word meaning repair, correction, amendment, or restoration: the idea of
+            taking something worn, damaged, or overlooked and making it right again.
           </p>
-          <BookRestorationCta />
+          <BookRestorationCta topCta />
           <div className="landing-about-tagline">
             <span className="rule" />
             SAME CULTURE.
@@ -113,7 +114,7 @@ export default function AboutPage() {
             <span className="landing-timeline-dot" />
             <div className="landing-timeline-year">2019</div>
             <strong>Growing the Craft</strong>
-            <p>Started taking on pairs for friends, family, and my community.</p>
+            <p>I started taking on pairs for friends, family, and my community.</p>
           </div>
           <div className="landing-timeline-item">
             <span className="landing-timeline-dot" />
@@ -215,6 +216,7 @@ export default function AboutPage() {
       </div>
 
       <SiteFooter active="about" />
+      <MobileBookBar />
       <MobileTabBar />
     </div>
   );

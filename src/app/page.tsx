@@ -13,6 +13,7 @@ import { BrandMarquee } from "@/features/landing/brand-marquee";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 
 // Customer-facing landing page. Light (default) + dark theme via
 // data-theme on #landing-root (src/styles/landing-theme.css), toggled by
@@ -25,19 +26,16 @@ const FAQS = [
   {
     question: "How does the process work?",
     answer:
-      "Drop off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+      "Schedule a pickup or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
   },
   {
     question: "How long does restoration take?",
     answer: "Most restorations take 5-10 business days depending on the service and current order volume.",
   },
   {
-    question: "Where can I drop off my sneakers?",
-    answer: "You can drop off in person at our Newark studio, or ship them to us using a prepaid mail-in label.",
-  },
-  {
-    question: "Do you offer mail-in service?",
-    answer: "Yes, we ship a prepaid label so you can send your sneakers from anywhere in the country.",
+    question: "How do I get my sneakers to you?",
+    answer:
+      "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the country using a prepaid mail-in label.",
   },
   {
     question: "What if I'm not happy with the results?",
@@ -108,7 +106,7 @@ export default function HomePage() {
             favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
-            <BookRestorationCta />
+            <BookRestorationCta topCta />
             <a className="landing-link-arrow" href="#gallery">
               View the gallery
               <ArrowIcon size={13} strokeWidth={26} />
@@ -142,7 +140,7 @@ export default function HomePage() {
           <span>
             <strong>NY / NJ / CT</strong>
             <br />
-            Local drop-off
+            Local pickup
           </span>
         </div>
         <div className="landing-trust-item">
@@ -154,7 +152,7 @@ export default function HomePage() {
           </span>
         </div>
         <div className="landing-trust-badges">
-          <span className="landing-trust-label">TRUSTED BY SNEAKER ENTHUSIASTS</span>
+          <span className="landing-trust-label">BRANDS WE RESTORE</span>
           <BrandMarquee />
         </div>
       </div>
@@ -218,6 +216,7 @@ export default function HomePage() {
       </div>
 
       <SiteFooter />
+      <MobileBookBar />
       <MobileTabBar />
     </div>
   );

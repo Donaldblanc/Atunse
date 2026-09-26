@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, ImagePlus, Mail, MapPin, Package, Phone, Truck, User, type LucideIcon } from "lucide-react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
-import type { PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
+import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
 
 export function ReviewStep({
   isBundle,
@@ -16,6 +16,7 @@ export function ReviewStep({
   pickupAddress,
   pickupSelection,
   mailInDate,
+  contact,
   onEdit,
 }: {
   isBundle: boolean;
@@ -28,6 +29,7 @@ export function ReviewStep({
   pickupAddress: PickupAddress;
   pickupSelection: PickupSelection | null;
   mailInDate: PickupSelection | null;
+  contact: ContactInfo;
   onEdit: (step: Step) => void;
 }) {
   const scheduleText =
@@ -42,7 +44,7 @@ export function ReviewStep({
   return (
     <>
       <div className="booking-page-section-head">
-        <p className="booking-page-step-eyebrow">STEP 4 OF 4</p>
+        <p className="booking-page-step-eyebrow">STEP 5 OF 5</p>
         <h2>Review &amp; confirm.</h2>
         <p>Here&rsquo;s a summary of your order. You can go back to make changes.</p>
       </div>
@@ -78,7 +80,12 @@ export function ReviewStep({
         <div className="booking-page-details-row">
           <ImagePlus size={16} aria-hidden="true" />
           <span>
-            Photos: <strong>No photos</strong>
+            Photos:{" "}
+            <strong>
+              {pairDetails.photos.length > 0
+                ? `${pairDetails.photos.length} photo${pairDetails.photos.length === 1 ? "" : "s"}`
+                : "No photos"}
+            </strong>
           </span>
         </div>
         <div className="booking-page-details-row">
@@ -117,20 +124,21 @@ export function ReviewStep({
       <div className="booking-page-review-card">
         <div className="booking-page-review-head">
           <span>CONTACT</span>
-          {/* No step collects name/email/phone yet (docs/TODO.md) — no
-              Edit link until one does; see #55 review. */}
+          <button type="button" className="booking-page-edit-link" onClick={() => onEdit("contact")}>
+            Edit
+          </button>
         </div>
         <div className="booking-page-details-row">
           <User size={16} aria-hidden="true" />
-          <span>John Doe</span>
+          <span>{contact.name || "—"}</span>
         </div>
         <div className="booking-page-details-row">
           <Mail size={16} aria-hidden="true" />
-          <span>john@example.com</span>
+          <span>{contact.email || "—"}</span>
         </div>
         <div className="booking-page-details-row">
           <Phone size={16} aria-hidden="true" />
-          <span>(123) 456-7890</span>
+          <span>{contact.phone || "—"}</span>
         </div>
       </div>
 

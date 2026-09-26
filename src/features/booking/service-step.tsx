@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowRight, Check, type LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Check, TriangleAlert, type LucideIcon } from "lucide-react";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
 
@@ -12,6 +13,7 @@ function ServiceRow({
   priceNote,
   badge,
   isActive,
+  shape = "radio",
   onClick,
 }: {
   Icon: LucideIcon;
@@ -21,6 +23,7 @@ function ServiceRow({
   priceNote?: string;
   badge?: string;
   isActive: boolean;
+  shape?: "radio" | "checkbox";
   onClick: () => void;
 }) {
   return (
@@ -29,9 +32,14 @@ function ServiceRow({
       className="booking-page-service-row"
       data-active={isActive}
       onClick={onClick}
-      aria-pressed={isActive}
+      role={shape === "checkbox" ? "checkbox" : undefined}
+      aria-checked={shape === "checkbox" ? isActive : undefined}
+      aria-pressed={shape === "radio" ? isActive : undefined}
     >
-      <span className="booking-page-service-check" aria-hidden="true">
+      <span
+        className={`booking-page-service-check${shape === "checkbox" ? " booking-page-service-check--checkbox" : ""}`}
+        aria-hidden="true"
+      >
         <Check size={12} />
       </span>
       <span className="booking-page-service-icon" aria-hidden="true">
@@ -54,24 +62,32 @@ function ServiceRow({
 
 export function ServiceStep({
   isBundle,
-  selectedServiceId,
-  onSelectService,
+  selectedServiceIds,
+  onToggleService,
   selectedBundleId,
   onSelectBundle,
   onContinue,
 }: {
   isBundle: boolean;
-  selectedServiceId: string;
-  onSelectService: (id: string) => void;
+  selectedServiceIds: string[];
+  onToggleService: (id: string) => void;
   selectedBundleId: string;
   onSelectBundle: (id: string) => void;
   onContinue: () => void;
 }) {
+  const [attempted, setAttempted] = useState(false);
+  const canContinue = isBundle || selectedServiceIds.length > 0;
+  const showWarning = attempted && !canContinue;
+
   return (
     <>
       <div className="booking-page-section-head">
-        <h2>{isBundle ? "Choose a bundle." : "Choose your service."}</h2>
-        <p>{isBundle ? "All bundles include 3 pairs, Premium Clean, and Suede fee waived." : "Clean, restore, and bring your sneakers back to life."}</p>
+        <h2>{isBundle ? "Choose a bundle." : "Choose your service(s)."}</h2>
+        <p>
+          {isBundle
+            ? "All bundles include 3 pairs, Premium Clean, and Suede fee waived."
+            : "Pick one cleaning tier, then add any restoration or custom work you need — those stack freely."}
+        </p>
       </div>
 
       <div className="booking-page-service-list">
@@ -90,6 +106,10 @@ export function ServiceStep({
           : SERVICES.flatMap((category) => {
               const services = BOOKING_SERVICES.filter((service) => service.category === category.id);
               if (services.length === 0) return [];
+              // Cleaning is single-select (you'd never book both Standard
+              // and Premium on the same pair); every other category is an
+              // additive add-on, so it renders as a checkbox.
+              const shape = category.id === "cleaning" ? "radio" : "checkbox";
               return [
                 <p className="booking-page-service-group-label" key={category.id}>
                   {category.title}
@@ -103,18 +123,36 @@ export function ServiceStep({
                     price={service.price}
                     priceNote={service.priceNote}
                     badge={service.badge}
-                    isActive={service.id === selectedServiceId}
-                    onClick={() => onSelectService(service.id)}
+                    shape={shape}
+                    isActive={selectedServiceIds.includes(service.id)}
+                    onClick={() => onToggleService(service.id)}
                   />
                 )),
               ];
             })}
       </div>
 
-      <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
+      <button
+        type="button"
+        className="landing-btn-primary booking-page-continue-btn"
+        onClick={() => {
+          if (!canContinue) {
+            setAttempted(true);
+            return;
+          }
+          onContinue();
+        }}
+        aria-describedby={showWarning ? "service-step-warning" : undefined}
+      >
         Continue
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {showWarning && (
+        <p className="booking-page-form-warning" id="service-step-warning" role="status" aria-live="polite">
+          <TriangleAlert size={14} aria-hidden="true" />
+          Select at least one service to continue.
+        </p>
+      )}
     </>
   );
 }

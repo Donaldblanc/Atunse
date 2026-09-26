@@ -28,7 +28,7 @@ export function ScheduleStep({
   return (
     <>
       <div className="booking-page-section-head">
-        <p className="booking-page-step-eyebrow">STEP 3 OF 4</p>
+        <p className="booking-page-step-eyebrow">STEP 3 OF 5</p>
         <h2>Pickup or mail in?</h2>
         <p>Choose how you&rsquo;d like to get your sneakers to us.</p>
       </div>

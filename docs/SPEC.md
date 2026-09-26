@@ -28,6 +28,7 @@ basis for this build.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
 - **Photo retention**: sneaker condition photos are retained indefinitely; accessible only to the owner/admin and the Account that owns the Order.
+- **Fulfillment Method**: exactly two, **Pickup** (the shop collects from the customer's address, NY/NJ/CT only) and **Mail-In** (nationwide). **There is no in-person drop-off** (resolved 2026-09-26). The original `docs/notes.txt` answers mention drop-off; that is superseded. Open: how finished sneakers return to Pickup customers, and renaming the "Ready for Pickup/Shipping" status to match (see `CONTEXT.md` open questions).
 - **Loyalty rewards**: dropped from MVP entirely (was ambiguous between must-have and deferred in the original notes — resolved to "not in MVP"). Accounts still track order history without any points system at launch.
 
 ## Architecture decisions (full text in docs/adr/)
@@ -37,7 +38,7 @@ basis for this build.
 | 0002 | Zelle/Cash payments confirmed manually by the owner in admin, not system-verified |
 | 0003 | Single full-stack app, strictly layered: use-cases → repositories → DB; auth checked server-side only; third-party services behind adapters; API versioned at `/api/v1/` from day one |
 | 0004 | File storage behind a swappable `FileStorage` adapter; S3 is the initial implementation |
-| 0005 | Managed auth provider (Clerk/Auth0/Supabase Auth — TBD which); single auth system with `role` (`customer` / `admin`); MVP `admin` role is a single blanket role, but role checks are per-use-case so finer roles (staff vs. owner) can be added later without rearchitecting |
+| 0005 | Managed auth provider (Clerk/Auth0/Supabase Auth — TBD which); single auth system with `role` (`customer` / `admin`); MVP `admin` role is a single blanket role, but role checks are per-use-case so finer roles (staff vs. owner) can be added later without rearchitecting. **Addendum:** until a provider is chosen, an interim in-house email/password login (scrypt hash + HMAC-signed session cookie) sits behind an `AuthService` interface |
 | 0006 | Notifications: Resend for email (permanent free tier); third-party seam is a `NotificationService` adapter; use-cases write to a DB-backed **outbox table** in the same transaction as the state change, a worker drains it and calls the provider; explicit domain events deferred until a second independent consumer (audit log, analytics) actually exists |
 | 0007 | Postgres as the database; GitHub Actions runs the test suite + lint/typecheck in CI |
 | 0008 | Hosting: Vercel (app) + Neon (Postgres) — chosen over Supabase to keep DB decoupled from the auth/storage adapters; Resend free tier covers email cost at MVP scale |
@@ -45,6 +46,7 @@ basis for this build.
 | 0010 | Mail-in: MVP only captures + validates the shipping address (address/maps validation adapter); no label generation — that's a future adapter (e.g. Shippo/EasyPost), not an MVP blocker |
 | 0011 | Code organized by **feature** first, layers (use-cases/repositories/adapters) inside each feature — refines ADR-0003's layering to avoid global layer folders |
 | 0012 | Money (integer-cents value type), idempotency keys, per-use-case authorization, and audit records are explicit domain concerns designed in from the first vertical slice — not infrastructure retrofitted later |
+| 0013 | Prisma for the ORM/migrations; Vitest for both unit and integration tests. `PrismaClient` is only imported inside repositories |
 
 ## Guiding build principle
 **Establish architectural boundaries early; implement the domain
@@ -56,14 +58,50 @@ the rest of the use-cases — rather than building every use-case's business
 logic before any of them has a working UI or a deployed admin panel to
 prove it against.
 
+## Where the build stands (as of 2026-09-26)
+**Phase 0 — done.**
+- Next.js scaffold with the feature-based layout (ADR-0011).
+- CI runs typecheck, lint, unit tests, migrations, and integration tests against a real Postgres service container.
+- `/admin/*` and `/api/v1/admin/*` fail closed via `src/middleware.ts`.
+- Narrow schema: `Account`, `Order`, `Item`, `ItemAuditEntry`.
+- Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
+
+**Phase 1 — backend started, not yet connected to any UI.**
+- `submitOrder` + `POST /api/v1/orders`: a guest submits one Item with photo keys. Policy Acceptance is enforced server-side. The notification goes through `ConsoleNotificationService` (logs only; no Resend adapter yet).
+- `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key.
+- `Money` value type; Prisma and in-memory `OrderRepository` implementations, with tests.
+- Not built yet:
+  - Presigned S3 uploads (no `FileStorage` adapter code exists).
+  - Resend adapter.
+  - Quote and manual payment confirmation screens.
+  - Any admin working screen. `/admin` is a dashboard listing the planned screens, with placeholder stats.
+
+**Customer site (marketing + booking UI).**
+- Pages: `/`, `/services`, `/about`, `/booking`.
+- `/coming-soon` is the placeholder destination for Process, Contact, Terms and Privacy.
+- `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review.
+  - **Service:** one pair with additive Services (one cleaning tier plus any restoration add-ons), or a three-pair Bundle.
+  - **Details:** at least one photo per pair.
+  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (date).
+  - **Your Info:** name, email, phone, and optional Rush.
+  - **Pricing:** computed in the browser from `src/features/booking/services-data.ts`, including the Suede fee on cleans and the Rush fee.
+- **The booking flow runs entirely in the browser.** "Confirm Booking" links to `/coming-soon`; nothing is submitted, uploaded or stored.
+
+**Gap between the booking UI and the Phase 1 API** (tracked in `docs/TODO.md`):
+- The API and schema take one Item with brand/model/description/photo keys and a guest email/phone.
+- They have no fields yet for Fulfillment Method, pickup address or slot, mail-in date, Services, price estimate, Rush, or contact name.
+- Bundles are three Items, which is Phase 2 (multi-item Orders).
+- The UI has no Policy Acceptance checkbox. There is only "By continuing, you agree…" text, which the server-side rule won't accept as-is.
+- The UI has no Deposit/payment step.
+
 ## Build sequence
-**Phase 0 — Skeleton**
+**Phase 0 — Skeleton** (done)
 - Repo scaffold (Next.js/TS), feature-based folder structure (ADR-0011)
 - GitHub Actions CI from commit one — unit tests, plus repository/migration integration tests against a real Postgres service container (not mocked), so schema drift is caught immediately
 - Auth wired and **admin routes protected from the very first deployment** — never ship an open `/admin` even temporarily, even before there's anything sensitive behind it
 - Narrow initial schema: just enough for the one workflow below (Order, Item, Customer/Account) — not the full domain model up front
 
-**Phase 1 — One real vertical slice, fully engineered**
+**Phase 1 — One real vertical slice, fully engineered** (in progress: backend use-cases and API only)
 Pick the core workflow: guest submits an Order with one Item and photos →
 owner reviews and sends a quote → customer pays the deposit manually
 (Zelle/Cash, ADR-0002) → owner confirms payment → Item moves through the
@@ -108,6 +146,8 @@ future standalone messages inbox (TODO) are both post-MVP admin screens.
 - [ ] SMS notifications — behind a feature toggle, off by default (ADR-0009)
 - [ ] Customer data import — dedicated admin-only screen, format still TBD, not an MVP-launch blocker
 - [ ] Mail-in label generation via third-party carrier API — not in MVP (ADR-0010)
+- [ ] Connect `/booking` to `POST /api/v1/orders` (schema/API fields, Policy Acceptance checkbox, presigned uploads)
+- [ ] Return leg for Pickup orders, and renaming the `READY_FOR_PICKUP_SHIPPING` status
 
 ## Open questions — still not resolved
 - **Launch date** — explicitly left undecided by the owner (neither "before summer over" nor Sept 26 is realistic against current scope + architecture; revisit once more of the build is scoped)
