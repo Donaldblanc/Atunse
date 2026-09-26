@@ -2,6 +2,7 @@ import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
+import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 
 export const metadata = {
@@ -215,6 +216,7 @@ export default function AboutPage() {
       </div>
 
       <SiteFooter active="about" />
+      <MobileBookBar />
       <MobileTabBar />
     </div>
   );

@@ -6,16 +6,28 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { PickupSelection } from "./pickup-date-picker";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
-import { EMPTY_ADDRESS, EMPTY_PAIR, type FlowType, type PairDetails, type PickupAddress, type ScheduleMethod, type Step } from "./booking-types";
+import {
+  EMPTY_ADDRESS,
+  EMPTY_CONTACT,
+  EMPTY_PAIR,
+  type ContactInfo,
+  type FlowType,
+  type PairDetails,
+  type PickupAddress,
+  type ScheduleMethod,
+  type Step,
+} from "./booking-types";
 import { ServiceStep } from "./service-step";
 import { DetailsStep } from "./details-step";
 import { ScheduleStep } from "./schedule-step";
+import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
   { key: "details", label: "Details" },
   { key: "schedule", label: "Schedule" },
+  { key: "contact", label: "Your Info" },
   { key: "review", label: "Review" },
 ];
 
@@ -25,8 +37,30 @@ const STEPS: { key: Step; label: string }[] = [
 const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
   details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
   schedule: () => "Pickup or drop off",
+  contact: () => "Contact details",
   review: () => "Confirm booking",
 };
+
+const RUSH_FEE = 20;
+const SUEDE_FEE = 10;
+
+// Only Standard/Premium Clean carry a flat +$10 Suede fee (their price is
+// a plain "$NN", unlike the range-priced restoration services) — and it's
+// only real when the customer actually picked Suede as the pair's
+// material, not just a disclaimer note that never changed the price.
+function computePricing(basePrice: string, baseNote: string | undefined, material: string, rush: boolean) {
+  const isFlatPriced = /^\$\d+$/.test(basePrice);
+  const hasSuedeFee = isFlatPriced && Boolean(baseNote?.includes("Suede"));
+  if (!isFlatPriced) return { price: basePrice, priceNote: baseNote };
+
+  const suedeApplies = hasSuedeFee && material === "Suede";
+  const total = parseInt(basePrice.slice(1), 10) + (suedeApplies ? SUEDE_FEE : 0) + (rush ? RUSH_FEE : 0);
+  const notes = [
+    hasSuedeFee ? (suedeApplies ? `Includes +$${SUEDE_FEE} Suede fee` : baseNote) : baseNote,
+    rush ? `+$${RUSH_FEE} rush` : null,
+  ].filter((n): n is string => Boolean(n));
+  return { price: `$${total}`, priceNote: notes.length > 0 ? notes.join(" · ") : undefined };
+}
 
 // Four real client-side steps, with two parallel flows: booking a single
 // pair's service, or a 3-pair bundle (each pair gets its own detail tab).
@@ -51,14 +85,17 @@ export function BookingFlow() {
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
+  const [contact, setContact] = useState<ContactInfo>(EMPTY_CONTACT);
+  const [rush, setRush] = useState(false);
 
   const selectedService = BOOKING_SERVICES.find((s) => s.id === selectedServiceId) ?? BOOKING_SERVICES[0]!;
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
   const isBundle = flow === "bundle";
   const SelectedIcon = isBundle ? selectedBundle.icon : selectedService.icon;
   const selectedName = isBundle ? selectedBundle.name : selectedService.name;
-  const selectedPrice = isBundle ? selectedBundle.price : selectedService.price;
-  const selectedPriceNote = isBundle ? undefined : selectedService.priceNote;
+  const { price: selectedPrice, priceNote: selectedPriceNote } = isBundle
+    ? { price: selectedBundle.price, priceNote: undefined }
+    : computePricing(selectedService.price, selectedService.priceNote, singlePair.material, rush);
   const stepIndex = STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
@@ -146,6 +183,16 @@ export function BookingFlow() {
             onConfirmPickup={setPickupSelection}
             mailInDate={mailInDate}
             onChangeMailInDate={setMailInDate}
+            onContinue={() => setStep("contact")}
+          />
+        )}
+
+        {step === "contact" && (
+          <ContactStep
+            contact={contact}
+            onChangeContact={setContact}
+            rush={rush}
+            onChangeRush={setRush}
             onContinue={() => setStep("review")}
           />
         )}
@@ -162,6 +209,7 @@ export function BookingFlow() {
             pickupAddress={pickupAddress}
             pickupSelection={pickupSelection}
             mailInDate={mailInDate}
+            contact={contact}
             onEdit={setStep}
           />
         )}

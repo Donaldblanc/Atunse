@@ -23,10 +23,12 @@ export function DetailsStep({
   onChangePair: (index: number, details: PairDetails) => void;
   onContinue: () => void;
 }) {
+  const photosMet = isBundle ? pairs.every((pair) => pair.photos.length > 0) : singlePair.photos.length > 0;
+
   return (
     <>
       <div className="booking-page-section-head">
-        <p className="booking-page-step-eyebrow">STEP 2 OF 4</p>
+        <p className="booking-page-step-eyebrow">STEP 2 OF 5</p>
         <h2>Tell us about your pair{isBundle ? "s" : ""}.</h2>
         <p>Help us give you the best care possible.</p>
       </div>
@@ -51,7 +53,13 @@ export function DetailsStep({
         <PairForm brandPlaceholder="e.g. Nike Air Force 1" details={singlePair} onChange={onChangeSinglePair} />
       )}
 
-      <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
+      <button
+        type="button"
+        className="landing-btn-primary booking-page-continue-btn"
+        onClick={onContinue}
+        disabled={!photosMet}
+        title={photosMet ? undefined : "Upload at least one photo per pair to continue"}
+      >
         Continue to schedule
         <ArrowRight size={14} aria-hidden="true" />
       </button>

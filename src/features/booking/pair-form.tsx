@@ -1,10 +1,13 @@
 "use client";
 
+import { useRef } from "react";
 import { ImagePlus } from "lucide-react";
 import type { PairDetails } from "./booking-types";
 
 // Shared brand/material/notes/photos form, used by DetailsStep for both a
-// single pair and each tab of a 3-pair bundle.
+// single pair and each tab of a 3-pair bundle. Photos are required (at
+// least one) — DetailsStep's Continue button checks details.photos.length
+// before advancing.
 export function PairForm({
   pairLabel,
   brandPlaceholder,
@@ -16,6 +19,8 @@ export function PairForm({
   details: PairDetails;
   onChange: (details: PairDetails) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <>
       {pairLabel && (
@@ -58,15 +63,27 @@ export function PairForm({
           <span className="booking-page-char-count">{details.notes.length}/500</span>
         </label>
         <div className="booking-page-field">
-          <span>Upload photos (optional)</span>
-          <div className="booking-page-dropzone">
+          <span>Upload photos (required)</span>
+          <button
+            type="button"
+            className="booking-page-dropzone"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <ImagePlus size={22} aria-hidden="true" />
             <span>
-              Drag &amp; drop photos here
-              <br />
-              or click to upload
+              {details.photos.length > 0
+                ? `${details.photos.length} photo${details.photos.length === 1 ? "" : "s"} selected`
+                : "Drag & drop photos here or click to upload"}
             </span>
-          </div>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => onChange({ ...details, photos: Array.from(e.target.files ?? []) })}
+          />
         </div>
       </div>
     </>
