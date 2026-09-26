@@ -6,7 +6,14 @@
 - [ ] Postgres/eslint dev-tooling audit warnings (PostCSS via eslint-config-next) — transitive, dev-only, not runtime-exploitable; revisit when upgrading to Next 15/16 (breaking change, not done now).
 - [ ] Deploys currently run through Vercel's native Git integration (Production Branch = `main`), not through `release.yml`. Gate production behind the `v*` tag `Release` creates instead once there's a real reason to (manual approval gate, stricter control than "Production Branch = main" gives) — full removal/rewire steps in `docs/DEPLOYMENT.md`'s "Future: gate deploys through git-flow" section.
 - [ ] Confirm the Neon Vercel integration (not just a pasted `DATABASE_URL`) is installed so Preview deployments get an isolated database branch instead of sharing one — see `docs/DEPLOYMENT.md`.
-- [ ] Landing page (`src/app/page.tsx`) CTAs ("Start a restoration") are inert placeholders — wire them to the real order-submission flow (presigned S3 uploads, policy acceptance, `submitOrder` use-case) once that page exists per `docs/SPEC.md`'s Phase 1 "real customer UI."
+- [x] Landing page CTAs used to be inert placeholders. Every "Book Now" CTA now links to `/booking`.
+- [ ] **Connect `/booking` to the real order submission.** "Confirm Booking" (`review-step.tsx`) links to `/coming-soon`, and nothing is submitted or stored. Wiring it to `POST /api/v1/orders` / `submitOrder` needs:
+  - Schema and API fields for Fulfillment Method, pickup address and date/time slot, mail-in date, selected Services and price estimate, Rush, and contact name. Today they take only one Item's brand/model/description/photo keys plus guest email/phone.
+  - Presigned S3 uploads (ADR-0004) for the photos the customer picked. No `FileStorage` adapter exists yet.
+  - A real Policy Acceptance checkbox on the Review step. The "By continuing, you agree…" text doesn't meet the rule `submitOrder` enforces. The Terms and Privacy links also go to `/coming-soon`.
+  - Multi-item Orders for Bundles (three pairs), which the Phase 1 API doesn't support (Phase 2).
+  - A decision on whether booking prices stay hard-coded in `services-data.ts` or move server-side, since the Deposit is based on them.
+- [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.
 
 ## Client feedback — landing page & booking flow (2026-09-26)
 Raw feedback checked against current code. Items already done or already
@@ -23,6 +30,8 @@ tracked elsewhere are marked; everything else is new.
 - [x] **Sticky mobile "Book Now" bar** — `mobile-book-bar.tsx`, added to every marketing page except `/booking` itself.
 - [x] **Social media is linked** — footer's Instagram/TikTok/YouTube icons are real `<a href>`s to `@RestoredByDJ`/`@RestoredByDj` now, in both the real app and the mock.
 - [x] **CTA copy: "Book a restoration" → "Book Now."** Done in `src/features/landing/book-restoration-cta.tsx`.
+- [ ] **Bundle Review step only shows the first pair.** `booking-flow.tsx` passes `pairs[0]` to `ReviewStep`, so pairs 2 and 3 (brand, material, photos, notes) are never shown for confirmation.
+- [ ] **Continue-button warnings may not be announced by screen readers.** The `role="status"` warning in `contact-step.tsx`, `details-step.tsx` and `service-step.tsx` mounts together with its text on the first failed click. Render the element always (empty until needed) so the change is announced.
 - [ ] **Photo dropzone nits** (`src/features/booking/pair-form.tsx`): a drop that misses the dropzone itself still makes the browser open the file (a window-level `dragover`/`drop` guard would cover that); there's also no per-photo remove control, so a wrongly picked photo can't be removed short of reloading the page and losing the whole booking.
 
 ## Still to grill (architecture/design/decisions not yet interviewed)

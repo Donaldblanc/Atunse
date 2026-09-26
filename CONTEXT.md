@@ -18,7 +18,16 @@ A single checkbox ("I agree to the Terms of Service, Refund Policy, Restoration 
 The difference between an Item's final price (set when its Quote is sent) and the rough estimate its share of the Deposit was based on. Handled by adjusting the Balance due at completion — the Deposit already paid is never re-charged or refunded for this; the customer is notified of the real total the moment the Quote is sent (not held back until pickup).
 
 ## Service
-A unit of restoration work (basic clean, deep clean, full restoration, sole cleaning/whitening, suede/leather care, custom quote) that can be attached to an Item. An Item can have multiple Services attached.
+A unit of cleaning or restoration work that can be attached to an Item: Standard Clean, Premium Clean, Oxidation Restoration, Sneaker Painting & Dyeing, or Reglue. An Item can have multiple Services attached, but at most one cleaning tier (Standard or Premium, never both). Restoration Services combine freely with each other and with the cleaning tier.
+
+## Bundle
+A fixed-price package of Services covering three pairs booked together. Each pair in a Bundle is still its own Item.
+
+## Rush
+An optional faster turnaround a customer can request for a flat extra fee.
+
+## Suede Fee
+A flat surcharge on a cleaning Service when the pair's material is suede. Waived in Bundles.
 
 ## Deposit
 A single payment equal to 50% of the sum of all Items' prices in an Order, charged once at submission — using each Item's published starting price where standard, and a rough estimate for Items pending a custom quote. The Balance (remaining 50%, plus any delta once custom-quoted Items are finalized) is reconciled and collected before completion/return.
