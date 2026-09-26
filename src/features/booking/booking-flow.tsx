@@ -36,7 +36,7 @@ const STEPS: { key: Step; label: string }[] = [
 // "details" pluralizes in the bundle flow, matching DetailsStep's heading.
 const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
   details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
-  schedule: () => "Pickup or drop off",
+  schedule: () => "Pickup or mail in",
   contact: () => "Contact details",
   review: () => "Confirm booking",
 };
@@ -47,19 +47,25 @@ const SUEDE_FEE = 10;
 // Single-pair services are additive — a customer can select Standard
 // Clean, Oxidation Restoration, and Painting all on the same pair — so
 // price/name/note are computed over the whole selected set, not one
-// service. Only Standard/Premium Clean carry a flat +$10 Suede fee (their
-// price is a plain "$NN", unlike the range-priced restoration services),
-// and it's only real when the customer actually picked Suede as the
-// pair's material, not just a disclaimer note that never changed the
-// price. Range-priced services (e.g. "Starting at $40+") contribute their
-// leading number to the running total and force a trailing "+" on it,
-// since the real total is condition-dependent.
-function computeMultiServicePricing(services: { name: string; price: string; priceNote?: string }[], material: string, rush: boolean) {
+// service. Only services with `suedeFee: true` (Standard/Premium Clean)
+// carry the flat +$10 Suede fee, and it's only real when the customer
+// actually picked Suede as the pair's material, not just a disclaimer
+// note that never changed the price. Range-priced services (e.g.
+// "Starting at $40+") contribute their leading number to the running
+// total and force a trailing "+" on it, since the real total is
+// condition-dependent. Each service's own priceNote (e.g. Oxidation's
+// "Sole from $40+") is preserved alongside the suede/rush notes rather
+// than being dropped.
+function computeMultiServicePricing(
+  services: { name: string; price: string; priceNote?: string; suedeFee?: boolean }[],
+  material: string,
+  rush: boolean,
+) {
   if (services.length === 0) return { name: "No service selected", price: "$0", priceNote: undefined as string | undefined };
 
   const name = services.map((s) => s.name).join(" + ");
   const anyNonFlat = services.some((s) => !/^\$\d+$/.test(s.price));
-  const hasSuedeFee = services.some((s) => /^\$\d+$/.test(s.price) && s.priceNote?.includes("Suede"));
+  const hasSuedeFee = services.some((s) => s.suedeFee);
   const suedeApplies = hasSuedeFee && material === "Suede";
   const baseTotal = services.reduce((sum, s) => {
     const match = s.price.match(/\d+/);
@@ -67,12 +73,18 @@ function computeMultiServicePricing(services: { name: string; price: string; pri
   }, 0);
   const total = baseTotal + (suedeApplies ? SUEDE_FEE : 0) + (rush ? RUSH_FEE : 0);
 
+  const ownNotes = services.map((s) => s.priceNote).filter((n): n is string => Boolean(n) && n !== "+$10 for Suede");
   const notes = [
+    ...ownNotes,
     hasSuedeFee ? (suedeApplies ? `Includes +$${SUEDE_FEE} Suede fee` : `+$${SUEDE_FEE} for Suede`) : null,
     rush ? `+$${RUSH_FEE} rush` : null,
   ].filter((n): n is string => Boolean(n));
 
-  return { name, price: `$${total}${anyNonFlat ? "+" : ""}`, priceNote: notes.length > 0 ? notes.join(" · ") : undefined };
+  return {
+    name,
+    price: `$${total}${total > 0 && anyNonFlat ? "+" : ""}`,
+    priceNote: notes.length > 0 ? notes.join(" · ") : undefined,
+  };
 }
 
 // Five real client-side steps, with two parallel flows: booking a single
@@ -114,7 +126,7 @@ export function BookingFlow() {
   const isBundle = flow === "bundle";
   const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
-    ? { name: selectedBundle.name, price: selectedBundle.price, priceNote: undefined as string | undefined }
+    ? computeMultiServicePricing([selectedBundle], "", rush)
     : computeMultiServicePricing(selectedServices, singlePair.material, rush);
   const stepIndex = STEPS.findIndex((s) => s.key === step);
 
@@ -268,7 +280,7 @@ export function BookingFlow() {
 
         <div className="booking-page-summary-total">
           <span>Estimated total</span>
-          <strong>{selectedPrice.includes("+") ? selectedPrice : `${selectedPrice}+`}</strong>
+          <strong>{selectedPrice === "$0" ? selectedPrice : selectedPrice.includes("+") ? selectedPrice : `${selectedPrice}+`}</strong>
         </div>
         <p className="booking-page-summary-caption">Final pricing may vary based on condition.</p>
 
@@ -283,7 +295,7 @@ export function BookingFlow() {
         <div className="booking-page-summary-feature">
           <Truck size={18} aria-hidden="true" />
           <span>
-            <strong>Pickup or drop off</strong>
+            <strong>Pickup or mail in</strong>
             Convenient options at scheduling.
           </span>
         </div>

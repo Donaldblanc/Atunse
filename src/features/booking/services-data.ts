@@ -10,6 +10,9 @@ export type BookingService = {
   badge?: string;
   icon: LucideIcon;
   category: ServiceCategoryId;
+  /** Explicit flag instead of inferring from priceNote text, so rewording
+   * priceNote can't silently change pricing behavior. */
+  suedeFee?: boolean;
 };
 
 // Granular SKUs for the booking flow. Each carries a `category` linking it
@@ -29,6 +32,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     priceNote: "+$10 for Suede",
     icon: SportShoe,
     category: "cleaning",
+    suedeFee: true,
   },
   {
     id: "premium",
@@ -39,6 +43,7 @@ export const BOOKING_SERVICES: BookingService[] = [
     badge: "MOST POPULAR",
     icon: Crown,
     category: "cleaning",
+    suedeFee: true,
   },
   {
     id: "oxidation",

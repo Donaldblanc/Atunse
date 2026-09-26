@@ -6,8 +6,7 @@ import type { ContactInfo } from "./booking-types";
 // Captures the order's contact info — previously nowhere in this flow,
 // which meant the review step always showed a hardcoded "John Doe" /
 // "john@example.com" placeholder (docs/TODO.md). Name/email/phone are
-// required; rush is an optional add-on (placeholder pricing, needs a
-// real decision from the owner — see docs/TODO.md).
+// required; rush is an optional +$20 add-on.
 export function ContactStep({
   contact,
   onChangeContact,
@@ -82,9 +81,7 @@ export function ContactStep({
         <Sparkles size={20} aria-hidden="true" />
         <span>
           <strong>Add rush service &mdash; +$20</strong>
-          <span>
-            Cuts standard turnaround roughly in half. <em>Placeholder pricing &mdash; confirm with DJ.</em>
-          </span>
+          <span>Cuts standard turnaround roughly in half.</span>
         </span>
       </button>
 

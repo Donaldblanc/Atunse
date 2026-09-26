@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import type { PairDetails } from "./booking-types";
 
@@ -20,6 +20,13 @@ export function PairForm({
   onChange: (details: PairDetails) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  function addPhotos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
+    onChange({ ...details, photos: [...details.photos, ...imageFiles] });
+  }
 
   return (
     <>
@@ -67,7 +74,18 @@ export function PairForm({
           <button
             type="button"
             className="booking-page-dropzone"
+            data-drag-over={isDragOver}
             onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDragOver(false);
+              addPhotos(e.dataTransfer.files);
+            }}
           >
             <ImagePlus size={22} aria-hidden="true" />
             <span>
@@ -82,7 +100,10 @@ export function PairForm({
             accept="image/*"
             multiple
             hidden
-            onChange={(e) => onChange({ ...details, photos: Array.from(e.target.files ?? []) })}
+            onChange={(e) => {
+              addPhotos(e.target.files);
+              e.target.value = "";
+            }}
           />
         </div>
       </div>

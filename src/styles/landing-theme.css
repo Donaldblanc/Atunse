@@ -2323,6 +2323,14 @@
   font-size: 12px;
   font-weight: 400;
   cursor: pointer;
+  background: none;
+  width: 100%;
+}
+
+.booking-page-dropzone[data-drag-over="true"] {
+  border-color: var(--blue);
+  background: var(--bg-panel);
+  color: var(--blue);
 }
 
 .booking-page-continue-btn {
