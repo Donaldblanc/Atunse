@@ -91,7 +91,10 @@ prove it against.
   - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (any US address, optional date).
   - **Your Info:** name, email, phone, and optional Rush.
   - **Review:** Policy Acceptance checkbox, then Confirm Booking submits.
-- **Bundles are still presentational.** They're three Items in one Order, which is Phase 2 (multi-item Orders). The Bundle flow stays the default for a bare `/booking`, but its Review step offers the single-pair flow instead of a Confirm button.
+- **Bundles** book three Items in one Order. The Bundle flow is the default for a bare `/booking`.
+  - Each pair has its own details and photos, and Review shows all three.
+  - Bundle names, prices and perks come from `BUNDLE_CATALOG` in `service-catalog.ts`, which the server also prices from.
+  - Every pair is booked as Premium Clean with the Suede Fee waived. The Order keeps the Bundle id, and the shop assigns the one- or two-pair perks after inspection.
 
 ## Build sequence
 **Phase 0 — Skeleton** (done)
@@ -145,7 +148,8 @@ future standalone messages inbox (TODO) are both post-MVP admin screens.
 - [ ] SMS notifications — behind a feature toggle, off by default (ADR-0009)
 - [ ] Customer data import — dedicated admin-only screen, format still TBD, not an MVP-launch blocker
 - [ ] Mail-in label generation via third-party carrier API — not in MVP (ADR-0010)
-- [x] Connect `/booking` to `POST /api/v1/orders` for a single pair (Bundles are Phase 2)
+- [x] Connect `/booking` to `POST /api/v1/orders` for a single pair
+- [x] Bundles: three Items in one Order, priced from `BUNDLE_CATALOG`
 - [ ] Create the S3 bucket and set its env vars; `/booking` can't be submitted on a deploy until then
 - [ ] Real Terms of Service, Refund Policy, Restoration Disclaimer, Payment Policy and Privacy pages (the Policy Acceptance checkbox links to `/coming-soon`)
 - [ ] Return leg for Pickup orders, and renaming the `READY_FOR_PICKUP_SHIPPING` status
