@@ -199,6 +199,39 @@ describe("submitOrder", () => {
       ).rejects.toThrow(BookingValidationError);
     });
 
+    it("rejects a same-day pickup slot that has passed or is under 2 hours away (#75)", async () => {
+      const base = validBookingInput().fulfillment;
+      if (base.method !== "PICKUP") throw new Error("fixture must be a pickup");
+      const at = (iso: string) => bookingDeps({ now: () => new Date(iso) });
+
+      // 9:45 PM EDT: today's 4:30 PM slot is long gone.
+      await expect(
+        submitOrder(at("2026-10-02T01:45:00Z"), guest, validBookingInput({ fulfillment: { ...base, date: "2026-10-01" } })),
+      ).rejects.toThrow(/no longer available/);
+      // 3:00 PM EDT: 4:30 PM is only 1.5 hours away, 5:00 PM is exactly 2.
+      await expect(
+        submitOrder(at("2026-10-01T19:00:00Z"), guest, validBookingInput({ fulfillment: { ...base, date: "2026-10-01" } })),
+      ).rejects.toThrow(/no longer available/);
+      await expect(
+        submitOrder(
+          at("2026-10-01T19:00:00Z"),
+          guest,
+          validBookingInput({ fulfillment: { ...base, date: "2026-10-01", slot: "5:00 PM – 5:30 PM" } }),
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it("judges 'today' by New York's date, not the customer's (#75)", async () => {
+      const mailIn = (preferredDate: string) =>
+        validBookingInput({ fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate } });
+      // 12:30 AM Oct 2 in New York = 9:30 PM Oct 1 in California: Oct 1 is past.
+      const pastMidnight = bookingDeps({ now: () => new Date("2026-10-02T04:30:00Z") });
+      await expect(submitOrder(pastMidnight, guest, mailIn("2026-10-01"))).rejects.toThrow(/from today onward/);
+      // 11:30 PM Oct 1 in New York (already Oct 2 in UTC): Oct 1 is still today.
+      const lateNight = bookingDeps({ now: () => new Date("2026-10-02T03:30:00Z") });
+      await expect(submitOrder(lateNight, guest, mailIn("2026-10-01"))).resolves.toBeDefined();
+    });
+
     it("accepts a nationwide Mail-In order with no preferred date", async () => {
       const input = validBookingInput({ fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate: null } });
       const order = await submitOrder(bookingDeps(), guest, input);

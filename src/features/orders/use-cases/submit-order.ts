@@ -1,9 +1,9 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { calendarDateInShopTime, isCalendarDate, type CalendarDate } from "../calendar-date";
+import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
@@ -101,9 +101,8 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     if (existing) return sendConfirmationOnce(deps, existing, now);
   }
 
-  const today = calendarDateInShopTime(now);
   const contact = validateContact(input.contact);
-  const fulfillment = validateFulfillment(input.fulfillment, today);
+  const fulfillment = validateFulfillment(input.fulfillment, now);
   const material = validateMaterial(input.item.material);
   validatePhotoKeys(input.item.photoKeys);
 
@@ -218,7 +217,10 @@ function validateContact(contact: SubmitOrderInput["contact"]) {
   return { name, email, phone };
 }
 
-function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Fulfillment {
+function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
+  // "Today" and slot availability are the shop's (New York's), the same
+  // rules the booking picker uses (pickup-window.ts, #75).
+  const today = calendarDateInShopTime(now);
   const address = {
     line1: fulfillment.address.line1.trim(),
     line2: blankToNull(fulfillment.address.line2),
@@ -238,6 +240,11 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
       throw new BookingValidationError("Choose a pickup time between 4:30 PM and 10:00 PM.");
+    }
+    if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
+      throw new BookingValidationError(
+        `That pickup time is no longer available. Same-day pickups need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
+      );
     }
     return { method: "PICKUP", address, date: fulfillment.date, slot: fulfillment.slot };
   }
