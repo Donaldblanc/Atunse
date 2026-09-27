@@ -48,7 +48,10 @@ export interface PairInput {
   brand: string | null;
   material: string | null;
   notes: string | null;
-  /** The pair's Services. Empty in a Bundle: its Services come from the catalog. */
+  /**
+   * The pair's Services, Add-ons included. In a Bundle, only the pair's
+   * Add-ons (often none): its other Services come with the Bundle.
+   */
   serviceIds: string[];
   photoKeys: string[]; // from presigned uploads (ADR-0004) — never raw file bytes
 }
@@ -388,7 +391,7 @@ function validateMaterial(material: string | null): Material | null {
  * Each pair's material, Services and estimate, from the server's own
  * catalog. A single pair is priced from its Services; a Bundle's three pairs
  * each get the Bundle's Services and an even share of its fixed price, with
- * the Suede Fee waived (CONTEXT.md: Bundle).
+ * the Suede Fee waived (CONTEXT.md: Bundle), plus their own Add-ons.
  */
 function pricePairs(input: SubmitOrderInput): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
   const pairLabel = (i: number) => (input.bundleId === null ? "your pair" : `pair ${i + 1}`);
@@ -406,12 +409,11 @@ function pricePairs(input: SubmitOrderInput): { material: Material | null; servi
     if (input.items.length !== BUNDLE_PAIRS) {
       throw new BookingValidationError(`A Bundle covers exactly ${BUNDLE_PAIRS} pairs.`);
     }
-    if (input.items.some((item) => item.serviceIds.length > 0)) {
-      throw new BookingValidationError("A Bundle's Services come with it: don't choose Services per pair.");
-    }
-    return estimateBundleItems(input.bundleId).map((estimate, i) => ({
+    // Add-ons only: estimateBundleItems refuses any other Service per pair.
+    const addOnIdsByPair = input.items.map((item) => item.serviceIds);
+    return estimateBundleItems(input.bundleId, addOnIdsByPair).map((estimate, i) => ({
       material: materials[i]!,
-      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS], // each Item its own array, never the catalog's
+      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS, ...addOnIdsByPair[i]!], // each Item its own array, never the catalog's
       estimate,
     }));
   } catch (err) {

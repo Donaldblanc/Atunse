@@ -48,6 +48,6 @@ describe("before/after gallery", () => {
     const lines = Object.fromEntries(BEFORE_AFTER_IMAGES.map((img) => [img.caption, img.serviceLine]));
     expect(lines["Air Jordan 5"]).toBe("Oxidation Restoration · Sole from $40+");
     expect(lines['Air Jordan 3 "Black Cement"']).toBe("Oxidation Restoration · From $25+");
-    expect(lines['Air Jordan 4 "Military Black"']).toBe("Shoe Lace Replacement");
+    expect(lines['Air Jordan 4 "Military Black"']).toBe("Lace Replacement · $15");
   });
 });

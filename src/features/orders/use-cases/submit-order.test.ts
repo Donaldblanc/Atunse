@@ -159,6 +159,21 @@ describe("submitOrder", () => {
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
 
+    it("adds a pair's Add-ons to its estimate and keeps them on the Item", async () => {
+      const input = validBookingInput();
+      input.items = [{ ...input.items[0]!, serviceIds: ["premium", "laces", "waterproofing"] }];
+      const order = await submitOrder(bookingDeps(), guest, input);
+      expect(order.items[0]!.serviceIds).toEqual(["premium", "laces", "waterproofing"]);
+      expect(order.estimate.cents).toBe(5000 + 1500 + 500);
+      expect(order.deposit.cents).toBe(3500);
+    });
+
+    it("refuses Add-ons booked on their own", async () => {
+      const input = validBookingInput();
+      input.items = [{ ...input.items[0]!, serviceIds: ["laces"] }];
+      await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow("Add-ons go with a cleaning or restoration service");
+    });
+
     it("rejects an unknown material", async () => {
       const input = validBookingInput();
       input.items = [{ ...input.items[0]!, material: "Velvet" }];
@@ -444,6 +459,20 @@ describe("submitOrder", () => {
       expect(order.estimate.cents).toBe(20000 + 2000);
     });
 
+    it("gives each pair its own Add-ons on top of its share of the Bundle", async () => {
+      const input = validBundleInput("revival");
+      input.items = input.items.map((pair, i) => ({ ...pair, serviceIds: [[], ["laces"], ["deodorizing", "waterproofing"]][i]! }));
+      const order = await submitOrder(bookingDeps(), guest, input);
+      expect(order.items.map((item) => item.serviceIds)).toEqual([
+        ["premium"],
+        ["premium", "laces"],
+        ["premium", "deodorizing", "waterproofing"],
+      ]);
+      expect(order.items.map((item) => item.estimate.cents)).toEqual([5000, 6500, 6500]);
+      expect(order.estimate.cents).toBe(15000 + 1500 + 1000 + 500);
+      expect(order.deposit.cents).toBe(9000);
+    });
+
     it("keeps each pair's photos with that pair, each as its own verified copy", async () => {
       const order = await submitOrder(bookingDeps(), guest, validBundleInput());
       const keys = order.items.map((item) => item.photoKeys);
@@ -461,7 +490,7 @@ describe("submitOrder", () => {
     it.each([
       ["two pairs", () => validBundleInput("revival", { items: [validPair({ serviceIds: [] }, 0), validPair({ serviceIds: [] }, 1)] })],
       ["an unknown Bundle", () => validBundleInput("mystery")],
-      ["Services chosen per pair", () => validBundleInput("revival", { items: [0, 1, 2].map((i) => validPair({}, i)) })],
+      ["Services other than Add-ons chosen per pair", () => validBundleInput("revival", { items: [0, 1, 2].map((i) => validPair({}, i)) })],
       ["the same photo on two pairs", () => validBundleInput("revival", { items: [0, 0, 1].map((i) => validPair({ serviceIds: [] }, i)) })],
       ["three pairs without a Bundle", () => validBookingInput({ items: [0, 1, 2].map((i) => validPair({}, i)) })],
     ])("rejects %s", async (_label, input) => {

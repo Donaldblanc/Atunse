@@ -23,7 +23,8 @@ import { ScheduleStep } from "./schedule-step";
 import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
-import { computeMultiServicePricing, pricedLineForService } from "./pricing";
+import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
+import { formatPrice } from "@/features/orders/service-catalog";
 import { CustomerSignIn } from "./customer-sign-in";
 import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
@@ -59,13 +60,13 @@ export function BookingFlow() {
   const [flow, setFlow] = useState<FlowType>(requestedService ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   // Cleaning is single-select (Standard vs Premium — never both on one
-  // pair); restoration/custom-work services are additive add-ons, so
-  // they're tracked separately and can combine freely with each other
-  // and with the chosen cleaning tier.
+  // pair); restoration/custom-work services stack, so they're tracked
+  // separately and combine freely with each other and with the chosen
+  // cleaning tier. Add-ons live on each pair (PairDetails.addOnIds).
   const [selectedCleaningId, setSelectedCleaningId] = useState<string | null>(() =>
     requestedService?.category === "cleaning" ? requestedService.id : null,
   );
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(() =>
+  const [selectedStackableIds, setSelectedStackableIds] = useState<string[]>(() =>
     requestedService && requestedService.category !== "cleaning" ? [requestedService.id] : [],
   );
   const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
@@ -92,14 +93,15 @@ export function BookingFlow() {
   const [conflict, setConflict] = useState<{ message: string; existing: SubmitOrderResponse } | null>(null);
   const policyAcceptedRef = useRef(false);
 
-  const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
+  const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedStackableIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
   const isBundle = flow === "bundle";
   const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
+  const selectedAddOns = addOnLines((isBundle ? pairs : [singlePair]).map((pair) => pair.addOnIds));
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
-    ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush)
-    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush);
+    ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush, selectedAddOns)
+    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush, selectedAddOns);
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
@@ -116,7 +118,7 @@ export function BookingFlow() {
     if (service.category === "cleaning") {
       setSelectedCleaningId((prev) => (prev === id ? null : id));
     } else {
-      setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+      setSelectedStackableIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
     }
   }
 
@@ -329,6 +331,14 @@ export function BookingFlow() {
           <span className="booking-page-summary-line-price">{selectedPrice}</span>
         </div>
         {selectedPriceNote && <span className="booking-page-summary-price-note">{selectedPriceNote}</span>}
+        {selectedAddOns.map((addOn) => (
+          <div className="booking-page-summary-line booking-page-summary-addon" key={addOn.key}>
+            <span className="booking-page-summary-line-body">
+              <span>{addOn.name}</span>
+            </span>
+            <span className="booking-page-summary-line-price">+{formatPrice(addOn.baseCents, addOn.isMinimum)}</span>
+          </div>
+        ))}
 
         <div className="booking-page-summary-rule" />
 

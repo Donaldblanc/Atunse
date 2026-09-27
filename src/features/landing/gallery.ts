@@ -68,10 +68,8 @@ export const BEFORE_AFTER_IMAGES: BeforeAfterImage[] = [
   { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"', serviceLine: serviceLine("oxidation") },
   { beforeKey: "jordan5-sole-before.jpg", afterKey: "jordan5-sole-after.jpg", caption: "Air Jordan 5", serviceLine: serviceLine("oxidation", "Sole") },
   // The one single-image card: the composite shows before, the lace-swap
-  // steps and after together, so it isn't split into halves. Lace
-  // replacement isn't a bookable Service in SERVICE_CATALOG yet, so there's
-  // no price to show; add it to the catalog to price it here.
-  { imageKey: "jordan4-militaryblack-laces.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: "Shoe Lace Replacement" },
+  // steps and after together, so it isn't split into halves.
+  { imageKey: "jordan4-militaryblack-laces.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: serviceLine("laces") },
 ];
 
 export function getGalleryImageUrl(key: string): string {
