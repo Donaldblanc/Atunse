@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hashPassword, passwordHashForMissingAccount, verifyPassword } from "./password";
+import { hashPassword, MISSING_ACCOUNT_PASSWORD_HASH, verifyPassword } from "./password";
 
 describe("password hashing", () => {
   it("verifies the right password and rejects a wrong one", async () => {
@@ -22,10 +22,10 @@ describe("password hashing", () => {
     await pending;
   });
 
-  it("offers one real, reusable hash for checking guesses against a missing account", async () => {
-    const dummy = await passwordHashForMissingAccount();
-    expect(dummy).toMatch(/^[0-9a-f]{32}:[0-9a-f]{128}$/);
-    expect(await passwordHashForMissingAccount()).toBe(dummy);
-    expect(await verifyPassword("anything", dummy)).toBe(false);
+  it("has a fixed, valid dummy hash for missing accounts that nothing matches", async () => {
+    expect(MISSING_ACCOUNT_PASSWORD_HASH).toMatch(/^[0-9a-f]{32}:[0-9a-f]{128}$/);
+    expect(await verifyPassword("", MISSING_ACCOUNT_PASSWORD_HASH)).toBe(false);
+    expect(await verifyPassword("password", MISSING_ACCOUNT_PASSWORD_HASH)).toBe(false);
   });
+
 });

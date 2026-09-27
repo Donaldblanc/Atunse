@@ -1,14 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { buildSignInCodeDeps, SignInUnavailableError } from "@/features/accounts/deps";
-import {
-  createSessionCookieValue,
-  CUSTOMER_SESSION_COOKIE_NAME,
-  SESSION_COOKIE_MAX_AGE_SECONDS,
-} from "@/features/accounts/session";
+import { createSessionCookieValue, CUSTOMER_SESSION_COOKIE_NAME, sessionCookieOptions } from "@/features/accounts/session";
 import { InvalidSignInCodeError, verifySignInCode } from "@/features/accounts/use-cases/verify-sign-in-code";
 import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
 import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
+import { redactForLog } from "@/shared/logging/redact";
 
 const body = z.object({ email: z.string().trim().email().max(254), code: z.string().trim().regex(/^\d{6}$/) });
 
@@ -28,18 +25,12 @@ export async function POST(req: NextRequest) {
   try {
     const { accountId } = await verifySignInCode(buildSignInCodeDeps(), parsed.data.email, parsed.data.code);
     const response = NextResponse.json({ ok: true });
-    response.cookies.set(CUSTOMER_SESSION_COOKIE_NAME, await createSessionCookieValue(accountId, "CUSTOMER"), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
-    });
+    response.cookies.set(CUSTOMER_SESSION_COOKIE_NAME, await createSessionCookieValue(accountId, "CUSTOMER"), sessionCookieOptions());
     return response;
   } catch (err) {
     if (err instanceof InvalidSignInCodeError) return NextResponse.json({ error: err.message }, { status: 400 });
     if (err instanceof SignInUnavailableError) {
-      console.error(`[sign-in] ${err.message}`);
+      console.error(`[sign-in] ${redactForLog(err.message)}`);
       return NextResponse.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
     }
     throw err;

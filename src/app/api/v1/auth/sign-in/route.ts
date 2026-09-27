@@ -2,11 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaPasswordAuthService } from "@/features/accounts/auth-service";
 import { limitByIp, limitByKey, RATE_LIMITS } from "@/shared/rate-limit";
-import {
-  SESSION_COOKIE_MAX_AGE_SECONDS,
-  SESSION_COOKIE_NAME,
-  createSessionCookieValue,
-} from "@/features/accounts/session";
+import { SESSION_COOKIE_NAME, createSessionCookieValue, sessionCookieOptions } from "@/features/accounts/session";
 
 // POST /api/v1/auth/sign-in — interim credential login (ADR-0005 addendum).
 // Publicly reachable; there's nothing to authorize yet, only to
@@ -39,13 +35,11 @@ export async function POST(req: NextRequest) {
   }
 
   const response = NextResponse.json({ role: account.role });
-  response.cookies.set(SESSION_COOKIE_NAME, await createSessionCookieValue(account.accountId, account.role), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: SESSION_COOKIE_MAX_AGE_SECONDS,
-  });
+  response.cookies.set(
+    SESSION_COOKIE_NAME,
+    await createSessionCookieValue(account.accountId, account.role),
+    sessionCookieOptions(),
+  );
   return response;
 }
 

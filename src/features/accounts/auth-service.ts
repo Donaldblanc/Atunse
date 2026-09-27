@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import { passwordHashForMissingAccount, verifyPassword } from "./password";
+import { MISSING_ACCOUNT_PASSWORD_HASH, verifyPassword } from "./password";
 import type { Role } from "./authz";
 
 export interface AuthenticatedAccount {
@@ -25,7 +25,7 @@ export class PrismaPasswordAuthService implements AuthService {
     });
     // Always run one scrypt check, even with no account to check against,
     // so response time doesn't reveal which emails are admins.
-    const matches = await verifyPassword(password, account?.passwordHash ?? (await passwordHashForMissingAccount()));
+    const matches = await verifyPassword(password, account?.passwordHash ?? MISSING_ACCOUNT_PASSWORD_HASH);
     if (!account || !account.passwordHash || !matches) return null;
 
     return { accountId: account.id, role: account.role };

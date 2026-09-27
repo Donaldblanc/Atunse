@@ -29,13 +29,14 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-let dummyHash: Promise<string> | undefined;
-
 /**
- * A real hash of a random password, for checking a guess against when
- * there's no account: the response then takes as long as for a real one,
- * so timing can't reveal which emails have accounts.
+ * A fixed, valid scrypt hash (same format and cost as hashPassword's) of a
+ * random password that was discarded when it was generated, so nothing
+ * matches it. A guess against an account that doesn't exist (or has no
+ * password) is checked against this, so the response takes as long as for
+ * a real account and timing can't reveal which emails have accounts. It's
+ * a constant rather than computed at startup, so even the first such
+ * request costs exactly one scrypt check.
  */
-export function passwordHashForMissingAccount(): Promise<string> {
-  return (dummyHash ??= hashPassword(randomBytes(32).toString("hex")));
-}
+export const MISSING_ACCOUNT_PASSWORD_HASH =
+  "2704814b8407d12f104f9250020e2169:262bac69abd092bd552065f8399799fda1b4ea4fda070dc4cc18f877326e4aef80b43e612f362b07220cc8a06a6219b9717a5311a9bcdf9c90f8618c964d7195";

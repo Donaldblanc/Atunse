@@ -1,4 +1,4 @@
-import { keyLabel, requireSessionSecret } from "@/shared/crypto/derived-key";
+import { derivedKeyBytes } from "@/shared/crypto/derived-key";
 import type { Role } from "./authz";
 
 // Minimal signed-cookie session — an interim stand-in for whatever a
@@ -31,17 +31,12 @@ function encoder() {
 }
 
 /**
- * The session signing key: HMAC-SHA256(SESSION_SECRET, "atunse:session"),
- * the same derivation as derivedSecret("session") in
- * shared/crypto/derived-key.ts, done with Web Crypto so this file stays
- * runtime-agnostic.
+ * The session signing key: HKDF-derived from SESSION_SECRET for the
+ * "atunse/session/v1" purpose (shared/crypto/derived-key.ts), via Web
+ * Crypto so this file stays runtime-agnostic.
  */
 async function hmacKey(): Promise<CryptoKey> {
-  const secret = requireSessionSecret();
-  const master = await crypto.subtle.importKey("raw", encoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
-    "sign",
-  ]);
-  const derived = await crypto.subtle.sign("HMAC", master, encoder().encode(keyLabel("session")));
+  const derived = await derivedKeyBytes("session");
   return crypto.subtle.importKey("raw", derived, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
@@ -66,38 +61,63 @@ export async function createSessionCookieValue(accountId: string, role: Role): P
   return `${encoded}.${toBase64Url(signature)}`;
 }
 
+/**
+ * The session a cookie value carries, or null. Fails closed: a missing,
+ * empty, malformed (wrong shape, not base64url, not JSON), wrongly signed,
+ * expired or structurally invalid value is simply "signed out", never an
+ * exception, so user-controlled cookies can't cause a 500. A missing or
+ * weak SESSION_SECRET still throws: that's misconfiguration, not input.
+ */
 export async function verifySessionCookieValue(
   value: string | undefined | null,
 ): Promise<SessionPayload | null> {
   if (!value) return null;
-
-  const [encoded, signature] = value.split(".");
-  if (!encoded || !signature) return null;
-
-  // A malformed signature (not base64url) is just an invalid cookie: treat
-  // it as signed out, not as a server error (vulnerability scan).
-  let signatureBytes: Uint8Array;
-  try {
-    signatureBytes = fromBase64Url(signature);
-  } catch {
-    return null;
-  }
+  const parts = value.split(".");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  const [encoded, signature] = parts as [string, string];
 
   const key = await hmacKey();
-  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, encoder().encode(encoded));
-  if (!valid) return null;
-
-  let payload: SessionPayload;
   try {
-    payload = JSON.parse(new TextDecoder().decode(fromBase64Url(encoded)));
+    const valid = await crypto.subtle.verify("HMAC", key, fromBase64Url(signature), encoder().encode(encoded));
+    if (!valid) return null;
+
+    const payload: unknown = JSON.parse(new TextDecoder().decode(fromBase64Url(encoded)));
+    return isSessionPayload(payload) && payload.exp >= Date.now() ? payload : null;
   } catch {
-    return null;
+    return null; // not base64url, or not JSON
   }
+}
 
-  if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
-  if (typeof payload.accountId !== "string" || typeof payload.role !== "string") return null;
-
-  return payload;
+function isSessionPayload(value: unknown): value is SessionPayload {
+  if (typeof value !== "object" || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (
+    typeof v.accountId === "string" &&
+    v.accountId.length > 0 &&
+    (v.role === "ADMIN" || v.role === "CUSTOMER") &&
+    typeof v.exp === "number" &&
+    Number.isFinite(v.exp)
+  );
 }
 
 export const SESSION_COOKIE_MAX_AGE_SECONDS = SESSION_TTL_MS / 1000;
+
+/**
+ * The attributes both session cookies are set with. Signing out clears a
+ * cookie with the same attributes (and Max-Age 0), so the browser matches
+ * and drops exactly that cookie.
+ */
+export function sessionCookieOptions(maxAgeSeconds: number = SESSION_COOKIE_MAX_AGE_SECONDS) {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+}
+
+/** Options that expire a session cookie immediately (sign-out). */
+export function clearedSessionCookieOptions() {
+  return { ...sessionCookieOptions(0), expires: new Date(0) };
+}

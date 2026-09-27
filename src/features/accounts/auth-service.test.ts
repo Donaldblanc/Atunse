@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { hashPassword } from "./password";
+import { hashPassword, MISSING_ACCOUNT_PASSWORD_HASH } from "./password";
 
 const verifyCalls: string[] = [];
 vi.mock("./password", async (importOriginal) => {
@@ -36,13 +36,12 @@ describe("PrismaPasswordAuthService", () => {
   it("still runs a full password check for an unknown email, so timing can't reveal admins", async () => {
     verifyCalls.length = 0;
     expect(await serviceWith(null).verifyCredentials("nobody@example.com", "guess")).toBeNull();
-    expect(verifyCalls).toHaveLength(1);
-    expect(verifyCalls[0]).toMatch(/^[0-9a-f]{32}:[0-9a-f]{128}$/);
+    expect(verifyCalls).toEqual([MISSING_ACCOUNT_PASSWORD_HASH]);
   });
 
   it("does the same for an account without a password", async () => {
     verifyCalls.length = 0;
     expect(await serviceWith({ id: "acc", role: "ADMIN", passwordHash: null }).verifyCredentials("a@b.co", "guess")).toBeNull();
-    expect(verifyCalls).toHaveLength(1);
+    expect(verifyCalls).toEqual([MISSING_ACCOUNT_PASSWORD_HASH]);
   });
 });
