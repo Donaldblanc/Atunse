@@ -63,7 +63,7 @@ prove it against.
 **Phase 0 — done.**
 - Next.js scaffold with the feature-based layout (ADR-0011).
 - CI runs typecheck, lint, unit tests, migrations, and integration tests against a real Postgres service container.
-- `/admin/*` and `/api/v1/admin/*` fail closed via `src/middleware.ts`.
+- `/admin/*` and `/api/v1/admin/*` fail closed via `src/proxy.ts`.
 - Narrow schema: `Account`, `Order`, `Item`, `ItemAuditEntry`.
 - Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
 
