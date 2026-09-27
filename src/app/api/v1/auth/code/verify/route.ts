@@ -8,6 +8,7 @@ import {
 } from "@/features/accounts/session";
 import { InvalidSignInCodeError, verifySignInCode } from "@/features/accounts/use-cases/verify-sign-in-code";
 import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 
 const body = z.object({ email: z.string().trim().email().max(254), code: z.string().trim().regex(/^\d{6}$/) });
 
@@ -16,6 +17,10 @@ const body = z.object({ email: z.string().trim().email().max(254), code: z.strin
 // FEATURE_CUSTOMER_SIGN_IN_ENABLED toggle is off.
 export async function POST(req: NextRequest) {
   if (!isCustomerSignInEnabled()) return new NextResponse(null, { status: 404 });
+  // Caps guesses per caller across all emails, on top of the per-account
+  // limits in SignInCodes (#77).
+  const limited = await limitByIp(req, RATE_LIMITS.codeVerify);
+  if (limited) return limited;
 
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter the 6-digit code from the email." }, { status: 400 });

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { parseSubmitOrderRequest, toSubmitOrderResponse } from "@/features/orders/api/submit-order-request";
 import { customerFromCookies } from "@/features/accounts/acting-user";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 import {
   BookingValidationError,
   PolicyNotAcceptedError,
@@ -21,6 +22,9 @@ import {
 // booking flow shows its login screen. A 409 with code SUBMISSION_CONFLICT
 // means the key already created an Order with different details (#76).
 export async function POST(req: NextRequest) {
+  const limited = await limitByIp(req, RATE_LIMITS.orders);
+  if (limited) return limited;
+
   let body: unknown;
   try {
     body = await req.json();

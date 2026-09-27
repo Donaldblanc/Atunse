@@ -4,6 +4,7 @@ import { requestPhotoUploads } from "@/features/orders/use-cases/request-photo-u
 import { BookingValidationError } from "@/features/orders/use-cases/submit-order";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { MAX_PHOTOS_PER_ITEM } from "@/features/orders/photo-keys";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 import { StorageNotConfiguredError } from "@/shared/storage";
 
 const body = z.object({
@@ -16,6 +17,9 @@ const body = z.object({
 // POSTs each file straight to its target, then submits the keys with
 // POST /api/v1/orders.
 export async function POST(req: NextRequest) {
+  const limited = await limitByIp(req, RATE_LIMITS.uploads);
+  if (limited) return limited;
+
   let json: unknown;
   try {
     json = await req.json();

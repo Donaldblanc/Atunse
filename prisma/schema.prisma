@@ -199,3 +199,16 @@ model SignInCode {
   @@index([accountId, createdAt])
   @@map("sign_in_codes")
 }
+
+// Fixed-window request counters for per-IP rate limits on the public
+// routes (#77). `key` is "<policy>:<HMAC of the client IP>": raw IPs are
+// never stored. Old windows are pruned as new ones are written.
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
+}
