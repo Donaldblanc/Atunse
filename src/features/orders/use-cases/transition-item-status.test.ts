@@ -3,19 +3,11 @@ import { UnauthorizedError } from "@/features/accounts/authz";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import { submitOrder } from "./submit-order";
+import { bookingDeps, validBookingInput } from "./test-fixtures";
 import { InvalidTransitionError, transitionItemStatus } from "./transition-item-status";
 
 async function seedOrder(orders: InMemoryOrderRepository) {
-  const order = await submitOrder(
-    { orders, notifications: new ConsoleNotificationService() },
-    { accountId: null, role: "GUEST" },
-    {
-      guestEmail: "customer@example.com",
-      guestPhone: null,
-      policyAccepted: true,
-      item: { brand: "Nike", model: "Air Max", description: null, photoKeys: ["k1"] },
-    },
-  );
+  const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
   return { order, item: order.items[0]! };
 }
 

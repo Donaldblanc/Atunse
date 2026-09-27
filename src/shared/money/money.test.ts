@@ -24,4 +24,11 @@ describe("Money", () => {
     expect(a.subtract(b).cents).toBe(700);
     expect(a.add(b).cents).toBe(1300);
   });
+
+  it("formats whole dollars without cents and partial dollars with two decimals", () => {
+    expect(Money.fromCents(3000).format()).toBe("$30");
+    expect(Money.fromCents(1262).format()).toBe("$12.62");
+    expect(Money.fromCents(5).format()).toBe("$0.05");
+    expect(Money.fromCents(-250).format()).toBe("-$2.50");
+  });
 });

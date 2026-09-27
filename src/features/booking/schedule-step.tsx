@@ -3,6 +3,7 @@
 import { ArrowRight, Info, Package, Truck } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";
+import { PICKUP_STATES, US_STATES } from "./pickup-window";
 
 export function ScheduleStep({
   method,
@@ -94,9 +95,9 @@ export function ScheduleStep({
             <option value="" disabled>
               Select
             </option>
-            <option>NY</option>
-            <option>NJ</option>
-            <option>CT</option>
+            {(method === "pickup" ? PICKUP_STATES : US_STATES).map((state) => (
+              <option key={state}>{state}</option>
+            ))}
           </select>
         </label>
         <label className="booking-page-field">

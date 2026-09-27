@@ -2,6 +2,7 @@
 
 import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { useState } from "react";
+import { PICKUP_TIME_SLOTS } from "./pickup-window";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";
@@ -23,28 +24,8 @@ const MONTH_NAMES = [
   "December",
 ];
 
-// Pickup window: 4:30 PM - 10:00 PM in 30-minute slots.
-const WINDOW_START_MINUTES = 16 * 60 + 30;
-const WINDOW_END_MINUTES = 22 * 60;
-
 export function formatDate(date: Date) {
   return `${WEEKDAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
-}
-
-function formatClock(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m === 0 ? "00" : m} ${period}`;
-}
-
-function buildTimeSlots() {
-  const slots: string[] = [];
-  for (let start = WINDOW_START_MINUTES; start < WINDOW_END_MINUTES; start += 30) {
-    slots.push(`${formatClock(start)} – ${formatClock(start + 30)}`);
-  }
-  return slots;
 }
 
 type CalendarCell = { day: number; date: Date | null; outside: boolean; disabled: boolean };
@@ -115,7 +96,7 @@ export function PickupDatePicker({
   }
 
   const cells = buildCalendarCells(viewYear, viewMonth);
-  const timeSlots = buildTimeSlots();
+  const timeSlots = PICKUP_TIME_SLOTS;
 
   return (
     <>
