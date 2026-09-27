@@ -22,6 +22,7 @@
 - [ ] **Orphaned uploads.** Photos uploaded for a booking that's never submitted stay in storage. Add an S3 lifecycle rule (or a cleanup job) for `bookings/` objects with no Order once admin photo viewing exists.
 - [ ] **Rate limiting** on the public `POST /api/v1/uploads` and `POST /api/v1/orders`.
 - [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.
+- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now: `chore/back-merge-ce98fe9` (0.2.2 `package.json` bump) needs a manual PR into `develop`.
 
 ## Client feedback — landing page & booking flow (2026-09-26)
 Raw feedback checked against current code. Items already done or already
