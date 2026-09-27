@@ -13,7 +13,15 @@ npm run prisma:generate
 npm run prisma:seed     # creates the bootstrap admin account
 ```
 
-Generate `SESSION_SECRET` with `openssl rand -hex 32`. `ADMIN_EMAIL`/
+Generate `SESSION_SECRET` with `openssl rand -hex 32`. It also signs the
+local photo-upload targets, so `/booking` needs it too.
+
+Booking photos use `STORAGE_DRIVER=local` by default in development: files
+land in `.uploads/` (gitignored) through the dev-only
+`POST /api/v1/uploads/local`, so no AWS account is needed. Set
+`STORAGE_DRIVER=s3` plus the `S3_*` vars to test against a real bucket.
+Set `ZELLE_RECIPIENT`/`ZELLE_NAME` to see real Deposit instructions on the
+booking confirmation. `ADMIN_EMAIL`/
 `ADMIN_PASSWORD` are only read by the seed script (ADR-0005 addendum) —
 sign in at `/sign-in` with them once the app is running.
 
@@ -41,7 +49,8 @@ npm run build
 ```
 
 ## API surface (Phase 1)
-- `POST /api/v1/orders` — customer-facing order submission (guest today; ties to an Account once auth is wired)
+- `POST /api/v1/uploads` — presigned upload targets for a booking's photos (one per photo; JPEG/PNG/WebP/HEIC, under 15 MB, at most 10)
+- `POST /api/v1/orders` — customer-facing order submission from `/booking` (guest today; ties to an Account once auth is wired). Send an `Idempotency-Key: <uuid>` header to make retries safe
 - `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
 - `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
 - `POST /api/v1/auth/sign-out` — clears the session cookie

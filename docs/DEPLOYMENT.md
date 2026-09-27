@@ -24,11 +24,20 @@ what replaces it later.
    | `SESSION_SECRET` | `openssl rand -hex 32` (unique, real secret) | same or a separate dev value |
    | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | only needed if you run `prisma:seed` manually — not read at runtime | — |
    | `RESEND_API_KEY` | leave unset until ADR-0006's provider is actually wired; `ConsoleNotificationService` is still what's used today | — |
+   | `STORAGE_DRIVER` | `s3` (the default in production; `local` is refused) | `s3` |
+   | `S3_BUCKET` / `S3_REGION` | the photo bucket | a separate preview bucket, or the same one |
+   | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | IAM user limited to `s3:PutObject` (and later `GetObject`) on the bucket | same |
+   | `ZELLE_RECIPIENT` / `ZELLE_NAME` | the Zelle email/phone and account name customers pay the Deposit to | same or a test value |
    | `FEATURE_STRIPE_ENABLED` | `false` | `false` |
    | `FEATURE_SMS_ENABLED` | `false` | `false` |
 
-   `S3_*` variables aren't needed yet — presigned uploads aren't built (see
-   `docs/SPEC.md` build sequence).
+   **Until the S3 variables are set, `/booking` can't be submitted on a
+   deploy:** `POST /api/v1/uploads` answers `503` ("Photo uploads are
+   temporarily unavailable"). The bucket also needs a CORS rule allowing
+   `POST` from the site's origins (production domain and
+   `https://*.vercel.app` for previews), since browsers upload straight to
+   it with a presigned POST (ADR-0004). Keep the bucket private: no public
+   read, block all public access on.
 
 3. **Connect Neon properly** — if you haven't already, install the
    [Neon Vercel integration](https://vercel.com/integrations/neon) instead
