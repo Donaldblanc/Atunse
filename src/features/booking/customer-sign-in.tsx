@@ -19,6 +19,9 @@ export function CustomerSignIn({
   onUseDifferentEmail: () => void;
 }) {
   const [codeSent, setCodeSent] = useState(false);
+  // Once the code is accepted the session exists and the code is used up:
+  // a retry must only resubmit the booking, never re-verify the code.
+  const [signedIn, setSignedIn] = useState(false);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +49,21 @@ export function CustomerSignIn({
     setBusy(false);
     if (failure) return setError(failure);
     setCodeSent(true);
-    setNotice(`We sent a 6-digit code to ${email}. It expires in 10 minutes.`);
+    // Worded conditionally: the server answers the same way when it sends
+    // nothing (e.g. too many recent codes), so it can't be used to probe.
+    setNotice(`If ${email} has an account, a 6-digit code is on its way. It expires in 10 minutes.`);
+  }
+
+  async function finishBooking() {
+    setBusy(true);
+    setError(null);
+    setNotice("Signed in. Finishing your booking…");
+    try {
+      await onSignedIn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setBusy(false);
+    }
   }
 
   async function verify() {
@@ -58,13 +75,8 @@ export function CustomerSignIn({
       setBusy(false);
       return setError(failure);
     }
-    setNotice("Signed in. Finishing your booking…");
-    try {
-      await onSignedIn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
-      setBusy(false);
-    }
+    setSignedIn(true);
+    await finishBooking();
   }
 
   return (
@@ -78,7 +90,18 @@ export function CustomerSignIn({
         </p>
       </div>
 
-      {codeSent ? (
+      {signedIn ? (
+        <button
+          type="button"
+          className="landing-btn-primary booking-page-continue-btn"
+          onClick={finishBooking}
+          disabled={busy}
+          aria-busy={busy}
+        >
+          {busy ? "Finishing…" : "Try confirming again"}
+          {!busy && <ArrowRight size={14} aria-hidden="true" />}
+        </button>
+      ) : codeSent ? (
         <>
           <div className="booking-page-form-grid">
             <label className="booking-page-field">
@@ -106,10 +129,11 @@ export function CustomerSignIn({
             {!busy && <ArrowRight size={14} aria-hidden="true" />}
           </button>
           <p className="booking-page-terms">
-            Didn&rsquo;t get it?{" "}
+            Didn&rsquo;t get it? Check spam, or{" "}
             <button type="button" className="booking-page-edit-link" onClick={sendCode} disabled={busy}>
-              Send a new code
+              send a new code
             </button>
+            . You can request up to 5 codes every 15 minutes.
           </p>
         </>
       ) : (
@@ -134,12 +158,14 @@ export function CustomerSignIn({
           {error}
         </p>
       )}
-      <p className="booking-page-terms">
-        Not you?{" "}
-        <button type="button" className="booking-page-edit-link" onClick={onUseDifferentEmail} disabled={busy}>
-          Use a different email
-        </button>
-      </p>
+      {!signedIn && (
+        <p className="booking-page-terms">
+          Not you?{" "}
+          <button type="button" className="booking-page-edit-link" onClick={onUseDifferentEmail} disabled={busy}>
+            Use a different email
+          </button>
+        </p>
+      )}
     </>
   );
 }

@@ -98,6 +98,9 @@ export function BookingFlow() {
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
+    // Leaving Review drops any "sign in to finish" screen: the booking will
+    // be resubmitted from Review, and the email may change on the way.
+    setSignInEmail(null);
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
   }
 
@@ -238,7 +241,10 @@ export function BookingFlow() {
         {step === "contact" && !confirmation && (
           <ContactStep
             contact={contact}
-            onChangeContact={setContact}
+            onChangeContact={(next) => {
+              setSignInEmail(null);
+              setContact(next);
+            }}
             rush={rush}
             onChangeRush={setRush}
             onContinue={() => setStep("review")}
