@@ -93,36 +93,50 @@ async function errorFrom(res: Response): Promise<BookingSubmitError> {
   }
 }
 
-async function uploadPhotos(photos: File[], fetchImpl: typeof fetch): Promise<string[]> {
-  const res = await fetchImpl("/api/v1/uploads", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files: photos.map((photo) => ({ contentType: photo.type, size: photo.size })) }),
-  });
-  if (!res.ok) throw await errorFrom(res);
-  const { uploads } = (await res.json()) as { uploads: { key: string; url: string; fields: Record<string, string> }[] };
+/**
+ * Storage keys of photos already uploaded during this booking (#78), keyed
+ * by the File the customer picked. Retries reuse them instead of uploading
+ * every photo again, which also keeps the submitted booking identical, so
+ * a retry is recognized as the same submission (#76).
+ */
+export type UploadedPhotoKeys = WeakMap<File, string>;
 
-  await Promise.all(
-    uploads.map(async (upload, index) => {
-      const form = new FormData();
-      for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
-      form.append("file", photos[index]!); // storage requires the file last
-      const uploaded = await fetchImpl(upload.url, { method: "POST", body: form });
-      if (!uploaded.ok) throw new BookingSubmitError("One of your photos didn't upload. Please try again.");
-    }),
-  );
-  return uploads.map((upload) => upload.key);
+async function uploadPhotos(photos: File[], uploaded: UploadedPhotoKeys, fetchImpl: typeof fetch): Promise<string[]> {
+  const pending = photos.filter((photo) => !uploaded.has(photo));
+  if (pending.length > 0) {
+    const res = await fetchImpl("/api/v1/uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: pending.map((photo) => ({ contentType: photo.type, size: photo.size })) }),
+    });
+    if (!res.ok) throw await errorFrom(res);
+    const { uploads } = (await res.json()) as { uploads: { key: string; url: string; fields: Record<string, string> }[] };
+
+    await Promise.all(
+      uploads.map(async (upload, index) => {
+        const photo = pending[index]!;
+        const form = new FormData();
+        for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
+        form.append("file", photo); // storage requires the file last
+        const res = await fetchImpl(upload.url, { method: "POST", body: form });
+        if (!res.ok) throw new BookingSubmitError("One of your photos didn't upload. Please try again.");
+        uploaded.set(photo, upload.key); // only once it's really in storage
+      }),
+    );
+  }
+  return photos.map((photo) => uploaded.get(photo)!);
 }
 
 export async function submitBooking(
   submission: BookingSubmission,
+  uploaded: UploadedPhotoKeys = new WeakMap(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<SubmitOrderResponse> {
   // Validate the request shape before spending time on uploads.
   buildOrderRequestBody(submission, []);
 
   try {
-    const photoKeys = await uploadPhotos(submission.pair.photos, fetchImpl);
+    const photoKeys = await uploadPhotos(submission.pair.photos, uploaded, fetchImpl);
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.submissionKey },

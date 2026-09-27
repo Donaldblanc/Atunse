@@ -59,6 +59,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       estimateIsMinimum: input.estimateIsMinimum,
       deposit: input.deposit,
       confirmationEmailSentAt: null,
+      submissionFingerprint: input.submissionFingerprint,
       items: [
         {
           id: fakeId("item"),

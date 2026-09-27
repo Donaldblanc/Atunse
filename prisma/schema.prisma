@@ -100,6 +100,10 @@ model Order {
   // Client-generated key for retry-safe submission (ADR-0012): a resubmit
   // with the same key returns the existing Order instead of a duplicate.
   submissionKey String? @unique
+  // Hash of what was submitted with that key (#76): a retry with the same
+  // key but different details is refused instead of returning this Order
+  // as if nothing changed. Null for Orders from before it existed.
+  submissionFingerprint String?
 
   // Set once the booking confirmation email has actually gone out. A retry
   // of the same submission sends it while this is still null, so a failed

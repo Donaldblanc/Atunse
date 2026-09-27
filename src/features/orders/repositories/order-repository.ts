@@ -45,6 +45,7 @@ export interface NewOrderInput {
   estimateIsMinimum: boolean;
   deposit: Money;
   submissionKey: string | null;
+  submissionFingerprint: string | null;
   item: {
     brand: string | null;
     model: string | null;

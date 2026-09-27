@@ -86,6 +86,8 @@ export interface Order {
   estimateIsMinimum: boolean;
   deposit: Money;
   confirmationEmailSentAt: Date | null;
+  /** What was submitted with its submission key (#76); null for older Orders. */
+  submissionFingerprint: string | null;
   items: Item[];
 }
 

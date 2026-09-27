@@ -6,6 +6,7 @@ import {
   BookingValidationError,
   PolicyNotAcceptedError,
   SignInRequiredError,
+  SubmissionConflictError,
   submitOrder,
 } from "@/features/orders/use-cases/submit-order";
 
@@ -17,7 +18,8 @@ import {
 // books like any signed-out customer, ADR-0014). An `Idempotency-Key`
 // header (UUID) makes retries return the same Order. A 409 with code
 // SIGN_IN_REQUIRED means the email already has a Customer Account: the
-// booking flow shows its login screen.
+// booking flow shows its login screen. A 409 with code SUBMISSION_CONFLICT
+// means the key already created an Order with different details (#76).
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -40,6 +42,12 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof PolicyNotAcceptedError || err instanceof BookingValidationError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof SubmissionConflictError) {
+      return NextResponse.json(
+        { error: err.message, code: "SUBMISSION_CONFLICT", reference: err.reference },
+        { status: 409 },
+      );
     }
     if (err instanceof SignInRequiredError) {
       return NextResponse.json({ error: err.message, code: "SIGN_IN_REQUIRED" }, { status: 409 });

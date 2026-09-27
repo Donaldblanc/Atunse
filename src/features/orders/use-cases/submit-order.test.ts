@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderReference } from "../domain";
-import { BookingValidationError, PolicyNotAcceptedError, SignInRequiredError, submitOrder } from "./submit-order";
+import {
+  BookingValidationError,
+  PolicyNotAcceptedError,
+  SignInRequiredError,
+  SubmissionConflictError,
+  submitOrder,
+} from "./submit-order";
 import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -286,6 +292,29 @@ describe("submitOrder", () => {
       expect(retry.id).toBe(first.id);
       expect(deps.orders.orders.size).toBe(1);
       expect(deps.notifications.sent).toHaveLength(1);
+    });
+
+    it("refuses a reused submission key whose booking details changed, naming the booking received (#76)", async () => {
+      const deps = bookingDeps();
+      const key = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+      const first = await submitOrder(deps, guest, validBookingInput({ submissionKey: key }));
+
+      const edited = validBookingInput({ submissionKey: key, rush: true });
+      const attempt = submitOrder(deps, guest, edited);
+      await expect(attempt).rejects.toThrow(SubmissionConflictError);
+      await expect(attempt).rejects.toMatchObject({ reference: orderReference(first.id) });
+      expect(deps.orders.orders.size).toBe(1);
+    });
+
+    it("returns the Order for an identical retry even after its pickup date has passed (#76)", async () => {
+      const deps = bookingDeps();
+      const key = "6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c";
+      const input = validBookingInput({ submissionKey: key }); // pickup Oct 3
+      const first = await submitOrder(deps, guest, input);
+
+      const weekLater = { ...deps, now: () => new Date("2026-10-08T15:00:00Z") };
+      const retry = await submitOrder(weekLater, guest, input);
+      expect(retry.id).toBe(first.id);
     });
 
     it("sends the email on retry when the first send failed after the order was created", async () => {

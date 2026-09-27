@@ -72,7 +72,7 @@ describe("submitBooking", () => {
       "/api/v1/orders": () => Response.json(orderResponse, { status: 201 }),
     });
 
-    const result = await submitBooking(submission(), impl);
+    const result = await submitBooking(submission(), new WeakMap(), impl);
 
     expect(result).toEqual(orderResponse);
     expect(calls.map((c) => c.url)).toEqual(["/api/v1/uploads", "https://bucket.test", "/api/v1/orders"]);
@@ -89,7 +89,7 @@ describe("submitBooking", () => {
       "https://bucket.test": () => new Response(null, { status: 204 }),
       "/api/v1/orders": () => Response.json({ error: "Enter a valid 5-digit zip code." }, { status: 400 }),
     });
-    await expect(submitBooking(submission(), impl)).rejects.toThrow("Enter a valid 5-digit zip code.");
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toThrow("Enter a valid 5-digit zip code.");
   });
 
   it("passes the server's SIGN_IN_REQUIRED code through, so the flow can show the login screen", async () => {
@@ -99,7 +99,7 @@ describe("submitBooking", () => {
       "/api/v1/orders": () =>
         Response.json({ error: "You already have an account with this email.", code: "SIGN_IN_REQUIRED" }, { status: 409 }),
     });
-    await expect(submitBooking(submission(), impl)).rejects.toMatchObject({
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toMatchObject({
       name: "BookingSubmitError",
       code: "SIGN_IN_REQUIRED",
     });
@@ -110,12 +110,60 @@ describe("submitBooking", () => {
       "/api/v1/uploads": uploadsOk,
       "https://bucket.test": () => new Response(null, { status: 403 }),
     });
-    await expect(submitBooking(submission(), impl)).rejects.toThrow(/photos didn't upload/);
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toThrow(/photos didn't upload/);
     expect(calls.some((c) => c.url === "/api/v1/orders")).toBe(false);
   });
 
   it("turns a network failure into a friendly error", async () => {
     const { impl } = fakeFetch({});
-    await expect(submitBooking(submission(), impl)).rejects.toThrow(BookingSubmitError);
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toThrow(BookingSubmitError);
+  });
+});
+
+describe("retries reuse uploaded photos (#78)", () => {
+  it("doesn't upload again when the order fails after the photos went up", async () => {
+    let orderAttempts = 0;
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () =>
+        ++orderAttempts === 1
+          ? Response.json({ error: "Something broke" }, { status: 500 })
+          : Response.json({ order: { reference: "ABC12345" }, paymentInstructions: { zelle: null } }, { status: 201 }),
+    });
+    const uploaded = new WeakMap<File, string>();
+    const booking = submission();
+
+    await expect(submitBooking(booking, uploaded, impl)).rejects.toThrow(BookingSubmitError);
+    await submitBooking(booking, uploaded, impl);
+
+    expect(calls.filter((c) => c.url === "/api/v1/uploads")).toHaveLength(1);
+    expect(calls.filter((c) => c.url === "https://bucket.test")).toHaveLength(1);
+    const orderBodies = calls.filter((c) => c.url === "/api/v1/orders").map((c) => JSON.parse(c.init.body as string));
+    expect(orderBodies[1].item.photoKeys).toEqual(orderBodies[0].item.photoKeys);
+  });
+
+  it("uploads only the photos that aren't in storage yet", async () => {
+    const second = new File([new Uint8Array(4)], "side.jpg", { type: "image/jpeg" });
+    const uploaded = new WeakMap<File, string>([[photo, "bookings/earlier/0.jpg"]]);
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": () =>
+        Response.json({ uploads: [{ key: "bookings/b/0.jpg", url: "https://bucket.test", fields: { key: "bookings/b/0.jpg" } }] }, { status: 201 }),
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () => Response.json({ order: {}, paymentInstructions: { zelle: null } }, { status: 201 }),
+    });
+
+    await submitBooking(submission({ pair: { ...submission().pair, photos: [photo, second] } }), uploaded, impl);
+
+    expect(JSON.parse(calls[0]!.init.body as string).files).toHaveLength(1); // only side.jpg
+    const order = JSON.parse(calls.find((c) => c.url === "/api/v1/orders")!.init.body as string);
+    expect(order.item.photoKeys).toEqual(["bookings/earlier/0.jpg", "bookings/b/0.jpg"]);
+  });
+
+  it("doesn't remember a photo whose upload failed", async () => {
+    const uploaded = new WeakMap<File, string>();
+    const { impl } = fakeFetch({ "/api/v1/uploads": uploadsOk, "https://bucket.test": () => new Response(null, { status: 403 }) });
+    await expect(submitBooking(submission(), uploaded, impl)).rejects.toThrow(BookingSubmitError);
+    expect(uploaded.has(photo)).toBe(false);
   });
 });

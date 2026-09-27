@@ -63,6 +63,7 @@ function toDomainOrder(row: OrderRow): Order {
     estimateIsMinimum: row.estimateIsMinimum,
     deposit: Money.fromCents(row.depositCents),
     confirmationEmailSentAt: row.confirmationEmailSentAt,
+    submissionFingerprint: row.submissionFingerprint,
     items: row.items.map(toDomainItem),
   };
 }
@@ -131,6 +132,7 @@ export class PrismaOrderRepository implements OrderRepository {
         estimateIsMinimum: input.estimateIsMinimum,
         depositCents: input.deposit.cents,
         submissionKey: input.submissionKey,
+        submissionFingerprint: input.submissionFingerprint,
         items: {
           create: [
             {

@@ -7,6 +7,7 @@ import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
+import { submissionFingerprint } from "../submission-fingerprint";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
   EmailTakenError,
@@ -67,6 +68,21 @@ export class SignInRequiredError extends Error {
   }
 }
 
+/**
+ * The submission key already created an Order, but with different booking
+ * details (#76). Returning that Order would show the customer a booking
+ * they've since changed, so they're pointed at the one that went through.
+ */
+export class SubmissionConflictError extends Error {
+  constructor(readonly reference: string) {
+    super(
+      `We already received this booking (reference ${reference}) before your changes. ` +
+        "Check your email for its details, and reply there to change anything.",
+    );
+    this.name = "SubmissionConflictError";
+  }
+}
+
 /** The booking breaks a domain rule; `message` is safe to show the customer. */
 export class BookingValidationError extends Error {
   constructor(message: string) {
@@ -95,10 +111,12 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   const now = deps.now?.() ?? new Date();
 
   // A retry of a submission that already went through gets its Order back
-  // before any other check: its photo keys are, by design, already in use.
+  // before any other check: its photo keys are, by design, already in use,
+  // and a date that was valid then may have passed since (#76).
+  const fingerprint = input.submissionKey ? submissionFingerprint(input) : null;
   if (input.submissionKey) {
     const existing = await deps.orders.findBySubmissionKey(input.submissionKey);
-    if (existing) return sendConfirmationOnce(deps, existing, now);
+    if (existing) return sendConfirmationOnce(deps, sameSubmission(existing, fingerprint), now);
   }
 
   const contact = validateContact(input.contact);
@@ -128,6 +146,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       estimateIsMinimum: orderEstimate.isMinimum,
       deposit: orderEstimate.deposit,
       submissionKey: input.submissionKey,
+      submissionFingerprint: fingerprint,
       item: {
         brand: blankToNull(input.item.brand),
         model: null, // the booking form's single "Brand / Model" field lands in `brand`
@@ -158,7 +177,17 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     throw err;
   }
 
-  return sendConfirmationOnce(deps, created.order, now);
+  // created is false when a concurrent request with the same key won.
+  const order = created.created ? created.order : sameSubmission(created.order, fingerprint);
+  return sendConfirmationOnce(deps, order, now);
+}
+
+/** The existing Order for a reused submission key, if it was the same booking (#76). */
+function sameSubmission(existing: Order, fingerprint: string | null): Order {
+  if (existing.submissionFingerprint !== null && existing.submissionFingerprint !== fingerprint) {
+    throw new SubmissionConflictError(orderReference(existing.id));
+  }
+  return existing;
 }
 
 /**

@@ -53,6 +53,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     estimateIsMinimum: false,
     deposit: Money.fromCents(1500),
     submissionKey: null,
+    submissionFingerprint: null,
     item: {
       brand: null,
       model: null,
@@ -177,6 +178,12 @@ describe("PrismaOrderRepository (integration)", () => {
       expect(rejected.reason).toBeInstanceOf(PhotoKeyInUseError);
       expect(await prisma.itemPhoto.count({ where: { key: shared[0] } })).toBe(1);
     }
+  });
+
+  it("stores the submission fingerprint with the key and finds the Order by key", async () => {
+    const { order } = await repo.create(newOrder({ submissionKey: "fp-key", submissionFingerprint: "abc123" }));
+    expect((await repo.findBySubmissionKey("fp-key"))?.id).toBe(order.id);
+    expect((await repo.findById(order.id))?.submissionFingerprint).toBe("abc123");
   });
 
   it("returns the existing order for a repeated submissionKey instead of inserting a duplicate", async () => {

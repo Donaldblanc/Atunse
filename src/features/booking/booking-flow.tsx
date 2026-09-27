@@ -25,7 +25,7 @@ import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { computeMultiServicePricing, pricedLineForService } from "./pricing";
 import { CustomerSignIn } from "./customer-sign-in";
-import { BookingSubmitError, submitBooking, type SubmitOrderResponse } from "./submit-booking";
+import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
@@ -81,6 +81,8 @@ export function BookingFlow() {
   // One key per booking, minted on the first Confirm: a retried Confirm
   // sends the same key and gets the same Order back, never a duplicate.
   const submissionKey = useRef<string | null>(null);
+  // Photos already in storage for this booking, reused by retries (#78).
+  const uploadedPhotoKeys = useRef<UploadedPhotoKeys>(new WeakMap());
   const [confirmation, setConfirmation] = useState<SubmitOrderResponse | null>(null);
   // Set when the server says the booking's email already has an Account:
   // the flow shows the customer login screen, then resubmits (ADR-0014).
@@ -130,7 +132,7 @@ export function BookingFlow() {
         mailInDate,
         contact,
         rush,
-      });
+      }, uploadedPhotoKeys.current);
     } catch (err) {
       if (err instanceof BookingSubmitError && err.code === "SIGN_IN_REQUIRED") {
         setSignInEmail(contact.email.trim());
