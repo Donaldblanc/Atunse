@@ -1,0 +1,43 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+import { requestPhotoUploads } from "@/features/orders/use-cases/request-photo-uploads";
+import { BookingValidationError } from "@/features/orders/use-cases/submit-order";
+import { getFileStorage, StorageNotConfiguredError } from "@/shared/storage";
+
+const body = z.object({
+  files: z.array(z.object({ contentType: z.string().max(100), size: z.number().int() })).max(20),
+});
+
+// POST /api/v1/uploads — presigned upload targets for /booking's photos
+// (ADR-0004). Returns { uploads: [{ key, url, fields }] }; the browser
+// POSTs each file straight to its target, then submits the keys with
+// POST /api/v1/orders.
+export async function POST(req: NextRequest) {
+  let json: unknown;
+  try {
+    json = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const parsed = body.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "files must be a list of { contentType, size }" }, { status: 400 });
+  }
+
+  // Guest until sessions exist (ADR-0005), same as POST /api/v1/orders.
+  const actingUser = { accountId: null, role: "GUEST" as const };
+
+  try {
+    const uploads = await requestPhotoUploads({ storage: getFileStorage() }, actingUser, parsed.data.files);
+    return NextResponse.json({ uploads }, { status: 201 });
+  } catch (err) {
+    if (err instanceof BookingValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof StorageNotConfiguredError) {
+      console.error(`[uploads] ${err.message}`);
+      return NextResponse.json({ error: "Photo uploads are temporarily unavailable." }, { status: 503 });
+    }
+    throw err;
+  }
+}

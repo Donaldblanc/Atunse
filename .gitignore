@@ -35,3 +35,6 @@ skills-lock.json
 
 /demo_mock/shared/images
 /scratch
+
+# Local photo uploads (STORAGE_DRIVER=local, dev only)
+/.uploads
