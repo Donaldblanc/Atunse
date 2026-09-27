@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { computeMultiServicePricing, RUSH_FEE, SUEDE_FEE } from "./pricing";
+import { estimateItem, estimateOrder, MATERIALS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { computeMultiServicePricing, pricedLineForService, RUSH_FEE, SUEDE_FEE } from "./pricing";
+import { BOOKING_BUNDLES, pricedLineForBundle } from "./services-data";
 
-const standardClean = { name: "Standard Clean", price: "$30", priceNote: "+$10 for Suede", suedeFee: true };
-const premiumClean = { name: "Premium Clean", price: "$50", priceNote: "+$10 for Suede", suedeFee: true };
-const oxidation = { name: "Oxidation Restoration", price: "Midsole from $25+", priceNote: "Sole from $40+" };
-const painting = { name: "Sneaker Painting & Dyeing", price: "Starting at $40+" };
-const revivalPack = { name: "The Revival Pack", price: "$150" };
+const standardClean = pricedLineForService("standard");
+const premiumClean = pricedLineForService("premium");
+const oxidation = pricedLineForService("oxidation");
+const painting = pricedLineForService("painting");
+const revivalPack = pricedLineForBundle(BOOKING_BUNDLES.find((b) => b.id === "revival")!);
 
 describe("computeMultiServicePricing", () => {
   it("returns a 'no service selected' placeholder for an empty selection", () => {
     const result = computeMultiServicePricing([], "", false);
-    expect(result).toEqual({ name: "No service selected", price: "$0", priceNote: undefined });
+    expect(result).toEqual({ name: "No service selected", totalCents: 0, price: "$0", priceNote: undefined });
   });
 
   it("prices a single flat service with no material or rush", () => {
@@ -88,5 +90,28 @@ describe("computeMultiServicePricing", () => {
     expect(result.name).toBe("The Revival Pack");
     expect(result.price).toBe(`$${150 + RUSH_FEE}`);
     expect(result.priceNote).toBe(`+$${RUSH_FEE} rush`);
+  });
+});
+
+// The booking summary and the server must never disagree about a total:
+// check every valid selection (at most one cleaning tier) × material × rush.
+describe("client total vs server estimate", () => {
+  const cleaning = SERVICE_CATALOG.filter((s) => s.isCleaningTier).map((s) => s.id);
+  const addons = SERVICE_CATALOG.filter((s) => !s.isCleaningTier).map((s) => s.id);
+  const addonSets = addons.reduce<string[][]>((sets, id) => [...sets, ...sets.map((set) => [...set, id])], [[]]);
+  const selections = [null, ...cleaning]
+    .flatMap((tier) => addonSets.map((set) => [...(tier ? [tier] : []), ...set]))
+    .filter((ids) => ids.length > 0);
+
+  it.each(selections.map((ids) => [ids.join(" + "), ids] as const))("%s", (_label, ids) => {
+    for (const material of [...MATERIALS, ""]) {
+      for (const rush of [false, true]) {
+        const client = computeMultiServicePricing(ids.map(pricedLineForService), material, rush);
+        const item = estimateItem({ serviceIds: [...ids], material: material === "" ? null : (material as (typeof MATERIALS)[number]) });
+        const server = estimateOrder({ items: [item], rush });
+        expect(client.totalCents).toBe(server.estimate.cents);
+        expect(client.price.endsWith("+")).toBe(server.isMinimum);
+      }
+    }
   });
 });

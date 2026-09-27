@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, Check, TriangleAlert, type LucideIcon } from "lucide-react";
+import { catalogService, formatPrice, formatServicePrice, serviceNotes } from "@/features/orders/service-catalog";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
 
@@ -98,7 +99,7 @@ export function ServiceStep({
                 Icon={bundle.icon}
                 name={bundle.name}
                 subtitle={bundle.perks.join(" · ")}
-                price={bundle.price}
+                price={formatPrice(bundle.priceCents, false)}
                 isActive={bundle.id === selectedBundleId}
                 onClick={() => onSelectBundle(bundle.id)}
               />
@@ -120,8 +121,8 @@ export function ServiceStep({
                     Icon={service.icon}
                     name={service.name}
                     subtitle={service.description}
-                    price={service.price}
-                    priceNote={service.priceNote}
+                    price={formatServicePrice(catalogService(service.id))}
+                    priceNote={serviceNotes(catalogService(service.id)).join(" · ") || undefined}
                     badge={service.badge}
                     shape={shape}
                     isActive={selectedServiceIds.includes(service.id)}

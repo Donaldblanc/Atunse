@@ -5,7 +5,7 @@ import { ArrowLeft, ArrowRight, Check, Info, Shield, Star, Truck } from "lucide-
 import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import type { PickupSelection } from "./pickup-date-picker";
-import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
+import { BOOKING_BUNDLES, BOOKING_SERVICES, pricedLineForBundle } from "./services-data";
 import {
   EMPTY_ADDRESS,
   EMPTY_CONTACT,
@@ -23,7 +23,7 @@ import { ScheduleStep } from "./schedule-step";
 import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
-import { computeMultiServicePricing } from "./pricing";
+import { computeMultiServicePricing, pricedLineForService } from "./pricing";
 import { CustomerSignIn } from "./customer-sign-in";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse } from "./submit-booking";
 
@@ -93,8 +93,8 @@ export function BookingFlow() {
   const isBundle = flow === "bundle";
   const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
-    ? computeMultiServicePricing([selectedBundle], "", rush)
-    : computeMultiServicePricing(selectedServices, singlePair.material, rush);
+    ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush)
+    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush);
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
