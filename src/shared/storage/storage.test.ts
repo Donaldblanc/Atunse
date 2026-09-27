@@ -166,7 +166,7 @@ describe("S3FileStorage", () => {
 
 describe("getFileStorage", () => {
   it("defaults to local storage in development", () => {
-    expect(getFileStorage({ NODE_ENV: "development", SESSION_SECRET: "s" })).toBeInstanceOf(LocalFileStorage);
+    expect(getFileStorage({ NODE_ENV: "development", SESSION_SECRET: "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef" })).toBeInstanceOf(LocalFileStorage);
   });
 
   it("uses S3 when configured", () => {
@@ -174,7 +174,7 @@ describe("getFileStorage", () => {
   });
 
   it("treats a blank STORAGE_DRIVER as unset", () => {
-    expect(getFileStorage({ NODE_ENV: "development", STORAGE_DRIVER: "", SESSION_SECRET: "s" })).toBeInstanceOf(
+    expect(getFileStorage({ NODE_ENV: "development", STORAGE_DRIVER: "", SESSION_SECRET: "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef" })).toBeInstanceOf(
       LocalFileStorage,
     );
     expect(getFileStorage({ NODE_ENV: "production", STORAGE_DRIVER: " ", S3_BUCKET: "b", S3_REGION: "r" })).toBeInstanceOf(
@@ -227,7 +227,7 @@ describe("getFileStorage", () => {
 
   it("fails loudly in production without S3 config, and never falls back to local disk", () => {
     expect(() => getFileStorage({ NODE_ENV: "production" })).toThrow(StorageNotConfiguredError);
-    expect(() => getFileStorage({ NODE_ENV: "production", STORAGE_DRIVER: "local", SESSION_SECRET: "s" })).toThrow(
+    expect(() => getFileStorage({ NODE_ENV: "production", STORAGE_DRIVER: "local", SESSION_SECRET: "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef" })).toThrow(
       StorageNotConfiguredError,
     );
   });

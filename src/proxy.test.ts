@@ -10,7 +10,7 @@ function req(path: string, cookie?: string): NextRequest {
 
 describe("proxy (admin route guard)", () => {
   beforeEach(() => {
-    process.env.SESSION_SECRET = "test-secret";
+    process.env.SESSION_SECRET = "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef";
   });
 
   it("redirects an unauthenticated request to /admin, to /sign-in", async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emailDeliveryConfigured, notificationServiceFromEnv } from ".";
-import { ConsoleNotificationService } from "./notification-service";
+import { ConsoleNotificationService, maskEmail } from "./notification-service";
 import { ResendNotificationService } from "./resend-notification-service";
 
 describe("ResendNotificationService", () => {
@@ -61,8 +61,11 @@ describe("console fallback", () => {
       subject: "123456 is your Atunṣe sign-in code",
       body: "Your sign-in code is 123456.",
     });
-    expect(log.mock.calls.flat().join(" ")).not.toContain("123456");
-    expect(log.mock.calls.flat().join(" ")).toContain("jordan@example.com");
+    const logged = log.mock.calls.flat().join(" ");
+    expect(logged).not.toContain("123456");
+    // Customer emails don't belong in production logs either: masked.
+    expect(logged).not.toContain("jordan@example.com");
+    expect(logged).toContain("j***@example.com");
   });
 
   it("shows subjects in development, where reading codes from the log is the point", async () => {
@@ -74,5 +77,12 @@ describe("console fallback", () => {
   it("reports email delivery as configured only with both RESEND_API_KEY and EMAIL_FROM", () => {
     expect(emailDeliveryConfigured({ NODE_ENV: "test", RESEND_API_KEY: "k", EMAIL_FROM: "a@b.co" })).toBe(true);
     expect(emailDeliveryConfigured({ NODE_ENV: "test", RESEND_API_KEY: "k" })).toBe(false);
+  });
+});
+
+describe("maskEmail", () => {
+  it("keeps only the first letter and the domain", () => {
+    expect(maskEmail("jordan@example.com")).toBe("j***@example.com");
+    expect(maskEmail("not-an-email")).toBe("***");
   });
 });

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it } from "vitest";
-import { checkAdminAccess } from "./admin-check";
+import { adminFromCookieValue, checkAdminAccess } from "./admin-check";
 import { SESSION_COOKIE_NAME, createSessionCookieValue } from "./session";
 
 function req(path: string, cookie?: string): NextRequest {
@@ -10,7 +10,7 @@ function req(path: string, cookie?: string): NextRequest {
 
 describe("checkAdminAccess", () => {
   beforeEach(() => {
-    process.env.SESSION_SECRET = "test-secret";
+    process.env.SESSION_SECRET = "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef";
   });
 
   it("fails closed with no session cookie", async () => {
@@ -49,5 +49,17 @@ describe("checkAdminAccess", () => {
     expect(result.allowed).toBe(true);
     expect(result.role).toBe("ADMIN");
     expect(result.accountId).toBe("acct_1");
+  });
+
+  it("treats a malformed signature as signed out instead of throwing (vulnerability scan)", async () => {
+    for (const bad of ["x.!!!", "%%%.@@@", "only-one-part", "a.b.c"]) {
+      await expect(adminFromCookieValue(bad)).resolves.toMatchObject({ allowed: false, role: "GUEST" });
+    }
+  });
+
+  it("gives the admin layout the same decision from a raw cookie value", async () => {
+    const cookie = await createSessionCookieValue("acct_1", "ADMIN");
+    expect(await adminFromCookieValue(cookie)).toEqual({ allowed: true, role: "ADMIN", accountId: "acct_1" });
+    expect(await adminFromCookieValue(undefined)).toMatchObject({ allowed: false });
   });
 });

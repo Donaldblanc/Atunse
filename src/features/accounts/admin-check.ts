@@ -20,7 +20,14 @@ export interface AdminCheckResult {
  * routes) don't need to change.
  */
 export async function checkAdminAccess(req: NextRequest): Promise<AdminCheckResult> {
-  const cookie = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+  return adminFromCookieValue(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+}
+
+/**
+ * The same decision from a raw admin-session cookie value, for places that
+ * aren't handed a NextRequest (the admin layout's server-side re-check).
+ */
+export async function adminFromCookieValue(cookie: string | undefined): Promise<AdminCheckResult> {
   const session = await verifySessionCookieValue(cookie);
   const role: Role = session?.role ?? "GUEST";
   return { allowed: role === "ADMIN", role, accountId: session?.accountId ?? null };

@@ -10,7 +10,7 @@ let adminToken: string;
 let customerToken: string;
 
 beforeAll(async () => {
-  process.env.SESSION_SECRET = "test-secret";
+  process.env.SESSION_SECRET = "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef";
   adminToken = await createSessionCookieValue("acc_admin", "ADMIN");
   customerToken = await createSessionCookieValue("acc_customer", "CUSTOMER");
 });

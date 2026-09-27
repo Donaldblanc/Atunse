@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { isIPv6 } from "node:net";
 import { NextResponse, type NextRequest } from "next/server";
+import { derivedSecret } from "@/shared/crypto/derived-key";
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaRateLimiter } from "./prisma-rate-limiter";
 import type { RateLimitPolicy, RateLimiter } from "./rate-limiter";
@@ -34,11 +35,12 @@ export function rateLimitSubject(ip: string): string {
 
 /**
  * A stable, non-reversible stand-in for a client, so raw IPs are never
- * stored. Keyed by SESSION_SECRET with no fallback: a public key would let
- * the stored hashes be reversed by brute-forcing IPv4 space.
+ * stored. Keyed by the rate-limit key derived from SESSION_SECRET, with no
+ * fallback: a public key would let the stored hashes be reversed by
+ * brute-forcing IPv4 space. `secret` is for tests.
  */
-export function hashClient(ip: string, secret: string | undefined = process.env.SESSION_SECRET): string {
-  if (!secret) throw new Error("SESSION_SECRET is not set — required to hash rate-limit keys");
+export function hashClient(ip: string, secret: string = derivedSecret("rate-limit")): string {
+  if (!secret) throw new Error("A secret is required to hash rate-limit keys");
   return createHmac("sha256", secret).update(rateLimitSubject(ip)).digest("hex").slice(0, 32);
 }
 

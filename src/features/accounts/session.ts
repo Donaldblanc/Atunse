@@ -1,3 +1,4 @@
+import { keyLabel, requireSessionSecret } from "@/shared/crypto/derived-key";
 import type { Role } from "./authz";
 
 // Minimal signed-cookie session — an interim stand-in for whatever a
@@ -29,15 +30,19 @@ function encoder() {
   return new TextEncoder();
 }
 
+/**
+ * The session signing key: HMAC-SHA256(SESSION_SECRET, "atunse:session"),
+ * the same derivation as derivedSecret("session") in
+ * shared/crypto/derived-key.ts, done with Web Crypto so this file stays
+ * runtime-agnostic.
+ */
 async function hmacKey(): Promise<CryptoKey> {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret) {
-    throw new Error("SESSION_SECRET is not set — required to sign/verify admin sessions");
-  }
-  return crypto.subtle.importKey("raw", encoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+  const secret = requireSessionSecret();
+  const master = await crypto.subtle.importKey("raw", encoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
-    "verify",
   ]);
+  const derived = await crypto.subtle.sign("HMAC", master, encoder().encode(keyLabel("session")));
+  return crypto.subtle.importKey("raw", derived, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 
 function toBase64Url(bytes: ArrayBuffer | Uint8Array): string {
@@ -69,8 +74,17 @@ export async function verifySessionCookieValue(
   const [encoded, signature] = value.split(".");
   if (!encoded || !signature) return null;
 
+  // A malformed signature (not base64url) is just an invalid cookie: treat
+  // it as signed out, not as a server error (vulnerability scan).
+  let signatureBytes: Uint8Array;
+  try {
+    signatureBytes = fromBase64Url(signature);
+  } catch {
+    return null;
+  }
+
   const key = await hmacKey();
-  const valid = await crypto.subtle.verify("HMAC", key, fromBase64Url(signature), encoder().encode(encoded));
+  const valid = await crypto.subtle.verify("HMAC", key, signatureBytes, encoder().encode(encoded));
   if (!valid) return null;
 
   let payload: SessionPayload;

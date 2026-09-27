@@ -28,7 +28,7 @@ describe("fixed-window rate limiting", () => {
 });
 
 beforeAll(() => {
-  process.env.SESSION_SECRET = "test-secret";
+  process.env.SESSION_SECRET = "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef";
 });
 
 describe("limitByIp", () => {
@@ -66,8 +66,8 @@ describe("limitByIp", () => {
     expect(hashClient("2001:db8:abcd:13::1", "s")).not.toBe(hashClient("2001:db8:abcd:12::1", "s"));
   });
 
-  it("refuses to hash without SESSION_SECRET, rather than use a guessable key", () => {
-    expect(() => hashClient("203.0.113.7", "")).toThrow(/SESSION_SECRET/);
+  it("refuses to hash without a secret, rather than use a guessable key", () => {
+    expect(() => hashClient("203.0.113.7", "")).toThrow(/secret is required/);
   });
 
   it("has a policy for each public route", () => {

@@ -1,3 +1,4 @@
+import { derivedSecret, WeakSecretError } from "@/shared/crypto/derived-key";
 import path from "node:path";
 import { StorageNotConfiguredError, type FileStorage } from "./file-storage";
 import { LocalFileStorage } from "./local-file-storage";
@@ -47,11 +48,13 @@ export function getLocalFileStorage(
     throw new StorageNotConfiguredError(
       "Local uploads are disabled in production.",
     );
-  const secret = env.SESSION_SECRET;
-  if (!secret)
-    throw new StorageNotConfiguredError(
-      "SESSION_SECRET must be set to sign local upload targets.",
-    );
+  let secret: string;
+  try {
+    secret = derivedSecret("local-upload", env);
+  } catch (err) {
+    if (err instanceof WeakSecretError) throw new StorageNotConfiguredError(err.message);
+    throw err;
+  }
   return new LocalFileStorage(
     path.join(process.cwd(), LOCAL_UPLOAD_DIR),
     secret,
