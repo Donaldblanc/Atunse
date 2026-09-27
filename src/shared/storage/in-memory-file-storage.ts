@@ -24,6 +24,13 @@ export class InMemoryFileStorage implements FileStorage {
     return `https://storage.test/signed/${key}`;
   }
 
+  async copy(fromKey: string, toKey: string): Promise<boolean> {
+    const object = this.objects.get(fromKey);
+    if (!object) return false;
+    this.objects.set(toKey, { bytes: object.bytes.slice(), contentType: object.contentType });
+    return true;
+  }
+
   async inspect(key: string): Promise<StoredObject | null> {
     const object = this.objects.get(key);
     if (!object) return null;

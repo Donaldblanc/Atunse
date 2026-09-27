@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir, open, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
   INSPECT_HEAD_BYTES,
@@ -42,13 +42,9 @@ function signaturesMatch(given: string, expectedHex: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
-  jpg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  heic: "image/heic",
-  heif: "image/heif",
-};
+// Like S3's object metadata, each file's Content-Type (the one its upload
+// target pinned) is kept beside it, in "<file>.content-type".
+const CONTENT_TYPE_SUFFIX = ".content-type";
 
 export class LocalFileStorage implements FileStorage {
   constructor(
@@ -85,10 +81,7 @@ export class LocalFileStorage implements FileStorage {
       const { size } = await file.stat();
       const buffer = Buffer.alloc(Math.min(INSPECT_HEAD_BYTES, size));
       await file.read(buffer, 0, buffer.length, 0);
-      // Local files keep no metadata; the upload was checked against its
-      // pinned type on the way in (receive), so report that type.
-      const extension = key.split(".").pop() ?? "";
-      return { size, contentType: CONTENT_TYPES_BY_EXTENSION[extension] ?? null, head: new Uint8Array(buffer) };
+      return { size, contentType: await this.storedContentType(key), head: new Uint8Array(buffer) };
     } finally {
       await file.close();
     }
@@ -103,8 +96,31 @@ export class LocalFileStorage implements FileStorage {
     }
     if (Number(expires) < this.now().getTime()) throw new LocalUploadRejectedError("View link expired");
     const destination = this.resolveKey(key);
-    const extension = key.split(".").pop() ?? "";
-    return { body: await readFile(destination), contentType: CONTENT_TYPES_BY_EXTENSION[extension] ?? "application/octet-stream" };
+    return { body: await readFile(destination), contentType: (await this.storedContentType(key)) ?? "application/octet-stream" };
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<boolean> {
+    const from = this.resolveKey(fromKey);
+    const to = this.resolveKey(toKey);
+    try {
+      await mkdir(path.dirname(to), { recursive: true });
+      await copyFile(from, to);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw err;
+    }
+    const contentType = await this.storedContentType(fromKey);
+    if (contentType) await writeFile(to + CONTENT_TYPE_SUFFIX, contentType);
+    return true;
+  }
+
+  private async storedContentType(key: string): Promise<string | null> {
+    try {
+      return (await readFile(this.resolveKey(key) + CONTENT_TYPE_SUFFIX, "utf8")).trim() || null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
   }
 
   private resolveKey(key: string): string {
@@ -135,5 +151,6 @@ export class LocalFileStorage implements FileStorage {
     const destination = this.resolveKey(fields.key);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, Buffer.from(await file.arrayBuffer()));
+    await writeFile(destination + CONTENT_TYPE_SUFFIX, fields.contentType);
   }
 }

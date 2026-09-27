@@ -15,10 +15,28 @@ export function corsRulesFor(origins: string[]): CORSRule[] {
   const cleaned = [...new Set(origins.map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean))];
   if (cleaned.length === 0) throw new Error("Give at least one origin, e.g. https://atunse.com");
   for (const origin of cleaned) {
-    const ok = /^https:\/\/[a-z0-9.*-]+(:\d+)?$/i.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin);
-    if (!ok) throw new Error(`Not an allowed origin: ${origin} (use https://…, or http://localhost:<port>)`);
+    // A wildcard only as a single leading label, before a real domain:
+    // https://*.vercel.app passes; https://*, https://*.* and https://*.com don't.
+    const ok = /^https:\/\/(\*\.)?[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?$/i.test(origin) && !/^https:\/\/\*\.[a-z0-9-]+(:\d+)?$/i.test(origin);
+    const localhost = /^http:\/\/localhost(:\d+)?$/.test(origin);
+    if (!ok && !localhost) throw new Error(`Not an allowed origin: ${origin} (use https://…, or http://localhost:<port>)`);
   }
   return [{ AllowedOrigins: cleaned, AllowedMethods: ["POST"], AllowedHeaders: ["*"], ExposeHeaders: ["ETag"], MaxAgeSeconds: 3000 }];
+}
+
+/**
+ * Refuses a cleanup whose database doesn't belong with the bucket (#77):
+ * if the bucket has photos but none of the database's photos are among
+ * them, the pair is almost certainly wrong (e.g. production bucket, dev
+ * database), and "unreferenced" would mean every photo.
+ */
+export function assertDatabaseMatchesBucket(bucketKeys: Set<string>, referencedKeys: Set<string>): void {
+  const matched = [...referencedKeys].filter((key) => bucketKeys.has(key)).length;
+  if (bucketKeys.size > 0 && matched === 0) {
+    throw new Error(
+      `None of this database's ${referencedKeys.size} photos are in the bucket (wrong database?). Refusing to delete anything.`,
+    );
+  }
 }
 
 export interface StoredKey {
@@ -30,14 +48,24 @@ export interface StoredKey {
 export const ORPHAN_AFTER_HOURS = 48;
 
 /**
- * Booking photos no Order references, old enough that no booking in
- * progress could still claim them. A bucket lifecycle rule can't make this
- * call (it can't tell attached photos from abandoned ones, which share the
- * bookings/ prefix), so it's checked against the database instead.
+ * Where booking photos live: `bookings/` holds uploads (throwaway once a
+ * booking copies them), `photos/` holds the verified copies Orders keep.
+ */
+export const PHOTO_PREFIXES = ["bookings/", "photos/"] as const;
+
+/**
+ * Photos no Order references, old enough that no booking in progress could
+ * still claim them: uploads that were copied on submit or never submitted,
+ * and copies from bookings that failed afterwards. A bucket lifecycle rule
+ * can't make this call (it can't tell an Order's photo from an abandoned
+ * one), so it's checked against the database instead.
  */
 export function selectOrphans(objects: StoredKey[], referencedKeys: Set<string>, now: Date, olderThanHours = ORPHAN_AFTER_HOURS): StoredKey[] {
   const cutoff = now.getTime() - olderThanHours * 60 * 60 * 1000;
   return objects.filter(
-    (object) => object.key.startsWith("bookings/") && !referencedKeys.has(object.key) && object.lastModified.getTime() < cutoff,
+    (object) =>
+      PHOTO_PREFIXES.some((prefix) => object.key.startsWith(prefix)) &&
+      !referencedKeys.has(object.key) &&
+      object.lastModified.getTime() < cutoff,
   );
 }

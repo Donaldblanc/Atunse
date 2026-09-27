@@ -23,10 +23,17 @@ export interface FileStorage {
    * if nothing was uploaded there. One request per object.
    */
   inspect(key: string): Promise<StoredObject | null>;
+  /**
+   * Copies an object to a new key, keeping its Content-Type. Returns false
+   * (copying nothing) when there's no object at `fromKey`. Used to move a
+   * booking's photos out of reach of their upload targets (#77).
+   */
+  copy(fromKey: string, toKey: string): Promise<boolean>;
 }
 
 export interface StoredObject {
   size: number;
+  /** The Content-Type the object was stored with (the upload target pins it). */
   contentType: string | null;
   /** The first INSPECT_HEAD_BYTES bytes (fewer if the file is shorter). */
   head: Uint8Array;

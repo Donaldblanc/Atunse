@@ -135,7 +135,7 @@ export async function submitBooking(
   // Validate the request shape before spending time on uploads.
   buildOrderRequestBody(submission, []);
 
-  try {
+  const attempt = async () => {
     const photoKeys = await uploadPhotos(submission.pair.photos, uploaded, fetchImpl);
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
@@ -144,6 +144,19 @@ export async function submitBooking(
     });
     if (!res.ok) throw await errorFrom(res);
     return (await res.json()) as SubmitOrderResponse;
+  };
+
+  try {
+    try {
+      return await attempt();
+    } catch (err) {
+      // The server can't find photos this booking uploaded earlier (e.g.
+      // cleaned up while the tab sat open): resending the remembered keys
+      // would fail forever, so forget them and upload once more (#77).
+      if (!(err instanceof BookingSubmitError && err.code === "PHOTOS_NOT_UPLOADED")) throw err;
+      for (const photo of submission.pair.photos) uploaded.delete(photo);
+      return await attempt();
+    }
   } catch (err) {
     if (err instanceof BookingSubmitError) throw err;
     throw new BookingSubmitError(GENERIC_FAILURE); // network failure

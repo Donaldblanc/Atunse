@@ -25,6 +25,15 @@ export function newPhotoKey(batchId: string, index: number, contentType: PhotoCo
   return `bookings/${batchId}/${index}.${PHOTO_CONTENT_TYPES[contentType]}`;
 }
 
+/**
+ * Where a submitted booking's photo is kept: a copy of its upload, under a
+ * prefix no upload target can write to, so the bytes verified at submit
+ * are the bytes stored (#77). Same extension as the upload.
+ */
+export function storedPhotoKey(batchId: string, index: number, uploadKey: string): string {
+  return `photos/${batchId}/${index}.${uploadKey.split(".").pop()}`;
+}
+
 export function isBookingPhotoKey(key: string): boolean {
   return PHOTO_KEY_PATTERN.test(key);
 }

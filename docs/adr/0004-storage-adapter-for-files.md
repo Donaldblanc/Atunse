@@ -48,15 +48,26 @@ and deleting are added when the admin Item detail screen needs them.
 - **Targets are capped at the declared size.** Each photo's
   `content-length-range` is the size the browser declared, not the 15 MB
   ceiling. Targets are valid for 5 minutes.
-- **Photos are verified before an Order is created.** `FileStorage.inspect`
-  (a ranged GET of the first 16 bytes, which also gives the size) must
-  find the object, and its magic number must match the image type in its
-  key. A target's pinned Content-Type is only a label on whatever bytes
-  were sent.
+- **Photos are copied, then verified, before an Order is created.** An
+  upload target stays usable for its whole lifetime, so an upload can be
+  overwritten after any check of it (verified live on Neon). On submit,
+  each upload is copied (`FileStorage.copy`) to a `photos/…` key that no
+  target can write to. The copy is then verified with `FileStorage.inspect`
+  (a ranged GET of the first 16 bytes, which also gives the size): it must
+  exist, its magic number must match the image type in its key, and so
+  must its stored Content-Type. The Item keeps the copy; the upload key is
+  recorded (unique) so an upload still belongs to one booking. A missing
+  upload answers `PHOTOS_NOT_UPLOADED`, and the booking client then
+  re-uploads once. A 403 counts as missing, since keys without
+  `s3:ListBucket` get 403 rather than 404 for a missing object.
 - **Per-IP rate limits** on the public routes, counted in Postgres
-  (`rate_limit_buckets`), since serverless instances share no memory.
+  (`rate_limit_buckets`), since serverless instances share no memory. An
+  IPv6 client is limited as its /64. IPs are stored only as an HMAC keyed
+  by `SESSION_SECRET`, with no fallback key.
 - **Bucket settings live in scripts, not the app.** CORS (site origins,
   `POST` only) and orphan cleanup run through `npm run storage:configure`
   and `npm run storage:cleanup`, both dry-run by default. A lifecycle rule
-  can't tell attached photos from abandoned ones, so cleanup checks the
-  database.
+  can't tell an Order's photos from abandoned ones, so cleanup checks the
+  database. It only accepts that database through
+  `STORAGE_CLEANUP_DATABASE_URL`, and refuses to delete when none of the
+  database's photos are in the bucket (a mismatched pair).

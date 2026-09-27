@@ -8,6 +8,7 @@ import {
   SubmissionConflictError,
   submitOrder,
 } from "./submit-order";
+import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
 import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -176,22 +177,44 @@ describe("submitOrder", () => {
   });
 
   describe("uploaded photo verification (#77)", () => {
-    it("refuses a photo key with nothing uploaded behind it, creating nothing", async () => {
-      const deps = bookingDeps();
+    const uploadKey = "bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg";
+    const withPhoto = (key: string) => {
       const input = validBookingInput();
-      input.item = { ...input.item, photoKeys: ["bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg"] };
-      await expect(submitOrder(deps, guest, input)).rejects.toThrow(/didn't finish uploading/);
+      input.item = { ...input.item, photoKeys: [key] };
+      return input;
+    };
+
+    it("refuses a photo key with nothing uploaded behind it, with a code telling the client to re-upload", async () => {
+      const deps = bookingDeps();
+      const attempt = submitOrder(deps, guest, withPhoto(uploadKey));
+      await expect(attempt).rejects.toThrow(/didn't finish uploading/);
+      await expect(attempt).rejects.toMatchObject({ code: "PHOTOS_NOT_UPLOADED" });
       expect(deps.orders.orders.size).toBe(0);
     });
 
     it("refuses bytes that aren't the image type the key promises", async () => {
       const deps = bookingDeps();
-      const key = "bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg";
-      deps.storage.put(key, new TextEncoder().encode("<html>not a photo</html>"), "image/jpeg");
-      const input = validBookingInput();
-      input.item = { ...input.item, photoKeys: [key] };
-      await expect(submitOrder(deps, guest, input)).rejects.toThrow(/aren't valid/);
+      deps.storage.put(uploadKey, new TextEncoder().encode("<html>not a photo</html>"), "image/jpeg");
+      await expect(submitOrder(deps, guest, withPhoto(uploadKey))).rejects.toThrow(/aren't valid/);
       expect(deps.orders.orders.size).toBe(0);
+    });
+
+    it("refuses a stored Content-Type that isn't the key's image type, even with image bytes", async () => {
+      const deps = bookingDeps();
+      deps.storage.put(uploadKey, JPEG_BYTES, "text/html");
+      await expect(submitOrder(deps, guest, withPhoto(uploadKey))).rejects.toThrow(/aren't valid/);
+    });
+
+    it("keeps a verified copy the upload target can't reach, so overwriting the upload afterwards changes nothing", async () => {
+      const deps = bookingDeps();
+      deps.storage.put(uploadKey);
+      const order = await submitOrder(deps, guest, withPhoto(uploadKey));
+
+      const [storedKey] = order.items[0]!.photoKeys;
+      expect(storedKey).toMatch(/^photos\/[0-9a-f-]{36}\/0\.jpg$/);
+      // The upload target is still valid for a few minutes: swap the bytes.
+      deps.storage.put(uploadKey, new TextEncoder().encode("<html>swapped</html>"), "image/jpeg");
+      expect(deps.storage.objects.get(storedKey!)?.bytes).toEqual(JPEG_BYTES);
     });
   });
 

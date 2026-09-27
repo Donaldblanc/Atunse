@@ -1,4 +1,4 @@
-import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import {
@@ -16,6 +16,17 @@ export interface S3FileStorageConfig {
   /** Set for S3-compatible providers (e.g. Neon storage); unset for AWS. */
   endpoint?: string;
   credentials?: { accessKeyId: string; secretAccessKey: string };
+}
+
+/**
+ * A missing object: NoSuchKey (404), or 403 for keys without s3:ListBucket,
+ * which AWS returns instead of 404 for a missing object (GetObject docs).
+ * Our keys are server-minted and shape-checked, so a 403 here means "not
+ * uploaded", not a permissions problem.
+ */
+function isMissingObject(err: unknown): boolean {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return err instanceof NoSuchKey || e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404 || e.$metadata?.httpStatusCode === 403;
 }
 
 export function s3ClientFor(config: S3FileStorageConfig): S3Client {
@@ -62,11 +73,29 @@ export class S3FileStorage implements FileStorage {
       const res = await this.client.send(
         new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=0-${INSPECT_HEAD_BYTES - 1}` }),
       );
-      const head = res.Body ? await res.Body.transformToByteArray() : new Uint8Array();
+      // Capped even if an endpoint ignores Range and sends the whole object.
+      const head = res.Body ? (await res.Body.transformToByteArray()).slice(0, INSPECT_HEAD_BYTES) : new Uint8Array();
       const total = res.ContentRange?.match(/\/(\d+)$/)?.[1];
       return { size: total ? Number(total) : (res.ContentLength ?? head.length), contentType: res.ContentType ?? null, head };
     } catch (err) {
-      if (err instanceof NoSuchKey || (err as { name?: string }).name === "NoSuchKey") return null;
+      if (isMissingObject(err)) return null;
+      throw err;
+    }
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<boolean> {
+    try {
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          Key: toKey,
+          CopySource: `${this.bucket}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
+          MetadataDirective: "COPY", // keeps the pinned Content-Type
+        }),
+      );
+      return true;
+    } catch (err) {
+      if (isMissingObject(err)) return false;
       throw err;
     }
   }

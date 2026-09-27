@@ -18,6 +18,7 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
+  private readonly uploadKeysInUse = new Set<string>();
 
   constructor(readonly accounts: InMemoryAccounts = new InMemoryAccounts()) {}
 
@@ -29,8 +30,7 @@ export class InMemoryOrderRepository implements OrderRepository {
 
     // Mirror the database's unique indexes, checking before writing
     // anything, like the single Prisma transaction.
-    const keysInUse = new Set([...this.orders.values()].flatMap((o) => o.items.flatMap((i) => i.photoKeys)));
-    if (input.item.photoKeys.some((key) => keysInUse.has(key))) throw new PhotoKeyInUseError();
+    if (input.item.photos.some((photo) => this.uploadKeysInUse.has(photo.uploadKey))) throw new PhotoKeyInUseError();
 
     let accountId: string;
     if ("accountId" in input.owner) {
@@ -72,10 +72,11 @@ export class InMemoryOrderRepository implements OrderRepository {
           estimate: input.item.estimate,
           status: "REQUEST_SUBMITTED",
           price: null,
-          photoKeys: input.item.photoKeys,
+          photoKeys: input.item.photos.map((photo) => photo.key),
         },
       ],
     };
+    for (const photo of input.item.photos) this.uploadKeysInUse.add(photo.uploadKey);
     this.orders.set(order.id, order);
     if (input.submissionKey) this.orderIdsBySubmissionKey.set(input.submissionKey, order.id);
     return { order, created: true };

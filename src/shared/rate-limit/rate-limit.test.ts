@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
-import { clientIp, hashClient, limitByIp, RATE_LIMITS } from ".";
+import { beforeAll } from "vitest";
+import { clientIp, hashClient, limitByIp, RATE_LIMITS, rateLimitSubject } from ".";
 import { InMemoryRateLimiter } from "./in-memory-rate-limiter";
 import { secondsLeftInWindow, windowStart } from "./rate-limiter";
 
@@ -26,6 +27,10 @@ describe("fixed-window rate limiting", () => {
   });
 });
 
+beforeAll(() => {
+  process.env.SESSION_SECRET = "test-secret";
+});
+
 describe("limitByIp", () => {
   it("answers 429 with Retry-After once an IP is over the limit, per IP", async () => {
     const limiter = new InMemoryRateLimiter();
@@ -40,6 +45,21 @@ describe("limitByIp", () => {
     expect(clientIp(request("203.0.113.7"))).toBe("203.0.113.7");
     expect(hashClient("203.0.113.7", "s")).not.toContain("203.0.113.7");
     expect(hashClient("203.0.113.7", "s")).toBe(hashClient("203.0.113.7", "s"));
+  });
+
+  it("limits an IPv6 client as its /64 network, and IPv4 addresses individually", () => {
+    expect(rateLimitSubject("2001:db8:abcd:12:1:2:3:4")).toBe("2001:db8:abcd:12::/64");
+    expect(rateLimitSubject("2001:0db8:abcd:0012:ffff::1")).toBe("2001:db8:abcd:12::/64");
+    expect(rateLimitSubject("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(rateLimitSubject("::ffff:203.0.113.7")).toBe("203.0.113.7");
+    expect(rateLimitSubject("203.0.113.7")).toBe("203.0.113.7");
+    // Two addresses in one /64 share a limit.
+    expect(hashClient("2001:db8:abcd:12::1", "s")).toBe(hashClient("2001:db8:abcd:12:9:9:9:9", "s"));
+    expect(hashClient("2001:db8:abcd:13::1", "s")).not.toBe(hashClient("2001:db8:abcd:12::1", "s"));
+  });
+
+  it("refuses to hash without SESSION_SECRET, rather than use a guessable key", () => {
+    expect(() => hashClient("203.0.113.7", "")).toThrow(/SESSION_SECRET/);
   });
 
   it("has a policy for each public route", () => {
