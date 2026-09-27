@@ -73,10 +73,12 @@ export interface Item {
 
 export interface Order {
   id: string;
-  accountId: string | null;
+  /** Every Order belongs to an Account (ADR-0014); there are no guest orders. */
+  accountId: string;
   contactName: string;
-  guestEmail: string | null;
-  guestPhone: string | null;
+  contactEmail: string;
+  contactPhone: string;
+  createdAt: Date;
   policyAcceptedAt: Date;
   fulfillment: Fulfillment;
   rush: boolean;

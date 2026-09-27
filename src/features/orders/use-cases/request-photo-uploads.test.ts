@@ -8,6 +8,9 @@ const storage: FileStorage = {
   async createUploadTarget({ key }) {
     return { url: "https://storage.test/upload", fields: { key } };
   },
+  async createViewUrl(key) {
+    return `https://storage.test/view/${key}`;
+  },
 };
 const deps = { storage, newBatchId: () => "0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f" };
 const guest = { accountId: null, role: "GUEST" as const };

@@ -10,7 +10,14 @@ import type { Role } from "./authz";
 // Edge runtime — node:crypto isn't available there, but Web Crypto is
 // available in both Edge and Node 18+.
 
+/** The admin session (password login). Only ever carries role ADMIN. */
 export const SESSION_COOKIE_NAME = "atunse_session";
+/**
+ * The customer session (email-code login), a separate cookie so admin and
+ * customer logins never mix (ADR-0014): an admin browsing the booking flow
+ * is a signed-out customer there. Only ever carries role CUSTOMER.
+ */
+export const CUSTOMER_SESSION_COOKIE_NAME = "atunse_customer_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
 export interface SessionPayload {

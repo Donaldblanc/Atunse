@@ -1,13 +1,16 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import type { Order, Item, AuditEntry, Fulfillment, CalendarDate } from "../domain";
-import type { NewOrderInput, OrderRepository } from "./order-repository";
+import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
 
 // Prisma's generated shape never leaks past this file (ADR-0011/0013) —
 // every method returns the domain's own Order/Item types.
 
-type ItemRow = Prisma.ItemGetPayload<object>;
-type OrderRow = Prisma.OrderGetPayload<{ include: { items: true } }>;
+const ITEM_INCLUDE = { photos: { orderBy: { position: "asc" } } } satisfies Prisma.ItemInclude;
+const ORDER_INCLUDE = { items: { include: ITEM_INCLUDE } } satisfies Prisma.OrderInclude;
+
+type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
+type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
 
 // @db.Date columns come back as UTC midnight; keep them as plain calendar
 // dates so a customer's "Oct 3" never becomes "Oct 2" in another timezone.
@@ -31,7 +34,7 @@ function toDomainItem(row: ItemRow): Item {
     estimate: Money.fromCents(row.estimateCents),
     status: row.status,
     price: row.priceCents === null ? null : Money.fromCents(row.priceCents),
-    photoKeys: row.photoKeys,
+    photoKeys: row.photos.map((photo) => photo.key),
   };
 }
 
@@ -59,8 +62,9 @@ function toDomainOrder(row: OrderRow): Order {
     id: row.id,
     accountId: row.accountId,
     contactName: row.contactName,
-    guestEmail: row.guestEmail,
-    guestPhone: row.guestPhone,
+    contactEmail: row.contactEmail,
+    contactPhone: row.contactPhone,
+    createdAt: row.createdAt,
     policyAcceptedAt: row.policyAcceptedAt,
     fulfillment: toDomainFulfillment(row),
     rush: row.rush,
@@ -72,8 +76,11 @@ function toDomainOrder(row: OrderRow): Order {
   };
 }
 
-function isUniqueViolation(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
+/** The fields of the unique constraint a Prisma P2002 violated, or null. */
+function uniqueViolationFields(err: unknown): string[] | null {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return null;
+  const target = err.meta?.target;
+  return Array.isArray(target) ? target.map(String) : [String(target ?? "")];
 }
 
 export class PrismaOrderRepository implements OrderRepository {
@@ -85,70 +92,83 @@ export class PrismaOrderRepository implements OrderRepository {
       if (existing) return { order: existing, created: false };
     }
 
-    const { fulfillment } = input;
     try {
-      const row = await this.prisma.order.create({
-        data: {
-          accountId: input.accountId,
-          contactName: input.contactName,
-          guestEmail: input.guestEmail,
-          guestPhone: input.guestPhone,
-          policyAcceptedAt: input.policyAcceptedAt,
-          fulfillmentMethod: fulfillment.method,
-          addressLine1: fulfillment.address.line1,
-          addressLine2: fulfillment.address.line2,
-          city: fulfillment.address.city,
-          state: fulfillment.address.state,
-          zip: fulfillment.address.zip,
-          pickupDate: fulfillment.method === "PICKUP" ? fromCalendarDate(fulfillment.date) : null,
-          pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
-          mailInDate:
-            fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
-              ? fromCalendarDate(fulfillment.preferredDate)
-              : null,
-          rush: input.rush,
-          estimateCents: input.estimate.cents,
-          estimateIsMinimum: input.estimateIsMinimum,
-          depositCents: input.deposit.cents,
-          submissionKey: input.submissionKey,
-          items: {
-            create: [
-              {
-                brand: input.item.brand,
-                model: input.item.model,
-                description: input.item.description,
-                material: input.item.material,
-                serviceIds: input.item.serviceIds,
-                estimateCents: input.item.estimate.cents,
-                photoKeys: input.item.photoKeys,
-                status: "REQUEST_SUBMITTED",
-              },
-            ],
-          },
-        },
-        include: { items: true },
-      });
-      return { order: toDomainOrder(row), created: true };
+      return { order: await this.insert(input), created: true };
     } catch (err) {
+      const fields = uniqueViolationFields(err);
       // Two concurrent submits with the same key: the loser reads the
       // winner's Order rather than failing.
-      if (input.submissionKey && isUniqueViolation(err)) {
+      if (input.submissionKey && fields?.includes("submissionKey")) {
         const existing = await this.findBySubmissionKey(input.submissionKey);
         if (existing) return { order: existing, created: false };
       }
+      if (fields?.includes("email")) throw new EmailTakenError();
+      if (fields?.includes("key")) throw new PhotoKeyInUseError();
       throw err;
     }
   }
 
-  private async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
-    const row = await this.prisma.order.findUnique({ where: { submissionKey }, include: { items: true } });
+  // One nested write: a new customer's Account, the Order, its Item and
+  // the Item's photos commit together, and the unique indexes (email per
+  // role, photo key) settle races inside that single transaction.
+  private async insert(input: NewOrderInput): Promise<Order> {
+    const { fulfillment, owner } = input;
+    const row = await this.prisma.order.create({
+      data: {
+        account:
+          "accountId" in owner
+            ? { connect: { id: owner.accountId } }
+            : { create: { role: "CUSTOMER", email: owner.newCustomer.email, phone: owner.newCustomer.phone } },
+        contactName: input.contactName,
+        contactEmail: input.contactEmail,
+        contactPhone: input.contactPhone,
+        policyAcceptedAt: input.policyAcceptedAt,
+        fulfillmentMethod: fulfillment.method,
+        addressLine1: fulfillment.address.line1,
+        addressLine2: fulfillment.address.line2,
+        city: fulfillment.address.city,
+        state: fulfillment.address.state,
+        zip: fulfillment.address.zip,
+        pickupDate: fulfillment.method === "PICKUP" ? fromCalendarDate(fulfillment.date) : null,
+        pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
+        mailInDate:
+          fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
+            ? fromCalendarDate(fulfillment.preferredDate)
+            : null,
+        rush: input.rush,
+        estimateCents: input.estimate.cents,
+        estimateIsMinimum: input.estimateIsMinimum,
+        depositCents: input.deposit.cents,
+        submissionKey: input.submissionKey,
+        items: {
+          create: [
+            {
+              brand: input.item.brand,
+              model: input.item.model,
+              description: input.item.description,
+              material: input.item.material,
+              serviceIds: input.item.serviceIds,
+              estimateCents: input.item.estimate.cents,
+              photos: { create: input.item.photoKeys.map((key, position) => ({ key, position })) },
+              status: "REQUEST_SUBMITTED",
+            },
+          ],
+        },
+      },
+      include: ORDER_INCLUDE,
+    });
+    return toDomainOrder(row);
+  }
+
+  async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
+    const row = await this.prisma.order.findUnique({ where: { submissionKey }, include: ORDER_INCLUDE });
     return row ? toDomainOrder(row) : null;
   }
 
   async findById(orderId: string): Promise<Order | null> {
     const row = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: ORDER_INCLUDE,
     });
     return row ? toDomainOrder(row) : null;
   }
@@ -180,6 +200,7 @@ export class PrismaOrderRepository implements OrderRepository {
       const updated = await tx.item.update({
         where: { id: params.itemId },
         data: { status: params.toStatus },
+        include: ITEM_INCLUDE,
       });
 
       await tx.itemAuditEntry.create({

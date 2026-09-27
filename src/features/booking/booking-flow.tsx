@@ -24,7 +24,8 @@ import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { computeMultiServicePricing } from "./pricing";
-import { submitBooking, type SubmitOrderResponse } from "./submit-booking";
+import { CustomerSignIn } from "./customer-sign-in";
+import { BookingSubmitError, submitBooking, type SubmitOrderResponse } from "./submit-booking";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
@@ -81,6 +82,10 @@ export function BookingFlow() {
   // sends the same key and gets the same Order back, never a duplicate.
   const submissionKey = useRef<string | null>(null);
   const [confirmation, setConfirmation] = useState<SubmitOrderResponse | null>(null);
+  // Set when the server says the booking's email already has an Account:
+  // the flow shows the customer login screen, then resubmits (ADR-0014).
+  const [signInEmail, setSignInEmail] = useState<string | null>(null);
+  const policyAcceptedRef = useRef(false);
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
@@ -93,6 +98,9 @@ export function BookingFlow() {
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
+    // Leaving Review drops any "sign in to finish" screen: the booking will
+    // be resubmitted from Review, and the email may change on the way.
+    setSignInEmail(null);
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
   }
 
@@ -107,19 +115,31 @@ export function BookingFlow() {
   }
 
   async function confirmBooking(policyAccepted: boolean) {
+    policyAcceptedRef.current = policyAccepted;
     submissionKey.current ??= crypto.randomUUID();
-    const result = await submitBooking({
-      submissionKey: submissionKey.current,
-      policyAccepted,
-      serviceIds: selectedServiceIds,
-      pair: singlePair,
-      scheduleMethod,
-      address: pickupAddress,
-      pickupSelection,
-      mailInDate,
-      contact,
-      rush,
-    });
+    let result: SubmitOrderResponse;
+    try {
+      result = await submitBooking({
+        submissionKey: submissionKey.current,
+        policyAccepted,
+        serviceIds: selectedServiceIds,
+        pair: singlePair,
+        scheduleMethod,
+        address: pickupAddress,
+        pickupSelection,
+        mailInDate,
+        contact,
+        rush,
+      });
+    } catch (err) {
+      if (err instanceof BookingSubmitError && err.code === "SIGN_IN_REQUIRED") {
+        setSignInEmail(contact.email.trim());
+        window.scrollTo({ top: 0 });
+        return;
+      }
+      throw err;
+    }
+    setSignInEmail(null);
     setConfirmation(result);
     window.scrollTo({ top: 0 });
   }
@@ -221,14 +241,28 @@ export function BookingFlow() {
         {step === "contact" && !confirmation && (
           <ContactStep
             contact={contact}
-            onChangeContact={setContact}
+            onChangeContact={(next) => {
+              setSignInEmail(null);
+              setContact(next);
+            }}
             rush={rush}
             onChangeRush={setRush}
             onContinue={() => setStep("review")}
           />
         )}
 
-        {step === "review" && !confirmation && (
+        {step === "review" && !confirmation && signInEmail && (
+          <CustomerSignIn
+            email={signInEmail}
+            onSignedIn={() => confirmBooking(policyAcceptedRef.current)}
+            onUseDifferentEmail={() => {
+              setSignInEmail(null);
+              setStep("contact");
+            }}
+          />
+        )}
+
+        {step === "review" && !confirmation && !signInEmail && (
           <ReviewStep
             isBundle={isBundle}
             name={selectedName}

@@ -6,7 +6,13 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
-import type { OrderRepository } from "../repositories/order-repository";
+import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
+import {
+  EmailTakenError,
+  PhotoKeyInUseError,
+  type OrderOwner,
+  type OrderRepository,
+} from "../repositories/order-repository";
 import {
   estimateItem,
   estimateOrder,
@@ -33,14 +39,30 @@ export interface SubmitOrderInput {
 
 export interface SubmitOrderDeps {
   orders: OrderRepository;
+  /** Customer Accounts only: Admin Accounts are a separate identity (ADR-0014). */
+  accounts: AccountRepository;
   notifications: NotificationService;
   paymentInstructions: PaymentInstructions;
+  /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
+  customerSignInEnabled: boolean;
   now?: () => Date;
 }
 
 export class PolicyNotAcceptedError extends Error {
   constructor() {
     super("Order cannot be submitted without accepting the required policies.");
+  }
+}
+
+/**
+ * A signed-out booking used an email that already has an Account, with
+ * customer login on. The customer signs in with an emailed code (the
+ * booking flow's login screen) and resubmits (ADR-0014).
+ */
+export class SignInRequiredError extends Error {
+  constructor() {
+    super("You already have an account with this email. Sign in to finish your booking.");
+    this.name = "SignInRequiredError";
   }
 }
 
@@ -57,12 +79,13 @@ const SHOP_TIMEZONE = "America/New_York";
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * Phase 1 vertical slice, step 1: a guest (or account holder) books one
- * pair through /booking. Every ADR-0012 concern is present: authz (anyone
- * can submit, but the check is still explicit), business rules enforced
- * server-side (Policy Acceptance, Pickup area, Service rules), money
- * computed from the server's own catalog, idempotency on the submission
- * key, and a notification on the resulting state.
+ * Phase 1 vertical slice, step 1: a customer books one pair through
+ * /booking. Every Order belongs to a Customer Account (ADR-0014), resolved
+ * by resolveOwner below: never an Admin Account, even for an admin's email. Every ADR-0012 concern is present: authz
+ * (anyone can submit, but the check is still explicit), business rules
+ * enforced server-side (Policy Acceptance, Pickup area, Service rules),
+ * money computed from the server's own catalog, idempotency on the
+ * submission key, and a notification on the resulting state.
  */
 export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser, input: SubmitOrderInput): Promise<Order> {
   requireRole(actingUser, "GUEST", "CUSTOMER");
@@ -72,6 +95,14 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
 
   const now = deps.now?.() ?? new Date();
+
+  // A retry of a submission that already went through gets its Order back
+  // before any other check: its photo keys are, by design, already in use.
+  if (input.submissionKey) {
+    const existing = await deps.orders.findBySubmissionKey(input.submissionKey);
+    if (existing) return sendConfirmationOnce(deps, existing, now);
+  }
+
   const today = shopToday(now);
   const contact = validateContact(input.contact);
   const fulfillment = validateFulfillment(input.fulfillment, today);
@@ -87,34 +118,88 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
 
-  const { order } = await deps.orders.create({
-    accountId: actingUser.accountId,
-    contactName: contact.name,
-    guestEmail: contact.email,
-    guestPhone: contact.phone,
-    policyAcceptedAt: now,
-    fulfillment,
-    rush: input.rush,
-    estimate: orderEstimate.estimate,
-    estimateIsMinimum: orderEstimate.isMinimum,
-    deposit: orderEstimate.deposit,
-    submissionKey: input.submissionKey,
-    item: {
-      brand: blankToNull(input.item.brand),
-      model: null, // the booking form's single "Brand / Model" field lands in `brand`
-      description: blankToNull(input.item.notes),
-      material,
-      serviceIds: input.item.serviceIds,
-      estimate: itemEstimate.estimate,
-      photoKeys: input.item.photoKeys,
-    },
-  });
+  const newOrder = (owner: OrderOwner) =>
+    deps.orders.create({
+      owner,
+      contactName: contact.name,
+      contactEmail: contact.email,
+      contactPhone: contact.phone,
+      policyAcceptedAt: now,
+      fulfillment,
+      rush: input.rush,
+      estimate: orderEstimate.estimate,
+      estimateIsMinimum: orderEstimate.isMinimum,
+      deposit: orderEstimate.deposit,
+      submissionKey: input.submissionKey,
+      item: {
+        brand: blankToNull(input.item.brand),
+        model: null, // the booking form's single "Brand / Model" field lands in `brand`
+        description: blankToNull(input.item.notes),
+        material,
+        serviceIds: input.item.serviceIds,
+        estimate: itemEstimate.estimate,
+        photoKeys: input.item.photoKeys,
+      },
+    });
 
-  // Sent until it succeeds once: a retry after a failed send (the route
-  // returned 500) sends it, and a retry after a successful one doesn't.
+  let created;
+  try {
+    try {
+      created = await newOrder(await resolveOwner(deps, actingUser, contact));
+    } catch (err) {
+      // A concurrent first booking created this email's Customer Account
+      // after our lookup: resolve again, now against that Account.
+      if (!(err instanceof EmailTakenError)) throw err;
+      created = await newOrder(await resolveOwner(deps, actingUser, contact));
+    }
+  } catch (err) {
+    // The database's unique photo key: a photo belongs to exactly one
+    // booking, so another Order can never gain view access to it.
+    if (err instanceof PhotoKeyInUseError) {
+      throw new BookingValidationError("One or more photos are already attached to another booking. Upload them again.");
+    }
+    throw err;
+  }
+
+  return sendConfirmationOnce(deps, created.order, now);
+}
+
+/**
+ * Which Customer Account the booking belongs to (ADR-0014):
+ * - A signed-in customer booking under their own email: their Account.
+ *   Under a different email (e.g. someone else on a shared browser), the
+ *   session is ignored and the booking is treated as signed out, so it
+ *   never lands in the wrong person's Account.
+ * - Signed out, new email: a new Customer Account.
+ * - Signed out, an email with a Customer Account: with customer login on,
+ *   they must sign in first; with it off, the Order attaches (nobody can
+ *   sign in to see it, so nothing is exposed).
+ * Admin Accounts never come into it: an admin's email books like any
+ * other, into a Customer Account of its own.
+ */
+async function resolveOwner(
+  deps: SubmitOrderDeps,
+  actingUser: ActingUser,
+  contact: { email: string; phone: string },
+): Promise<OrderOwner> {
+  const email = contact.email.toLowerCase();
+  if (actingUser.role === "CUSTOMER" && actingUser.accountId) {
+    const session = await deps.accounts.findCustomerById(actingUser.accountId);
+    if (session?.email === email) return { accountId: session.id };
+  }
+
+  const existing = await deps.accounts.findCustomerByEmail(email);
+  if (!existing) return { newCustomer: { email, phone: contact.phone } };
+  if (deps.customerSignInEnabled) throw new SignInRequiredError();
+  return { accountId: existing.id };
+}
+
+// Sent until it succeeds once: a retry after a failed send (the route
+// returned 500) sends it, and a retry after a successful one doesn't.
+async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Date): Promise<Order> {
   if (!order.confirmationEmailSentAt) {
     await deps.notifications.sendEmail({
-      to: contact.email,
+      to: order.contactEmail,
       subject: `We received your booking (${orderReference(order.id)})`,
       body: confirmationEmailBody(order, deps.paymentInstructions),
     });

@@ -24,7 +24,8 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
           You&rsquo;re booked in.
         </h2>
         <p>
-          Your reference is <strong>{order.reference}</strong>. We&rsquo;ve emailed the details to {email}.
+          Your reference is <strong>{order.reference}</strong>. It&rsquo;s saved to your account for {email}, and
+          we&rsquo;ve emailed you the details.
         </p>
       </div>
 

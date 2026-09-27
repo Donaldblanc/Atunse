@@ -37,23 +37,28 @@ enum FulfillmentMethod {
   MAIL_IN
 }
 
-// A person: either a guest (accountId null) or a signed-up Customer/Admin.
-// Guest orders match to an Account later by email/phone (ADR "Account Linking").
+// A Customer or Admin (ADR-0014). The two are separate identities: an
+// admin who books gets a Customer Account under the same email, and Orders
+// only ever belong to Customer Accounts. A Customer Account is created
+// automatically by their first booking; there are no guest orders.
 model Account {
   id        String   @id @default(cuid())
   role      Role     @default(CUSTOMER)
-  email     String   @unique
+  email     String   // always stored lowercased; unique per role, below
+  // Required for Customer Accounts (the booking that creates one requires
+  // it); null only for Admin Accounts seeded without one.
   phone     String?
 
-  // Interim in-house credential store (ADR-0005 addendum): null for
-  // guest-derived/customer accounts that haven't set a password yet.
-  // Swappable behind AuthService once a managed provider is chosen.
+  // Interim admin password login (ADR-0005 addendum). Customers sign in
+  // with an emailed code instead (SignInCode), so this stays null for them.
   passwordHash String?
 
   createdAt DateTime @default(now())
 
-  orders Order[]
+  orders      Order[]
+  signInCodes SignInCode[]
 
+  @@unique([email, role])
   @@map("accounts")
 }
 
@@ -61,13 +66,14 @@ model Account {
 // display is always a per-Item breakdown.
 model Order {
   id        String   @id @default(cuid())
-  accountId String?
-  account   Account? @relation(fields: [accountId], references: [id])
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
 
-  // Guest contact info, used for later Account Linking when accountId is null.
-  contactName String
-  guestEmail  String?
-  guestPhone  String?
+  // Contact details as entered for this booking. The owning Account is
+  // accountId; these are a per-Order snapshot for the shop to reach out.
+  contactName  String
+  contactEmail String
+  contactPhone String
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
 
@@ -128,7 +134,7 @@ model Item {
   // Money as integer cents (ADR-0012) — never a float.
   priceCents Int?
 
-  photoKeys String[] // storage keys from the FileStorage adapter (ADR-0004), not URLs
+  photos ItemPhoto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,6 +142,21 @@ model Item {
   auditEntries ItemAuditEntry[]
 
   @@map("items")
+}
+
+// One condition photo on an Item: a storage key from the FileStorage
+// adapter (ADR-0004), not a URL. `key` is unique, so a photo belongs to
+// exactly one Item and quoting another booking's key can never grant view
+// access to it (ADR-0014).
+model ItemPhoto {
+  id       String @id @default(cuid())
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id])
+  key      String @unique
+  position Int
+
+  @@index([itemId])
+  @@map("item_photos")
 }
 
 // Every state-changing action on an Item is recorded (ADR-0012: auditability
@@ -156,4 +177,21 @@ model ItemAuditEntry {
 
   @@unique([itemId, idempotencyKey])
   @@map("item_audit_entries")
+}
+
+// One-time email sign-in code (ADR-0014). Only an HMAC of the code is
+// stored. A code is single-use, expires after a few minutes, and is locked
+// after too many wrong guesses.
+model SignInCode {
+  id         String    @id @default(cuid())
+  accountId  String
+  account    Account   @relation(fields: [accountId], references: [id])
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("sign_in_codes")
 }

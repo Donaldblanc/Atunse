@@ -3,7 +3,11 @@ import { StorageNotConfiguredError, type FileStorage } from "./file-storage";
 import { LocalFileStorage } from "./local-file-storage";
 import { S3FileStorage } from "./s3-file-storage";
 
-export { StorageNotConfiguredError, type FileStorage, type UploadTarget } from "./file-storage";
+export {
+  StorageNotConfiguredError,
+  type FileStorage,
+  type UploadTarget,
+} from "./file-storage";
 
 const LOCAL_UPLOAD_DIR = ".uploads";
 
@@ -14,13 +18,18 @@ const LOCAL_UPLOAD_DIR = ".uploads";
  * per-instance), so a deploy without S3 config fails loudly here instead
  * of losing photos.
  */
-export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorage {
+export function getFileStorage(
+  env: NodeJS.ProcessEnv = process.env,
+): FileStorage {
   const isProduction = env.NODE_ENV === "production";
   // Blank counts as unset: .env.example ships `STORAGE_DRIVER=`.
   const driver = env.STORAGE_DRIVER?.trim() || (isProduction ? "s3" : "local");
 
   if (driver === "local") {
-    if (isProduction) throw new StorageNotConfiguredError("The local storage driver can't be used in production.");
+    if (isProduction)
+      throw new StorageNotConfiguredError(
+        "The local storage driver can't be used in production.",
+      );
     return getLocalFileStorage(env);
   }
 
@@ -29,7 +38,10 @@ export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorag
     // AWS SDK's own conventions) provide, so they work unchanged.
     const bucket = env.S3_BUCKET;
     const region = env.S3_REGION || env.AWS_REGION;
-    if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION (or AWS_REGION) must be set.");
+    if (!bucket || !region)
+      throw new StorageNotConfiguredError(
+        "S3_BUCKET and S3_REGION (or AWS_REGION) must be set.",
+      );
     const credentials = s3Credentials(env) ?? awsCredentials(env);
     const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
     return new S3FileStorage({ bucket, region, endpoint, credentials });
@@ -39,11 +51,22 @@ export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorag
 }
 
 /** For the dev-only receiving route. Throws in production. */
-export function getLocalFileStorage(env: NodeJS.ProcessEnv = process.env): LocalFileStorage {
-  if (env.NODE_ENV === "production") throw new StorageNotConfiguredError("Local uploads are disabled in production.");
+export function getLocalFileStorage(
+  env: NodeJS.ProcessEnv = process.env,
+): LocalFileStorage {
+  if (env.NODE_ENV === "production")
+    throw new StorageNotConfiguredError(
+      "Local uploads are disabled in production.",
+    );
   const secret = env.SESSION_SECRET;
-  if (!secret) throw new StorageNotConfiguredError("SESSION_SECRET must be set to sign local upload targets.");
-  return new LocalFileStorage(path.join(process.cwd(), LOCAL_UPLOAD_DIR), secret);
+  if (!secret)
+    throw new StorageNotConfiguredError(
+      "SESSION_SECRET must be set to sign local upload targets.",
+    );
+  return new LocalFileStorage(
+    path.join(process.cwd(), LOCAL_UPLOAD_DIR),
+    secret,
+  );
 }
 
 type Credentials = { accessKeyId: string; secretAccessKey: string };
@@ -57,13 +80,19 @@ function s3Credentials(env: NodeJS.ProcessEnv): Credentials | undefined {
   const accessKeyId = env.S3_ACCESS_KEY_ID;
   const secretAccessKey = env.S3_SECRET_ACCESS_KEY;
   if (!accessKeyId !== !secretAccessKey) {
-    throw new StorageNotConfiguredError("Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither.");
+    throw new StorageNotConfiguredError(
+      "Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither.",
+    );
   }
-  return accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
+  return accessKeyId && secretAccessKey
+    ? { accessKeyId, secretAccessKey }
+    : undefined;
 }
 
 function awsCredentials(env: NodeJS.ProcessEnv): Credentials | undefined {
   const accessKeyId = env.AWS_ACCESS_KEY_ID;
   const secretAccessKey = env.AWS_SECRET_ACCESS_KEY;
-  return accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
+  return accessKeyId && secretAccessKey
+    ? { accessKeyId, secretAccessKey }
+    : undefined;
 }

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { requestPhotoUploads } from "@/features/orders/use-cases/request-photo-uploads";
 import { BookingValidationError } from "@/features/orders/use-cases/submit-order";
-import { getFileStorage, StorageNotConfiguredError } from "@/shared/storage";
+import { buildOrderUseCaseDeps } from "@/features/orders/deps";
+import { StorageNotConfiguredError } from "@/shared/storage";
 
 const body = z.object({
   files: z.array(z.object({ contentType: z.string().max(100), size: z.number().int() })).max(20),
@@ -24,11 +25,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "files must be a list of { contentType, size }" }, { status: 400 });
   }
 
-  // Guest until sessions exist (ADR-0005), same as POST /api/v1/orders.
+  // Anonymous on purpose: a key only gains an owner when submitOrder
+  // attaches it to an Order (ADR-0014), and a key can be attached once.
   const actingUser = { accountId: null, role: "GUEST" as const };
 
   try {
-    const uploads = await requestPhotoUploads({ storage: getFileStorage() }, actingUser, parsed.data.files);
+    const uploads = await requestPhotoUploads(buildOrderUseCaseDeps(), actingUser, parsed.data.files);
     return NextResponse.json({ uploads }, { status: 201 });
   } catch (err) {
     if (err instanceof BookingValidationError) {

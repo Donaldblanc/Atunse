@@ -8,11 +8,16 @@ export interface NotificationService {
   sendEmail(params: { to: string; subject: string; body: string }): Promise<void>;
 }
 
-/** Phase 1 default: logs instead of calling Resend, so the slice runs with
- * zero external dependencies until the Resend adapter (ADR-0006) is wired. */
+/** Used when Resend isn't configured (see ./index.ts): logs instead of
+ * sending, so development needs no email account. Sign-in codes are in the
+ * subject, so it's logged only when `logSubjects` is on (development); in
+ * production only the recipient is, keeping codes out of hosting logs. */
 export class ConsoleNotificationService implements NotificationService {
+  constructor(private readonly options: { logSubjects: boolean } = { logSubjects: true }) {}
+
   async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
+    const subject = this.options.logSubjects ? ` subject="${params.subject}"` : " (subject withheld)";
     // eslint-disable-next-line no-console
-    console.log(`[notification] to=${params.to} subject="${params.subject}"`);
+    console.log(`[notification] to=${params.to}${subject}`);
   }
 }

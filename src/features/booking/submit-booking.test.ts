@@ -92,6 +92,19 @@ describe("submitBooking", () => {
     await expect(submitBooking(submission(), impl)).rejects.toThrow("Enter a valid 5-digit zip code.");
   });
 
+  it("passes the server's SIGN_IN_REQUIRED code through, so the flow can show the login screen", async () => {
+    const { impl } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () =>
+        Response.json({ error: "You already have an account with this email.", code: "SIGN_IN_REQUIRED" }, { status: 409 }),
+    });
+    await expect(submitBooking(submission(), impl)).rejects.toMatchObject({
+      name: "BookingSubmitError",
+      code: "SIGN_IN_REQUIRED",
+    });
+  });
+
   it("stops before submitting when a photo upload fails", async () => {
     const { impl, calls } = fakeFetch({
       "/api/v1/uploads": uploadsOk,

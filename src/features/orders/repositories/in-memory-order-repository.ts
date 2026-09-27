@@ -1,9 +1,12 @@
 // Test double for the OrderRepository seam — lets use-case unit tests
 // (ADR-0012's vertical slice) run with no real Postgres, per the build
 // strategy's split between fast unit tests and real-DB integration tests.
+// New Customer Accounts go into the shared InMemoryAccounts table, the
+// same one the sign-in use-cases read, so tests can book → sign in → rebook.
 
+import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import type { AuditEntry, Item, Order } from "../domain";
-import type { NewOrderInput, OrderRepository } from "./order-repository";
+import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
 
 let nextId = 0;
 function fakeId(prefix: string): string {
@@ -16,19 +19,39 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
 
+  constructor(readonly accounts: InMemoryAccounts = new InMemoryAccounts()) {}
+
   async create(input: NewOrderInput): Promise<{ order: Order; created: boolean }> {
     if (input.submissionKey) {
-      const existingId = this.orderIdsBySubmissionKey.get(input.submissionKey);
-      if (existingId) return { order: this.orders.get(existingId)!, created: false };
+      const existing = await this.findBySubmissionKey(input.submissionKey);
+      if (existing) return { order: existing, created: false };
+    }
+
+    // Mirror the database's unique indexes, checking before writing
+    // anything, like the single Prisma transaction.
+    const keysInUse = new Set([...this.orders.values()].flatMap((o) => o.items.flatMap((i) => i.photoKeys)));
+    if (input.item.photoKeys.some((key) => keysInUse.has(key))) throw new PhotoKeyInUseError();
+
+    let accountId: string;
+    if ("accountId" in input.owner) {
+      accountId = input.owner.accountId;
+    } else {
+      try {
+        accountId = this.accounts.add({ role: "CUSTOMER", ...input.owner.newCustomer }).id;
+      } catch (err) {
+        if (err instanceof InMemoryEmailTakenError) throw new EmailTakenError();
+        throw err;
+      }
     }
 
     const orderId = fakeId("order");
     const order: Order = {
       id: orderId,
-      accountId: input.accountId,
+      accountId,
       contactName: input.contactName,
-      guestEmail: input.guestEmail,
-      guestPhone: input.guestPhone,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      createdAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,
       fulfillment: input.fulfillment,
       rush: input.rush,
@@ -59,6 +82,11 @@ export class InMemoryOrderRepository implements OrderRepository {
 
   async findById(orderId: string): Promise<Order | null> {
     return this.orders.get(orderId) ?? null;
+  }
+
+  async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
+    const orderId = this.orderIdsBySubmissionKey.get(submissionKey);
+    return orderId ? (this.orders.get(orderId) ?? null) : null;
   }
 
   async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {

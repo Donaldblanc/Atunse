@@ -19,6 +19,11 @@
   - **Check what was actually uploaded.** The stored Content-Type is the label the target pins, not the bytes: a target issued for a PNG accepted JPEG bytes and stored them as `image/png`. `submitOrder` also only checks key shape, not that the object exists. Verify each key with a HEAD (size and type), and sniff magic bytes, before accepting the Order.
   - **Scope the storage keys** to this one bucket, write-only for the app (plus read for admin later), if Neon's key settings allow it.
   - **Shorter target lifetime.** 10 minutes today; a few minutes is enough for one upload batch.
+- [ ] **Before turning on `FEATURE_CUSTOMER_SIGN_IN_ENABLED`:** set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in Resend). Without them, sign-in codes only reach the server log and customers can't sign in (ADR-0014).
+- [ ] **Customer "my bookings" page.** Customers can sign in (ADR-0014) and `GET /api/v1/orders/:orderId/photos` already enforces ownership, but no front-end page lists a customer's own bookings and photos yet.
+- [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).
+- [ ] **Rate-limit `POST /api/v1/auth/code/request` per IP.** It's already capped at 5 codes per 15 minutes per Account (ADR-0014), but not per caller (tracked with #77).
+- [ ] **Legacy orders with a blank `contactPhone`.** The ADR-0014 migration marked pre-booking-flow smoke-test orders that had no phone with `''`. Check production for any before launch.
 - [ ] **Orphaned uploads.** Photos uploaded for a booking that's never submitted stay in storage. Add an S3 lifecycle rule (or a cleanup job) for `bookings/` objects with no Order once admin photo viewing exists.
 - [ ] **Rate limiting** on the public `POST /api/v1/uploads` and `POST /api/v1/orders`.
 - [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.

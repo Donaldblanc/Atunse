@@ -5,7 +5,7 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import type { NewOrderInput } from "./order-repository";
+import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput } from "./order-repository";
 import { PrismaOrderRepository } from "./prisma-order-repository";
 
 const prisma = new PrismaClient();
@@ -13,9 +13,23 @@ const repo = new PrismaOrderRepository(prisma);
 
 beforeEach(async () => {
   await prisma.itemAuditEntry.deleteMany();
+  await prisma.itemPhoto.deleteMany();
   await prisma.item.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.signInCode.deleteMany();
+  await prisma.account.deleteMany({ where: { role: "CUSTOMER" } });
 });
+
+let counter = 0;
+/** A fresh new-customer owner per call, so tests don't collide on email. */
+function newCustomer(email = `customer${++counter}@example.com`) {
+  return { newCustomer: { email, phone: "2125550142" } };
+}
+/** Unique photo keys per call: item_photos.key is unique across all Items. */
+function photoKeys(n = 1) {
+  counter += 1;
+  return Array.from({ length: n }, (_, i) => `bookings/run-${counter}/${i}.jpg`);
+}
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -23,10 +37,10 @@ afterAll(async () => {
 
 function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
   return {
-    accountId: null,
+    owner: newCustomer(),
     contactName: "Jordan Smith",
-    guestEmail: "customer@example.com",
-    guestPhone: null,
+    contactEmail: "customer@example.com",
+    contactPhone: "2125550142",
     policyAcceptedAt: new Date(),
     fulfillment: {
       method: "PICKUP",
@@ -46,7 +60,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
       material: null,
       serviceIds: ["standard"],
       estimate: Money.fromCents(3000),
-      photoKeys: [],
+      photoKeys: photoKeys(),
     },
     ...overrides,
   };
@@ -111,6 +125,58 @@ describe("PrismaOrderRepository (integration)", () => {
       preferredDate: "2026-11-15",
     });
     expect((await repo.findById(withoutDate.order.id))?.fulfillment).toMatchObject({ preferredDate: null });
+  });
+
+  it("creates the new customer's Account with the Order", async () => {
+    const { order } = await repo.create(newOrder({ owner: newCustomer("new@example.com") }));
+    const account = await prisma.account.findUniqueOrThrow({ where: { id: order.accountId } });
+    expect(account).toMatchObject({ email: "new@example.com", phone: "2125550142", role: "CUSTOMER" });
+  });
+
+  it("reports a taken customer email as EmailTakenError, and writes nothing", async () => {
+    await repo.create(newOrder({ owner: newCustomer("taken@example.com") }));
+    await expect(repo.create(newOrder({ owner: newCustomer("taken@example.com") }))).rejects.toThrow(EmailTakenError);
+    expect(await prisma.order.count()).toBe(1);
+  });
+
+  it("keeps Admin and Customer Accounts separate: an admin's email can have its own Customer Account", async () => {
+    const admin = await prisma.account.create({ data: { role: "ADMIN", email: "owner-it@example.com" } });
+    try {
+      const { order } = await repo.create(newOrder({ owner: newCustomer("owner-it@example.com") }));
+      expect(order.accountId).not.toBe(admin.id);
+      expect(await prisma.account.count({ where: { email: "owner-it@example.com" } })).toBe(2);
+    } finally {
+      await prisma.itemPhoto.deleteMany();
+      await prisma.item.deleteMany();
+      await prisma.order.deleteMany();
+      await prisma.account.delete({ where: { id: admin.id } });
+    }
+  });
+
+  it("books into an existing Account by id", async () => {
+    const first = await repo.create(newOrder());
+    const second = await repo.create(newOrder({ owner: { accountId: first.order.accountId } }));
+    expect(second.order.accountId).toBe(first.order.accountId);
+  });
+
+  it("stores photos in order and round-trips them", async () => {
+    const keys = photoKeys(3);
+    const { order } = await repo.create(newOrder({ item: { ...newOrder().item, photoKeys: keys } }));
+    expect((await repo.findById(order.id))?.items[0]?.photoKeys).toEqual(keys);
+  });
+
+  it("lets exactly one of two concurrent bookings claim a photo key (20 runs)", async () => {
+    for (let run = 0; run < 20; run++) {
+      const shared = photoKeys();
+      const results = await Promise.allSettled([
+        repo.create(newOrder({ item: { ...newOrder().item, photoKeys: shared } })),
+        repo.create(newOrder({ item: { ...newOrder().item, photoKeys: shared } })),
+      ]);
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+      expect(rejected.reason).toBeInstanceOf(PhotoKeyInUseError);
+      expect(await prisma.itemPhoto.count({ where: { key: shared[0] } })).toBe(1);
+    }
   });
 
   it("returns the existing order for a repeated submissionKey instead of inserting a duplicate", async () => {

@@ -22,9 +22,16 @@ export interface BookingSubmission {
   rush: boolean;
 }
 
-/** A failure whose message is safe to show the customer. */
+/**
+ * A failure whose message is safe to show the customer. `code` is
+ * SIGN_IN_REQUIRED when the email already has an Account and the customer
+ * has to sign in (the booking flow's login screen) before resubmitting.
+ */
 export class BookingSubmitError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
     super(message);
     this.name = "BookingSubmitError";
   }
@@ -74,12 +81,15 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
   };
 }
 
-async function errorMessage(res: Response): Promise<string> {
+async function errorFrom(res: Response): Promise<BookingSubmitError> {
   try {
-    const body = (await res.json()) as { error?: unknown };
-    return typeof body.error === "string" ? body.error : GENERIC_FAILURE;
+    const body = (await res.json()) as { error?: unknown; code?: unknown };
+    return new BookingSubmitError(
+      typeof body.error === "string" ? body.error : GENERIC_FAILURE,
+      typeof body.code === "string" ? body.code : undefined,
+    );
   } catch {
-    return GENERIC_FAILURE;
+    return new BookingSubmitError(GENERIC_FAILURE);
   }
 }
 
@@ -89,7 +99,7 @@ async function uploadPhotos(photos: File[], fetchImpl: typeof fetch): Promise<st
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ files: photos.map((photo) => ({ contentType: photo.type, size: photo.size })) }),
   });
-  if (!res.ok) throw new BookingSubmitError(await errorMessage(res));
+  if (!res.ok) throw await errorFrom(res);
   const { uploads } = (await res.json()) as { uploads: { key: string; url: string; fields: Record<string, string> }[] };
 
   await Promise.all(
@@ -118,7 +128,7 @@ export async function submitBooking(
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.submissionKey },
       body: JSON.stringify(buildOrderRequestBody(submission, photoKeys)),
     });
-    if (!res.ok) throw new BookingSubmitError(await errorMessage(res));
+    if (!res.ok) throw await errorFrom(res);
     return (await res.json()) as SubmitOrderResponse;
   } catch (err) {
     if (err instanceof BookingSubmitError) throw err;
