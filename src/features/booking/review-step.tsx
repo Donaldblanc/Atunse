@@ -20,6 +20,7 @@ export function ReviewStep({
   mailInDate,
   contact,
   onEdit,
+  onEditPair,
   onConfirm,
 }: {
   isBundle: boolean;
@@ -35,6 +36,8 @@ export function ReviewStep({
   mailInDate: PickupSelection | null;
   contact: ContactInfo;
   onEdit: (step: Step) => void;
+  /** Opens the Details step on pair `index`. */
+  onEditPair: (index: number) => void;
   onConfirm: (policyAccepted: boolean) => Promise<void>;
 }) {
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -105,7 +108,7 @@ export function ReviewStep({
         <div className="booking-page-review-card" key={i}>
           <div className="booking-page-review-head">
             <span>{pairs.length === 1 ? "YOUR PAIR" : `PAIR ${i + 1}`}</span>
-            <button type="button" className="booking-page-edit-link" onClick={() => onEdit("details")}>
+            <button type="button" className="booking-page-edit-link" onClick={() => onEditPair(i)}>
               Edit
             </button>
           </div>

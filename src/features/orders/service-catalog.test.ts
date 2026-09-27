@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { RATE_LIMITS } from "@/shared/rate-limit/rate-limiter";
 import { Money } from "@/shared/money/money";
 import { BOOKING_SERVICES } from "@/features/booking/services-data";
 import {
@@ -93,5 +94,11 @@ describe("catalog display prices", () => {
 
   it("has a catalog entry for every Service the booking flow offers, and no others", () => {
     expect(SERVICE_CATALOG.map((s) => s.id).sort()).toEqual(BOOKING_SERVICES.map((s) => s.id).sort());
+  });
+});
+
+describe("upload rate limit vs Bundles (#85)", () => {
+  it("allows ~20 Bundle attempts: one uploads request per pair per attempt", () => {
+    expect(RATE_LIMITS.uploads.limit).toBeGreaterThanOrEqual(20 * BUNDLE_PAIRS);
   });
 });

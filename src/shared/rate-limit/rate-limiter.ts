@@ -37,8 +37,13 @@ export function secondsLeftInWindow(policy: RateLimitPolicy, now: Date): number 
  * per-account sign-in limits (ADR-0014) still apply on top.
  */
 export const RATE_LIMITS = {
-  /** Upload targets: one request per booking attempt, up to 10 photos each. */
-  uploads: { name: "uploads", limit: 20, windowSeconds: 10 * 60 },
+  /**
+   * Upload targets: one request per pair per booking attempt (up to 10
+   * photos each). A Bundle is 3 pairs (BUNDLE_PAIRS), so this allows ~20
+   * Bundle attempts, the same as ~20 single-pair ones. A test in
+   * features/orders keeps it in step with BUNDLE_PAIRS.
+   */
+  uploads: { name: "uploads", limit: 60, windowSeconds: 10 * 60 },
   /** Booking submissions, including retries. */
   orders: { name: "orders", limit: 10, windowSeconds: 10 * 60 },
   /** Sign-in code emails, across all emails a caller tries. */

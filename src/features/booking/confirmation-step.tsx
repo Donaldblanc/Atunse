@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, CircleCheck, Info, Mail, Package, Truck, Wallet } from "lucide-react";
 import { Money } from "@/shared/money/money";
+import { pairsPhrase } from "@/features/orders/domain";
 import type { SubmitOrderResponse } from "./submit-booking";
 
 // Shown in place of the steps once POST /api/v1/orders succeeds. Everything
@@ -14,7 +15,7 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
   const estimate = Money.fromCents(order.estimateCents).format();
   const deposit = Money.fromCents(order.depositCents).format();
   const zelle = paymentInstructions.zelle;
-  const pairs = order.pairCount === 1 ? "your pair" : `your ${order.pairCount} pairs`;
+  const pairs = pairsPhrase(order.pairCount);
 
   return (
     <>

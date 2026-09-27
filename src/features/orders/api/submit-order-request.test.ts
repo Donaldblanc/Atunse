@@ -65,4 +65,14 @@ describe("parseSubmitOrderRequest", () => {
   it("rejects a non-UUID Idempotency-Key", () => {
     expect(parseSubmitOrderRequest(body, "retry-please")).toEqual({ ok: false, error: expect.stringContaining("UUID") });
   });
+
+  it("still accepts the pre-Bundle single `item` body from tabs loaded before the deploy", () => {
+    const { items: _items, bundleId: _bundle, ...rest } = body as Record<string, unknown>;
+    const legacy = { ...rest, item: (body as { items: unknown[] }).items[0] };
+    const result = parseSubmitOrderRequest(legacy, null);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.bundleId).toBeNull();
+    expect(result.value.items).toHaveLength(1);
+  });
 });

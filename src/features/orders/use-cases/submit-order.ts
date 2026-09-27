@@ -4,8 +4,9 @@ import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
 import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
-import { orderReference, type Fulfillment, type Order } from "../domain";
+import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
+import { mapWithConcurrency } from "@/shared/concurrency";
 import type { FileStorage } from "@/shared/storage";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
@@ -18,12 +19,12 @@ import {
   type OrderRepository,
 } from "../repositories/order-repository";
 import {
-  BUNDLE_CATALOG,
   BUNDLE_PAIR_SERVICE_IDS,
   BUNDLE_PAIRS,
   estimateBundleItems,
   estimateItem,
   estimateOrder,
+  findBundle,
   InvalidServiceSelectionError,
   MATERIALS,
   type ItemEstimate,
@@ -345,6 +346,9 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
  * key alone proves nothing: it doesn't show the upload finished, and a
  * target's pinned Content-Type is only a label on whatever bytes were sent.
  */
+/** Storage calls in flight at once while copying and checking photos. */
+const STORAGE_CONCURRENCY = 10;
+
 async function keepVerifiedPhotos(
   deps: SubmitOrderDeps,
   uploadKeysByPair: string[][],
@@ -357,10 +361,11 @@ async function keepVerifiedPhotos(
   );
   const photos = byPair.flat();
 
-  const copied = await Promise.all(photos.map((photo) => deps.storage.copy(photo.uploadKey, photo.key)));
+  // A Bundle can carry 30 photos; bounded so the calls don't all start at once.
+  const copied = await mapWithConcurrency(photos, STORAGE_CONCURRENCY, (photo) => deps.storage.copy(photo.uploadKey, photo.key));
   if (copied.includes(false)) throw new PhotosNotUploadedError();
 
-  const stored = await Promise.all(photos.map((photo) => deps.storage.inspect(photo.key)));
+  const stored = await mapWithConcurrency(photos, STORAGE_CONCURRENCY, (photo) => deps.storage.inspect(photo.key));
   if (stored.some((object) => object === null || object.size === 0)) throw new PhotosNotUploadedError();
   const valid = stored.every(
     (object, i) =>
@@ -406,7 +411,7 @@ function pricePairs(input: SubmitOrderInput): { material: Material | null; servi
     }
     return estimateBundleItems(input.bundleId).map((estimate, i) => ({
       material: materials[i]!,
-      serviceIds: BUNDLE_PAIR_SERVICE_IDS,
+      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS], // each Item its own array, never the catalog's
       estimate,
     }));
   } catch (err) {
@@ -434,12 +439,12 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
   const howToPay = payment.zelle
     ? `Pay the ${order.deposit.format()} deposit by Zelle to ${payment.zelle.recipient} (${payment.zelle.name}) with "${reference}" in the memo.`
     : `We'll email you how to pay the ${order.deposit.format()} deposit.`;
-  const pairs = order.items.length === 1 ? "your pair" : `your ${order.items.length} pairs`;
+  const pairs = pairsPhrase(order.items.length);
   const nextStep =
     order.fulfillment.method === "PICKUP"
       ? `We'll pick up ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}.`
       : `We'll email you where to ship ${pairs}.`;
-  const bundle = BUNDLE_CATALOG.find((b) => b.id === order.bundleId);
+  const bundle = findBundle(order.bundleId);
   return [
     `Thanks, ${order.contactName}. Your booking ${reference} was received.`,
     ...(bundle

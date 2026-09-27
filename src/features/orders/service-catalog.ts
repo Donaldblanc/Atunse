@@ -55,7 +55,7 @@ export interface CatalogBundle {
 export const BUNDLE_PAIRS = 3;
 
 /** Premium Clean on every pair: the one perk each Bundle gives all three pairs. */
-export const BUNDLE_PAIR_SERVICE_IDS = ["premium"];
+export const BUNDLE_PAIR_SERVICE_IDS = ["premium"] as const;
 
 export const BUNDLE_CATALOG: CatalogBundle[] = [
   {
@@ -132,6 +132,11 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
   const suedeApplies = material === "Suede" && services.some((s) => s.suedeFee);
   const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeApplies ? SUEDE_FEE_CENTS : 0);
   return { estimate: Money.fromCents(cents), isMinimum: services.some((s) => s.isMinimum) };
+}
+
+/** The Bundle with this id, or null (e.g. a single-pair Order's null bundleId). */
+export function findBundle(id: string | null): CatalogBundle | null {
+  return id === null ? null : (BUNDLE_CATALOG.find((b) => b.id === id) ?? null);
 }
 
 export function catalogBundle(id: string): CatalogBundle {

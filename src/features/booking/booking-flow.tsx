@@ -300,6 +300,10 @@ export function BookingFlow() {
             mailInDate={mailInDate}
             contact={contact}
             onEdit={setStep}
+            onEditPair={(index) => {
+              setActivePair(index);
+              setStep("details");
+            }}
             onConfirm={confirmBooking}
           />
         )}

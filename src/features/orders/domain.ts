@@ -110,3 +110,8 @@ export interface AuditEntry {
   idempotencyKey: string | null;
   metadata?: Record<string, unknown>;
 }
+
+/** How customer-facing copy refers to an Order's sneakers: "your pair" or "your 3 pairs". */
+export function pairsPhrase(pairCount: number): string {
+  return pairCount === 1 ? "your pair" : `your ${pairCount} pairs`;
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
-import { orderReference } from "../domain";
+import { orderReference, pairsPhrase } from "../domain";
+import { BUNDLE_PAIR_SERVICE_IDS } from "../service-catalog";
 import {
   BookingValidationError,
   PolicyNotAcceptedError,
@@ -471,6 +472,50 @@ describe("submitOrder", () => {
       const input = validBundleInput();
       input.items = [input.items[0]!, { ...input.items[1]!, photoKeys: [] }, input.items[2]!];
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow("Add at least one photo of pair 2.");
+    });
+  });
+
+  describe("Bundle review fixes (#85)", () => {
+    it("gives each Bundle Item its own services array, never the catalog constant", async () => {
+      const order = await submitOrder(bookingDeps(), guest, validBundleInput("revival"));
+      const [a, b, c] = order.items.map((item) => item.serviceIds);
+      expect(a).toEqual(["premium"]);
+      expect(a).not.toBe(b);
+      expect(b).not.toBe(c);
+      expect(a).not.toBe(BUNDLE_PAIR_SERVICE_IDS);
+    });
+
+    it("never has more than 10 storage calls in flight for a 30-photo Bundle", async () => {
+      const deps = bookingDeps();
+      const keys = Array.from({ length: 30 }, (_, i) => `bookings/5a4f3c2d-1e0f-4a8b-9c7d-6e5f4a3b2c1d/${i}.jpg`);
+      for (const key of keys) deps.storage.put(key);
+      let inFlight = 0;
+      let peak = 0;
+      const track = <T>(call: () => Promise<T>) => async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 1));
+        try {
+          return await call();
+        } finally {
+          inFlight -= 1;
+        }
+      };
+      const { copy, inspect } = deps.storage;
+      deps.storage.copy = (from, to) => track(() => copy.call(deps.storage, from, to))();
+      deps.storage.inspect = (key) => track(() => inspect.call(deps.storage, key))();
+
+      const input = validBundleInput("revival");
+      input.items = input.items.map((item, pair) => ({ ...item, photoKeys: keys.slice(pair * 10, pair * 10 + 10) }));
+      const order = await submitOrder(deps, guest, input);
+
+      expect(order.items.flatMap((item) => item.photoKeys)).toHaveLength(30);
+      expect(peak).toBeLessThanOrEqual(10);
+    });
+
+    it("words the pairs the same way everywhere", () => {
+      expect(pairsPhrase(1)).toBe("your pair");
+      expect(pairsPhrase(3)).toBe("your 3 pairs");
     });
   });
 });

@@ -278,3 +278,26 @@ describe("server answers the booking flow acts on", () => {
     expect(uploaded.get(photo)).toBe("bookings/b/0.jpg");
   });
 });
+
+describe("Bundle photo uploads (#85)", () => {
+  it("uploads the pairs in parallel, not one after another", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const impl = (async (url: string) => {
+      if (url === "/api/v1/uploads") {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight -= 1;
+        return Response.json({ uploads: [{ key: `bookings/${Math.random()}/0.jpg`, url: "https://bucket.test", fields: {} }] }, { status: 201 });
+      }
+      if (url === "https://bucket.test") return new Response(null, { status: 204 });
+      return Response.json({ order: { reference: "B" }, paymentInstructions: { zelle: null } }, { status: 201 });
+    }) as unknown as typeof fetch;
+    const pair = (name: string) => ({ brand: name, material: "", notes: "", photos: [new File([new Uint8Array(4)], `${name}.jpg`, { type: "image/jpeg" })] });
+
+    await submitBooking(submission({ bundleId: "revival", serviceIds: [], pairs: [pair("A"), pair("B"), pair("C")] }), new WeakMap(), impl);
+
+    expect(peak).toBe(3);
+  });
+});

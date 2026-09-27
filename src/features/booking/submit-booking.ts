@@ -148,10 +148,9 @@ export async function submitBooking(
   const allPhotos = submission.pairs.flatMap((pair) => pair.photos);
 
   const attempt = async () => {
-    // One uploads request per pair: the route takes at most one pair's
-    // photos (MAX_PHOTOS_PER_ITEM) per request.
-    const photoKeys: string[][] = [];
-    for (const pair of submission.pairs) photoKeys.push(await uploadPhotos(pair.photos, uploaded, fetchImpl));
+    // One uploads request per pair (the route takes at most one pair's
+    // photos, MAX_PHOTOS_PER_ITEM, per request), all pairs at once.
+    const photoKeys = await Promise.all(submission.pairs.map((pair) => uploadPhotos(pair.photos, uploaded, fetchImpl)));
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.submissionKey },
