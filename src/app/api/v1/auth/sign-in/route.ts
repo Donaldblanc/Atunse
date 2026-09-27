@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaPasswordAuthService } from "@/features/accounts/auth-service";
+import { limitByIp, limitByKey, RATE_LIMITS } from "@/shared/rate-limit";
 import {
   SESSION_COOKIE_MAX_AGE_SECONDS,
   SESSION_COOKIE_NAME,
@@ -23,6 +24,13 @@ export async function POST(req: NextRequest) {
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
+
+  // Both limits count before the password is checked (a scrypt check is
+  // the expensive part): per caller, and per email across all callers.
+  const limited =
+    (await limitByIp(req, RATE_LIMITS.adminSignIn)) ??
+    (await limitByKey(RATE_LIMITS.adminSignInAccount, `admin-email:${parsed.value.email.trim().toLowerCase()}`));
+  if (limited) return limited;
 
   const authService = new PrismaPasswordAuthService(prisma);
   const account = await authService.verifyCredentials(parsed.value.email, parsed.value.password);

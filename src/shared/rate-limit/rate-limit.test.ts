@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { beforeAll } from "vitest";
-import { clientIp, hashClient, limitByIp, RATE_LIMITS, rateLimitSubject } from ".";
+import { clientIp, hashClient, limitByIp, limitByKey, RATE_LIMITS, rateLimitSubject } from ".";
 import { InMemoryRateLimiter } from "./in-memory-rate-limiter";
 import { secondsLeftInWindow, windowStart } from "./rate-limiter";
 
@@ -41,6 +41,14 @@ describe("limitByIp", () => {
     expect(await limitByIp(request("198.51.100.2"), policy, limiter)).toBeNull();
   });
 
+  it("limits by an arbitrary key (e.g. an email) the same way, without storing the key", async () => {
+    const limiter = new InMemoryRateLimiter();
+    for (let i = 0; i < 3; i++) expect(await limitByKey(policy, "admin-email:owner@example.com", limiter)).toBeNull();
+    expect((await limitByKey(policy, "admin-email:owner@example.com", limiter))?.status).toBe(429);
+    expect(await limitByKey(policy, "admin-email:other@example.com", limiter)).toBeNull();
+    expect([...limiter.counts.keys()].join()).not.toContain("owner@example.com");
+  });
+
   it("uses the first X-Forwarded-For hop, and never stores the raw IP", () => {
     expect(clientIp(request("203.0.113.7"))).toBe("203.0.113.7");
     expect(hashClient("203.0.113.7", "s")).not.toContain("203.0.113.7");
@@ -63,6 +71,13 @@ describe("limitByIp", () => {
   });
 
   it("has a policy for each public route", () => {
-    expect(Object.keys(RATE_LIMITS).sort()).toEqual(["codeRequest", "codeVerify", "orders", "uploads"]);
+    expect(Object.keys(RATE_LIMITS).sort()).toEqual([
+      "adminSignIn",
+      "adminSignInAccount",
+      "codeRequest",
+      "codeVerify",
+      "orders",
+      "uploads",
+    ]);
   });
 });

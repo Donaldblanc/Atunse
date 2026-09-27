@@ -52,9 +52,29 @@ let defaultLimiter: RateLimiter | undefined;
 export async function limitByIp(
   req: NextRequest,
   policy: RateLimitPolicy,
-  limiter: RateLimiter = (defaultLimiter ??= new PrismaRateLimiter(prisma)),
+  limiter: RateLimiter = defaultRateLimiter(),
 ): Promise<NextResponse | null> {
-  const result = await limiter.consume(policy, hashClient(clientIp(req)));
+  return tooMany(await limiter.consume(policy, hashClient(clientIp(req))));
+}
+
+/**
+ * Counts the request against `policy` for any subject other than an IP,
+ * e.g. an email being signed in to. The key is hashed like an IP, so it's
+ * never stored as given. Returns a 429 response when over the limit.
+ */
+export async function limitByKey(
+  policy: RateLimitPolicy,
+  key: string,
+  limiter: RateLimiter = defaultRateLimiter(),
+): Promise<NextResponse | null> {
+  return tooMany(await limiter.consume(policy, hashClient(`key:${key}`)));
+}
+
+function defaultRateLimiter(): RateLimiter {
+  return (defaultLimiter ??= new PrismaRateLimiter(prisma));
+}
+
+function tooMany(result: { allowed: boolean; retryAfterSeconds: number }): NextResponse | null {
   if (result.allowed) return null;
   return NextResponse.json(
     { error: "Too many requests. Please wait a few minutes and try again." },
