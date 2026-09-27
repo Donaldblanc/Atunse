@@ -134,6 +134,7 @@ describe("submitOrder", () => {
 
       const stolen = validBookingInput({ contact: { name: "Eve", email: "eve@example.com", phone: "2125550100" } });
       await expect(submitOrder(deps, guest, stolen)).rejects.toThrow(/already attached to another booking/);
+      await expect(submitOrder(deps, guest, stolen)).rejects.toMatchObject({ code: "PHOTOS_IN_USE" });
     });
   });
 
@@ -304,6 +305,39 @@ describe("submitOrder", () => {
       await expect(attempt).rejects.toThrow(SubmissionConflictError);
       await expect(attempt).rejects.toMatchObject({ reference: orderReference(first.id) });
       expect(deps.orders.orders.size).toBe(1);
+    });
+
+    it("sends the pending confirmation before refusing an edited retry, since the 409 says to check email", async () => {
+      const deps = bookingDeps();
+      const key = "7b8c9d0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e";
+      deps.notifications.failing = true;
+      await expect(submitOrder(deps, guest, validBookingInput({ submissionKey: key }))).rejects.toThrow(/email provider/);
+      expect(deps.notifications.sent).toHaveLength(0);
+
+      deps.notifications.failing = false;
+      const edited = (phone: string) =>
+        submitOrder(deps, guest, validBookingInput({ submissionKey: key, contact: { name: "Jordan", email: "customer@example.com", phone } }));
+      for (const phone of ["2125550100", "2125550101", "2125550102"]) {
+        await expect(edited(phone)).rejects.toThrow(SubmissionConflictError);
+      }
+      expect(deps.notifications.sent).toHaveLength(1); // sent once, on the first edited retry
+      await expect(edited("2125550103")).rejects.toMatchObject({ existing: { id: [...deps.orders.orders.keys()][0] } });
+    });
+
+    it("does the same when a concurrent request with the key won the race", async () => {
+      const deps = bookingDeps();
+      const key = "8c9d0e1f-2a3b-4c4d-9e5f-6a7b8c9d0e1f";
+      deps.notifications.failing = true;
+      await submitOrder(deps, guest, validBookingInput({ submissionKey: key })).catch(() => undefined);
+      deps.notifications.failing = false;
+      // The up-front lookup misses (the other request hadn't committed yet); create() then finds it.
+      const lookup = deps.orders.findBySubmissionKey.bind(deps.orders);
+      let lookups = 0;
+      deps.orders.findBySubmissionKey = async (k) => (++lookups === 1 ? null : lookup(k));
+      await expect(submitOrder(deps, guest, validBookingInput({ submissionKey: key, rush: true }))).rejects.toThrow(
+        SubmissionConflictError,
+      );
+      expect(deps.notifications.sent).toHaveLength(1);
     });
 
     it("returns the Order for an identical retry even after its pickup date has passed (#76)", async () => {

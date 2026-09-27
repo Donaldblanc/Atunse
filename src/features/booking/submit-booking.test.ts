@@ -167,3 +167,38 @@ describe("retries reuse uploaded photos (#78)", () => {
     expect(uploaded.has(photo)).toBe(false);
   });
 });
+
+describe("server answers the booking flow acts on", () => {
+  it("carries the existing booking with SUBMISSION_CONFLICT, so the flow can show it", async () => {
+    const existing = { order: { reference: "ABC12345" }, paymentInstructions: { zelle: null } };
+    const { impl } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () =>
+        Response.json({ error: "We already received this booking.", code: "SUBMISSION_CONFLICT", existing }, { status: 409 }),
+    });
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toMatchObject({
+      code: "SUBMISSION_CONFLICT",
+      existing,
+    });
+  });
+
+  it("re-uploads once when the server says the remembered photos are already in use", async () => {
+    let orderAttempts = 0;
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () =>
+        ++orderAttempts === 1
+          ? Response.json({ error: "Already attached.", code: "PHOTOS_IN_USE" }, { status: 400 })
+          : Response.json({ order: { reference: "NEW00001" }, paymentInstructions: { zelle: null } }, { status: 201 }),
+    });
+    const uploaded = new WeakMap<File, string>([[photo, "bookings/first-order/0.jpg"]]);
+
+    const result = await submitBooking(submission(), uploaded, impl);
+
+    expect(result.order.reference).toBe("NEW00001");
+    expect(calls.filter((c) => c.url === "/api/v1/uploads")).toHaveLength(1); // only the retry uploads
+    expect(uploaded.get(photo)).toBe("bookings/b/0.jpg");
+  });
+});

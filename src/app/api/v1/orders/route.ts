@@ -40,12 +40,22 @@ export async function POST(req: NextRequest) {
     const order = await submitOrder(deps, actingUser, parsed.value);
     return NextResponse.json(toSubmitOrderResponse(order, deps.paymentInstructions), { status: 201 });
   } catch (err) {
-    if (err instanceof PolicyNotAcceptedError || err instanceof BookingValidationError) {
+    if (err instanceof PolicyNotAcceptedError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
+    if (err instanceof BookingValidationError) {
+      return NextResponse.json({ error: err.message, ...(err.code ? { code: err.code } : {}) }, { status: 400 });
+    }
     if (err instanceof SubmissionConflictError) {
+      // `existing` lets the booking flow show the Order that did go
+      // through. Only the browser holding this submission key gets it.
       return NextResponse.json(
-        { error: err.message, code: "SUBMISSION_CONFLICT", reference: err.reference },
+        {
+          error: err.message,
+          code: "SUBMISSION_CONFLICT",
+          reference: err.reference,
+          existing: toSubmitOrderResponse(err.existing, deps.paymentInstructions),
+        },
         { status: 409 },
       );
     }

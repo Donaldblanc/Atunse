@@ -62,7 +62,7 @@ const RESTORATION_SERVICES = [
     title: "OXIDATION RESTORATION",
     description: "Reduces yellowing and discoloration, restoring the clean, bright appearance of oxidized soles and midsoles.",
     subitems: [
-      { label: "MIDSOLE", price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
+      { label: (oxidation.minimumLabel ?? "From").toUpperCase(), price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
       ...(oxidation.alsoFrom ?? []).map((part) => ({ label: part.label.toUpperCase(), price: `From ${formatPrice(part.cents, true)}` })),
     ],
   },

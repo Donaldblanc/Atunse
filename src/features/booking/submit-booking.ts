@@ -31,11 +31,16 @@ export class BookingSubmitError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    /** With SUBMISSION_CONFLICT: the booking that already went through. */
+    readonly existing?: SubmitOrderResponse,
   ) {
     super(message);
     this.name = "BookingSubmitError";
   }
 }
+
+/** Server answers meaning "upload the photos again", not "resend the same keys". */
+const REUPLOAD_CODES = ["PHOTOS_IN_USE"];
 
 const GENERIC_FAILURE = "Something went wrong submitting your booking. Please try again.";
 
@@ -83,10 +88,11 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
 
 async function errorFrom(res: Response): Promise<BookingSubmitError> {
   try {
-    const body = (await res.json()) as { error?: unknown; code?: unknown };
+    const body = (await res.json()) as { error?: unknown; code?: unknown; existing?: SubmitOrderResponse };
     return new BookingSubmitError(
       typeof body.error === "string" ? body.error : GENERIC_FAILURE,
       typeof body.code === "string" ? body.code : undefined,
+      body.existing,
     );
   } catch {
     return new BookingSubmitError(GENERIC_FAILURE);
@@ -135,7 +141,7 @@ export async function submitBooking(
   // Validate the request shape before spending time on uploads.
   buildOrderRequestBody(submission, []);
 
-  try {
+  const attempt = async () => {
     const photoKeys = await uploadPhotos(submission.pair.photos, uploaded, fetchImpl);
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
@@ -144,6 +150,19 @@ export async function submitBooking(
     });
     if (!res.ok) throw await errorFrom(res);
     return (await res.json()) as SubmitOrderResponse;
+  };
+
+  try {
+    try {
+      return await attempt();
+    } catch (err) {
+      // The server can't use the photo keys this booking remembered (e.g.
+      // already attached to another booking): resending them would fail
+      // forever, so forget them and upload once more.
+      if (!(err instanceof BookingSubmitError && REUPLOAD_CODES.includes(err.code ?? ""))) throw err;
+      for (const photo of submission.pair.photos) uploaded.delete(photo);
+      return await attempt();
+    }
   } catch (err) {
     if (err instanceof BookingSubmitError) throw err;
     throw new BookingSubmitError(GENERIC_FAILURE); // network failure
