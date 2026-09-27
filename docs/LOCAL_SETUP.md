@@ -59,6 +59,12 @@ DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npx prisma mi
 DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:integration
 ```
 
+### Rate limits in development
+The public routes are rate-limited per IP (#77). Locally every request
+comes from the same "local" client, so a script that books many times will
+start getting 429s. Reset the counters with
+`psql -d atunse_dev -c 'DELETE FROM rate_limit_buckets'`.
+
 ### Customer sign-in codes in development
 Set `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true` in `.env` to try the booking
 flow's customer login. Without `RESEND_API_KEY`/`EMAIL_FROM`, codes aren't

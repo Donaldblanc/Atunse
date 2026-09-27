@@ -18,6 +18,17 @@ export interface S3FileStorageConfig {
   credentials?: { accessKeyId: string; secretAccessKey: string };
 }
 
+export function s3ClientFor(config: S3FileStorageConfig): S3Client {
+  return new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    credentials: config.credentials,
+    // S3-compatible endpoints don't serve bucket subdomains
+    // (bucket.endpoint), so address the bucket in the path instead.
+    forcePathStyle: Boolean(config.endpoint),
+  });
+}
+
 // Presigned POST rather than PUT: its policy can enforce a size range and
 // pin the Content-Type, so a leaked target can't be used to upload
 // something else or something huge (ADR-0004 addendum).
@@ -27,14 +38,7 @@ export class S3FileStorage implements FileStorage {
 
   constructor(config: S3FileStorageConfig) {
     this.bucket = config.bucket;
-    this.client = new S3Client({
-      region: config.region,
-      endpoint: config.endpoint,
-      credentials: config.credentials,
-      // S3-compatible endpoints don't serve bucket subdomains
-      // (bucket.endpoint), so address the bucket in the path instead.
-      forcePathStyle: Boolean(config.endpoint),
-    });
+    this.client = s3ClientFor(config);
   }
 
   async createUploadTarget(params: { key: string; contentType: string; maxBytes: number }): Promise<UploadTarget> {

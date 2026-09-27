@@ -43,3 +43,20 @@ and deleting are added when the admin Item detail screen needs them.
   `S3FileStorage` takes an optional endpoint (`S3_ENDPOINT` or
   `AWS_ENDPOINT_URL_S3`) and switches to path-style URLs when one is set,
   since bucket subdomains don't resolve there. No other code changes.
+
+## Addendum (2026-09-27): upload hardening (#77)
+- **Targets are capped at the declared size.** Each photo's
+  `content-length-range` is the size the browser declared, not the 15 MB
+  ceiling. Targets are valid for 5 minutes.
+- **Photos are verified before an Order is created.** `FileStorage.inspect`
+  (a ranged GET of the first 16 bytes, which also gives the size) must
+  find the object, and its magic number must match the image type in its
+  key. A target's pinned Content-Type is only a label on whatever bytes
+  were sent.
+- **Per-IP rate limits** on the public routes, counted in Postgres
+  (`rate_limit_buckets`), since serverless instances share no memory.
+- **Bucket settings live in scripts, not the app.** CORS (site origins,
+  `POST` only) and orphan cleanup run through `npm run storage:configure`
+  and `npm run storage:cleanup`, both dry-run by default. A lifecycle rule
+  can't tell attached photos from abandoned ones, so cleanup checks the
+  database.
