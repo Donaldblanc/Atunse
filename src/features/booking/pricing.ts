@@ -1,5 +1,8 @@
-export const RUSH_FEE = 20;
-export const SUEDE_FEE = 10;
+import { RUSH_FEE_CENTS, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
+
+// Whole dollars for display; the catalog (server source of truth) holds cents.
+export const RUSH_FEE = RUSH_FEE_CENTS / 100;
+export const SUEDE_FEE = SUEDE_FEE_CENTS / 100;
 
 export type PricedService = {
   name: string;

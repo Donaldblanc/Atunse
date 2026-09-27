@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { ImagePlus } from "lucide-react";
+import { MATERIALS } from "@/features/orders/service-catalog";
 import type { PairDetails } from "./booking-types";
 
 // Shared brand/material/notes/photos form, used by DetailsStep for both a
@@ -51,10 +52,9 @@ export function PairForm({
             <option value="" disabled>
               Select material
             </option>
-            <option>Leather</option>
-            <option>Suede</option>
-            <option>Canvas</option>
-            <option>Knit / Mesh</option>
+            {MATERIALS.map((material) => (
+              <option key={material}>{material}</option>
+            ))}
           </select>
         </label>
       </div>
