@@ -39,6 +39,57 @@ export const SERVICE_CATALOG: CatalogService[] = [
   { id: "reglue", name: "Reglue", isCleaningTier: false, baseCents: 5000, isMinimum: true, suedeFee: false },
 ];
 
+/**
+ * CONTEXT.md: Bundle. A fixed-price package covering three pairs, each its
+ * own Item. Every pair gets BUNDLE_PAIR_SERVICE_IDS; the perks that cover
+ * only some pairs ("Oxidation touch-up on 1 pair") are assigned by the shop
+ * after inspection, so the Order records which Bundle was bought.
+ */
+export interface CatalogBundle {
+  id: string;
+  name: string;
+  priceCents: number;
+  perks: string[];
+}
+
+export const BUNDLE_PAIRS = 3;
+
+/** Premium Clean on every pair: the one perk each Bundle gives all three pairs. */
+export const BUNDLE_PAIR_SERVICE_IDS = ["premium"];
+
+export const BUNDLE_CATALOG: CatalogBundle[] = [
+  {
+    id: "revival",
+    name: "The Revival Pack",
+    priceCents: 15000,
+    perks: ["Premium Clean (all 3 pairs)", "Suede fee waived", "Priority turnaround", "Oxidation touch-up on 1 pair"],
+  },
+  {
+    id: "restoration",
+    name: "The Restoration Trio",
+    priceCents: 17500,
+    perks: [
+      "Premium Clean (all 3 pairs)",
+      "Suede fee waived",
+      "Deep sole whitening (all pairs)",
+      "Oxidation midsole on 1 pair",
+    ],
+  },
+  {
+    id: "collector",
+    name: "The Collector’s Triple",
+    priceCents: 20000,
+    perks: [
+      "Premium Clean (all 3 pairs)",
+      "Suede fee waived",
+      "Oxidation midsole (2 pairs)",
+      "Reglue inspection",
+      "Paint/dye touch-up on 1 pair",
+      "VIP turnaround (48–72 hours)",
+    ],
+  },
+];
+
 export const MATERIALS = ["Leather", "Suede", "Canvas", "Knit / Mesh"] as const;
 export type Material = (typeof MATERIALS)[number];
 
@@ -81,6 +132,28 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
   const suedeApplies = material === "Suede" && services.some((s) => s.suedeFee);
   const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeApplies ? SUEDE_FEE_CENTS : 0);
   return { estimate: Money.fromCents(cents), isMinimum: services.some((s) => s.isMinimum) };
+}
+
+export function catalogBundle(id: string): CatalogBundle {
+  const bundle = BUNDLE_CATALOG.find((b) => b.id === id);
+  if (!bundle) throw new InvalidServiceSelectionError(`Unknown bundle: ${id}`);
+  return bundle;
+}
+
+/**
+ * Each pair's share of a Bundle's fixed price. Split evenly, with leftover
+ * cents on the first pairs, so the Items always sum to exactly the Bundle
+ * price (CONTEXT.md: the Deposit is 50% of the sum of the Items). Flat, and
+ * the Suede Fee is waived whatever the material.
+ */
+export function estimateBundleItems(bundleId: string): ItemEstimate[] {
+  const { priceCents } = catalogBundle(bundleId);
+  const share = Math.floor(priceCents / BUNDLE_PAIRS);
+  const leftover = priceCents - share * BUNDLE_PAIRS;
+  return Array.from({ length: BUNDLE_PAIRS }, (_, i) => ({
+    estimate: Money.fromCents(share + (i < leftover ? 1 : 0)),
+    isMinimum: false,
+  }));
 }
 
 export interface OrderEstimate {

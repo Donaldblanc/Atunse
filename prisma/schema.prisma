@@ -97,6 +97,11 @@ model Order {
   estimateIsMinimum Boolean // true when a "from $X+" Service is included
   depositCents      Int // 50% of estimateCents, rounded down (CONTEXT.md: Deposit)
 
+  // The Bundle bought (BUNDLE_CATALOG id), or null for a single pair. Its
+  // perks that cover only some pairs are assigned by the shop after
+  // inspection, so the Order has to say which Bundle it was.
+  bundleId String?
+
   // Client-generated key for retry-safe submission (ADR-0012): a resubmit
   // with the same key returns the existing Order instead of a duplicate.
   submissionKey String? @unique
@@ -129,6 +134,10 @@ model Item {
   model       String?
   description String?
   material    String?
+
+  // The pair's place in its Order (0 for a single pair; 0-2 in a Bundle),
+  // so pairs always read back in the order the customer entered them.
+  position Int @default(0)
 
   serviceIds    String[] // catalog ids (src/features/orders/service-catalog.ts)
   estimateCents Int // this pair's share of the Order estimate, before Rush

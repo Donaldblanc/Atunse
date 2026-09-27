@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import { BOOKING_SERVICES } from "@/features/booking/services-data";
 import {
+  BUNDLE_CATALOG,
+  BUNDLE_PAIRS,
+  estimateBundleItems,
   formatServicePrice,
   serviceNotes,
   estimateItem,
@@ -38,6 +41,22 @@ describe("estimateItem", () => {
     expect(() => estimateItem({ serviceIds: ["standard", "premium"], material: null })).toThrow(
       InvalidServiceSelectionError,
     );
+  });
+});
+
+describe("estimateBundleItems", () => {
+  it("splits every Bundle into three flat shares that sum to exactly its price", () => {
+    for (const bundle of BUNDLE_CATALOG) {
+      const shares = estimateBundleItems(bundle.id);
+      expect(shares).toHaveLength(BUNDLE_PAIRS);
+      expect(shares.reduce((sum, share) => sum + share.estimate.cents, 0)).toBe(bundle.priceCents);
+      expect(Math.max(...shares.map((s) => s.estimate.cents)) - Math.min(...shares.map((s) => s.estimate.cents))).toBeLessThanOrEqual(1);
+      expect(shares.every((share) => !share.isMinimum)).toBe(true);
+    }
+  });
+
+  it("rejects an unknown Bundle", () => {
+    expect(() => estimateBundleItems("mystery")).toThrow(InvalidServiceSelectionError);
   });
 });
 

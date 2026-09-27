@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateItem, estimateOrder, MATERIALS, RUSH_FEE_CENTS, SERVICE_CATALOG, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
+import { estimateBundleItems, estimateItem, estimateOrder, MATERIALS, RUSH_FEE_CENTS, SERVICE_CATALOG, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
 
 const RUSH_FEE = RUSH_FEE_CENTS / 100;
 const SUEDE_FEE = SUEDE_FEE_CENTS / 100;
@@ -116,6 +116,17 @@ describe("client total vs server estimate", () => {
         expect(client.isMinimum).toBe(server.isMinimum);
         expect(client.price.endsWith("+")).toBe(server.isMinimum);
       }
+    }
+  });
+});
+
+describe("client Bundle total vs server estimate", () => {
+  it.each(BOOKING_BUNDLES.map((bundle) => [bundle.name, bundle] as const))("%s", (_label, bundle) => {
+    for (const rush of [false, true]) {
+      const client = computeMultiServicePricing([pricedLineForBundle(bundle)], "", rush);
+      const server = estimateOrder({ items: estimateBundleItems(bundle.id), rush });
+      expect(client.totalCents).toBe(server.estimate.cents);
+      expect(client.isMinimum).toBe(server.isMinimum);
     }
   });
 });

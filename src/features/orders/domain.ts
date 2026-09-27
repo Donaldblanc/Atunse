@@ -85,6 +85,8 @@ export interface Order {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /** The Bundle bought (service-catalog.ts BUNDLE_CATALOG), or null for a single pair. */
+  bundleId: string | null;
   confirmationEmailSentAt: Date | null;
   /** What was submitted with its submission key (#76); null for older Orders. */
   submissionFingerprint: string | null;

@@ -14,6 +14,7 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
   const estimate = Money.fromCents(order.estimateCents).format();
   const deposit = Money.fromCents(order.depositCents).format();
   const zelle = paymentInstructions.zelle;
+  const pairs = order.pairCount === 1 ? "your pair" : `your ${order.pairCount} pairs`;
 
   return (
     <>
@@ -33,6 +34,13 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
         <div className="booking-page-review-head">
           <span>DEPOSIT</span>
         </div>
+        {order.bundleName && (
+          <div className="booking-page-details-row">
+            <span>
+              Bundle: <strong>{order.bundleName}</strong> for {order.pairCount} pairs
+            </span>
+          </div>
+        )}
         <div className="booking-page-details-row">
           <span>
             Estimated total: <strong>{order.estimateIsMinimum ? `from ${estimate}` : estimate}</strong>
@@ -79,12 +87,12 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
           {order.fulfillmentMethod === "PICKUP" ? (
             <>
               <Truck size={16} aria-hidden="true" />
-              <span>We&rsquo;ll collect your pair from your address at the time you picked.</span>
+              <span>We&rsquo;ll collect {pairs} from your address at the time you picked.</span>
             </>
           ) : (
             <>
               <Package size={16} aria-hidden="true" />
-              <span>We&rsquo;ll email you where to ship your pair.</span>
+              <span>We&rsquo;ll email you where to ship {pairs}.</span>
             </>
           )}
         </div>

@@ -48,10 +48,9 @@ const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => stri
 
 // Five client-side steps, with two parallel flows: booking a single pair's
 // additive service selection, or a 3-pair bundle (each pair gets its own
-// detail tab). A single pair's "Confirm Booking" uploads its photos and
-// submits a real Order (submit-booking.ts), then shows the confirmation.
-// Bundles are multi-item Orders, which the backend doesn't take yet
-// (Phase 2), so the bundle Review step offers the single-pair flow instead.
+// detail tab). "Confirm Booking" uploads each pair's photos and submits a
+// real Order (submit-booking.ts): one Item for a single pair, three for a
+// Bundle. Then it shows the confirmation.
 export function BookingFlow() {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
@@ -129,8 +128,9 @@ export function BookingFlow() {
       result = await submitBooking({
         submissionKey: submissionKey.current,
         policyAccepted,
-        serviceIds: selectedServiceIds,
-        pair: singlePair,
+        bundleId: isBundle ? selectedBundle.id : null,
+        serviceIds: isBundle ? [] : selectedServiceIds,
+        pairs: isBundle ? pairs : [singlePair],
         scheduleMethod,
         address: pickupAddress,
         pickupSelection,
@@ -155,15 +155,6 @@ export function BookingFlow() {
     setConflict(null);
     setConfirmation(result);
     window.scrollTo({ top: 0 });
-  }
-
-  // From the blocked bundle Review step: keep schedule and contact, carry
-  // Pair 1's details over if the single pair is still empty, and start the
-  // single-pair flow at service selection.
-  function switchToSingle() {
-    setFlow("single");
-    if (singlePair.photos.length === 0) setSinglePair(pairs[0]!);
-    setStep("service");
   }
 
   function changePair(index: number, details: PairDetails) {
@@ -302,15 +293,14 @@ export function BookingFlow() {
             price={selectedPrice}
             priceNote={selectedPriceNote}
             Icon={SelectedIcon}
-            pairDetails={isBundle ? pairs[0]! : singlePair}
+            pairs={isBundle ? pairs : [singlePair]}
             scheduleMethod={scheduleMethod}
             pickupAddress={pickupAddress}
             pickupSelection={pickupSelection}
             mailInDate={mailInDate}
             contact={contact}
             onEdit={setStep}
-            onConfirm={isBundle ? null : confirmBooking}
-            onSwitchToSingle={switchToSingle}
+            onConfirm={confirmBooking}
           />
         )}
 

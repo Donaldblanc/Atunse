@@ -1,4 +1,4 @@
-// Browser side of "Confirm Booking": uploads the pair's photos straight to
+// Browser side of "Confirm Booking": uploads each pair's photos straight to
 // storage (ADR-0004), then submits the Order with their keys. Split out of
 // the React components so the request shape is unit-testable.
 
@@ -12,8 +12,12 @@ export type { SubmitOrderResponse };
 export interface BookingSubmission {
   submissionKey: string;
   policyAccepted: boolean;
+  /** The Bundle chosen, or null for a single pair. */
+  bundleId: string | null;
+  /** The single pair's Services; empty for a Bundle, whose Services come with it. */
   serviceIds: string[];
-  pair: PairDetails;
+  /** One pair, or a Bundle's three. */
+  pairs: PairDetails[];
   scheduleMethod: ScheduleMethod;
   address: PickupAddress;
   pickupSelection: PickupSelection | null;
@@ -44,7 +48,7 @@ const REUPLOAD_CODES = ["PHOTOS_IN_USE", "PHOTOS_NOT_UPLOADED"];
 
 const GENERIC_FAILURE = "Something went wrong submitting your booking. Please try again.";
 
-export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: string[]) {
+export function buildOrderRequestBody(submission: BookingSubmission, photoKeysByPair: string[][]) {
   const { address } = submission;
   const orderAddress = {
     line1: address.address,
@@ -76,13 +80,14 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
     contact: submission.contact,
     fulfillment,
     rush: submission.rush,
-    item: {
-      brand: submission.pair.brand || null,
-      material: submission.pair.material || null,
-      notes: submission.pair.notes || null,
+    bundleId: submission.bundleId,
+    items: submission.pairs.map((pair, i) => ({
+      brand: pair.brand || null,
+      material: pair.material || null,
+      notes: pair.notes || null,
       serviceIds: submission.serviceIds,
-      photoKeys,
-    },
+      photoKeys: photoKeysByPair[i] ?? [],
+    })),
   };
 }
 
@@ -140,9 +145,13 @@ export async function submitBooking(
 ): Promise<SubmitOrderResponse> {
   // Validate the request shape before spending time on uploads.
   buildOrderRequestBody(submission, []);
+  const allPhotos = submission.pairs.flatMap((pair) => pair.photos);
 
   const attempt = async () => {
-    const photoKeys = await uploadPhotos(submission.pair.photos, uploaded, fetchImpl);
+    // One uploads request per pair: the route takes at most one pair's
+    // photos (MAX_PHOTOS_PER_ITEM) per request.
+    const photoKeys: string[][] = [];
+    for (const pair of submission.pairs) photoKeys.push(await uploadPhotos(pair.photos, uploaded, fetchImpl));
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.submissionKey },
@@ -161,7 +170,7 @@ export async function submitBooking(
       // attached to another booking. Resending them would fail forever, so
       // forget them and upload once more.
       if (!(err instanceof BookingSubmitError && REUPLOAD_CODES.includes(err.code ?? ""))) throw err;
-      for (const photo of submission.pair.photos) uploaded.delete(photo);
+      for (const photo of allPhotos) uploaded.delete(photo);
       return await attempt();
     }
   } catch (err) {

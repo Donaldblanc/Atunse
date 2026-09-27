@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { orderReference, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
+import { BUNDLE_CATALOG, BUNDLE_PAIRS } from "../service-catalog";
 import type { SubmitOrderInput } from "../use-cases/submit-order";
 
 const text = (max: number) => z.string().max(max);
@@ -30,13 +31,20 @@ const submitOrderBody = z.object({
     z.object({ method: z.literal("MAIL_IN"), address, preferredDate: calendarDate.nullish().transform((v) => v ?? null) }),
   ]),
   rush: z.boolean(),
-  item: z.object({
-    brand: optionalText(200),
-    material: optionalText(40),
-    notes: optionalText(2000),
-    serviceIds: z.array(text(40)).max(10),
-    photoKeys: z.array(text(200)).max(10),
-  }),
+  // A Bundle id for three pairs; absent or null for a single pair.
+  bundleId: text(40).nullish().transform((v) => v ?? null),
+  items: z
+    .array(
+      z.object({
+        brand: optionalText(200),
+        material: optionalText(40),
+        notes: optionalText(2000),
+        serviceIds: z.array(text(40)).max(10),
+        photoKeys: z.array(text(200)).max(10),
+      }),
+    )
+    .min(1)
+    .max(BUNDLE_PAIRS),
 });
 
 const submissionKey = z.string().uuid();
@@ -65,6 +73,9 @@ export function toSubmitOrderResponse(order: Order, paymentInstructions: Payment
       estimateCents: order.estimate.cents,
       estimateIsMinimum: order.estimateIsMinimum,
       depositCents: order.deposit.cents,
+      pairCount: order.items.length,
+      /** The Bundle's name, or null for a single pair. */
+      bundleName: BUNDLE_CATALOG.find((bundle) => bundle.id === order.bundleId)?.name ?? null,
     },
     paymentInstructions,
   };

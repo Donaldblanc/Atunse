@@ -8,7 +8,7 @@ import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepo
 // every method returns the domain's own Order/Item types.
 
 const ITEM_INCLUDE = { photos: { orderBy: { position: "asc" } } } satisfies Prisma.ItemInclude;
-const ORDER_INCLUDE = { items: { include: ITEM_INCLUDE } } satisfies Prisma.OrderInclude;
+const ORDER_INCLUDE = { items: { include: ITEM_INCLUDE, orderBy: { position: "asc" as const } } } satisfies Prisma.OrderInclude;
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -64,6 +64,7 @@ function toDomainOrder(row: OrderRow): Order {
     deposit: Money.fromCents(row.depositCents),
     confirmationEmailSentAt: row.confirmationEmailSentAt,
     submissionFingerprint: row.submissionFingerprint,
+    bundleId: row.bundleId,
     items: row.items.map(toDomainItem),
   };
 }
@@ -133,21 +134,21 @@ export class PrismaOrderRepository implements OrderRepository {
         depositCents: input.deposit.cents,
         submissionKey: input.submissionKey,
         submissionFingerprint: input.submissionFingerprint,
+        bundleId: input.bundleId,
         items: {
-          create: [
-            {
-              brand: input.item.brand,
-              model: input.item.model,
-              description: input.item.description,
-              material: input.item.material,
-              serviceIds: input.item.serviceIds,
-              estimateCents: input.item.estimate.cents,
-              photos: {
-                create: input.item.photos.map((photo, position) => ({ key: photo.key, uploadKey: photo.uploadKey, position })),
-              },
-              status: "REQUEST_SUBMITTED",
+          create: input.items.map((item, position) => ({
+            position,
+            brand: item.brand,
+            model: item.model,
+            description: item.description,
+            material: item.material,
+            serviceIds: item.serviceIds,
+            estimateCents: item.estimate.cents,
+            photos: {
+              create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
             },
-          ],
+            status: "REQUEST_SUBMITTED" as const,
+          })),
         },
       },
       include: ORDER_INCLUDE,

@@ -30,7 +30,10 @@ export class InMemoryOrderRepository implements OrderRepository {
 
     // Mirror the database's unique indexes, checking before writing
     // anything, like the single Prisma transaction.
-    if (input.item.photos.some((photo) => this.uploadKeysInUse.has(photo.uploadKey))) throw new PhotoKeyInUseError();
+    const uploadKeys = input.items.flatMap((item) => item.photos.map((photo) => photo.uploadKey));
+    if (new Set(uploadKeys).size !== uploadKeys.length || uploadKeys.some((key) => this.uploadKeysInUse.has(key))) {
+      throw new PhotoKeyInUseError();
+    }
 
     let accountId: string;
     if ("accountId" in input.owner) {
@@ -60,23 +63,22 @@ export class InMemoryOrderRepository implements OrderRepository {
       deposit: input.deposit,
       confirmationEmailSentAt: null,
       submissionFingerprint: input.submissionFingerprint,
-      items: [
-        {
-          id: fakeId("item"),
-          orderId,
-          brand: input.item.brand,
-          model: input.item.model,
-          description: input.item.description,
-          material: input.item.material,
-          serviceIds: input.item.serviceIds,
-          estimate: input.item.estimate,
-          status: "REQUEST_SUBMITTED",
-          price: null,
-          photoKeys: input.item.photos.map((photo) => photo.key),
-        },
-      ],
+      bundleId: input.bundleId,
+      items: input.items.map((item) => ({
+        id: fakeId("item"),
+        orderId,
+        brand: item.brand,
+        model: item.model,
+        description: item.description,
+        material: item.material,
+        serviceIds: item.serviceIds,
+        estimate: item.estimate,
+        status: "REQUEST_SUBMITTED",
+        price: null,
+        photoKeys: item.photos.map((photo) => photo.key),
+      })),
     };
-    for (const photo of input.item.photos) this.uploadKeysInUse.add(photo.uploadKey);
+    for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
     if (input.submissionKey) this.orderIdsBySubmissionKey.set(input.submissionKey, order.id);
     return { order, created: true };

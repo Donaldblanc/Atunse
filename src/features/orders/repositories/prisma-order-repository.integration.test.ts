@@ -5,7 +5,7 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput } from "./order-repository";
+import { EmailTakenError, PhotoKeyInUseError, type NewItemInput, type NewOrderInput } from "./order-repository";
 import { PrismaOrderRepository } from "./prisma-order-repository";
 
 const prisma = new PrismaClient();
@@ -57,15 +57,21 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     deposit: Money.fromCents(1500),
     submissionKey: null,
     submissionFingerprint: null,
-    item: {
-      brand: null,
-      model: null,
-      description: null,
-      material: null,
-      serviceIds: ["standard"],
-      estimate: Money.fromCents(3000),
-      photos: photos(),
-    },
+    bundleId: null,
+    items: [newItem()],
+    ...overrides,
+  };
+}
+
+function newItem(overrides: Partial<NewItemInput> = {}): NewItemInput {
+  return {
+    brand: null,
+    model: null,
+    description: null,
+    material: null,
+    serviceIds: ["standard"],
+    estimate: Money.fromCents(3000),
+    photos: photos(),
     ...overrides,
   };
 }
@@ -77,18 +83,20 @@ describe("PrismaOrderRepository (integration)", () => {
         rush: true,
         estimate: Money.fromCents(5000),
         deposit: Money.fromCents(2500),
-        item: {
-          brand: "Nike Air Max",
-          model: null,
-          description: "scuffed",
-          material: "Suede",
-          serviceIds: ["standard"],
-          estimate: Money.fromCents(4000),
-          photos: [
-            { key: "photos/k/1.jpg", uploadKey: "bookings/k/1.jpg" },
-            { key: "photos/k/2.jpg", uploadKey: "bookings/k/2.jpg" },
-          ],
-        },
+        items: [
+          {
+            brand: "Nike Air Max",
+            model: null,
+            description: "scuffed",
+            material: "Suede",
+            serviceIds: ["standard"],
+            estimate: Money.fromCents(4000),
+            photos: [
+              { key: "photos/k/1.jpg", uploadKey: "bookings/k/1.jpg" },
+              { key: "photos/k/2.jpg", uploadKey: "bookings/k/2.jpg" },
+            ],
+          },
+        ],
       }),
     );
 
@@ -160,6 +168,33 @@ describe("PrismaOrderRepository (integration)", () => {
     }
   });
 
+  it("stores a Bundle's three pairs in the order given, with the Bundle id", async () => {
+    const pairs = ["Pair A", "Pair B", "Pair C"].map((brand, i) =>
+      newItem({ brand, serviceIds: ["premium"], estimate: Money.fromCents(i === 0 ? 5834 : 5833) }),
+    );
+    const { order } = await repo.create(
+      newOrder({ bundleId: "restoration", items: pairs, estimate: Money.fromCents(17500), deposit: Money.fromCents(8750) }),
+    );
+    const reloaded = await repo.findById(order.id);
+    expect(reloaded?.bundleId).toBe("restoration");
+    expect(reloaded?.items.map((item) => item.brand)).toEqual(["Pair A", "Pair B", "Pair C"]);
+    expect(reloaded?.items.map((item) => item.estimate.cents)).toEqual([5834, 5833, 5833]);
+  });
+
+  it("writes nothing when one pair of a booking reuses another pair's upload", async () => {
+    const [shared] = photos();
+    const attempt = repo.create(
+      newOrder({
+        items: [
+          newItem({ photos: [{ key: "photos/dup/0.jpg", uploadKey: shared!.uploadKey }] }),
+          newItem({ photos: [{ key: "photos/dup/1.jpg", uploadKey: shared!.uploadKey }] }),
+        ],
+      }),
+    );
+    await expect(attempt).rejects.toBeInstanceOf(PhotoKeyInUseError);
+    expect(await prisma.order.count()).toBe(0);
+  });
+
   it("books into an existing Account by id", async () => {
     const first = await repo.create(newOrder());
     const second = await repo.create(newOrder({ owner: { accountId: first.order.accountId } }));
@@ -168,7 +203,7 @@ describe("PrismaOrderRepository (integration)", () => {
 
   it("stores photos in order and round-trips them", async () => {
     const three = photos(3);
-    const { order } = await repo.create(newOrder({ item: { ...newOrder().item, photos: three } }));
+    const { order } = await repo.create(newOrder({ items: [newItem({ photos: three })] }));
     expect((await repo.findById(order.id))?.items[0]?.photoKeys).toEqual(three.map((p) => p.key));
   });
 
@@ -177,8 +212,8 @@ describe("PrismaOrderRepository (integration)", () => {
       // Same upload, each booking with its own copy, as submitOrder makes them.
       const [upload] = photos();
       const results = await Promise.allSettled([
-        repo.create(newOrder({ item: { ...newOrder().item, photos: [{ key: `${upload!.key}.a`, uploadKey: upload!.uploadKey }] } })),
-        repo.create(newOrder({ item: { ...newOrder().item, photos: [{ key: `${upload!.key}.b`, uploadKey: upload!.uploadKey }] } })),
+        repo.create(newOrder({ items: [newItem({ photos: [{ key: `${upload!.key}.a`, uploadKey: upload!.uploadKey }] })] })),
+        repo.create(newOrder({ items: [newItem({ photos: [{ key: `${upload!.key}.b`, uploadKey: upload!.uploadKey }] })] })),
       ]);
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
