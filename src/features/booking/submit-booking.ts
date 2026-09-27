@@ -31,11 +31,16 @@ export class BookingSubmitError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    /** With SUBMISSION_CONFLICT: the booking that already went through. */
+    readonly existing?: SubmitOrderResponse,
   ) {
     super(message);
     this.name = "BookingSubmitError";
   }
 }
+
+/** Server answers meaning "upload the photos again", not "resend the same keys". */
+const REUPLOAD_CODES = ["PHOTOS_IN_USE", "PHOTOS_NOT_UPLOADED"];
 
 const GENERIC_FAILURE = "Something went wrong submitting your booking. Please try again.";
 
@@ -83,10 +88,11 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
 
 async function errorFrom(res: Response): Promise<BookingSubmitError> {
   try {
-    const body = (await res.json()) as { error?: unknown; code?: unknown };
+    const body = (await res.json()) as { error?: unknown; code?: unknown; existing?: SubmitOrderResponse };
     return new BookingSubmitError(
       typeof body.error === "string" ? body.error : GENERIC_FAILURE,
       typeof body.code === "string" ? body.code : undefined,
+      body.existing,
     );
   } catch {
     return new BookingSubmitError(GENERIC_FAILURE);
@@ -150,10 +156,11 @@ export async function submitBooking(
     try {
       return await attempt();
     } catch (err) {
-      // The server can't find photos this booking uploaded earlier (e.g.
-      // cleaned up while the tab sat open): resending the remembered keys
-      // would fail forever, so forget them and upload once more (#77).
-      if (!(err instanceof BookingSubmitError && err.code === "PHOTOS_NOT_UPLOADED")) throw err;
+      // The server can't use the photo keys this booking remembered: gone
+      // from storage (e.g. cleaned up while the tab sat open), or already
+      // attached to another booking. Resending them would fail forever, so
+      // forget them and upload once more.
+      if (!(err instanceof BookingSubmitError && REUPLOAD_CODES.includes(err.code ?? ""))) throw err;
       for (const photo of submission.pair.photos) uploaded.delete(photo);
       return await attempt();
     }

@@ -8,10 +8,6 @@ import {
   suedeFeeNote,
 } from "@/features/orders/service-catalog";
 
-// Whole dollars for display copy (the Rush toggle's label).
-export const RUSH_FEE = RUSH_FEE_CENTS / 100;
-export const SUEDE_FEE = SUEDE_FEE_CENTS / 100;
-
 /** One priced thing in the summary: a catalog Service, or a Bundle. */
 export type PricedLine = {
   name: string;
@@ -26,6 +22,8 @@ export type ComputedPricing = {
   name: string;
   /** Integer cents, the same math as the server's estimateItem/estimateOrder. */
   totalCents: number;
+  /** The total is a minimum ("$55+"), exactly when the server's estimateIsMinimum is. */
+  isMinimum: boolean;
   price: string;
   priceNote: string | undefined;
 };
@@ -50,7 +48,7 @@ export function pricedLineForService(serviceId: string): PricedLine {
 // Rush is a flat fee on top; any minimum ("from $25+") price makes the
 // total a minimum too.
 export function computeMultiServicePricing(lines: PricedLine[], material: string, rush: boolean): ComputedPricing {
-  if (lines.length === 0) return { name: "No service selected", totalCents: 0, price: "$0", priceNote: undefined };
+  if (lines.length === 0) return { name: "No service selected", totalCents: 0, isMinimum: false, price: "$0", priceNote: undefined };
 
   const hasSuedeFee = lines.some((line) => line.suedeFee);
   const suedeApplies = hasSuedeFee && material === "Suede";
@@ -62,10 +60,12 @@ export function computeMultiServicePricing(lines: PricedLine[], material: string
     rush ? rushFeeNote() : null,
   ].filter((n): n is string => Boolean(n));
 
+  const isMinimum = lines.some((line) => line.isMinimum);
   return {
     name: lines.map((line) => line.name).join(" + "),
     totalCents,
-    price: `${Money.fromCents(totalCents).format()}${totalCents > 0 && lines.some((line) => line.isMinimum) ? "+" : ""}`,
+    isMinimum,
+    price: `${Money.fromCents(totalCents).format()}${totalCents > 0 && isMinimum ? "+" : ""}`,
     priceNote: notes.length > 0 ? notes.join(" · ") : undefined,
   };
 }

@@ -25,6 +25,7 @@ import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { computeMultiServicePricing, pricedLineForService } from "./pricing";
 import { CustomerSignIn } from "./customer-sign-in";
+import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
 
 const STEPS: { key: Step; label: string }[] = [
@@ -87,6 +88,9 @@ export function BookingFlow() {
   // Set when the server says the booking's email already has an Account:
   // the flow shows the customer login screen, then resubmits (ADR-0014).
   const [signInEmail, setSignInEmail] = useState<string | null>(null);
+  // Set when this booking's submission key already created an Order with
+  // other details (#76): the customer keeps that booking or books anew.
+  const [conflict, setConflict] = useState<{ message: string; existing: SubmitOrderResponse } | null>(null);
   const policyAcceptedRef = useRef(false);
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
@@ -103,6 +107,7 @@ export function BookingFlow() {
     // Leaving Review drops any "sign in to finish" screen: the booking will
     // be resubmitted from Review, and the email may change on the way.
     setSignInEmail(null);
+    setConflict(null);
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
   }
 
@@ -139,9 +144,15 @@ export function BookingFlow() {
         window.scrollTo({ top: 0 });
         return;
       }
+      if (err instanceof BookingSubmitError && err.code === "SUBMISSION_CONFLICT" && err.existing) {
+        setConflict({ message: err.message, existing: err.existing });
+        window.scrollTo({ top: 0 });
+        return;
+      }
       throw err;
     }
     setSignInEmail(null);
+    setConflict(null);
     setConfirmation(result);
     window.scrollTo({ top: 0 });
   }
@@ -245,6 +256,7 @@ export function BookingFlow() {
             contact={contact}
             onChangeContact={(next) => {
               setSignInEmail(null);
+              setConflict(null);
               setContact(next);
             }}
             rush={rush}
@@ -264,7 +276,26 @@ export function BookingFlow() {
           />
         )}
 
-        {step === "review" && !confirmation && !signInEmail && (
+        {step === "review" && !confirmation && conflict && (
+          <SubmissionConflict
+            message={conflict.message}
+            existing={conflict.existing}
+            onViewExisting={() => {
+              setConfirmation(conflict.existing);
+              setConflict(null);
+              window.scrollTo({ top: 0 });
+            }}
+            onBookAsNew={async () => {
+              // A separate booking: a new submission key, and fresh photo
+              // uploads, since the remembered ones belong to the first Order.
+              submissionKey.current = null;
+              uploadedPhotoKeys.current = new WeakMap();
+              await confirmBooking(policyAcceptedRef.current);
+            }}
+          />
+        )}
+
+        {step === "review" && !confirmation && !signInEmail && !conflict && (
           <ReviewStep
             isBundle={isBundle}
             name={selectedName}
@@ -309,7 +340,8 @@ export function BookingFlow() {
 
         <div className="booking-page-summary-total">
           <span>Estimated total</span>
-          <strong>{selectedPrice === "$0" ? selectedPrice : selectedPrice.includes("+") ? selectedPrice : `${selectedPrice}+`}</strong>
+          {/* "+" only when the estimate really is a minimum, as the server says (#81). */}
+          <strong>{selectedPrice}</strong>
         </div>
         <p className="booking-page-summary-caption">Final pricing may vary based on condition.</p>
 

@@ -79,12 +79,17 @@ export class SignInRequiredError extends Error {
  * they've since changed, so they're pointed at the one that went through.
  */
 export class SubmissionConflictError extends Error {
-  constructor(readonly reference: string) {
+  readonly reference: string;
+
+  /** `existing` is the Order the key created, so the client can show it. */
+  constructor(readonly existing: Order) {
+    const reference = orderReference(existing.id);
     super(
       `We already received this booking (reference ${reference}) before your changes. ` +
         "Check your email for its details, and reply there to change anything.",
     );
     this.name = "SubmissionConflictError";
+    this.reference = reference;
   }
 }
 
@@ -109,6 +114,18 @@ export class PhotosNotUploadedError extends BookingValidationError {
 
   constructor() {
     super("One or more photos didn't finish uploading. Please try again.");
+  }
+}
+
+/**
+ * A photo is already attached to another booking. The code tells the
+ * booking client to upload its photos again rather than resend the keys.
+ */
+export class PhotosInUseError extends BookingValidationError {
+  override readonly code = "PHOTOS_IN_USE";
+
+  constructor() {
+    super("One or more photos are already attached to another booking. Upload them again.");
   }
 }
 
@@ -137,7 +154,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   const fingerprint = input.submissionKey ? submissionFingerprint(input) : null;
   if (input.submissionKey) {
     const existing = await deps.orders.findBySubmissionKey(input.submissionKey);
-    if (existing) return sendConfirmationOnce(deps, sameSubmission(existing, fingerprint), now);
+    if (existing) return sendConfirmationOnce(deps, await sameSubmission(deps, existing, fingerprint, now), now);
   }
 
   const contact = validateContact(input.contact);
@@ -193,21 +210,27 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   } catch (err) {
     // The database's unique photo key: a photo belongs to exactly one
     // booking, so another Order can never gain view access to it.
-    if (err instanceof PhotoKeyInUseError) {
-      throw new BookingValidationError("One or more photos are already attached to another booking. Upload them again.");
-    }
+    if (err instanceof PhotoKeyInUseError) throw new PhotosInUseError();
     throw err;
   }
 
   // created is false when a concurrent request with the same key won.
-  const order = created.created ? created.order : sameSubmission(created.order, fingerprint);
+  const order = created.created ? created.order : await sameSubmission(deps, created.order, fingerprint, now);
   return sendConfirmationOnce(deps, order, now);
 }
 
-/** The existing Order for a reused submission key, if it was the same booking (#76). */
-function sameSubmission(existing: Order, fingerprint: string | null): Order {
+/**
+ * The existing Order for a reused submission key, if it was the same
+ * booking (#76). If the details changed, the customer is refused and told
+ * to check their email for the booking that went through, so that email
+ * must actually go out first. A failed first send is the likeliest reason
+ * they edited and retried. Best effort: the refusal stands even if the
+ * send fails again, and a later retry tries once more.
+ */
+async function sameSubmission(deps: SubmitOrderDeps, existing: Order, fingerprint: string | null, now: Date): Promise<Order> {
   if (existing.submissionFingerprint !== null && existing.submissionFingerprint !== fingerprint) {
-    throw new SubmissionConflictError(orderReference(existing.id));
+    await sendConfirmationOnce(deps, existing, now).catch(() => undefined);
+    throw new SubmissionConflictError(existing);
   }
   return existing;
 }

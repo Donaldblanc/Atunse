@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { estimateItem, estimateOrder, MATERIALS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
-import { computeMultiServicePricing, pricedLineForService, RUSH_FEE, SUEDE_FEE } from "./pricing";
+import { estimateItem, estimateOrder, MATERIALS, RUSH_FEE_CENTS, SERVICE_CATALOG, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
+
+const RUSH_FEE = RUSH_FEE_CENTS / 100;
+const SUEDE_FEE = SUEDE_FEE_CENTS / 100;
+import { computeMultiServicePricing, pricedLineForService } from "./pricing";
 import { BOOKING_BUNDLES, pricedLineForBundle } from "./services-data";
 
 const standardClean = pricedLineForService("standard");
@@ -12,7 +15,7 @@ const revivalPack = pricedLineForBundle(BOOKING_BUNDLES.find((b) => b.id === "re
 describe("computeMultiServicePricing", () => {
   it("returns a 'no service selected' placeholder for an empty selection", () => {
     const result = computeMultiServicePricing([], "", false);
-    expect(result).toEqual({ name: "No service selected", totalCents: 0, price: "$0", priceNote: undefined });
+    expect(result).toEqual({ name: "No service selected", totalCents: 0, isMinimum: false, price: "$0", priceNote: undefined });
   });
 
   it("prices a single flat service with no material or rush", () => {
@@ -110,6 +113,7 @@ describe("client total vs server estimate", () => {
         const item = estimateItem({ serviceIds: [...ids], material: material === "" ? null : (material as (typeof MATERIALS)[number]) });
         const server = estimateOrder({ items: [item], rush });
         expect(client.totalCents).toBe(server.estimate.cents);
+        expect(client.isMinimum).toBe(server.isMinimum);
         expect(client.price.endsWith("+")).toBe(server.isMinimum);
       }
     }
