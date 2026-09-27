@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 import { isIPv6 } from "node:net";
 import { NextResponse, type NextRequest } from "next/server";
+import { derivedSecret } from "@/shared/crypto/derived-key";
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaRateLimiter } from "./prisma-rate-limiter";
 import type { RateLimitPolicy, RateLimiter } from "./rate-limiter";
@@ -8,12 +9,12 @@ import type { RateLimitPolicy, RateLimiter } from "./rate-limiter";
 export { RATE_LIMITS, type RateLimitPolicy, type RateLimiter } from "./rate-limiter";
 
 /**
- * The caller's IP: Vercel sets `req.ip` (and a trustworthy first
- * X-Forwarded-For entry, since it overwrites that header); locally there's
- * none, so everyone is "local".
+ * The caller's IP from X-Forwarded-For, which Vercel overwrites with the
+ * real client address so it can't be spoofed (Next 15 removed `req.ip`,
+ * which read the same value). Locally there's none, so everyone is "local".
  */
 export function clientIp(req: NextRequest): string {
-  return req.ip ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "local";
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
 }
 
 /**
@@ -34,11 +35,12 @@ export function rateLimitSubject(ip: string): string {
 
 /**
  * A stable, non-reversible stand-in for a client, so raw IPs are never
- * stored. Keyed by SESSION_SECRET with no fallback: a public key would let
- * the stored hashes be reversed by brute-forcing IPv4 space.
+ * stored. Keyed by the rate-limit key derived from SESSION_SECRET, with no
+ * fallback: a public key would let the stored hashes be reversed by
+ * brute-forcing IPv4 space. `secret` is for tests.
  */
-export function hashClient(ip: string, secret: string | undefined = process.env.SESSION_SECRET): string {
-  if (!secret) throw new Error("SESSION_SECRET is not set — required to hash rate-limit keys");
+export function hashClient(ip: string, secret: string = derivedSecret("rate-limit")): string {
+  if (!secret) throw new Error("A secret is required to hash rate-limit keys");
   return createHmac("sha256", secret).update(rateLimitSubject(ip)).digest("hex").slice(0, 32);
 }
 
@@ -52,9 +54,29 @@ let defaultLimiter: RateLimiter | undefined;
 export async function limitByIp(
   req: NextRequest,
   policy: RateLimitPolicy,
-  limiter: RateLimiter = (defaultLimiter ??= new PrismaRateLimiter(prisma)),
+  limiter: RateLimiter = defaultRateLimiter(),
 ): Promise<NextResponse | null> {
-  const result = await limiter.consume(policy, hashClient(clientIp(req)));
+  return tooMany(await limiter.consume(policy, hashClient(clientIp(req))));
+}
+
+/**
+ * Counts the request against `policy` for any subject other than an IP,
+ * e.g. an email being signed in to. The key is hashed like an IP, so it's
+ * never stored as given. Returns a 429 response when over the limit.
+ */
+export async function limitByKey(
+  policy: RateLimitPolicy,
+  key: string,
+  limiter: RateLimiter = defaultRateLimiter(),
+): Promise<NextResponse | null> {
+  return tooMany(await limiter.consume(policy, hashClient(`key:${key}`)));
+}
+
+function defaultRateLimiter(): RateLimiter {
+  return (defaultLimiter ??= new PrismaRateLimiter(prisma));
+}
+
+function tooMany(result: { allowed: boolean; retryAfterSeconds: number }): NextResponse | null {
   if (result.allowed) return null;
   return NextResponse.json(
     { error: "Too many requests. Please wait a few minutes and try again." },

@@ -4,6 +4,7 @@ import { buildSignInCodeDeps, SignInUnavailableError } from "@/features/accounts
 import { requestSignInCode } from "@/features/accounts/use-cases/request-sign-in-code";
 import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
 import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
+import { redactForLog } from "@/shared/logging/redact";
 
 const body = z.object({ email: z.string().trim().email().max(254) });
 
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 202 });
   } catch (err) {
     if (err instanceof SignInUnavailableError) {
-      console.error(`[sign-in] ${err.message}`);
+      console.error(`[sign-in] ${redactForLog(err.message)}`);
       return NextResponse.json({ error: "Sign-in is temporarily unavailable." }, { status: 503 });
     }
     throw err;

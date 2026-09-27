@@ -50,4 +50,13 @@ export const RATE_LIMITS = {
   codeRequest: { name: "code-request", limit: 10, windowSeconds: 15 * 60 },
   /** Sign-in code guesses, across all emails a caller tries. */
   codeVerify: { name: "code-verify", limit: 20, windowSeconds: 15 * 60 },
+  /** Admin password guesses per caller, across every email they try. */
+  adminSignIn: { name: "admin-sign-in", limit: 10, windowSeconds: 15 * 60 },
+  /**
+   * Admin password guesses per email, from anywhere, so spreading a
+   * brute force over many IPs doesn't help. Counts every attempt, so a
+   * flood can lock the real admin out for up to an hour; that's the
+   * accepted trade against unlimited guessing.
+   */
+  adminSignInAccount: { name: "admin-sign-in-account", limit: 20, windowSeconds: 60 * 60 },
 } satisfies Record<string, RateLimitPolicy>;

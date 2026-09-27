@@ -3,7 +3,7 @@
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).
 - [x] `/booking`'s contact step now checks email and US phone format with the same rules `submitOrder` enforces server-side (`src/features/booking/contact-rules.ts`).
-- [ ] Postgres/eslint dev-tooling audit warnings (PostCSS via eslint-config-next) — transitive, dev-only, not runtime-exploitable; revisit when upgrading to Next 15/16 (breaking change, not done now).
+- [x] Dependency security alerts: upgraded to Next 16 / React 19 / Node 24 LTS (Next 16 ships the patched PostCSS; Vitest 5, tsx and ESLint 9 cover the dev-tooling advisories).
 - [ ] Deploys currently run through Vercel's native Git integration (Production Branch = `main`), not through `release.yml`. Gate production behind the `v*` tag `Release` creates instead once there's a real reason to (manual approval gate, stricter control than "Production Branch = main" gives) — full removal/rewire steps in `docs/DEPLOYMENT.md`'s "Future: gate deploys through git-flow" section.
 - [ ] Confirm the Neon Vercel integration (not just a pasted `DATABASE_URL`) is installed so Preview deployments get an isolated database branch instead of sharing one — see `docs/DEPLOYMENT.md`.
 - [x] Landing page CTAs used to be inert placeholders. Every "Book Now" CTA now links to `/booking`.
@@ -16,6 +16,13 @@
   - [ ] **Apply the bucket CORS:** `STORAGE_ALLOWED_ORIGINS=https://<prod domain>,https://*.vercel.app,http://localhost:3000 npm run storage:configure -- --apply` (dry run without `--apply`). It replaces today's any-origin rule (`*`, with PUT/DELETE) with the site's origins and POST only. Check that Neon honours the `*.vercel.app` wildcard (upload once from a preview afterwards).
   - [ ] **Clean up abandoned uploads** now and then: `STORAGE_CLEANUP_DATABASE_URL=<the database for this bucket> npm run storage:cleanup` (dry run), then add `-- --apply`. Uploads are throwaway once a booking copies them; this also removes uploads from bookings never submitted. It never reads `DATABASE_URL`, and refuses to delete if none of the database's photos are in the bucket. Could become a Vercel cron route later.
   - [ ] **Scope the storage keys** in Neon's console to this one bucket: read, write and **list**. `storage:cleanup` needs `s3:ListBucket`, and so does a clean "photo not uploaded" answer on AWS (without it, a missing object is a 403, which the app also handles).
+- [ ] **Turn on GitHub's security settings** (repo admin only): Dependabot security updates, secret scanning, and push protection, all under Settings → Code security. They were off at the vulnerability scan; see `docs/DEPLOYMENT.md`.
+- [ ] **Content-Security-Policy: roll out to nonce-based enforcement.** `next.config.mjs` sends it as `Content-Security-Policy-Report-Only` (vulnerability scan, #88), so browsers only log what it would block. The target state isn't just "flip it to enforcing": it's **nonce- (or hash-) based scripts with no `'unsafe-inline'`**, which is transitional debt kept only because Next's inline bootstrap has no nonce yet. Rollout:
+  1. Report-Only: browse a preview (landing, services, booking with a photo upload, admin) and collect violations.
+  2. Tighten sources to what's actually used.
+  3. Generate a per-request nonce in `src/proxy.ts` (widen its matcher to pages), pass it to Next, and replace `'unsafe-inline'` in `script-src` with `'nonce-…' 'strict-dynamic'`.
+  4. Rename the header to `Content-Security-Policy` (enforce) once a preview shows no violations.
+- [ ] **HSTS preload.** HSTS is sent with `includeSubDomains` but without `preload`. Add `preload` and submit the domain at hstspreload.org only once every subdomain serves HTTPS; it's hard to undo.
 - [ ] **Before turning on `FEATURE_CUSTOMER_SIGN_IN_ENABLED`:** set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in Resend). Without them, sign-in codes only reach the server log and customers can't sign in (ADR-0014).
 - [ ] **Customer "my bookings" page.** Customers can sign in (ADR-0014) and `GET /api/v1/orders/:orderId/photos` already enforces ownership, but no front-end page lists a customer's own bookings and photos yet.
 - [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).

@@ -7,17 +7,19 @@ import {
   InvalidTransitionError,
   transitionItemStatus,
 } from "@/features/orders/use-cases/transition-item-status";
+import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/repositories/order-repository";
 
 // POST /api/v1/admin/items/:itemId/transitions — every admin action on the
 // item pipeline (review started, quote sent, manual payment confirmed,
 // approved, ...) goes through this one endpoint (ADR-0001: every Item is
 // reviewed; the generalized transitionItemStatus use-case backs every step).
 //
-// Reachable only past src/middleware.ts's admin guard (matcher includes
+// Reachable only past src/proxy.ts's admin guard (matcher includes
 // /api/v1/admin/:path*) — but the authz check here is a second, independent
 // gate via the same checkAdminAccess, since a use-case must never trust a
 // route just because middleware let the request through (ADR-0012).
-export async function POST(req: NextRequest, { params }: { params: { itemId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ itemId: string }> }) {
+  const { itemId } = await params;
   const { allowed, accountId } = await checkAdminAccess(req);
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -41,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: { itemId: str
 
   try {
     const item = await transitionItemStatus(buildOrderUseCaseDeps(), actingUser, {
-      itemId: params.itemId,
+      itemId,
       ...parsed.value,
     });
     if (item === null) {
@@ -50,8 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: { itemId: str
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (err) {
-    if (err instanceof InvalidTransitionError) {
+    if (err instanceof InvalidTransitionError || err instanceof ItemStatusChangedError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof ItemNotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: 404 });
     }
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 403 });

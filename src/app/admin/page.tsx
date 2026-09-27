@@ -1,4 +1,4 @@
-// Reachable only past src/middleware.ts's admin guard (AdminCheck) — the
+// Reachable only past src/proxy.ts's admin guard (AdminCheck) — the
 // admin surface is protected from the very first deployment.
 //
 // This is the admin landing page from the MVP screen inventory

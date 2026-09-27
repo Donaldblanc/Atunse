@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
+import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order-repository";
 import { submitOrder } from "./submit-order";
 import { bookingDeps, validBookingInput } from "./test-fixtures";
 import { InvalidTransitionError, transitionItemStatus } from "./transition-item-status";
@@ -83,5 +84,27 @@ describe("transitionItemStatus", () => {
 
     expect(first?.status).toBe("UNDER_REVIEW");
     expect(retry).toBeNull(); // already applied — not an error, not a double-transition
+  });
+
+  it("refuses an item that doesn't exist, instead of reporting it as already applied", async () => {
+    const orders = new InMemoryOrderRepository();
+    await expect(
+      transitionItemStatus(
+        { orders, notifications: new ConsoleNotificationService() },
+        admin,
+        { itemId: "item_missing", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" },
+      ),
+    ).rejects.toThrow(ItemNotFoundError);
+  });
+
+  it("refuses a stale fromStatus, so a step can't be skipped, and leaves the item as it was", async () => {
+    const orders = new InMemoryOrderRepository();
+    const { item } = await seedOrder(orders);
+    const deps = { orders, notifications: new ConsoleNotificationService() };
+    // The item is REQUEST_SUBMITTED; a caller claiming it's QUOTE_SENT tries to approve it.
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "QUOTE_SENT", toStatus: "APPROVED", action: "APPROVED" }),
+    ).rejects.toThrow(ItemStatusChangedError);
+    expect(item.status).toBe("REQUEST_SUBMITTED");
   });
 });

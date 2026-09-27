@@ -34,6 +34,7 @@ export function MobileBookBar() {
       const rect = topCta!.getBoundingClientRect();
       return rect.bottom > topMargin && rect.top < window.innerHeight - bottomMargin;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- measured before paint on purpose (see above)
     setHidden(isTopCtaVisible());
 
     const observer = new IntersectionObserver(([entry]) => setHidden(Boolean(entry?.isIntersecting)), {

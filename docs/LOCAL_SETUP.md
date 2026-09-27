@@ -1,7 +1,7 @@
 # Local setup
 
 ## Prerequisites
-- Node 20+
+- Node 24, the active LTS (`engines.node` in `package.json`; e.g. `nvm install 24 && nvm use 24`)
 - Postgres 14+ (local, for dev/integration tests — CI uses a service container, ADR-0007)
 
 ## First-time setup
@@ -83,14 +83,14 @@ from the admin one, so you can be signed in as both.
 - `POST /api/v1/auth/sign-out` — clears the session cookie
 
 Both `/admin/*` pages and `/api/v1/admin/*` routes are gated by
-`src/middleware.ts`, which delegates the actual decision to
+`src/proxy.ts`, which delegates the actual decision to
 `checkAdminAccess` in `src/features/accounts/admin-check.ts` — see that
-file's tests (`admin-check.test.ts`, `middleware.test.ts`) for the guard's
+file's tests (`admin-check.test.ts`, `proxy.test.ts`) for the guard's
 guaranteed behavior.
 
 ## Verified working (this session)
 - `npm install`, `tsc --noEmit`, `eslint`, `next build` — all clean
-- 21 unit tests passing (Money, Item status pipeline, both use-cases, the admin-access check, and the middleware itself)
+- 21 unit tests passing (Money, Item status pipeline, both use-cases, the admin-access check, and the proxy itself)
 - 3 integration tests passing against real local Postgres, including a transactional idempotency check
 - `prisma migrate dev` applied the first migration successfully
 - End-to-end verified against a real running dev server + database:

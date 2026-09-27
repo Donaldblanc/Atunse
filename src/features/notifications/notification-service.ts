@@ -1,3 +1,5 @@
+import { maskEmail } from "@/shared/logging/redact";
+
 // The third-party seam for notifications (ADR-0003/0006). Phase 1
 // deliberately uses a direct synchronous call through this interface — no
 // outbox/worker yet. Promote to the DB-backed outbox (ADR-0006) once a
@@ -9,15 +11,20 @@ export interface NotificationService {
 }
 
 /** Used when Resend isn't configured (see ./index.ts): logs instead of
- * sending, so development needs no email account. Sign-in codes are in the
- * subject, so it's logged only when `logSubjects` is on (development); in
- * production only the recipient is, keeping codes out of hosting logs. */
+ * sending, so development needs no email account. In development it logs
+ * the recipient and subject (sign-in codes are in the subject); in
+ * production only a masked recipient, keeping codes and customer emails
+ * out of hosting logs. */
 export class ConsoleNotificationService implements NotificationService {
-  constructor(private readonly options: { logSubjects: boolean } = { logSubjects: true }) {}
+  constructor(private readonly options: { development: boolean } = { development: true }) {}
 
   async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
-    const subject = this.options.logSubjects ? ` subject="${params.subject}"` : " (subject withheld)";
-    // eslint-disable-next-line no-console
-    console.log(`[notification] to=${params.to}${subject}`);
+    // In production, logs are no place for customer details: mask the
+    // recipient and withhold the subject (it can carry a sign-in code).
+    const to = this.options.development ? params.to : maskEmail(params.to);
+    const subject = this.options.development ? ` subject="${params.subject}"` : " (subject withheld)";
+    console.log(`[notification] to=${to}${subject}`);
   }
 }
+
+export { maskEmail } from "@/shared/logging/redact";

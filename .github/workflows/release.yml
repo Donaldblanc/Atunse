@@ -8,19 +8,20 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  pull-requests: write
+# Least privilege: nothing by default; each job asks for what it needs.
+permissions: {}
 
 jobs:
   tag-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version tag and create the GitHub Release
     steps:
       # fetch-tags: default checkout is shallow and skips tags entirely, so
       # the "does this tag already exist" check below always says no even
       # when it does — that's what caused the rejected push in the first
       # place (tried to (re)create a tag the remote already had).
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -46,7 +47,7 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ steps.version.outputs.version }}
           generate_release_notes: true
@@ -58,8 +59,11 @@ jobs:
   back-merge-to-develop:
     needs: tag-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the back-merge branch
+      pull-requests: write # open the back-merge PR
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
