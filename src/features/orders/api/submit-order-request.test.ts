@@ -40,6 +40,13 @@ describe("parseSubmitOrderRequest", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("passes the acknowledged terms through, and treats a body without them as none acknowledged", () => {
+    const withTerms = parseSubmitOrderRequest({ ...body, acknowledgedTerms: ["final-pricing"] }, null);
+    expect(withTerms.ok && withTerms.value.acknowledgedTerms).toEqual(["final-pricing"]);
+    const without = parseSubmitOrderRequest(body, null);
+    expect(without.ok && without.value.acknowledgedTerms).toEqual([]);
+  });
+
   it("names the offending field", () => {
     const result = parseSubmitOrderRequest({ ...body, policyAccepted: "yes" }, null);
     expect(result).toEqual({ ok: false, error: expect.stringContaining("policyAccepted") });

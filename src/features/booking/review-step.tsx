@@ -1,12 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Info, Mail, MapPin, Package, Phone, Truck, TriangleAlert, User, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  FileText,
+  ImagePlus,
+  Info,
+  Mail,
+  MapPin,
+  Package,
+  Phone,
+  Truck,
+  TriangleAlert,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
-import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
+import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsAcceptance } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
+import { acknowledgesAll, BOOKING_ACKNOWLEDGEMENTS } from "@/features/orders/booking-terms";
 
 export function ReviewStep({
   isBundle,
@@ -39,24 +53,27 @@ export function ReviewStep({
   onEdit: (step: Step) => void;
   /** Opens the Details step on pair `index`. */
   onEditPair: (index: number) => void;
-  onConfirm: (policyAccepted: boolean) => Promise<void>;
+  onConfirm: (terms: TermsAcceptance) => Promise<void>;
 }) {
+  // Every acknowledgement and the agree box are required (CONTEXT.md:
+  // Policy Acceptance); submitOrder refuses the booking otherwise too.
+  const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  // Confirm Booking stays disabled until all of them are ticked.
   const [policyAccepted, setPolicyAccepted] = useState(false);
-  const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const showPolicyWarning = attempted && !policyAccepted;
+  const termsAccepted = policyAccepted && acknowledgesAll(acknowledged);
+
+  function toggleAcknowledgement(id: string) {
+    setAcknowledged((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+  }
 
   async function confirm() {
-    if (submitting) return;
-    if (!policyAccepted) {
-      setAttempted(true);
-      return;
-    }
+    if (submitting || !termsAccepted) return;
     setSubmitting(true);
     setError(null);
     try {
-      await onConfirm(policyAccepted);
+      await onConfirm({ policyAccepted, acknowledgedTerms: acknowledged });
     } catch (err) {
       setError(err instanceof BookingSubmitError ? err.message : "Something went wrong. Please try again.");
       setSubmitting(false);
@@ -164,16 +181,43 @@ export function ReviewStep({
         </div>
       </div>
 
-      <label className="booking-page-policy">
+      <section className="booking-page-terms-card" aria-labelledby="booking-terms-heading">
+        <span className="booking-page-terms-icon" aria-hidden="true">
+          <FileText size={24} />
+        </span>
+        <div className="booking-page-terms-body">
+          <h3 id="booking-terms-heading">
+            Terms &amp; Acknowledgement{" "}
+            <span className="booking-page-required" aria-hidden="true">
+              *
+            </span>
+          </h3>
+          {BOOKING_ACKNOWLEDGEMENTS.map((ack) => (
+            <label className="booking-page-policy" key={ack.id}>
+              <input
+                type="checkbox"
+                required
+                checked={acknowledged.includes(ack.id)}
+                onChange={() => toggleAcknowledgement(ack.id)}
+              />
+              <span>{ack.text}</span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <label className="booking-page-policy booking-page-policy-agree">
         <input
           type="checkbox"
+          required
           checked={policyAccepted}
           onChange={(e) => setPolicyAccepted(e.target.checked)}
-          aria-describedby={showPolicyWarning ? "review-step-policy-warning" : undefined}
         />
         <span>
-          I agree to the <Link href="/coming-soon">Terms of Service</Link>, Refund Policy, Restoration Disclaimer, and
-          Payment Policy.
+          I understand and agree to the terms above.{" "}
+          <span className="booking-page-required" aria-hidden="true">
+            *
+          </span>
         </span>
       </label>
 
@@ -181,19 +225,15 @@ export function ReviewStep({
         type="button"
         className="landing-btn-primary booking-page-continue-btn"
         onClick={confirm}
-        disabled={submitting}
+        disabled={submitting || !termsAccepted}
         aria-busy={submitting}
+        aria-describedby={termsAccepted ? undefined : "review-step-policy-warning"}
       >
         {submitting ? "Submitting…" : "Confirm Booking"}
         {!submitting && <ArrowRight size={14} aria-hidden="true" />}
       </button>
-      <p className="booking-page-form-warning" id="review-step-policy-warning" role="status" aria-live="polite">
-        {showPolicyWarning && (
-          <>
-            <TriangleAlert size={14} aria-hidden="true" />
-            Please accept the policies to confirm your booking.
-          </>
-        )}
+      <p className="booking-page-form-hint" id="review-step-policy-warning" role="status" aria-live="polite">
+        {!termsAccepted && "Tick each acknowledgement and agree to the terms to confirm your booking."}
       </p>
       {error && (
         <p className="booking-page-form-error" role="alert">
@@ -202,7 +242,10 @@ export function ReviewStep({
         </p>
       )}
       <p className="booking-page-terms">
-        See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
+        By confirming, you agree to our <Link href="/coming-soon">Terms of Service</Link>,{" "}
+        <Link href="/coming-soon">Refund Policy</Link>, <Link href="/coming-soon">Restoration Disclaimer</Link>, and{" "}
+        <Link href="/coming-soon">Payment Policy</Link>. See our <Link href="/coming-soon">Privacy Policy</Link> for how we
+        handle your details.
       </p>
     </>
   );

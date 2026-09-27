@@ -16,6 +16,7 @@ import {
   type PickupAddress,
   type ScheduleMethod,
   type Step,
+  type TermsAcceptance,
 } from "./booking-types";
 import { ServiceStep } from "./service-step";
 import { DetailsStep } from "./details-step";
@@ -91,7 +92,7 @@ export function BookingFlow() {
   // Set when this booking's submission key already created an Order with
   // other details (#76): the customer keeps that booking or books anew.
   const [conflict, setConflict] = useState<{ message: string; existing: SubmitOrderResponse } | null>(null);
-  const policyAcceptedRef = useRef(false);
+  const termsRef = useRef<TermsAcceptance>({ policyAccepted: false, acknowledgedTerms: [] });
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedStackableIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
@@ -122,14 +123,14 @@ export function BookingFlow() {
     }
   }
 
-  async function confirmBooking(policyAccepted: boolean) {
-    policyAcceptedRef.current = policyAccepted;
+  async function confirmBooking(terms: TermsAcceptance) {
+    termsRef.current = terms;
     submissionKey.current ??= crypto.randomUUID();
     let result: SubmitOrderResponse;
     try {
       result = await submitBooking({
         submissionKey: submissionKey.current,
-        policyAccepted,
+        ...terms,
         bundleId: isBundle ? selectedBundle.id : null,
         serviceIds: isBundle ? [] : selectedServiceIds,
         pairs: isBundle ? pairs : [singlePair],
@@ -261,7 +262,7 @@ export function BookingFlow() {
         {step === "review" && !confirmation && signInEmail && (
           <CustomerSignIn
             email={signInEmail}
-            onSignedIn={() => confirmBooking(policyAcceptedRef.current)}
+            onSignedIn={() => confirmBooking(termsRef.current)}
             onUseDifferentEmail={() => {
               setSignInEmail(null);
               setStep("contact");
@@ -283,7 +284,7 @@ export function BookingFlow() {
               // uploads, since the remembered ones belong to the first Order.
               submissionKey.current = null;
               uploadedPhotoKeys.current = new WeakMap();
-              await confirmBooking(policyAcceptedRef.current);
+              await confirmBooking(termsRef.current);
             }}
           />
         )}

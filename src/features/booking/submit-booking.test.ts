@@ -8,6 +8,7 @@ function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmissi
   return {
     submissionKey: "3c1f0e2a-7d4b-4a8e-9f6c-1b2d3e4f5a6b",
     policyAccepted: true,
+    acknowledgedTerms: ["final-pricing", "additional-charges", "results-vary", "no-structural-guarantee"],
     bundleId: null,
     serviceIds: ["standard"],
     pairs: [{ brand: "Nike AF1", material: "Suede", notes: "", photos: [photo], addOnIds: [] }],
@@ -31,6 +32,7 @@ describe("buildOrderRequestBody", () => {
       slot: "4:30 PM – 5:00 PM",
     });
     expect(body.bundleId).toBeNull();
+    expect(body.acknowledgedTerms).toEqual(["final-pricing", "additional-charges", "results-vary", "no-structural-guarantee"]);
     expect(body.items).toEqual([{ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] }]);
   });
 
