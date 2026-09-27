@@ -6,6 +6,7 @@ import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { MAX_PHOTOS_PER_ITEM } from "@/features/orders/photo-keys";
 import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 import { StorageNotConfiguredError } from "@/shared/storage";
+import { redactForLog } from "@/shared/logging/redact";
 
 const body = z.object({
   // The same cap as requestPhotoUploads, so the route can't admit more (#77).
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
     if (err instanceof StorageNotConfiguredError) {
-      console.error(`[uploads] ${err.message}`);
+      console.error(`[uploads] ${redactForLog(err.message)}`);
       return NextResponse.json({ error: "Photo uploads are temporarily unavailable." }, { status: 503 });
     }
     throw err;

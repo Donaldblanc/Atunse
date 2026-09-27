@@ -1,3 +1,5 @@
+import { maskEmail } from "@/shared/logging/redact";
+
 // The third-party seam for notifications (ADR-0003/0006). Phase 1
 // deliberately uses a direct synchronous call through this interface — no
 // outbox/worker yet. Promote to the DB-backed outbox (ADR-0006) once a
@@ -25,9 +27,4 @@ export class ConsoleNotificationService implements NotificationService {
   }
 }
 
-/** "jordan@example.com" becomes "j***@example.com". */
-export function maskEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  if (at <= 0) return "***";
-  return `${email[0]}***${email.slice(at)}`;
-}
+export { maskEmail } from "@/shared/logging/redact";
