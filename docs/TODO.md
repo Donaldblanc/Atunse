@@ -28,7 +28,7 @@
 - [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).
 - [ ] **Legacy orders with a blank `contactPhone`.** The ADR-0014 migration marked pre-booking-flow smoke-test orders that had no phone with `''`. Check production for any before launch.
 - [ ] **Landing booking panel copy is out of date** (`src/features/landing/booking-panel.tsx`). "Pricing from $45" (Pickup) and "Pricing from $55, includes return shipping" (Mail-In) match no catalog price. The Mail-In tab also promises "We email a prepaid shipping label" / "Request a mail-in label", which ADR-0010 rules out for the MVP. Owner to confirm the copy; prices should then come from `SERVICE_CATALOG` like the rest of the site (#81).
-- [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.
+- [ ] Remaining `/coming-soon` placeholders: footer "Contact", and the Terms and Privacy links.
 - [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now: `chore/back-merge-ce98fe9` (0.2.2 `package.json` bump) needs a manual PR into `develop`.
 
 ## Client feedback — landing page & booking flow (2026-09-26)

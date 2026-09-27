@@ -7,10 +7,8 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 
 // Generic placeholder for any page/section that isn't built yet (order
-// flow, a standalone Process page, pricing/booking). Linked from SiteNav's
-// "Book a restoration"/"Process" and from the home page's other
-// not-yet-real CTAs (View pricing & book now, View all services, View
-// more) — see docs/TODO.md.
+// flow, pricing/booking). Linked from the footer's "Contact", the policy
+// links and any other not-yet-real CTA — see docs/TODO.md.
 export const metadata = {
   title: "Coming Soon — Atunṣe",
 };

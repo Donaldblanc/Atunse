@@ -1,7 +1,9 @@
 /*
  * Atunse customer landing page — light (default) + dark theme, toggled via
- * data-theme on #landing-root (ThemeToggle). Matches the approved mock at
- * scratch/landing-mock.html (not committed — kept as the design reference).
+ * data-theme on #landing-root (ThemeToggle). The first pages were built
+ * from scratch/landing-mock.html, which is no longer the design reference:
+ * new pages (e.g. /process) follow their own approved design images in
+ * scratch/ (not committed), keeping the site's nav, footer and buttons.
  */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Anton&display=swap");
@@ -3915,5 +3917,239 @@
   }
   .services-page-restoration-grid {
     padding: 0 20px 44px;
+  }
+}
+
+/* ---------- process page (/process) ----------
+   Follows its own approved design (scratch/image copy 8.png), not the
+   landing mock: warm neutrals and a photo-led hero. Fonts, heading style
+   and buttons stay the site's own (Inter, .landing-btn-primary).
+   The hero photo fades out with a mask, so it sits on either theme. */
+
+.landing .process-page {
+  --process-accent: #a0826a;
+  --process-icon-bg: #ebe1d5;
+  --process-dash: #d2bfae;
+  position: relative;
+  overflow-x: clip;
+  padding-bottom: 56px;
+}
+
+.process-hero,
+.process-steps,
+.process-cta {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-inline: 32px;
+}
+
+.landing[data-theme="dark"] .process-page {
+  --process-accent: #cdb094;
+  --process-icon-bg: #232a44;
+  --process-dash: #3a4260;
+}
+
+.process-hero {
+  padding-top: 40px;
+  padding-bottom: 36px;
+}
+
+/* Bleeds to the page's right edge (.process-page is full-width), at the
+   photo's own aspect ratio so it isn't zoomed or cropped. */
+.process-hero-visual {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: min(52%, 900px);
+  aspect-ratio: 746 / 292;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.process-hero-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 34%), linear-gradient(to top, transparent 0%, #000 22%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 34%), linear-gradient(to top, transparent 0%, #000 22%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.process-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 820px;
+}
+
+.process-eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--process-accent);
+  margin: 0 0 18px;
+}
+
+/* Same heading style as the Services page hero. */
+.landing .process-h1 {
+  font-size: clamp(36px, 4.2vw, 56px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 20px;
+}
+
+.landing[data-theme="dark"] .process-h1 {
+  color: #fff;
+}
+
+.process-h1 span {
+  display: block;
+  color: var(--blue);
+}
+
+.process-lede {
+  font-size: 17px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  max-width: 62ch;
+  margin: 0;
+}
+
+.process-steps {
+  list-style: none;
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding-block: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.process-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* The dashed line joining each step's icon to the next one's. */
+.process-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 42px;
+  left: calc(50% + 56px);
+  width: calc(100% + 28px - 112px);
+  border-top: 1.5px dashed var(--process-dash);
+}
+
+.process-step-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--process-icon-bg);
+  color: var(--ink);
+  box-shadow: 0 0 0 5px var(--bg), 0 0 0 6px var(--line);
+}
+
+.process-step-num {
+  margin-top: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--process-accent);
+}
+
+.process-step-title {
+  font-size: clamp(18px, 1.5vw, 21px);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  margin: 6px 0 10px;
+  color: var(--ink);
+}
+
+.process-step-desc {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  max-width: 32ch;
+  margin: 0 0 22px;
+}
+
+.process-step-photo {
+  margin-top: auto;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 336 / 274;
+  object-fit: cover;
+  border-radius: 12px;
+  display: block;
+}
+
+.process-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  margin-top: 36px;
+}
+
+.process-tagline {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--process-accent);
+}
+
+@media (max-width: 1024px) {
+  .process-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 44px;
+  }
+  .process-step::after {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .landing .process-page {
+    padding-bottom: 40px;
+  }
+  .process-hero,
+  .process-steps,
+  .process-cta {
+    padding-inline: 16px;
+  }
+  .process-hero {
+    padding-top: 0;
+    padding-bottom: 28px;
+  }
+  .process-hero-visual {
+    position: relative;
+    width: auto;
+    margin: 0 -16px 8px;
+  }
+  .process-hero-visual img {
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 35%);
+    mask-image: linear-gradient(to top, transparent 0%, #000 35%);
+  }
+  .landing .process-h1 {
+    font-size: clamp(30px, 8vw, 38px);
+  }
+  .process-lede {
+    font-size: 15px;
+  }
+  .process-steps {
+    grid-template-columns: 1fr;
+    row-gap: 40px;
   }
 }
