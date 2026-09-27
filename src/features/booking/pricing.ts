@@ -39,6 +39,20 @@ export function pricedLineForService(serviceId: string): PricedLine {
   };
 }
 
+/**
+ * The Add-ons chosen across the booking's pairs, one line each, labelled
+ * with their pair when there's more than one (e.g. "Lace Replacement · Pair 2").
+ */
+export function addOnLines(addOnIdsByPair: string[][]): (PricedLine & { key: string })[] {
+  return addOnIdsByPair.flatMap((addOnIds, pair) =>
+    addOnIds.map((id) => {
+      const line = pricedLineForService(id);
+      const label = addOnIdsByPair.length > 1 ? `${line.name} · Pair ${pair + 1}` : line.name;
+      return { ...line, name: label, key: `${pair}-${id}` };
+    }),
+  );
+}
+
 // Single-pair services are additive — a customer can select Standard
 // Clean, Oxidation Restoration, and Painting all on the same pair — so
 // price/name/note are computed over the whole selected set, not one
@@ -46,9 +60,16 @@ export function pricedLineForService(serviceId: string): PricedLine {
 // the same rules as the server's estimate: the Suede fee is charged once,
 // only when a suedeFee service is selected and the material is Suede;
 // Rush is a flat fee on top; any minimum ("from $25+") price makes the
-// total a minimum too.
-export function computeMultiServicePricing(lines: PricedLine[], material: string, rush: boolean): ComputedPricing {
-  if (lines.length === 0) return { name: "No service selected", totalCents: 0, isMinimum: false, price: "$0", priceNote: undefined };
+// total a minimum too. `addOns` count toward the total but not the name,
+// which stays the main selection (the summary lists Add-ons on their own).
+export function computeMultiServicePricing(
+  mainLines: PricedLine[],
+  material: string,
+  rush: boolean,
+  addOns: PricedLine[] = [],
+): ComputedPricing {
+  if (mainLines.length === 0) return { name: "No service selected", totalCents: 0, isMinimum: false, price: "$0", priceNote: undefined };
+  const lines = [...mainLines, ...addOns];
 
   const hasSuedeFee = lines.some((line) => line.suedeFee);
   const suedeApplies = hasSuedeFee && material === "Suede";
@@ -62,7 +83,7 @@ export function computeMultiServicePricing(lines: PricedLine[], material: string
 
   const isMinimum = lines.some((line) => line.isMinimum);
   return {
-    name: lines.map((line) => line.name).join(" + "),
+    name: mainLines.map((line) => line.name).join(" + "),
     totalCents,
     isMinimum,
     price: `${Money.fromCents(totalCents).format()}${totalCents > 0 && isMinimum ? "+" : ""}`,

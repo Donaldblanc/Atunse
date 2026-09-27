@@ -16,7 +16,7 @@ export interface BookingSubmission {
   bundleId: string | null;
   /** The single pair's Services; empty for a Bundle, whose Services come with it. */
   serviceIds: string[];
-  /** One pair, or a Bundle's three. */
+  /** One pair, or a Bundle's three, each with its own Add-ons. */
   pairs: PairDetails[];
   scheduleMethod: ScheduleMethod;
   address: PickupAddress;
@@ -85,7 +85,8 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
       brand: pair.brand || null,
       material: pair.material || null,
       notes: pair.notes || null,
-      serviceIds: submission.serviceIds,
+      // Each pair's Add-ons ride along with its Services (a Bundle pair's alone).
+      serviceIds: [...submission.serviceIds, ...pair.addOnIds],
       photoKeys: photoKeysByPair[i] ?? [],
     })),
   };

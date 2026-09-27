@@ -20,9 +20,12 @@ The difference between an Item's final price (set when its Quote is sent) and th
 ## Service
 A unit of cleaning or restoration work that can be attached to an Item: Standard Clean, Premium Clean, Oxidation Restoration, Sneaker Painting & Dyeing, or Reglue. An Item can have multiple Services attached, but at most one cleaning tier (Standard or Premium, never both). Restoration Services combine freely with each other and with the cleaning tier.
 
+## Add-on
+An optional extra Service on one pair, on top of its main Service: Lace Replacement, Premium Deodorizing Treatment, or Waterproof Seal. Flat-priced, with no Suede Fee. Never booked on its own: an Item needs at least one cleaning or restoration Service before it can take an Add-on. Chosen per pair, Bundle pairs included (e.g. new laces on one pair of three). _Avoid_: calling restoration Services "add-ons".
+
 ## Bundle
 A fixed-price package of Services covering three pairs booked together. Each pair in a Bundle is still its own Item.
-Every pair gets Premium Clean; the Bundle's perks that cover only some pairs (e.g. "Oxidation touch-up on 1 pair") are assigned by the shop after inspection, so the Order records which Bundle was bought. The Bundle price is split evenly across its three Items (any leftover cent on the first), so the Items always sum to the Bundle price.
+Every pair gets Premium Clean; the Bundle's perks that cover only some pairs (e.g. "Oxidation touch-up on 1 pair") are assigned by the shop after inspection, so the Order records which Bundle was bought. The Bundle price is split evenly across its three Items (any leftover cent on the first), and each Item adds its own **Add-ons** on top, so the Items always sum to the Bundle price plus its Add-ons.
 
 ## Rush
 An optional faster turnaround a customer can request for a flat extra fee.

@@ -2174,6 +2174,14 @@
   margin: 10px 0 -2px;
 }
 
+/* A pair's optional Add-ons, under its form on the Details step. */
+.booking-page-addons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .booking-page-service-group-label:first-child {
   margin-top: 0;
 }
@@ -2609,6 +2617,18 @@
   font-size: 15px;
   font-weight: 800;
   color: var(--ink);
+}
+
+/* An Add-on under the main selection: lighter than the line it adds to. */
+.booking-page-summary-addon {
+  margin-top: 8px;
+  padding: 9px 14px;
+  border-style: dashed;
+}
+
+.booking-page-summary-addon .booking-page-summary-line-price {
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .booking-page-summary-price-note {

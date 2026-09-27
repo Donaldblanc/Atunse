@@ -6,6 +6,7 @@ import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
+import { catalogService } from "@/features/orders/service-catalog";
 
 export function ReviewStep({
   isBundle,
@@ -233,6 +234,11 @@ function PairSummary({ pair }: { pair: PairDetails }) {
       <div className="booking-page-details-row">
         <span>
           Notes: <strong>{pair.notes || "No notes"}</strong>
+        </span>
+      </div>
+      <div className="booking-page-details-row">
+        <span>
+          Add-ons: <strong>{pair.addOnIds.map((id) => catalogService(id).name).join(", ") || "None"}</strong>
         </span>
       </div>
     </>

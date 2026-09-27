@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { ImagePlus, TriangleAlert, X } from "lucide-react";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_ITEM } from "@/features/orders/photo-keys";
-import { MATERIALS } from "@/features/orders/service-catalog";
+import { catalogService, formatServicePrice, MATERIALS } from "@/features/orders/service-catalog";
 import { PHOTO_ACCEPT, selectPhotos, skippedMessage } from "./photo-selection";
 import type { PairDetails } from "./booking-types";
+import { ServiceRow } from "./service-row";
+import { BOOKING_ADD_ONS } from "./services-data";
 
-// Shared brand/material/notes/photos form, used by DetailsStep for both a
-// single pair and each tab of a 3-pair bundle. Photos are required (at
+// Shared brand/material/notes/photos/add-ons form, used by DetailsStep for
+// both a single pair and each tab of a 3-pair bundle, so each pair picks
+// its own optional Add-ons. Photos are required (at
 // least one) — DetailsStep's Continue button checks details.photos.length
 // before advancing. Picked photos are filtered against the server's limits
 // (photo-selection.ts) and each can be removed.
@@ -32,6 +35,11 @@ export function PairForm({
     const { photos, skipped } = selectPhotos(details.photos, Array.from(files));
     setSkipped(skippedMessage(skipped));
     onChange({ ...details, photos });
+  }
+
+  function toggleAddOn(id: string) {
+    const addOnIds = details.addOnIds.includes(id) ? details.addOnIds.filter((existing) => existing !== id) : [...details.addOnIds, id];
+    onChange({ ...details, addOnIds });
   }
 
   function removePhoto(index: number) {
@@ -133,6 +141,23 @@ export function PairForm({
               </>
             )}
           </p>
+        </div>
+      </div>
+      <div className="booking-page-addons">
+        <p className="booking-page-service-group-label">Additional services (optional)</p>
+        <div className="booking-page-service-list">
+          {BOOKING_ADD_ONS.map((addOn) => (
+            <ServiceRow
+              key={addOn.id}
+              Icon={addOn.icon}
+              name={addOn.name}
+              subtitle={addOn.description}
+              price={formatServicePrice(catalogService(addOn.id))}
+              shape="checkbox"
+              isActive={details.addOnIds.includes(addOn.id)}
+              onClick={() => toggleAddOn(addOn.id)}
+            />
+          ))}
         </div>
       </div>
     </>

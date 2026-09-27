@@ -1,6 +1,6 @@
-import { Crown, Droplet, Palette, Sparkles, SportShoe, type LucideIcon } from "lucide-react";
+import { Crown, Droplet, Palette, Ribbon, ShieldCheck, Sparkles, SportShoe, Wind, type LucideIcon } from "lucide-react";
 import type { ServiceCategoryId } from "@/features/landing/services";
-import { BUNDLE_CATALOG, type CatalogBundle } from "@/features/orders/service-catalog";
+import { ADD_ON_SERVICES, BUNDLE_CATALOG, type CatalogBundle } from "@/features/orders/service-catalog";
 import type { PricedLine } from "./pricing";
 
 export type BookingService = {
@@ -20,10 +20,11 @@ export type BookingService = {
 // (src/features/landing/services.ts) — ServiceStep groups this list under
 // each category's title using it.
 //
-// "protection" has no SKU of its own: per services/page.tsx's Standard/
-// Premium Clean checklist ("Finished with Crep Protection Shoe Deodorizer
-// & Protection Spray"), protection is a finishing treatment bundled into
-// every clean, not a separately bookable service.
+// "protection" has no main SKU of its own: per services/page.tsx's
+// Standard/Premium Clean checklist ("Finished with Crep Protection Shoe
+// Deodorizer & Protection Spray"), protection is a finishing treatment
+// bundled into every clean. The Waterproof Seal and Premium Deodorizing
+// Treatment go further, as optional Add-ons (BOOKING_ADD_ONS below).
 export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "standard",
@@ -62,6 +63,24 @@ export const BOOKING_SERVICES: BookingService[] = [
     category: "restoration",
   },
 ];
+
+/** An Add-on (a SERVICE_CATALOG entry with isAddOn) with its copy and icon. */
+export type BookingAddOn = { id: string; name: string; description: string; icon: LucideIcon };
+
+const ADD_ON_COPY: Record<string, { description: string; icon: LucideIcon }> = {
+  laces: { description: "Fresh new laces to finish the look.", icon: Ribbon },
+  deodorizing: { description: "A deeper odor treatment that leaves the inside fresh.", icon: Wind },
+  waterproofing: { description: "A seal against rain, stains, and the unexpected.", icon: ShieldCheck },
+};
+
+// Optional extras chosen per pair in PairForm (CONTEXT.md: Add-on). Names
+// and prices come from SERVICE_CATALOG; only the copy and icon live here.
+export const BOOKING_ADD_ONS: BookingAddOn[] = ADD_ON_SERVICES.map((service) => ({
+  id: service.id,
+  name: service.name,
+  description: ADD_ON_COPY[service.id]?.description ?? "",
+  icon: ADD_ON_COPY[service.id]?.icon ?? Sparkles,
+}));
 
 /** A catalog Bundle (BUNDLE_CATALOG) plus its icon. */
 export type BookingBundle = CatalogBundle & { icon: LucideIcon };

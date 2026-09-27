@@ -1,65 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Check, TriangleAlert, type LucideIcon } from "lucide-react";
+import { ArrowRight, TriangleAlert } from "lucide-react";
 import { catalogService, formatPrice, formatServicePrice, serviceNotes } from "@/features/orders/service-catalog";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
-
-function ServiceRow({
-  Icon,
-  name,
-  subtitle,
-  price,
-  priceNote,
-  badge,
-  isActive,
-  shape = "radio",
-  onClick,
-}: {
-  Icon: LucideIcon;
-  name: string;
-  subtitle: string;
-  price: string;
-  priceNote?: string;
-  badge?: string;
-  isActive: boolean;
-  shape?: "radio" | "checkbox";
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="booking-page-service-row"
-      data-active={isActive}
-      onClick={onClick}
-      role={shape === "checkbox" ? "checkbox" : undefined}
-      aria-checked={shape === "checkbox" ? isActive : undefined}
-      aria-pressed={shape === "radio" ? isActive : undefined}
-    >
-      <span
-        className={`booking-page-service-check${shape === "checkbox" ? " booking-page-service-check--checkbox" : ""}`}
-        aria-hidden="true"
-      >
-        <Check size={12} />
-      </span>
-      <span className="booking-page-service-icon" aria-hidden="true">
-        <Icon size={20} />
-      </span>
-      <span className="booking-page-service-body">
-        <strong>
-          {name}
-          {badge && <span className="booking-page-badge">{badge}</span>}
-        </strong>
-        <span>{subtitle}</span>
-      </span>
-      <span className="booking-page-service-price">
-        <strong>{price}</strong>
-        {priceNote && <span>{priceNote}</span>}
-      </span>
-    </button>
-  );
-}
+import { ServiceRow } from "./service-row";
 
 export function ServiceStep({
   isBundle,
@@ -87,7 +33,8 @@ export function ServiceStep({
         <p>
           {isBundle
             ? "All bundles include 3 pairs, Premium Clean, and Suede fee waived."
-            : "Pick one cleaning tier, then add any restoration or custom work you need — those stack freely."}
+            : "Pick one cleaning tier, then add any restoration or custom work you need — those stack freely."}{" "}
+          Optional add-ons, like Lace Replacement, come next with your pair{isBundle ? "s'" : "'s"} details.
         </p>
       </div>
 
@@ -108,8 +55,9 @@ export function ServiceStep({
               const services = BOOKING_SERVICES.filter((service) => service.category === category.id);
               if (services.length === 0) return [];
               // Cleaning is single-select (you'd never book both Standard
-              // and Premium on the same pair); every other category is an
-              // additive add-on, so it renders as a checkbox.
+              // and Premium on the same pair); every other category stacks
+              // freely, so it renders as a checkbox. Add-ons are picked per
+              // pair on the Details step (PairForm), not here.
               const shape = category.id === "cleaning" ? "radio" : "checkbox";
               return [
                 <p className="booking-page-service-group-label" key={category.id}>
