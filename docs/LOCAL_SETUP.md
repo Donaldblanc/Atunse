@@ -13,7 +13,15 @@ npm run prisma:generate
 npm run prisma:seed     # creates the bootstrap admin account
 ```
 
-Generate `SESSION_SECRET` with `openssl rand -hex 32`. `ADMIN_EMAIL`/
+Generate `SESSION_SECRET` with `openssl rand -hex 32`. It also signs the
+local photo-upload targets, so `/booking` needs it too.
+
+Booking photos use `STORAGE_DRIVER=local` by default in development: files
+land in `.uploads/` (gitignored) through the dev-only
+`POST /api/v1/uploads/local`, so no AWS account is needed. Set
+`STORAGE_DRIVER=s3` plus the `S3_*` vars to test against a real bucket.
+Set `ZELLE_RECIPIENT`/`ZELLE_NAME` to see real Deposit instructions on the
+booking confirmation. `ADMIN_EMAIL`/
 `ADMIN_PASSWORD` are only read by the seed script (ADR-0005 addendum) —
 sign in at `/sign-in` with them once the app is running.
 
@@ -36,12 +44,40 @@ npm run dev              # Next.js dev server
 npm run typecheck
 npm run lint
 npm test                 # unit tests (no DB required)
-npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres
+npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres (see below)
 npm run build
 ```
 
+### Run integration tests against a separate database
+Integration tests **delete every order and customer account** in the
+database they run against. Point them at a throwaway database, not
+`atunse_dev`:
+
+```bash
+createdb -h localhost -U atunse atunse_test   # once
+DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npx prisma migrate deploy
+DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:integration
+```
+
+### Rate limits in development
+The public routes are rate-limited per IP (#77). Locally every request
+comes from the same "local" client, so a script that books many times will
+start getting 429s. Reset the counters with
+`psql -d atunse_dev -c 'DELETE FROM rate_limit_buckets'`.
+
+### Customer sign-in codes in development
+Set `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true` in `.env` to try the booking
+flow's customer login. Without `RESEND_API_KEY`/`EMAIL_FROM`, codes aren't
+emailed: the dev server log shows them as
+`[notification] to=… subject="123456 is your Atunṣe sign-in code"`. The
+customer session is its own cookie (`atunse_customer_session`), separate
+from the admin one, so you can be signed in as both.
+
 ## API surface (Phase 1)
-- `POST /api/v1/orders` — customer-facing order submission (guest today; ties to an Account once auth is wired)
+- `POST /api/v1/uploads` — presigned upload targets for a booking's photos (one per photo; JPEG/PNG/WebP/HEIC, under 15 MB, at most 10)
+- `POST /api/v1/orders` — customer-facing order submission from `/booking`. Creates the customer's Account on their first booking (ADR-0014). Send an `Idempotency-Key: <uuid>` header to make retries safe. `409 SIGN_IN_REQUIRED` means the email already has an Account (with customer sign-in on)
+- `POST /api/v1/auth/code/request`, `POST /api/v1/auth/code/verify` — customer email-code sign-in (404 unless `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true`)
+- `GET /api/v1/orders/:orderId/photos` — 5-minute photo view links, for the Order's owner or an admin
 - `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
 - `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
 - `POST /api/v1/auth/sign-out` — clears the session cookie

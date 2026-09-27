@@ -1,13 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { ImagePlus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ImagePlus, TriangleAlert, X } from "lucide-react";
+import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_ITEM } from "@/features/orders/photo-keys";
+import { MATERIALS } from "@/features/orders/service-catalog";
+import { PHOTO_ACCEPT, selectPhotos, skippedMessage } from "./photo-selection";
 import type { PairDetails } from "./booking-types";
 
 // Shared brand/material/notes/photos form, used by DetailsStep for both a
 // single pair and each tab of a 3-pair bundle. Photos are required (at
 // least one) — DetailsStep's Continue button checks details.photos.length
-// before advancing.
+// before advancing. Picked photos are filtered against the server's limits
+// (photo-selection.ts) and each can be removed.
 export function PairForm({
   pairLabel,
   brandPlaceholder,
@@ -21,11 +25,18 @@ export function PairForm({
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [skipped, setSkipped] = useState<string | null>(null);
 
   function addPhotos(files: FileList | null) {
     if (!files || files.length === 0) return;
-    const imageFiles = Array.from(files).filter((file) => file.type.startsWith("image/"));
-    onChange({ ...details, photos: [...details.photos, ...imageFiles] });
+    const { photos, skipped } = selectPhotos(details.photos, Array.from(files));
+    setSkipped(skippedMessage(skipped));
+    onChange({ ...details, photos });
+  }
+
+  function removePhoto(index: number) {
+    setSkipped(null);
+    onChange({ ...details, photos: details.photos.filter((_, i) => i !== index) });
   }
 
   return (
@@ -51,10 +62,9 @@ export function PairForm({
             <option value="" disabled>
               Select material
             </option>
-            <option>Leather</option>
-            <option>Suede</option>
-            <option>Canvas</option>
-            <option>Knit / Mesh</option>
+            {MATERIALS.map((material) => (
+              <option key={material}>{material}</option>
+            ))}
           </select>
         </label>
       </div>
@@ -97,7 +107,7 @@ export function PairForm({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={PHOTO_ACCEPT}
             multiple
             hidden
             onChange={(e) => {
@@ -105,8 +115,48 @@ export function PairForm({
               e.target.value = "";
             }}
           />
+          <span className="booking-page-field-caption">
+            JPEG, PNG, WebP or HEIC, up to {MAX_PHOTOS_PER_ITEM} photos, {MAX_PHOTO_BYTES / 1024 / 1024} MB each.
+          </span>
+          {details.photos.length > 0 && (
+            <ul className="booking-page-photo-list">
+              {details.photos.map((photo, index) => (
+                <PhotoThumb key={`${photo.name}-${photo.lastModified}-${index}`} photo={photo} onRemove={() => removePhoto(index)} />
+              ))}
+            </ul>
+          )}
+          <p className="booking-page-form-warning" role="status" aria-live="polite">
+            {skipped && (
+              <>
+                <TriangleAlert size={14} aria-hidden="true" />
+                {skipped}
+              </>
+            )}
+          </p>
         </div>
       </div>
     </>
+  );
+}
+
+function PhotoThumb({ photo, onRemove }: { photo: File; onRemove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  // Object URLs hold the file in memory until revoked.
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(photo);
+    setUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [photo]);
+
+  return (
+    <li className="booking-page-photo-item">
+      {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview, nothing for next/image to optimize */}
+      {url ? <img src={url} alt="" /> : <span className="booking-page-photo-placeholder" aria-hidden="true" />}
+      <span className="booking-page-photo-name">{photo.name}</span>
+      <button type="button" className="booking-page-photo-remove" onClick={onRemove} aria-label={`Remove ${photo.name}`}>
+        <X size={14} aria-hidden="true" />
+      </button>
+    </li>
   );
 }

@@ -2,6 +2,8 @@
 
 import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { useState } from "react";
+import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
+import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES } from "@/features/orders/pickup-window";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";
@@ -23,35 +25,17 @@ const MONTH_NAMES = [
   "December",
 ];
 
-// Pickup window: 4:30 PM - 10:00 PM in 30-minute slots.
-const WINDOW_START_MINUTES = 16 * 60 + 30;
-const WINDOW_END_MINUTES = 22 * 60;
-
 export function formatDate(date: Date) {
   return `${WEEKDAY_NAMES[date.getDay()]}, ${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
 }
 
-function formatClock(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const period = h >= 12 ? "PM" : "AM";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m === 0 ? "00" : m} ${period}`;
-}
-
-function buildTimeSlots() {
-  const slots: string[] = [];
-  for (let start = WINDOW_START_MINUTES; start < WINDOW_END_MINUTES; start += 30) {
-    slots.push(`${formatClock(start)} – ${formatClock(start + 30)}`);
-  }
-  return slots;
-}
-
 type CalendarCell = { day: number; date: Date | null; outside: boolean; disabled: boolean };
 
-function buildCalendarCells(year: number, month: number) {
-  const today = new Date();
-  const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+// Which days and slots are open is the shop's rule (pickup-window.ts, on
+// New York time), the same one the server enforces (#75), not the
+// browser's local clock.
+function buildCalendarCells(year: number, month: number, mode: PickupPickerMode, now: Date) {
+  const method = mode === "datetime" ? "PICKUP" : "MAIL_IN";
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
@@ -62,7 +46,7 @@ function buildCalendarCells(year: number, month: number) {
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
-    cells.push({ day: d, date, outside: false, disabled: date < todayMidnight });
+    cells.push({ day: d, date, outside: false, disabled: !isBookableDay(calendarDateInLocalTime(date), method, now) });
   }
   let nextMonthDay = 1;
   while (cells.length % 7 !== 0) {
@@ -114,8 +98,9 @@ export function PickupDatePicker({
     setViewYear(year);
   }
 
-  const cells = buildCalendarCells(viewYear, viewMonth);
-  const timeSlots = buildTimeSlots();
+  const cells = buildCalendarCells(viewYear, viewMonth, mode, today);
+  const timeSlots = pendingDate ? availablePickupSlots(calendarDateInLocalTime(pendingDate), today) : [];
+  const pendingTimeAvailable = pendingTime !== null && timeSlots.includes(pendingTime);
 
   return (
     <>
@@ -223,9 +208,15 @@ export function PickupDatePicker({
                     Change
                   </button>
                 </div>
-                <p className="booking-page-time-caption">Available pickup times are between 4:30 PM &ndash; 10:00 PM.</p>
+                <p className="booking-page-time-caption">
+                  Available pickup times are between 4:30 PM &ndash; 10:00 PM (New York time). Same-day pickups need at
+                  least {PICKUP_LEAD_MINUTES / 60} hours&rsquo; notice.
+                </p>
 
                 <div className="booking-page-time-list">
+                  {timeSlots.length === 0 && (
+                    <p className="booking-page-time-caption">No pickup times left on this day. Choose another date.</p>
+                  )}
                   {timeSlots.map((slot) => (
                     <button
                       type="button"
@@ -243,9 +234,9 @@ export function PickupDatePicker({
                 <button
                   type="button"
                   className="landing-btn-primary booking-page-continue-btn"
-                  disabled={!pendingDate || !pendingTime}
+                  disabled={!pendingDate || !pendingTimeAvailable}
                   onClick={() => {
-                    if (!pendingDate || !pendingTime) return;
+                    if (!pendingDate || !pendingTime || !pendingTimeAvailable) return;
                     onConfirm({ date: pendingDate, time: pendingTime });
                     setOpen(false);
                   }}

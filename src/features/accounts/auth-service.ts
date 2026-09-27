@@ -18,7 +18,11 @@ export class PrismaPasswordAuthService implements AuthService {
   constructor(private readonly prisma: PrismaClient) {}
 
   async verifyCredentials(email: string, password: string): Promise<AuthenticatedAccount | null> {
-    const account = await this.prisma.account.findUnique({ where: { email: email.toLowerCase() } });
+    // Admin password login only (ADR-0005 addendum). A customer with the
+    // same email is a separate Account and can't sign in here (ADR-0014).
+    const account = await this.prisma.account.findUnique({
+      where: { email_role: { email: email.trim().toLowerCase(), role: "ADMIN" } },
+    });
     if (!account || !account.passwordHash) return null;
     if (!verifyPassword(password, account.passwordHash)) return null;
 

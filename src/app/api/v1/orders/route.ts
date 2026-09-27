@@ -1,12 +1,30 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
-import { submitOrder, PolicyNotAcceptedError } from "@/features/orders/use-cases/submit-order";
+import { parseSubmitOrderRequest, toSubmitOrderResponse } from "@/features/orders/api/submit-order-request";
+import { customerFromCookies } from "@/features/accounts/acting-user";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
+import {
+  BookingValidationError,
+  PolicyNotAcceptedError,
+  SignInRequiredError,
+  SubmissionConflictError,
+  submitOrder,
+} from "@/features/orders/use-cases/submit-order";
 
 // POST /api/v1/orders — the customer-facing submit step of the Phase 1
-// vertical slice. Publicly reachable (guest or account holder); the
-// authorization check itself still lives in the use-case (ADR-0012), not
-// here — this route just derives who's calling.
+// vertical slice (/booking's "Confirm Booking"). Publicly reachable
+// (signed out, or a signed-in Customer); the authorization check itself
+// still lives in the use-case (ADR-0012), not here — this route just
+// derives who's calling (the customer session only: a signed-in admin
+// books like any signed-out customer, ADR-0014). An `Idempotency-Key`
+// header (UUID) makes retries return the same Order. A 409 with code
+// SIGN_IN_REQUIRED means the email already has a Customer Account: the
+// booking flow shows its login screen. A 409 with code SUBMISSION_CONFLICT
+// means the key already created an Order with different details (#76).
 export async function POST(req: NextRequest) {
+  const limited = await limitByIp(req, RATE_LIMITS.orders);
+  if (limited) return limited;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -14,58 +32,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const parsed = parseSubmitOrderBody(body);
+  const parsed = parseSubmitOrderRequest(body, req.headers.get("idempotency-key"));
   if (!parsed.ok) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  // No auth provider wired yet (ADR-0005) — every caller here is a guest
-  // for now; an authenticated Customer's accountId will replace this once
-  // sessions exist.
-  const actingUser = { accountId: null, role: "GUEST" as const };
+  const actingUser = await customerFromCookies(req.cookies);
 
+  const deps = buildOrderUseCaseDeps();
   try {
-    const order = await submitOrder(buildOrderUseCaseDeps(), actingUser, parsed.value);
-    return NextResponse.json({ order }, { status: 201 });
+    const order = await submitOrder(deps, actingUser, parsed.value);
+    return NextResponse.json(toSubmitOrderResponse(order, deps.paymentInstructions), { status: 201 });
   } catch (err) {
     if (err instanceof PolicyNotAcceptedError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
+    if (err instanceof BookingValidationError) {
+      return NextResponse.json({ error: err.message, ...(err.code ? { code: err.code } : {}) }, { status: 400 });
+    }
+    if (err instanceof SubmissionConflictError) {
+      // `existing` lets the booking flow show the Order that did go
+      // through. Only the browser holding this submission key gets it.
+      return NextResponse.json(
+        {
+          error: err.message,
+          code: "SUBMISSION_CONFLICT",
+          reference: err.reference,
+          existing: toSubmitOrderResponse(err.existing, deps.paymentInstructions),
+        },
+        { status: 409 },
+      );
+    }
+    if (err instanceof SignInRequiredError) {
+      return NextResponse.json({ error: err.message, code: "SIGN_IN_REQUIRED" }, { status: 409 });
+    }
     throw err;
   }
-}
-
-function parseSubmitOrderBody(
-  body: unknown,
-): { ok: true; value: Parameters<typeof submitOrder>[2] } | { ok: false; error: string } {
-  if (typeof body !== "object" || body === null) {
-    return { ok: false, error: "Request body must be an object" };
-  }
-  const b = body as Record<string, unknown>;
-
-  if (typeof b.guestEmail !== "string" || b.guestEmail.length === 0) {
-    return { ok: false, error: "guestEmail is required" };
-  }
-  if (typeof b.policyAccepted !== "boolean") {
-    return { ok: false, error: "policyAccepted must be a boolean" };
-  }
-  const item = b.item as Record<string, unknown> | undefined;
-  if (!item || !Array.isArray(item.photoKeys)) {
-    return { ok: false, error: "item.photoKeys is required (from presigned S3 uploads)" };
-  }
-
-  return {
-    ok: true,
-    value: {
-      guestEmail: b.guestEmail,
-      guestPhone: typeof b.guestPhone === "string" ? b.guestPhone : null,
-      policyAccepted: b.policyAccepted,
-      item: {
-        brand: typeof item.brand === "string" ? item.brand : null,
-        model: typeof item.model === "string" ? item.model : null,
-        description: typeof item.description === "string" ? item.description : null,
-        photoKeys: item.photoKeys.filter((k): k is string => typeof k === "string"),
-      },
-    },
-  };
 }

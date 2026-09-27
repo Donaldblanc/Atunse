@@ -2,24 +2,83 @@
 // Prisma directly. See ./prisma-order-repository.ts for the real
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
-import type { AuditEntry, Order } from "../domain";
+import type { Money } from "@/shared/money/money";
+import type { AuditEntry, Fulfillment, Order } from "../domain";
+
+/**
+ * Who the Order belongs to: an existing Customer Account, or a new one the
+ * repository creates in the same transaction as the Order. Deciding which
+ * (and what to do when an email is taken) is submitOrder's policy, not the
+ * repository's (ADR-0014).
+ */
+export type OrderOwner = { accountId: string } | { newCustomer: { email: string; phone: string } };
+
+/**
+ * A new Customer Account's email was taken between submitOrder's lookup and
+ * the insert (a concurrent first booking won). Nothing was written; the
+ * caller resolves the owner again.
+ */
+export class EmailTakenError extends Error {
+  constructor() {
+    super("A Customer Account with this email was just created.");
+    this.name = "EmailTakenError";
+  }
+}
+
+/** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
+export class PhotoKeyInUseError extends Error {
+  constructor() {
+    super("A photo is already attached to another booking.");
+    this.name = "PhotoKeyInUseError";
+  }
+}
 
 export interface NewOrderInput {
-  accountId: string | null;
-  guestEmail: string | null;
-  guestPhone: string | null;
+  owner: OrderOwner;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
   policyAcceptedAt: Date;
-  item: {
-    brand: string | null;
-    model: string | null;
-    description: string | null;
-    photoKeys: string[];
-  };
+  fulfillment: Fulfillment;
+  rush: boolean;
+  estimate: Money;
+  estimateIsMinimum: boolean;
+  deposit: Money;
+  submissionKey: string | null;
+  submissionFingerprint: string | null;
+  /** The Bundle bought, or null for a single pair. */
+  bundleId: string | null;
+  /** One per pair, in the order the customer entered them. */
+  items: NewItemInput[];
+}
+
+export interface NewItemInput {
+  brand: string | null;
+  model: string | null;
+  description: string | null;
+  material: string | null;
+  serviceIds: string[];
+  estimate: Money;
+  /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
+  photos: { key: string; uploadKey: string }[];
 }
 
 export interface OrderRepository {
-  create(input: NewOrderInput): Promise<Order>;
+  /**
+   * Creates the Order with its Items and their photos, and the owner's Account when
+   * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
+   * an Order with the same `submissionKey` already exists, returns that
+   * Order with `created: false` instead of inserting a duplicate. Throws
+   * EmailTakenError or PhotoKeyInUseError, having written nothing.
+   */
+  create(input: NewOrderInput): Promise<{ order: Order; created: boolean }>;
   findById(orderId: string): Promise<Order | null>;
+
+  /** The Order a submission key already created, if any (ADR-0012 retries). */
+  findBySubmissionKey(submissionKey: string): Promise<Order | null>;
+
+  /** Records that the booking confirmation email was sent. */
+  markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void>;
 
   /**
    * Atomically transitions one Item's status and appends its audit entry

@@ -1,8 +1,8 @@
-// Phase 0 schema — deliberately narrow (ADR-0012's build-strategy revision).
-// Only what the first vertical slice needs: a guest submits an Order with
-// one Item and photos -> owner quotes -> manual deposit confirmed -> Item
-// completes. Multi-item, Services catalog, Balance Delta, Stripe, and the
-// outbox table are added in Phase 2/3 (see docs/SPEC.md Build sequence).
+// Deliberately narrow (ADR-0012's build-strategy revision). Only what the
+// first vertical slice needs: a guest books one pair through /booking ->
+// owner quotes -> manual deposit confirmed -> Item completes. Multi-item
+// (Bundles), Balance Delta, Stripe, and the outbox table are added in
+// Phase 2/3 (see docs/SPEC.md Build sequence).
 
 generator client {
   provider = "prisma-client-js"
@@ -31,23 +31,34 @@ enum ItemStatus {
   CANCELLED
 }
 
-// A person: either a guest (accountId null) or a signed-up Customer/Admin.
-// Guest orders match to an Account later by email/phone (ADR "Account Linking").
+// CONTEXT.md: exactly two ways sneakers reach the shop. There is no drop-off.
+enum FulfillmentMethod {
+  PICKUP
+  MAIL_IN
+}
+
+// A Customer or Admin (ADR-0014). The two are separate identities: an
+// admin who books gets a Customer Account under the same email, and Orders
+// only ever belong to Customer Accounts. A Customer Account is created
+// automatically by their first booking; there are no guest orders.
 model Account {
   id        String   @id @default(cuid())
   role      Role     @default(CUSTOMER)
-  email     String   @unique
+  email     String   // always stored lowercased; unique per role, below
+  // Required for Customer Accounts (the booking that creates one requires
+  // it); null only for Admin Accounts seeded without one.
   phone     String?
 
-  // Interim in-house credential store (ADR-0005 addendum): null for
-  // guest-derived/customer accounts that haven't set a password yet.
-  // Swappable behind AuthService once a managed provider is chosen.
+  // Interim admin password login (ADR-0005 addendum). Customers sign in
+  // with an emailed code instead (SignInCode), so this stays null for them.
   passwordHash String?
 
   createdAt DateTime @default(now())
 
-  orders Order[]
+  orders      Order[]
+  signInCodes SignInCode[]
 
+  @@unique([email, role])
   @@map("accounts")
 }
 
@@ -55,14 +66,54 @@ model Account {
 // display is always a per-Item breakdown.
 model Order {
   id        String   @id @default(cuid())
-  accountId String?
-  account   Account? @relation(fields: [accountId], references: [id])
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
 
-  // Guest contact info, used for later Account Linking when accountId is null.
-  guestEmail String?
-  guestPhone String?
+  // Contact details as entered for this booking. The owning Account is
+  // accountId; these are a per-Order snapshot for the shop to reach out.
+  contactName  String
+  contactEmail String
+  contactPhone String
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
+
+  // Where the sneakers come from: the Pickup address (NY/NJ/CT) or the
+  // Mail-In customer's shipping address (ADR-0010: captured, not labelled).
+  fulfillmentMethod FulfillmentMethod
+  addressLine1      String
+  addressLine2      String?
+  city              String
+  state             String
+  zip               String
+  pickupDate        DateTime? @db.Date // Pickup only
+  pickupSlot        String? // Pickup only, e.g. "4:30 PM – 5:00 PM"
+  mailInDate        DateTime? @db.Date // Mail-In only, optional preferred date
+
+  rush Boolean @default(false)
+
+  // Server-computed from the service catalog, never from client-sent
+  // prices. Money as integer cents (ADR-0012).
+  estimateCents     Int
+  estimateIsMinimum Boolean // true when a "from $X+" Service is included
+  depositCents      Int // 50% of estimateCents, rounded down (CONTEXT.md: Deposit)
+
+  // The Bundle bought (BUNDLE_CATALOG id), or null for a single pair. Its
+  // perks that cover only some pairs are assigned by the shop after
+  // inspection, so the Order has to say which Bundle it was.
+  bundleId String?
+
+  // Client-generated key for retry-safe submission (ADR-0012): a resubmit
+  // with the same key returns the existing Order instead of a duplicate.
+  submissionKey String? @unique
+  // Hash of what was submitted with that key (#76): a retry with the same
+  // key but different details is refused instead of returning this Order
+  // as if nothing changed. Null for Orders from before it existed.
+  submissionFingerprint String?
+
+  // Set once the booking confirmation email has actually gone out. A retry
+  // of the same submission sends it while this is still null, so a failed
+  // send (e.g. a provider outage) isn't lost for good.
+  confirmationEmailSentAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,13 +133,21 @@ model Item {
   brand       String?
   model       String?
   description String?
+  material    String?
+
+  // The pair's place in its Order (0 for a single pair; 0-2 in a Bundle),
+  // so pairs always read back in the order the customer entered them.
+  position Int @default(0)
+
+  serviceIds    String[] // catalog ids (src/features/orders/service-catalog.ts)
+  estimateCents Int // this pair's share of the Order estimate, before Rush
 
   status ItemStatus @default(REQUEST_SUBMITTED)
 
   // Money as integer cents (ADR-0012) — never a float.
   priceCents Int?
 
-  photoKeys String[] // storage keys from the FileStorage adapter (ADR-0004), not URLs
+  photos ItemPhoto[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -96,6 +155,27 @@ model Item {
   auditEntries ItemAuditEntry[]
 
   @@map("items")
+}
+
+// One condition photo on an Item: a storage key from the FileStorage
+// adapter (ADR-0004), not a URL.
+// - `key` is where the photo lives: a copy made when the booking was
+//   submitted, which no upload target can write to, so the verified bytes
+//   can't be swapped afterwards (#77).
+// - `uploadKey` is the key the browser uploaded to. It's unique, so an
+//   upload belongs to exactly one Item, and quoting another booking's key
+//   can never grant view access to it (ADR-0014).
+// Orders from before #77 have key = uploadKey.
+model ItemPhoto {
+  id        String @id @default(cuid())
+  itemId    String
+  item      Item   @relation(fields: [itemId], references: [id])
+  key       String @unique
+  uploadKey String @unique
+  position  Int
+
+  @@index([itemId])
+  @@map("item_photos")
 }
 
 // Every state-changing action on an Item is recorded (ADR-0012: auditability
@@ -116,4 +196,34 @@ model ItemAuditEntry {
 
   @@unique([itemId, idempotencyKey])
   @@map("item_audit_entries")
+}
+
+// One-time email sign-in code (ADR-0014). Only an HMAC of the code is
+// stored. A code is single-use, expires after a few minutes, and is locked
+// after too many wrong guesses.
+model SignInCode {
+  id         String    @id @default(cuid())
+  accountId  String
+  account    Account   @relation(fields: [accountId], references: [id])
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([accountId, createdAt])
+  @@map("sign_in_codes")
+}
+
+// Fixed-window request counters for per-IP rate limits on the public
+// routes (#77). `key` is "<policy>:<HMAC of the client IP>": raw IPs are
+// never stored. Old windows are pruned as new ones are written.
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
 }

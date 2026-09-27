@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Mail, MapPin, Package, Phone, Truck, User, type LucideIcon } from "lucide-react";
+import { ArrowRight, ImagePlus, Info, Mail, MapPin, Package, Phone, Truck, TriangleAlert, User, type LucideIcon } from "lucide-react";
+import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
+import { BookingSubmitError } from "./submit-booking";
 
 export function ReviewStep({
   isBundle,
@@ -11,27 +13,55 @@ export function ReviewStep({
   price,
   priceNote,
   Icon,
-  pairDetails,
+  pairs,
   scheduleMethod,
   pickupAddress,
   pickupSelection,
   mailInDate,
   contact,
   onEdit,
+  onEditPair,
+  onConfirm,
 }: {
   isBundle: boolean;
   name: string;
   price: string;
   priceNote: string | undefined;
   Icon: LucideIcon;
-  pairDetails: PairDetails;
+  /** One pair, or a Bundle's three, in the order they were entered. */
+  pairs: PairDetails[];
   scheduleMethod: ScheduleMethod;
   pickupAddress: PickupAddress;
   pickupSelection: PickupSelection | null;
   mailInDate: PickupSelection | null;
   contact: ContactInfo;
   onEdit: (step: Step) => void;
+  /** Opens the Details step on pair `index`. */
+  onEditPair: (index: number) => void;
+  onConfirm: (policyAccepted: boolean) => Promise<void>;
 }) {
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const showPolicyWarning = attempted && !policyAccepted;
+
+  async function confirm() {
+    if (submitting) return;
+    if (!policyAccepted) {
+      setAttempted(true);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfirm(policyAccepted);
+    } catch (err) {
+      setError(err instanceof BookingSubmitError ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
+  }
+
   const scheduleText =
     scheduleMethod === "pickup"
       ? pickupSelection
@@ -66,34 +96,25 @@ export function ReviewStep({
           </span>
           <span className="booking-page-review-line-price">{price}</span>
         </div>
-        <div className="booking-page-details-row" style={{ marginTop: 14 }}>
-          <User size={16} aria-hidden="true" />
-          <span>
-            Brand / Model: <strong>{pairDetails.brand || "—"}</strong>
-          </span>
-        </div>
-        <div className="booking-page-details-row">
-          <span>
-            Material: <strong>{pairDetails.material || "—"}</strong>
-          </span>
-        </div>
-        <div className="booking-page-details-row">
-          <ImagePlus size={16} aria-hidden="true" />
-          <span>
-            Photos:{" "}
-            <strong>
-              {pairDetails.photos.length > 0
-                ? `${pairDetails.photos.length} photo${pairDetails.photos.length === 1 ? "" : "s"}`
-                : "No photos"}
-            </strong>
-          </span>
-        </div>
-        <div className="booking-page-details-row">
-          <span>
-            Notes: <strong>{pairDetails.notes || "No notes"}</strong>
-          </span>
-        </div>
+        {isBundle && (
+          <div className="booking-page-details-row">
+            <Info size={16} aria-hidden="true" />
+            <span>Every pair gets Premium Clean. We&rsquo;ll decide which pairs get the Bundle&rsquo;s other extras once we&rsquo;ve inspected them.</span>
+          </div>
+        )}
       </div>
+
+      {pairs.map((pair, i) => (
+        <div className="booking-page-review-card" key={i}>
+          <div className="booking-page-review-head">
+            <span>{pairs.length === 1 ? "YOUR PAIR" : `PAIR ${i + 1}`}</span>
+            <button type="button" className="booking-page-edit-link" onClick={() => onEditPair(i)}>
+              Edit
+            </button>
+          </div>
+          <PairSummary pair={pair} />
+        </div>
+      ))}
 
       <div className="booking-page-review-card">
         <div className="booking-page-review-head">
@@ -142,14 +163,78 @@ export function ReviewStep({
         </div>
       </div>
 
-      <Link className="landing-btn-primary booking-page-continue-btn" href="/coming-soon">
-        Confirm Booking
-        <ArrowRight size={14} aria-hidden="true" />
-      </Link>
-      <p className="booking-page-terms">
-        By continuing, you agree to our <Link href="/coming-soon">Terms &amp; Conditions</Link> and{" "}
-        <Link href="/coming-soon">Privacy Policy</Link>.
+      <label className="booking-page-policy">
+        <input
+          type="checkbox"
+          checked={policyAccepted}
+          onChange={(e) => setPolicyAccepted(e.target.checked)}
+          aria-describedby={showPolicyWarning ? "review-step-policy-warning" : undefined}
+        />
+        <span>
+          I agree to the <Link href="/coming-soon">Terms of Service</Link>, Refund Policy, Restoration Disclaimer, and
+          Payment Policy.
+        </span>
+      </label>
+
+      <button
+        type="button"
+        className="landing-btn-primary booking-page-continue-btn"
+        onClick={confirm}
+        disabled={submitting}
+        aria-busy={submitting}
+      >
+        {submitting ? "Submitting…" : "Confirm Booking"}
+        {!submitting && <ArrowRight size={14} aria-hidden="true" />}
+      </button>
+      <p className="booking-page-form-warning" id="review-step-policy-warning" role="status" aria-live="polite">
+        {showPolicyWarning && (
+          <>
+            <TriangleAlert size={14} aria-hidden="true" />
+            Please accept the policies to confirm your booking.
+          </>
+        )}
       </p>
+      {error && (
+        <p className="booking-page-form-error" role="alert">
+          <TriangleAlert size={14} aria-hidden="true" />
+          {error}
+        </p>
+      )}
+      <p className="booking-page-terms">
+        See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
+      </p>
+    </>
+  );
+}
+
+function PairSummary({ pair }: { pair: PairDetails }) {
+  return (
+    <>
+      <div className="booking-page-details-row">
+        <User size={16} aria-hidden="true" />
+        <span>
+          Brand / Model: <strong>{pair.brand || "—"}</strong>
+        </span>
+      </div>
+      <div className="booking-page-details-row">
+        <span>
+          Material: <strong>{pair.material || "—"}</strong>
+        </span>
+      </div>
+      <div className="booking-page-details-row">
+        <ImagePlus size={16} aria-hidden="true" />
+        <span>
+          Photos:{" "}
+          <strong>
+            {pair.photos.length > 0 ? `${pair.photos.length} photo${pair.photos.length === 1 ? "" : "s"}` : "No photos"}
+          </strong>
+        </span>
+      </div>
+      <div className="booking-page-details-row">
+        <span>
+          Notes: <strong>{pair.notes || "No notes"}</strong>
+        </span>
+      </div>
     </>
   );
 }

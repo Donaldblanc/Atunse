@@ -7,6 +7,15 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 import { ArrowIcon } from "@/features/landing/arrow-icon";
+import { catalogService, formatPrice, formatServicePrice, suedeFeeNote } from "@/features/orders/service-catalog";
+
+// Every price on this page comes from SERVICE_CATALOG, the same source the
+// booking flow and the server's estimate use.
+const standard = catalogService("standard");
+const premium = catalogService("premium");
+const oxidation = catalogService("oxidation");
+const painting = catalogService("painting");
+const reglue = catalogService("reglue");
 
 export const metadata = {
   title: "Services & Pricing — Atunṣe",
@@ -16,8 +25,8 @@ const CLEANING_PLANS = [
   {
     serviceId: "standard",
     label: "STANDARD CLEAN",
-    price: "$30",
-    priceNote: "+$10 for Suede",
+    price: formatServicePrice(standard),
+    priceNote: standard.suedeFee ? suedeFeeNote(false) : undefined,
     description: "A deep, thorough clean to keep your sneakers looking and feeling fresh.",
     checklist: [
       "Laces detached & scrubbed clean",
@@ -33,8 +42,8 @@ const CLEANING_PLANS = [
   {
     serviceId: "premium",
     label: "PREMIUM CLEAN",
-    price: "$50",
-    priceNote: "+$10 for Suede",
+    price: formatServicePrice(premium),
+    priceNote: premium.suedeFee ? suedeFeeNote(false) : undefined,
     description: "Our most detailed clean, designed for high-end and heavily worn pairs.",
     checklist: [
       "Targeted stain treatment",
@@ -53,21 +62,21 @@ const RESTORATION_SERVICES = [
     title: "OXIDATION RESTORATION",
     description: "Reduces yellowing and discoloration, restoring the clean, bright appearance of oxidized soles and midsoles.",
     subitems: [
-      { label: "MIDSOLE", price: "From $25+" },
-      { label: "SOLE", price: "From $40+" },
+      { label: (oxidation.minimumLabel ?? "From").toUpperCase(), price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
+      ...(oxidation.alsoFrom ?? []).map((part) => ({ label: part.label.toUpperCase(), price: `From ${formatPrice(part.cents, true)}` })),
     ],
   },
   {
     icon: Palette,
     title: "SNEAKER PAINTING & DYEING",
     description: "Custom color changes, touch-ups, and dye work to refresh, restore, or transform your shoes.",
-    price: "$40+",
+    price: formatPrice(painting.baseCents, painting.isMinimum),
   },
   {
     icon: Wrench,
     title: "REGLUE",
     description: "Professional sole separation repair to securely reattach and restore your sneakers.",
-    price: "$50+",
+    price: formatPrice(reglue.baseCents, reglue.isMinimum),
   },
 ];
 

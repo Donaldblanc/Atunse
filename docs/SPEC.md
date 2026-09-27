@@ -23,7 +23,7 @@ basis for this build.
 - **Approval Gate**: every Item, no exceptions, is manually priced/reviewed by the owner before the customer can pay on it (ADR-0001) — no auto-priced "standard" tier in MVP.
 - **Deposit**: one 50% payment per Order at submission, based on published/estimated prices.
 - **Balance Delta**: if a custom-quoted Item's final price exceeds its deposit estimate, the delta is folded into the Balance due at completion (deposit never re-charged/refunded) and the customer is notified as soon as the Quote is sent — no surprise at pickup.
-- **Guest Order / Customer Account / Account Linking**: guests can order without an account; creating an account auto-matches (by email/phone) and offers past guest orders to link, customer confirms.
+- **Customer Account** (ADR-0014): every booking belongs to an Account, created automatically by the first booking from its email and phone. There are no guest orders and no Account Linking. A signed-out booking whose email already has an Account must sign in with an emailed **Sign-in Code** (the booking flow's own login screen), behind the `FEATURE_CUSTOMER_SIGN_IN_ENABLED` toggle. Customers can only ever see their own photos, through short-lived links.
 - **Manual Payment Confirmation**: Zelle/Cash payments only advance an Order once the owner marks them received in admin (ADR-0002); Apple Pay/card (Stripe, once toggled on) confirms automatically.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
@@ -47,6 +47,7 @@ basis for this build.
 | 0011 | Code organized by **feature** first, layers (use-cases/repositories/adapters) inside each feature — refines ADR-0003's layering to avoid global layer folders |
 | 0012 | Money (integer-cents value type), idempotency keys, per-use-case authorization, and audit records are explicit domain concerns designed in from the first vertical slice — not infrastructure retrofitted later |
 | 0013 | Prisma for the ORM/migrations; Vitest for both unit and integration tests. `PrismaClient` is only imported inside repositories |
+| 0014 | Every booking belongs to a Customer Account (created at first booking; no guest orders), separate from Admin Accounts even for the same email, with separate logins. Customers sign in with emailed codes, only when a booking's email already has an Account; photos are viewable only by their Account's owner or an admin, through 5-minute presigned links. Customer login is behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED` |
 
 ## Guiding build principle
 **Establish architectural boundaries early; implement the domain
@@ -66,33 +67,34 @@ prove it against.
 - Narrow schema: `Account`, `Order`, `Item`, `ItemAuditEntry`.
 - Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
 
-**Phase 1 — backend started, not yet connected to any UI.**
-- `submitOrder` + `POST /api/v1/orders`: a guest submits one Item with photo keys. Policy Acceptance is enforced server-side. The notification goes through `ConsoleNotificationService` (logs only; no Resend adapter yet).
+**Phase 1 — booking submission connected end to end (single pair).**
+- `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, pickup slot or preferred mail-in date, Rush and contact name.
+- The estimate and 50% Deposit are computed server-side from `src/features/orders/service-catalog.ts`. The browser's display prices in `services-data.ts` are kept in step by a parity test; client-sent prices are ignored.
+- Server-side rules: Policy Acceptance, Pickup only in NY/NJ/CT within the 4:30–10:00 PM window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
+- Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
+- The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
+- `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).
 - `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key.
-- `Money` value type; Prisma and in-memory `OrderRepository` implementations, with tests.
+- **Customer Accounts (ADR-0014).** Every booking creates or uses a Customer Account (`orders.accountId` is required). With `FEATURE_CUSTOMER_SIGN_IN_ENABLED` on, a signed-out booking whose email already has an Account gets the booking flow's email-code login screen (`POST /api/v1/auth/code/request` and `/verify`). With it off (the default), that booking attaches to the existing Account.
+- **Photo viewing**: `GET /api/v1/orders/:orderId/photos` issues 5-minute presigned GET links to the Order's Account owner or an admin only. A photo key can belong to only one Order.
+- Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
 - Not built yet:
-  - Presigned S3 uploads (no `FileStorage` adapter code exists).
-  - Resend adapter.
-  - Quote and manual payment confirmation screens.
+  - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
   - Any admin working screen. `/admin` is a dashboard listing the planned screens, with placeholder stats.
 
 **Customer site (marketing + booking UI).**
 - Pages: `/`, `/services`, `/about`, `/booking`.
 - `/coming-soon` is the placeholder destination for Process, Contact, Terms and Privacy.
-- `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review.
+- `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review, then a confirmation.
   - **Service:** one pair with additive Services (one cleaning tier plus any restoration add-ons), or a three-pair Bundle.
   - **Details:** at least one photo per pair.
-  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (date).
+  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (any US address, optional date).
   - **Your Info:** name, email, phone, and optional Rush.
-  - **Pricing:** computed in the browser from `src/features/booking/services-data.ts`, including the Suede fee on cleans and the Rush fee.
-- **The booking flow runs entirely in the browser.** "Confirm Booking" links to `/coming-soon`; nothing is submitted, uploaded or stored.
-
-**Gap between the booking UI and the Phase 1 API** (tracked in `docs/TODO.md`):
-- The API and schema take one Item with brand/model/description/photo keys and a guest email/phone.
-- They have no fields yet for Fulfillment Method, pickup address or slot, mail-in date, Services, price estimate, Rush, or contact name.
-- Bundles are three Items, which is Phase 2 (multi-item Orders).
-- The UI has no Policy Acceptance checkbox. There is only "By continuing, you agree…" text, which the server-side rule won't accept as-is.
-- The UI has no Deposit/payment step.
+  - **Review:** Policy Acceptance checkbox, then Confirm Booking submits.
+- **Bundles** book three Items in one Order. The Bundle flow is the default for a bare `/booking`.
+  - Each pair has its own details and photos, and Review shows all three.
+  - Bundle names, prices and perks come from `BUNDLE_CATALOG` in `service-catalog.ts`, which the server also prices from.
+  - Every pair is booked as Premium Clean with the Suede Fee waived. The Order keeps the Bundle id, and the shop assigns the one- or two-pair perks after inspection.
 
 ## Build sequence
 **Phase 0 — Skeleton** (done)
@@ -102,7 +104,7 @@ prove it against.
 - Narrow initial schema: just enough for the one workflow below (Order, Item, Customer/Account) — not the full domain model up front
 
 **Phase 1 — One real vertical slice, fully engineered** (in progress: backend use-cases and API only)
-Pick the core workflow: guest submits an Order with one Item and photos →
+Pick the core workflow: a customer submits an Order with one Item and photos →
 owner reviews and sends a quote → customer pays the deposit manually
 (Zelle/Cash, ADR-0002) → owner confirms payment → Item moves through the
 Status Pipeline to Completed. Build this **one path** all the way through,
@@ -119,7 +121,7 @@ This slice is the thing that proves the architecture, not a diagram.
 **Phase 2 — Generalize to the rest of the domain**
 - Multi-item orders, the remaining Services, Balance Delta logic
 - Remaining Item Status Pipeline transitions and admin queues (Under-Review, Awaiting-payment)
-- Customer account creation + guest-order linking
+- Customer "my bookings" page (the photo endpoint and customer sessions already exist, ADR-0014)
 - Full admin screen inventory (Orders queue, Customers, Settings)
 
 **Phase 3 — Reliability and scale-out of what Phase 1 stubbed**
@@ -134,7 +136,7 @@ This slice is the thing that proves the architecture, not a diagram.
 2. **Item detail** — photos, condition notes, service selection, price/quote entry, status transitions, payment status (incl. manual Zelle/Cash confirmation per ADR-0002), and messages scoped to this item (see below)
 3. **Under-Review / needs-action queue** — items awaiting a quote (every item requires manual review, ADR-0001) — where the owner's daily work starts
 4. **Awaiting payment confirmation queue** — Zelle/Cash items with a deposit/balance not yet marked received
-5. **Customers** — list + detail (contact info, order history, linked guest orders)
+5. **Customers** — list + detail (contact info, order history)
 6. **Settings** — service/pricing reference list, policy documents. Feature toggles (Stripe, SMS) are **env-var/config-only**, not an admin UI control.
 
 Messaging in MVP lives inside Item detail only — no cross-order inbox yet
@@ -146,7 +148,10 @@ future standalone messages inbox (TODO) are both post-MVP admin screens.
 - [ ] SMS notifications — behind a feature toggle, off by default (ADR-0009)
 - [ ] Customer data import — dedicated admin-only screen, format still TBD, not an MVP-launch blocker
 - [ ] Mail-in label generation via third-party carrier API — not in MVP (ADR-0010)
-- [ ] Connect `/booking` to `POST /api/v1/orders` (schema/API fields, Policy Acceptance checkbox, presigned uploads)
+- [x] Connect `/booking` to `POST /api/v1/orders` for a single pair
+- [x] Bundles: three Items in one Order, priced from `BUNDLE_CATALOG`
+- [ ] Create the S3 bucket and set its env vars; `/booking` can't be submitted on a deploy until then
+- [ ] Real Terms of Service, Refund Policy, Restoration Disclaimer, Payment Policy and Privacy pages (the Policy Acceptance checkbox links to `/coming-soon`)
 - [ ] Return leg for Pickup orders, and renaming the `READY_FOR_PICKUP_SHIPPING` status
 
 ## Open questions — still not resolved

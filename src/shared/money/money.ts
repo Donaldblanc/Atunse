@@ -44,6 +44,13 @@ export class Money {
     return this.cents === other.cents && this.currency === other.currency;
   }
 
+  /** Customer-facing: "$30" for whole dollars, "$12.62" otherwise. */
+  format(): string {
+    const sign = this.cents < 0 ? "-" : "";
+    const abs = Math.abs(this.cents);
+    return abs % 100 === 0 ? `${sign}$${abs / 100}` : `${sign}$${(abs / 100).toFixed(2)}`;
+  }
+
   toString(): string {
     return `${(this.cents / 100).toFixed(2)} ${this.currency}`;
   }

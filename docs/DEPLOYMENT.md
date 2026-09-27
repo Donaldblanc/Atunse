@@ -23,12 +23,42 @@ what replaces it later.
    | `DATABASE_URL` | Neon production branch connection string | Neon preview/dev branch string (see below) |
    | `SESSION_SECRET` | `openssl rand -hex 32` (unique, real secret) | same or a separate dev value |
    | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | only needed if you run `prisma:seed` manually — not read at runtime | — |
-   | `RESEND_API_KEY` | leave unset until ADR-0006's provider is actually wired; `ConsoleNotificationService` is still what's used today | — |
+   | `RESEND_API_KEY` / `EMAIL_FROM` | Resend API key and a sender on a verified domain; without both, emails (booking confirmations, sign-in codes) are only logged | unset, or a test key |
+   | `FEATURE_CUSTOMER_SIGN_IN_ENABLED` | `false` until Resend is live, then `true` (ADR-0014) | same |
+   | `STORAGE_DRIVER` | `s3` (the default in production; `local` is refused) | `s3` |
+   | `S3_BUCKET` | the photo bucket (Neon storage: `atunse-images`) | a separate preview bucket, or the same one |
+   | `S3_REGION` or `AWS_REGION` | the bucket's region | same |
+   | `S3_ENDPOINT` or `AWS_ENDPOINT_URL_S3` | only for an S3-compatible provider (Neon storage's endpoint); leave unset for AWS | same |
+   | `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | keys limited to writing (and later reading) that bucket | same |
+   | `ZELLE_RECIPIENT` / `ZELLE_NAME` | the Zelle email/phone and account name customers pay the Deposit to | same or a test value |
    | `FEATURE_STRIPE_ENABLED` | `false` | `false` |
    | `FEATURE_SMS_ENABLED` | `false` | `false` |
 
-   `S3_*` variables aren't needed yet — presigned uploads aren't built (see
-   `docs/SPEC.md` build sequence).
+   **Until the S3 variables are set, `/booking` can't be submitted on a
+   deploy:** `POST /api/v1/uploads` answers `503` ("Photo uploads are
+   temporarily unavailable"). The bucket also needs a CORS rule allowing
+   `POST` from the site's origins (production domain and
+   `https://*.vercel.app` for previews), since browsers upload straight to
+   it with a presigned POST (ADR-0004). Keep the bucket private: no public
+   read, block all public access on.
+
+   **Bucket settings are applied by script, not by the app** (#77):
+   - `STORAGE_ALLOWED_ORIGINS=https://<prod>,https://*.vercel.app,http://localhost:3000 npm run storage:configure -- --apply` restricts CORS to those origins and `POST` only. Run it without `--apply` first to see the current and proposed rules.
+   - `STORAGE_CLEANUP_DATABASE_URL=<database for this bucket> npm run storage:cleanup` lists photos older than 48 hours that no order references; add `-- --apply` to delete them. The database must be given explicitly (it never falls back to `DATABASE_URL`), and deletion is refused if none of the database's photos are in the bucket.
+
+   **Rate limits** (per client IP, stored hashed in `rate_limit_buckets`):
+   - uploads: 20 per 10 minutes;
+   - orders: 10 per 10 minutes;
+   - sign-in code requests: 10 per 15 minutes;
+   - sign-in code guesses: 20 per 15 minutes.
+
+   Over the limit returns 429 with `Retry-After`. Change them in `src/shared/rate-limit/rate-limiter.ts`.
+
+   The bucket is currently **Neon's S3-compatible storage**. Its setup
+   hands out the `AWS_*` names above, which the app reads as-is. Verified
+   2026-09-26: presigned POST works path-style, Neon enforces the POST
+   policy (oversized, wrong-type and re-keyed uploads are rejected), and
+   anonymous GET/LIST return 403.
 
 3. **Connect Neon properly** — if you haven't already, install the
    [Neon Vercel integration](https://vercel.com/integrations/neon) instead
