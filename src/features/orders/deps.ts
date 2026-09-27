@@ -1,5 +1,6 @@
 import { prisma } from "@/shared/db/prisma-client";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
+import { paymentInstructionsFromEnv } from "./payment-instructions";
 import { PrismaOrderRepository } from "./repositories/prisma-order-repository";
 
 // Wires the real (Prisma-backed) implementations behind the use-case
@@ -10,5 +11,6 @@ export function buildOrderUseCaseDeps() {
   return {
     orders: new PrismaOrderRepository(prisma),
     notifications: new ConsoleNotificationService(),
+    paymentInstructions: paymentInstructionsFromEnv(),
   };
 }

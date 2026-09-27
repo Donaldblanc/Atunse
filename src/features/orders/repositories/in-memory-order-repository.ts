@@ -14,35 +14,56 @@ function fakeId(prefix: string): string {
 export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
+  private readonly orderIdsBySubmissionKey = new Map<string, string>();
 
-  async create(input: NewOrderInput): Promise<Order> {
-    const itemId = fakeId("item");
+  async create(input: NewOrderInput): Promise<{ order: Order; created: boolean }> {
+    if (input.submissionKey) {
+      const existingId = this.orderIdsBySubmissionKey.get(input.submissionKey);
+      if (existingId) return { order: this.orders.get(existingId)!, created: false };
+    }
+
+    const orderId = fakeId("order");
     const order: Order = {
-      id: fakeId("order"),
+      id: orderId,
       accountId: input.accountId,
+      contactName: input.contactName,
       guestEmail: input.guestEmail,
       guestPhone: input.guestPhone,
       policyAcceptedAt: input.policyAcceptedAt,
+      fulfillment: input.fulfillment,
+      rush: input.rush,
+      estimate: input.estimate,
+      estimateIsMinimum: input.estimateIsMinimum,
+      deposit: input.deposit,
+      confirmationEmailSentAt: null,
       items: [
         {
-          id: itemId,
-          orderId: "", // filled in below once order.id exists
+          id: fakeId("item"),
+          orderId,
           brand: input.item.brand,
           model: input.item.model,
           description: input.item.description,
+          material: input.item.material,
+          serviceIds: input.item.serviceIds,
+          estimate: input.item.estimate,
           status: "REQUEST_SUBMITTED",
           price: null,
           photoKeys: input.item.photoKeys,
         },
       ],
     };
-    order.items[0]!.orderId = order.id;
     this.orders.set(order.id, order);
-    return order;
+    if (input.submissionKey) this.orderIdsBySubmissionKey.set(input.submissionKey, order.id);
+    return { order, created: true };
   }
 
   async findById(orderId: string): Promise<Order | null> {
     return this.orders.get(orderId) ?? null;
+  }
+
+  async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (order) order.confirmationEmailSentAt = sentAt;
   }
 
   async transitionItemStatus(params: {

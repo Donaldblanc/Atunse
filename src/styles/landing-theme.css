@@ -2341,6 +2341,65 @@
   width: 100%;
 }
 
+.booking-page-photo-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.booking-page-photo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.booking-page-photo-item img,
+.booking-page-photo-placeholder {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bg-panel);
+}
+
+.booking-page-photo-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.booking-page-photo-remove {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.booking-page-photo-remove:hover {
+  background: var(--bg-panel);
+  color: var(--ink);
+}
+
 .booking-page-dropzone[data-drag-over="true"] {
   border-color: var(--blue);
   background: var(--bg-panel);
@@ -2418,6 +2477,61 @@
 .booking-page-shipping-card span span {
   font-size: 12px;
   line-height: 1.4;
+}
+
+/* Always rendered so screen readers announce the warning when it appears. */
+.booking-page-form-warning:empty {
+  margin: 0;
+}
+
+.booking-page-form-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin: 10px 0 0;
+}
+
+.landing[data-theme="dark"] .booking-page-form-error {
+  color: #f87171;
+}
+
+.booking-page-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 4px 0 14px;
+  cursor: pointer;
+}
+
+.booking-page-policy input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.booking-page-policy a {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.booking-page-confirmation-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.booking-page-confirmation-title svg {
+  color: var(--blue);
+  flex: none;
 }
 
 .booking-page-terms {

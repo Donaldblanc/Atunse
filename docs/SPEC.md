@@ -66,33 +66,30 @@ prove it against.
 - Narrow schema: `Account`, `Order`, `Item`, `ItemAuditEntry`.
 - Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
 
-**Phase 1 — backend started, not yet connected to any UI.**
-- `submitOrder` + `POST /api/v1/orders`: a guest submits one Item with photo keys. Policy Acceptance is enforced server-side. The notification goes through `ConsoleNotificationService` (logs only; no Resend adapter yet).
+**Phase 1 — booking submission connected end to end (single pair).**
+- `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, pickup slot or preferred mail-in date, Rush and contact name.
+- The estimate and 50% Deposit are computed server-side from `src/features/orders/service-catalog.ts`. The browser's display prices in `services-data.ts` are kept in step by a parity test; client-sent prices are ignored.
+- Server-side rules: Policy Acceptance, Pickup only in NY/NJ/CT within the 4:30–10:00 PM window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
+- Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
+- The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
+- `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).
 - `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key.
-- `Money` value type; Prisma and in-memory `OrderRepository` implementations, with tests.
+- Notifications still go through `ConsoleNotificationService` (logs only; no Resend adapter yet).
 - Not built yet:
-  - Presigned S3 uploads (no `FileStorage` adapter code exists).
+  - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
   - Resend adapter.
-  - Quote and manual payment confirmation screens.
   - Any admin working screen. `/admin` is a dashboard listing the planned screens, with placeholder stats.
 
 **Customer site (marketing + booking UI).**
 - Pages: `/`, `/services`, `/about`, `/booking`.
 - `/coming-soon` is the placeholder destination for Process, Contact, Terms and Privacy.
-- `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review.
+- `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review, then a confirmation.
   - **Service:** one pair with additive Services (one cleaning tier plus any restoration add-ons), or a three-pair Bundle.
   - **Details:** at least one photo per pair.
-  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (date).
+  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (any US address, optional date).
   - **Your Info:** name, email, phone, and optional Rush.
-  - **Pricing:** computed in the browser from `src/features/booking/services-data.ts`, including the Suede fee on cleans and the Rush fee.
-- **The booking flow runs entirely in the browser.** "Confirm Booking" links to `/coming-soon`; nothing is submitted, uploaded or stored.
-
-**Gap between the booking UI and the Phase 1 API** (tracked in `docs/TODO.md`):
-- The API and schema take one Item with brand/model/description/photo keys and a guest email/phone.
-- They have no fields yet for Fulfillment Method, pickup address or slot, mail-in date, Services, price estimate, Rush, or contact name.
-- Bundles are three Items, which is Phase 2 (multi-item Orders).
-- The UI has no Policy Acceptance checkbox. There is only "By continuing, you agree…" text, which the server-side rule won't accept as-is.
-- The UI has no Deposit/payment step.
+  - **Review:** Policy Acceptance checkbox, then Confirm Booking submits.
+- **Bundles are still presentational.** They're three Items in one Order, which is Phase 2 (multi-item Orders). The Bundle flow stays the default for a bare `/booking`, but its Review step offers the single-pair flow instead of a Confirm button.
 
 ## Build sequence
 **Phase 0 — Skeleton** (done)
@@ -146,7 +143,9 @@ future standalone messages inbox (TODO) are both post-MVP admin screens.
 - [ ] SMS notifications — behind a feature toggle, off by default (ADR-0009)
 - [ ] Customer data import — dedicated admin-only screen, format still TBD, not an MVP-launch blocker
 - [ ] Mail-in label generation via third-party carrier API — not in MVP (ADR-0010)
-- [ ] Connect `/booking` to `POST /api/v1/orders` (schema/API fields, Policy Acceptance checkbox, presigned uploads)
+- [x] Connect `/booking` to `POST /api/v1/orders` for a single pair (Bundles are Phase 2)
+- [ ] Create the S3 bucket and set its env vars; `/booking` can't be submitted on a deploy until then
+- [ ] Real Terms of Service, Refund Policy, Restoration Disclaimer, Payment Policy and Privacy pages (the Policy Acceptance checkbox links to `/coming-soon`)
 - [ ] Return leg for Pickup orders, and renaming the `READY_FOR_PICKUP_SHIPPING` status
 
 ## Open questions — still not resolved

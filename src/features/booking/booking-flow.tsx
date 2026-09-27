@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, Info, Shield, Star, Truck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { PickupSelection } from "./pickup-date-picker";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import {
@@ -22,7 +22,9 @@ import { DetailsStep } from "./details-step";
 import { ScheduleStep } from "./schedule-step";
 import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
+import { ConfirmationStep } from "./confirmation-step";
 import { computeMultiServicePricing } from "./pricing";
+import { submitBooking, type SubmitOrderResponse } from "./submit-booking";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "service", label: "Service" },
@@ -42,11 +44,12 @@ const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => stri
   review: () => "Confirm booking",
 };
 
-// Five real client-side steps, with two parallel flows: booking a single
-// pair's additive service selection, or a 3-pair bundle (each pair gets
-// its own detail tab). There's no real order-submission flow yet
-// (docs/TODO.md) — "Confirm Booking" is presentational, matching every
-// other not-yet-real CTA on the marketing site.
+// Five client-side steps, with two parallel flows: booking a single pair's
+// additive service selection, or a 3-pair bundle (each pair gets its own
+// detail tab). A single pair's "Confirm Booking" uploads its photos and
+// submits a real Order (submit-booking.ts), then shows the confirmation.
+// Bundles are multi-item Orders, which the backend doesn't take yet
+// (Phase 2), so the bundle Review step offers the single-pair flow instead.
 export function BookingFlow() {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
@@ -74,6 +77,10 @@ export function BookingFlow() {
   const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
   const [contact, setContact] = useState<ContactInfo>(EMPTY_CONTACT);
   const [rush, setRush] = useState(false);
+  // One key per booking, minted on the first Confirm: a retried Confirm
+  // sends the same key and gets the same Order back, never a duplicate.
+  const submissionKey = useRef<string | null>(null);
+  const [confirmation, setConfirmation] = useState<SubmitOrderResponse | null>(null);
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
@@ -83,7 +90,7 @@ export function BookingFlow() {
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
     ? computeMultiServicePricing([selectedBundle], "", rush)
     : computeMultiServicePricing(selectedServices, singlePair.material, rush);
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
     setStep(STEPS[Math.max(0, stepIndex - 1)]!.key);
@@ -99,6 +106,33 @@ export function BookingFlow() {
     }
   }
 
+  async function confirmBooking(policyAccepted: boolean) {
+    submissionKey.current ??= crypto.randomUUID();
+    const result = await submitBooking({
+      submissionKey: submissionKey.current,
+      policyAccepted,
+      serviceIds: selectedServiceIds,
+      pair: singlePair,
+      scheduleMethod,
+      address: pickupAddress,
+      pickupSelection,
+      mailInDate,
+      contact,
+      rush,
+    });
+    setConfirmation(result);
+    window.scrollTo({ top: 0 });
+  }
+
+  // From the blocked bundle Review step: keep schedule and contact, carry
+  // Pair 1's details over if the single pair is still empty, and start the
+  // single-pair flow at service selection.
+  function switchToSingle() {
+    setFlow("single");
+    if (singlePair.photos.length === 0) setSinglePair(pairs[0]!);
+    setStep("service");
+  }
+
   function changePair(index: number, details: PairDetails) {
     setPairs((prev) => prev.map((pair, i) => (i === index ? details : pair)));
   }
@@ -106,14 +140,14 @@ export function BookingFlow() {
   return (
     <div className="booking-page-layout">
       <div className="booking-page-main">
-        {step !== "service" && (
+        {step !== "service" && !confirmation && (
           <button type="button" className="booking-page-back-link" onClick={goBack}>
             <ArrowLeft size={14} aria-hidden="true" />
             <span className="booking-page-back-text">Back</span>
           </button>
         )}
 
-        {step === "service" && (
+        {step === "service" && !confirmation && (
           <div className="booking-page-flow-switch">
             <button type="button" data-active={!isBundle} onClick={() => setFlow("single")}>
               Single Pair
@@ -146,7 +180,7 @@ export function BookingFlow() {
           })}
         </div>
 
-        {step === "service" && (
+        {step === "service" && !confirmation && (
           <ServiceStep
             isBundle={isBundle}
             selectedServiceIds={selectedServiceIds}
@@ -157,7 +191,7 @@ export function BookingFlow() {
           />
         )}
 
-        {step === "details" && (
+        {step === "details" && !confirmation && (
           <DetailsStep
             isBundle={isBundle}
             activePair={activePair}
@@ -170,7 +204,7 @@ export function BookingFlow() {
           />
         )}
 
-        {step === "schedule" && (
+        {step === "schedule" && !confirmation && (
           <ScheduleStep
             method={scheduleMethod}
             onSelectMethod={setScheduleMethod}
@@ -184,7 +218,7 @@ export function BookingFlow() {
           />
         )}
 
-        {step === "contact" && (
+        {step === "contact" && !confirmation && (
           <ContactStep
             contact={contact}
             onChangeContact={setContact}
@@ -194,7 +228,7 @@ export function BookingFlow() {
           />
         )}
 
-        {step === "review" && (
+        {step === "review" && !confirmation && (
           <ReviewStep
             isBundle={isBundle}
             name={selectedName}
@@ -208,8 +242,12 @@ export function BookingFlow() {
             mailInDate={mailInDate}
             contact={contact}
             onEdit={setStep}
+            onConfirm={isBundle ? null : confirmBooking}
+            onSwitchToSingle={switchToSingle}
           />
         )}
+
+        {confirmation && <ConfirmationStep result={confirmation} email={contact.email} />}
       </div>
 
       <aside className="booking-page-summary">

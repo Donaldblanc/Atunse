@@ -1,8 +1,8 @@
-// Phase 0 schema — deliberately narrow (ADR-0012's build-strategy revision).
-// Only what the first vertical slice needs: a guest submits an Order with
-// one Item and photos -> owner quotes -> manual deposit confirmed -> Item
-// completes. Multi-item, Services catalog, Balance Delta, Stripe, and the
-// outbox table are added in Phase 2/3 (see docs/SPEC.md Build sequence).
+// Deliberately narrow (ADR-0012's build-strategy revision). Only what the
+// first vertical slice needs: a guest books one pair through /booking ->
+// owner quotes -> manual deposit confirmed -> Item completes. Multi-item
+// (Bundles), Balance Delta, Stripe, and the outbox table are added in
+// Phase 2/3 (see docs/SPEC.md Build sequence).
 
 generator client {
   provider = "prisma-client-js"
@@ -29,6 +29,12 @@ enum ItemStatus {
   READY_FOR_PICKUP_SHIPPING
   COMPLETED
   CANCELLED
+}
+
+// CONTEXT.md: exactly two ways sneakers reach the shop. There is no drop-off.
+enum FulfillmentMethod {
+  PICKUP
+  MAIL_IN
 }
 
 // A person: either a guest (accountId null) or a signed-up Customer/Admin.
@@ -59,10 +65,40 @@ model Order {
   account   Account? @relation(fields: [accountId], references: [id])
 
   // Guest contact info, used for later Account Linking when accountId is null.
-  guestEmail String?
-  guestPhone String?
+  contactName String
+  guestEmail  String?
+  guestPhone  String?
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
+
+  // Where the sneakers come from: the Pickup address (NY/NJ/CT) or the
+  // Mail-In customer's shipping address (ADR-0010: captured, not labelled).
+  fulfillmentMethod FulfillmentMethod
+  addressLine1      String
+  addressLine2      String?
+  city              String
+  state             String
+  zip               String
+  pickupDate        DateTime? @db.Date // Pickup only
+  pickupSlot        String? // Pickup only, e.g. "4:30 PM – 5:00 PM"
+  mailInDate        DateTime? @db.Date // Mail-In only, optional preferred date
+
+  rush Boolean @default(false)
+
+  // Server-computed from the service catalog, never from client-sent
+  // prices. Money as integer cents (ADR-0012).
+  estimateCents     Int
+  estimateIsMinimum Boolean // true when a "from $X+" Service is included
+  depositCents      Int // 50% of estimateCents, rounded down (CONTEXT.md: Deposit)
+
+  // Client-generated key for retry-safe submission (ADR-0012): a resubmit
+  // with the same key returns the existing Order instead of a duplicate.
+  submissionKey String? @unique
+
+  // Set once the booking confirmation email has actually gone out. A retry
+  // of the same submission sends it while this is still null, so a failed
+  // send (e.g. a provider outage) isn't lost for good.
+  confirmationEmailSentAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,6 +118,10 @@ model Item {
   brand       String?
   model       String?
   description String?
+  material    String?
+
+  serviceIds    String[] // catalog ids (src/features/orders/service-catalog.ts)
+  estimateCents Int // this pair's share of the Order estimate, before Rush
 
   status ItemStatus @default(REQUEST_SUBMITTED)
 

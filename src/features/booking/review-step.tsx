@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Mail, MapPin, Package, Phone, Truck, User, type LucideIcon } from "lucide-react";
+import { ArrowRight, ImagePlus, Info, Mail, MapPin, Package, Phone, Truck, TriangleAlert, User, type LucideIcon } from "lucide-react";
+import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
+import { BookingSubmitError } from "./submit-booking";
 
 export function ReviewStep({
   isBundle,
@@ -18,6 +20,8 @@ export function ReviewStep({
   mailInDate,
   contact,
   onEdit,
+  onConfirm,
+  onSwitchToSingle,
 }: {
   isBundle: boolean;
   name: string;
@@ -31,7 +35,32 @@ export function ReviewStep({
   mailInDate: PickupSelection | null;
   contact: ContactInfo;
   onEdit: (step: Step) => void;
+  /** Null for Bundles, which can't be submitted yet (Phase 2). */
+  onConfirm: ((policyAccepted: boolean) => Promise<void>) | null;
+  onSwitchToSingle: () => void;
 }) {
+  const [policyAccepted, setPolicyAccepted] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const showPolicyWarning = attempted && !policyAccepted;
+
+  async function confirm() {
+    if (!onConfirm || submitting) return;
+    if (!policyAccepted) {
+      setAttempted(true);
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onConfirm(policyAccepted);
+    } catch (err) {
+      setError(err instanceof BookingSubmitError ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
+  }
+
   const scheduleText =
     scheduleMethod === "pickup"
       ? pickupSelection
@@ -142,14 +171,62 @@ export function ReviewStep({
         </div>
       </div>
 
-      <Link className="landing-btn-primary booking-page-continue-btn" href="/coming-soon">
-        Confirm Booking
-        <ArrowRight size={14} aria-hidden="true" />
-      </Link>
-      <p className="booking-page-terms">
-        By continuing, you agree to our <Link href="/coming-soon">Terms &amp; Conditions</Link> and{" "}
-        <Link href="/coming-soon">Privacy Policy</Link>.
-      </p>
+      {onConfirm ? (
+        <>
+          <label className="booking-page-policy">
+            <input
+              type="checkbox"
+              checked={policyAccepted}
+              onChange={(e) => setPolicyAccepted(e.target.checked)}
+              aria-describedby={showPolicyWarning ? "review-step-policy-warning" : undefined}
+            />
+            <span>
+              I agree to the <Link href="/coming-soon">Terms of Service</Link>, Refund Policy, Restoration Disclaimer, and
+              Payment Policy.
+            </span>
+          </label>
+
+          <button
+            type="button"
+            className="landing-btn-primary booking-page-continue-btn"
+            onClick={confirm}
+            disabled={submitting}
+            aria-busy={submitting}
+          >
+            {submitting ? "Submitting…" : "Confirm Booking"}
+            {!submitting && <ArrowRight size={14} aria-hidden="true" />}
+          </button>
+          <p className="booking-page-form-warning" id="review-step-policy-warning" role="status" aria-live="polite">
+            {showPolicyWarning && (
+              <>
+                <TriangleAlert size={14} aria-hidden="true" />
+                Please accept the policies to confirm your booking.
+              </>
+            )}
+          </p>
+          {error && (
+            <p className="booking-page-form-error" role="alert">
+              <TriangleAlert size={14} aria-hidden="true" />
+              {error}
+            </p>
+          )}
+          <p className="booking-page-terms">
+            See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
+          </p>
+        </>
+      ) : (
+        <div className="booking-page-info-box">
+          <Info size={16} aria-hidden="true" />
+          <span>
+            <strong>Bundle booking opens soon.</strong> Book your pairs individually for now. Your schedule and contact
+            details carry over.
+            <br />
+            <button type="button" className="booking-page-edit-link" onClick={onSwitchToSingle}>
+              Book a single pair instead
+            </button>
+          </span>
+        </div>
+      )}
     </>
   );
 }
