@@ -7,6 +7,7 @@ import {
   InvalidTransitionError,
   transitionItemStatus,
 } from "@/features/orders/use-cases/transition-item-status";
+import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/repositories/order-repository";
 
 // POST /api/v1/admin/items/:itemId/transitions — every admin action on the
 // item pipeline (review started, quote sent, manual payment confirmed,
@@ -51,8 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ite
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (err) {
-    if (err instanceof InvalidTransitionError) {
+    if (err instanceof InvalidTransitionError || err instanceof ItemStatusChangedError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof ItemNotFoundError) {
+      return NextResponse.json({ error: err.message }, { status: 404 });
     }
     if (err instanceof UnauthorizedError) {
       return NextResponse.json({ error: err.message }, { status: 403 });

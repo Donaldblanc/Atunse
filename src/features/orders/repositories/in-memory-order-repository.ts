@@ -6,7 +6,14 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import type { AuditEntry, Item, Order } from "../domain";
-import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
+import {
+  EmailTakenError,
+  ItemNotFoundError,
+  ItemStatusChangedError,
+  PhotoKeyInUseError,
+  type NewOrderInput,
+  type OrderRepository,
+} from "./order-repository";
 
 let nextId = 0;
 function fakeId(prefix: string): string {
@@ -103,19 +110,15 @@ export class InMemoryOrderRepository implements OrderRepository {
     toStatus: Item["status"];
     entry: AuditEntry;
   }): Promise<Item | null> {
-    if (params.entry.idempotencyKey) {
-      const key = `${params.itemId}:${params.entry.idempotencyKey}`;
-      if (this.appliedIdempotencyKeys.has(key)) return null;
-      this.appliedIdempotencyKeys.add(key);
-    }
+    const key = params.entry.idempotencyKey ? `${params.itemId}:${params.entry.idempotencyKey}` : null;
+    if (key && this.appliedIdempotencyKeys.has(key)) return null;
 
-    for (const order of this.orders.values()) {
-      const item = order.items.find((i) => i.id === params.itemId);
-      if (item) {
-        item.status = params.toStatus;
-        return item;
-      }
-    }
-    return null;
+    const item = [...this.orders.values()].flatMap((o) => o.items).find((i) => i.id === params.itemId);
+    if (!item) throw new ItemNotFoundError(params.itemId);
+    if (params.entry.fromStatus && item.status !== params.entry.fromStatus) throw new ItemStatusChangedError(item.status);
+
+    item.status = params.toStatus;
+    if (key) this.appliedIdempotencyKeys.add(key);
+    return item;
   }
 }

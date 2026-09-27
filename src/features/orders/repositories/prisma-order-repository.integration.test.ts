@@ -5,7 +5,14 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { EmailTakenError, PhotoKeyInUseError, type NewItemInput, type NewOrderInput } from "./order-repository";
+import {
+  EmailTakenError,
+  ItemNotFoundError,
+  ItemStatusChangedError,
+  PhotoKeyInUseError,
+  type NewItemInput,
+  type NewOrderInput,
+} from "./order-repository";
 import { PrismaOrderRepository } from "./prisma-order-repository";
 
 const prisma = new PrismaClient();
@@ -270,6 +277,27 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(updated?.status).toBe("UNDER_REVIEW");
     const entries = await prisma.itemAuditEntry.findMany({ where: { itemId } });
     expect(entries).toHaveLength(1);
+  });
+
+  it("refuses a missing item or a stale fromStatus, writing no audit entry", async () => {
+    const { order } = await repo.create(newOrder());
+    const itemId = order.items[0]!.id;
+    const entry = (fromStatus: "REQUEST_SUBMITTED" | "QUOTE_SENT") => ({
+      action: "X",
+      fromStatus,
+      toStatus: "UNDER_REVIEW" as const,
+      actorAccountId: null,
+      idempotencyKey: null,
+    });
+
+    await expect(repo.transitionItemStatus({ itemId: "item_missing", toStatus: "UNDER_REVIEW", entry: entry("REQUEST_SUBMITTED") })).rejects.toThrow(
+      ItemNotFoundError,
+    );
+    await expect(repo.transitionItemStatus({ itemId, toStatus: "UNDER_REVIEW", entry: entry("QUOTE_SENT") })).rejects.toThrow(
+      ItemStatusChangedError,
+    );
+    expect((await repo.findById(order.id))?.items[0]?.status).toBe("REQUEST_SUBMITTED");
+    expect(await prisma.itemAuditEntry.count({ where: { itemId } })).toBe(0);
   });
 
   it("is idempotent at the database level: a repeated key is a no-op, not a duplicate audit row", async () => {
