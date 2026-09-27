@@ -10,7 +10,7 @@ import {
 import { SignOutButton } from "./sign-out-button";
 
 // Shared shell for every admin screen (dashboard today; queues/detail
-// screens as they land). Reachable only past src/middleware.ts's AdminCheck
+// screens as they land). Reachable only past src/proxy.ts's AdminCheck
 // guard — this layout is purely presentational, it does not re-check auth.
 // Visual system: design-system/atunse-admin/MASTER.md (ui-ux-pro-max skill).
 const NAV_ITEMS = [

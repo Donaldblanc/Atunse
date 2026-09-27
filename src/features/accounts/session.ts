@@ -5,10 +5,9 @@ import type { Role } from "./authz";
 // server-verified on every request; nothing here is trusted from the
 // client without checking the signature.
 //
-// Uses Web Crypto (globalThis.crypto.subtle) rather than node:crypto
-// because this is imported from src/middleware.ts, which runs on Next's
-// Edge runtime — node:crypto isn't available there, but Web Crypto is
-// available in both Edge and Node 18+.
+// Uses Web Crypto (globalThis.crypto.subtle) rather than node:crypto so it
+// runs on any runtime: src/proxy.ts (Node.js since Next 16; middleware ran
+// on the Edge runtime before) and the route handlers.
 
 /** The admin session (password login). Only ever carries role ADMIN. */
 export const SESSION_COOKIE_NAME = "atunse_session";

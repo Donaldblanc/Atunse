@@ -1,4 +1,5 @@
 import "@/styles/landing-theme.css";
+import Link from "next/link";
 import { COMING_SOON_HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -32,12 +33,12 @@ export default function ComingSoonPage() {
               We&rsquo;re working on this page to bring you an even better experience. Check back
               soon &mdash; it&rsquo;ll be worth the wait.
             </p>
-            <a href="/" className="coming-soon-back-link">
+            <Link href="/" className="coming-soon-back-link">
               <span className="arrow" aria-hidden="true">
                 &larr;
               </span>
               Back to home
-            </a>
+            </Link>
           </div>
           <div className="coming-soon-visual-wrap">
             {/* eslint-disable-next-line @next/next/no-img-element -- external/S3-resolved URL, not a static import next/image can optimize */}

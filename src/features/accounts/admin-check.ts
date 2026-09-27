@@ -9,8 +9,8 @@ export interface AdminCheckResult {
 }
 
 /**
- * The actual admin-access decision, extracted out of src/middleware.ts so
- * it's unit-testable without spinning up the Next.js middleware runtime.
+ * The actual admin-access decision, extracted out of src/proxy.ts so
+ * it's unit-testable without spinning up the Next.js proxy runtime.
  *
  * Interim implementation (ADR-0005 addendum): verifies the signed session
  * cookie set by POST /api/v1/auth/sign-in. Still fails closed — a missing,

@@ -15,6 +15,7 @@ export function ThemeToggle() {
   useEffect(() => {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     if (saved === "light" || saved === "dark") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- read after hydration so server and client HTML match
       setTheme(saved);
     }
   }, []);
