@@ -1,4 +1,5 @@
 import { emailDeliveryConfigured, notificationServiceFromEnv } from "@/features/notifications";
+import { derivedSecret, WeakSecretError } from "@/shared/crypto/derived-key";
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaAccountRepository } from "./repositories/prisma-account-repository";
 import { PrismaSignInCodes } from "./repositories/prisma-sign-in-codes";
@@ -8,8 +9,13 @@ import type { SignInCodeDeps } from "./use-cases/request-sign-in-code";
 export class SignInUnavailableError extends Error {}
 
 export function buildSignInCodeDeps(env: NodeJS.ProcessEnv = process.env): SignInCodeDeps {
-  const secret = env.SESSION_SECRET;
-  if (!secret) throw new SignInUnavailableError("SESSION_SECRET is not set — required to hash sign-in codes");
+  let secret: string;
+  try {
+    secret = derivedSecret("sign-in-code", env);
+  } catch (err) {
+    if (err instanceof WeakSecretError) throw new SignInUnavailableError(err.message);
+    throw err;
+  }
   // Fail closed: in production, codes must go out by email, never to the
   // console, whose output lands in the hosting logs (ADR-0014).
   if (env.NODE_ENV === "production" && !emailDeliveryConfigured(env)) {

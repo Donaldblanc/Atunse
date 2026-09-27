@@ -2,7 +2,14 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
 import type { Order, Item, AuditEntry, Fulfillment } from "../domain";
-import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
+import {
+  EmailTakenError,
+  ItemNotFoundError,
+  ItemStatusChangedError,
+  PhotoKeyInUseError,
+  type NewOrderInput,
+  type OrderRepository,
+} from "./order-repository";
 
 // Prisma's generated shape never leaks past this file (ADR-0011/0013) —
 // every method returns the domain's own Order/Item types.
@@ -193,11 +200,18 @@ export class PrismaOrderRepository implements OrderRepository {
         if (existing) return null;
       }
 
-      const updated = await tx.item.update({
-        where: { id: params.itemId },
+      // Conditional on the status the caller saw, so a stale or concurrent
+      // request can't skip a step in the pipeline.
+      const { count } = await tx.item.updateMany({
+        where: { id: params.itemId, ...(params.entry.fromStatus ? { status: params.entry.fromStatus } : {}) },
         data: { status: params.toStatus },
-        include: ITEM_INCLUDE,
       });
+      if (count === 0) {
+        const current = await tx.item.findUnique({ where: { id: params.itemId }, select: { status: true } });
+        if (!current) throw new ItemNotFoundError(params.itemId);
+        throw new ItemStatusChangedError(current.status);
+      }
+      const updated = await tx.item.findUniqueOrThrow({ where: { id: params.itemId }, include: ITEM_INCLUDE });
 
       await tx.itemAuditEntry.create({
         data: {

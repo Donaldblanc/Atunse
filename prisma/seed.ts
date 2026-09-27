@@ -18,10 +18,11 @@ async function main() {
     throw new Error("ADMIN_PASSWORD must be at least 8 characters");
   }
 
+  const passwordHash = await hashPassword(password);
   const account = await prisma.account.upsert({
     where: { email_role: { email: email.toLowerCase(), role: "ADMIN" } },
-    update: { passwordHash: hashPassword(password) },
-    create: { email: email.toLowerCase(), role: "ADMIN", passwordHash: hashPassword(password) },
+    update: { passwordHash },
+    create: { email: email.toLowerCase(), role: "ADMIN", passwordHash },
   });
 
   console.log(`Seeded admin account: ${account.email} (${account.id})`);

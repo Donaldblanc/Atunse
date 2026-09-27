@@ -7,11 +7,15 @@ import {
   UsersIcon,
   GearIcon,
 } from "@phosphor-icons/react/dist/ssr";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { adminFromCookieValue } from "@/features/accounts/admin-check";
+import { SESSION_COOKIE_NAME } from "@/features/accounts/session";
 import { SignOutButton } from "./sign-out-button";
 
 // Shared shell for every admin screen (dashboard today; queues/detail
-// screens as they land). Reachable only past src/proxy.ts's AdminCheck
-// guard — this layout is purely presentational, it does not re-check auth.
+// screens as they land). Reachable only past src/proxy.ts's admin guard,
+// and it re-checks the session itself too (defense in depth).
 // Visual system: design-system/atunse-admin/MASTER.md (ui-ux-pro-max skill).
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/admin", active: true, icon: SquaresFourIcon },
@@ -22,7 +26,13 @@ const NAV_ITEMS = [
   { label: "Settings", href: "#", active: false, icon: GearIcon },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // src/proxy.ts already guards every /admin request; this is a second,
+  // independent check (defense in depth), so a proxy misconfiguration or
+  // bypass still can't render admin pages.
+  const { allowed } = await adminFromCookieValue((await cookies()).get(SESSION_COOKIE_NAME)?.value);
+  if (!allowed) redirect("/sign-in");
+
   return (
     <div className="admin-root">
       <div className="admin-shell">

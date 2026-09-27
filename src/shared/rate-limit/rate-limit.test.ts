@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import { beforeAll } from "vitest";
-import { clientIp, hashClient, limitByIp, RATE_LIMITS, rateLimitSubject } from ".";
+import { clientIp, hashClient, limitByIp, limitByKey, RATE_LIMITS, rateLimitSubject } from ".";
 import { InMemoryRateLimiter } from "./in-memory-rate-limiter";
 import { secondsLeftInWindow, windowStart } from "./rate-limiter";
 
@@ -28,7 +28,7 @@ describe("fixed-window rate limiting", () => {
 });
 
 beforeAll(() => {
-  process.env.SESSION_SECRET = "test-secret";
+  process.env.SESSION_SECRET = "test-secret-0123456789abcdef0123456789abcdef0123456789abcdef";
 });
 
 describe("limitByIp", () => {
@@ -39,6 +39,14 @@ describe("limitByIp", () => {
     expect(refused?.status).toBe(429);
     expect(Number(refused?.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect(await limitByIp(request("198.51.100.2"), policy, limiter)).toBeNull();
+  });
+
+  it("limits by an arbitrary key (e.g. an email) the same way, without storing the key", async () => {
+    const limiter = new InMemoryRateLimiter();
+    for (let i = 0; i < 3; i++) expect(await limitByKey(policy, "admin-email:owner@example.com", limiter)).toBeNull();
+    expect((await limitByKey(policy, "admin-email:owner@example.com", limiter))?.status).toBe(429);
+    expect(await limitByKey(policy, "admin-email:other@example.com", limiter)).toBeNull();
+    expect([...limiter.counts.keys()].join()).not.toContain("owner@example.com");
   });
 
   it("uses the first X-Forwarded-For hop, and never stores the raw IP", () => {
@@ -58,11 +66,18 @@ describe("limitByIp", () => {
     expect(hashClient("2001:db8:abcd:13::1", "s")).not.toBe(hashClient("2001:db8:abcd:12::1", "s"));
   });
 
-  it("refuses to hash without SESSION_SECRET, rather than use a guessable key", () => {
-    expect(() => hashClient("203.0.113.7", "")).toThrow(/SESSION_SECRET/);
+  it("refuses to hash without a secret, rather than use a guessable key", () => {
+    expect(() => hashClient("203.0.113.7", "")).toThrow(/secret is required/);
   });
 
   it("has a policy for each public route", () => {
-    expect(Object.keys(RATE_LIMITS).sort()).toEqual(["codeRequest", "codeVerify", "orders", "uploads"]);
+    expect(Object.keys(RATE_LIMITS).sort()).toEqual([
+      "adminSignIn",
+      "adminSignInAccount",
+      "codeRequest",
+      "codeVerify",
+      "orders",
+      "uploads",
+    ]);
   });
 });

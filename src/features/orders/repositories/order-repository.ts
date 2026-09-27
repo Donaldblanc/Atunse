@@ -25,6 +25,25 @@ export class EmailTakenError extends Error {
   }
 }
 
+/** No Item has this id. Nothing was written. */
+export class ItemNotFoundError extends Error {
+  constructor(readonly itemId: string) {
+    super("Item not found.");
+    this.name = "ItemNotFoundError";
+  }
+}
+
+/**
+ * The Item isn't in the status the transition expected (a stale admin
+ * screen, or a concurrent change). Nothing was written.
+ */
+export class ItemStatusChangedError extends Error {
+  constructor(readonly currentStatus: string) {
+    super(`The item is now ${currentStatus}; reload and try again.`);
+    this.name = "ItemStatusChangedError";
+  }
+}
+
 /** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
 export class PhotoKeyInUseError extends Error {
   constructor() {
@@ -82,9 +101,11 @@ export interface OrderRepository {
 
   /**
    * Atomically transitions one Item's status and appends its audit entry
-   * in the same transaction. Returns null if `idempotencyKey` was already
-   * recorded for this item (ADR-0012: retry-safe) — the caller should treat
-   * that as "already applied", not an error.
+   * in the same transaction, only if the Item is still in
+   * `entry.fromStatus`. Returns null if `idempotencyKey` was already
+   * recorded for this item (ADR-0012: retry-safe); the caller should treat
+   * that as "already applied", not an error. Throws ItemNotFoundError or
+   * ItemStatusChangedError, having written nothing.
    */
   transitionItemStatus(params: {
     itemId: string;

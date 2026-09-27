@@ -73,6 +73,66 @@ what replaces it later.
    deploy (production or preview) applies pending migrations to whichever
    database its `DATABASE_URL` points at before building.
 
+## Repository security settings (GitHub → Settings → Code security)
+These are GitHub settings, not files, so they have to be turned on by a
+repo admin. They were all off at the time of the vulnerability scan.
+- **Dependabot security updates:** on. `.github/dependabot.yml` already
+  schedules weekly npm and Actions updates into `develop`; this adds
+  immediate PRs for security advisories.
+- **Secret scanning** and **push protection:** on. Push protection blocks
+  a commit that contains a recognisable secret (API keys, database URLs)
+  before it reaches GitHub.
+
+Workflows pin every action to a full commit SHA (with the version in a
+comment), so a moved tag can't change what runs with the repo's token.
+Dependabot's `github-actions` updates keep the pins current.
+
+## Rolling out the security hardening (PR #88)
+**Expected side effects (one-time).** Every key is now HKDF-derived from
+`SESSION_SECRET` per purpose (`atunse/<purpose>/v1`), so on the first
+deploy:
+- everyone is signed out, admins and customers;
+- sign-in codes still in flight stop working (request a new one);
+- rate-limit counters start fresh;
+- local upload links (dev only) change.
+
+Deploys also fail closed if `SESSION_SECRET` is missing, shorter than 32
+characters or a placeholder: check the Vercel value first
+(`openssl rand -hex 32`).
+
+**Order.**
+1. **Preview first.** Deploy the PR to a Vercel preview and run the full
+   automated suite (`npm test`, `npm run test:integration`, `tsc`,
+   `eslint`, `next build`, `npm audit`), all on Node 24.
+2. **Manual abuse checks on the preview:**
+   - 11 bad admin sign-ins from one IP: the 11th gets 429 with Retry-After.
+   - Repeated attempts on one email from several IPs: the 21st gets 429.
+   - `atunse_session=x.!!!` on `/admin` redirects; it doesn't 500.
+   - `/admin` and `/api/v1/admin/*` without an admin session are refused.
+   - Timing: compare the median of ~10 known-email and ~10 unknown-email
+     wrong-password attempts. They should be within noise. This is an
+     observation, not a CI assertion.
+3. **CSP:** browse landing, services, booking (with a photo upload) and
+   admin with the console open, and note any
+   `Content-Security-Policy-Report-Only` violations.
+4. **Normal flows:** admin sign-in, a single-pair and a Bundle booking with
+   photos, customer email-code sign-in (if enabled), and sign-out.
+5. **Production.** Then monitor the logs for a day:
+   - authentication failures (401 on `/api/v1/auth/*`);
+   - 429s, which should be rare for real users;
+   - unexpected 401/403 on admin or photo routes;
+   - any 5xx.
+
+   Straight after the deploy, check admin sign-in and a booking with a
+   photo upload.
+
+**Rollback.** Use Vercel "Instant Rollback" to the previous deployment.
+#88 has no database migration, so the schema is untouched and nothing
+needs reverting in Neon. Rolling back swaps keys a second time, so
+everyone is signed out again and rate-limit counters restart. The
+`rate_limit_buckets` rows written in the meantime are harmless (they age
+out).
+
 ## Triggering a deploy
 
 With the integration connected, you don't run anything manually:

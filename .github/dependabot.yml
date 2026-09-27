@@ -1,0 +1,24 @@
+# Dependency and GitHub Actions update PRs (vulnerability scan follow-up).
+# They target develop, per docs/GIT_WORKFLOW.md. Security fixes also need
+# "Dependabot security updates" turned on in the repo's Code security
+# settings (see docs/DEPLOYMENT.md).
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
