@@ -2484,6 +2484,16 @@
   margin: 0;
 }
 
+.booking-page-form-notice {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin: 10px 0 0;
+}
+
+.booking-page-form-notice:empty {
+  margin: 0;
+}
+
 .booking-page-form-error {
   display: flex;
   align-items: center;
