@@ -8,6 +8,10 @@ on:
   pull_request:
     branches: [main]
 
+# Least privilege: these jobs only read the repo (vulnerability scan).
+permissions:
+  contents: read
+
 jobs:
   check-source-branch:
     runs-on: ubuntu-latest
