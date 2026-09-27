@@ -34,12 +34,14 @@ export const SERVICE_IMAGES: [GalleryImage, GalleryImage, GalleryImage, GalleryI
   { key: "custom-work.jpg", alt: "Custom sneaker work" },
 ];
 
-export interface BeforeAfterImage {
-  beforeKey: string;
-  afterKey: string;
-  caption: string;
-  serviceLine: string;
-}
+/**
+ * A gallery card: normally a before/after pair shown as two halves. The one
+ * exception is a single photo that already shows before and after itself
+ * (e.g. a step-by-step composite); it's shown whole, at the card's 4:3.
+ */
+export type BeforeAfterImage =
+  | { beforeKey: string; afterKey: string; caption: string; serviceLine: string }
+  | { imageKey: string; caption: string; serviceLine: string };
 
 // Before/After band — pixel-accurate before/after crops, one pair per
 // restoration (see public/images/landing/README.txt for how these were cut).
@@ -65,9 +67,11 @@ export const BEFORE_AFTER_IMAGES: BeforeAfterImage[] = [
   { beforeKey: "bottega-veneta-orbit-before.jpg", afterKey: "bottega-veneta-orbit-after.jpg", caption: "Bottega Veneta Orbit", serviceLine: serviceLine("premium") },
   { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"', serviceLine: serviceLine("oxidation") },
   { beforeKey: "jordan5-sole-before.jpg", afterKey: "jordan5-sole-after.jpg", caption: "Air Jordan 5", serviceLine: serviceLine("oxidation", "Sole") },
-  // Lace replacement isn't a bookable Service in SERVICE_CATALOG yet, so
-  // there's no price to show; add it to the catalog to price it here.
-  { beforeKey: "jordan4-militaryblack-before.jpg", afterKey: "jordan4-militaryblack-after.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: "Shoe Lace Replacement" },
+  // The one single-image card: the composite shows before, the lace-swap
+  // steps and after together, so it isn't split into halves. Lace
+  // replacement isn't a bookable Service in SERVICE_CATALOG yet, so there's
+  // no price to show; add it to the catalog to price it here.
+  { imageKey: "jordan4-militaryblack-laces.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: "Shoe Lace Replacement" },
 ];
 
 export function getGalleryImageUrl(key: string): string {

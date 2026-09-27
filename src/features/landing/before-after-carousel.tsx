@@ -43,24 +43,33 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
       </div>
       <div className="landing-ba-track" ref={trackRef}>
         {images.map((image) => {
-          const beforeUrl = getGalleryImageUrl(image.beforeKey);
-          const afterUrl = getGalleryImageUrl(image.afterKey);
+          const single = "imageKey" in image;
           return (
-            <div className="landing-ba-card" key={image.afterKey}>
-              <div className="landing-ba-photo">
-                <div className="landing-ba-half before" style={{ backgroundImage: `url(${beforeUrl})` }}>
-                  <div className="landing-ba-pill">Before</div>
+            <div className="landing-ba-card" key={single ? image.imageKey : image.afterKey}>
+              {single ? (
+                // Already shows before and after itself, labels included.
+                <div
+                  className="landing-ba-photo landing-ba-photo--single"
+                  role="img"
+                  aria-label={`${image.caption}: before and after`}
+                  style={{ backgroundImage: `url(${getGalleryImageUrl(image.imageKey)})` }}
+                />
+              ) : (
+                <div className="landing-ba-photo">
+                  <div className="landing-ba-half before" style={{ backgroundImage: `url(${getGalleryImageUrl(image.beforeKey)})` }}>
+                    <div className="landing-ba-pill">Before</div>
+                  </div>
+                  <div className="landing-ba-half after" style={{ backgroundImage: `url(${getGalleryImageUrl(image.afterKey)})` }}>
+                    <div className="landing-ba-pill">After</div>
+                  </div>
+                  <div className="landing-ba-handle" aria-hidden="true">
+                    <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
+                      <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <ArrowIcon size={9} strokeWidth={30} />
+                  </div>
                 </div>
-                <div className="landing-ba-half after" style={{ backgroundImage: `url(${afterUrl})` }}>
-                  <div className="landing-ba-pill">After</div>
-                </div>
-                <div className="landing-ba-handle" aria-hidden="true">
-                  <svg width="9" height="9" viewBox="0 0 256 256" fill="none">
-                    <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="30" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <ArrowIcon size={9} strokeWidth={30} />
-                </div>
-              </div>
+              )}
               <div className="landing-ba-caption">{image.caption}</div>
               <div className="landing-ba-service-line">{image.serviceLine}</div>
             </div>

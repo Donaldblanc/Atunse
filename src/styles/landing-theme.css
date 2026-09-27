@@ -608,6 +608,14 @@
   overflow: hidden;
 }
 
+/* The single-image card (a composite that shows before and after itself):
+   one photo filling the same 4:3 box as a pair. */
+.landing-ba-photo--single {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .landing-ba-half {
   width: 50%;
   height: 100%;

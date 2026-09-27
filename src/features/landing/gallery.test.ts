@@ -19,7 +19,15 @@ function jpegSize(file: string): { width: number; height: number } {
 }
 
 describe("before/after gallery", () => {
-  it.each(BEFORE_AFTER_IMAGES.map((img) => [img.caption, img] as const))("%s has both photos, cropped as a matching portrait pair", (_c, img) => {
+  it.each(BEFORE_AFTER_IMAGES.map((img) => [img.caption, img] as const))("%s has its photos, in the card's shapes", (_c, img) => {
+    if ("imageKey" in img) {
+      // The single-image exception fills the whole 4:3 card.
+      const file = path.join(LANDING_DIR, img.imageKey);
+      expect(existsSync(file), img.imageKey).toBe(true);
+      const { width, height } = jpegSize(file);
+      expect(width / height).toBeCloseTo(4 / 3, 2);
+      return;
+    }
     const before = path.join(LANDING_DIR, img.beforeKey);
     const after = path.join(LANDING_DIR, img.afterKey);
     expect(existsSync(before), img.beforeKey).toBe(true);
@@ -29,6 +37,11 @@ describe("before/after gallery", () => {
       expect(width / height).toBeGreaterThan(0.5);
       expect(width / height).toBeLessThan(0.62);
     }
+  });
+
+  it("has exactly one single-image card (the lace replacement), for now", () => {
+    const singles = BEFORE_AFTER_IMAGES.filter((img) => "imageKey" in img).map((img) => img.caption);
+    expect(singles).toEqual(['Air Jordan 4 "Military Black"']);
   });
 
   it("prices each Service line from the catalog, including a part's own price", () => {
