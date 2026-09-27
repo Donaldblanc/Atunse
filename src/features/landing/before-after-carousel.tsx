@@ -47,13 +47,17 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
           return (
             <div className="landing-ba-card" key={single ? image.imageKey : image.afterKey}>
               {single ? (
-                // Already shows before and after itself, labels included.
+                // Shows before (left) and after (right) itself, so it gets
+                // the same pills as a pair but no split or handle.
                 <div
                   className="landing-ba-photo landing-ba-photo--single"
                   role="img"
                   aria-label={`${image.caption}: before and after`}
                   style={{ backgroundImage: `url(${getGalleryImageUrl(image.imageKey)})` }}
-                />
+                >
+                  <div className="landing-ba-pill landing-ba-pill--before">Before</div>
+                  <div className="landing-ba-pill landing-ba-pill--after">After</div>
+                </div>
               ) : (
                 <div className="landing-ba-photo">
                   <div className="landing-ba-half before" style={{ backgroundImage: `url(${getGalleryImageUrl(image.beforeKey)})` }}>

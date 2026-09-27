@@ -660,13 +660,15 @@
   z-index: 2;
 }
 
-.landing-ba-half.before .landing-ba-pill {
+.landing-ba-half.before .landing-ba-pill,
+.landing-ba-pill--before {
   left: 10px;
   background: #fff;
   color: #12183a;
 }
 
-.landing-ba-half.after .landing-ba-pill {
+.landing-ba-half.after .landing-ba-pill,
+.landing-ba-pill--after {
   right: 10px;
   background: var(--blue);
   color: #fff;

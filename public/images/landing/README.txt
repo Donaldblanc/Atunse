@@ -3,9 +3,11 @@ ATUNSE — BEFORE/AFTER WEB ASSETS
 15 JPEG images:
 - 7 restoration pairs, with matching *-before.jpg / *-after.jpg filenames
 - 1 single image (the only exception): jordan4-militaryblack-laces.jpg, a
-  composite that shows before, the lace-swap steps and after together. It's
-  shown whole in its card, padded to the card's 4:3 with a blurred band of
-  the photo itself rather than split into halves
+  composite that shows before, the lace-swap steps and after together. Its
+  own "Before"/"After" labels are painted out (the card adds the gallery's
+  pills, like every pair), and it's shown whole in its card rather than
+  split into halves, padded to the card's 4:3 with a blurred band of the
+  photo itself
 
 Optimization:
 - JPEG quality: 92
