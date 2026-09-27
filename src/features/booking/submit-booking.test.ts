@@ -1,0 +1,108 @@
+import { describe, expect, it } from "vitest";
+import { EMPTY_ADDRESS, EMPTY_CONTACT } from "./booking-types";
+import { BookingSubmitError, buildOrderRequestBody, submitBooking, type BookingSubmission } from "./submit-booking";
+
+const photo = new File([new Uint8Array(4)], "shoe.jpg", { type: "image/jpeg" });
+
+function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmission {
+  return {
+    submissionKey: "3c1f0e2a-7d4b-4a8e-9f6c-1b2d3e4f5a6b",
+    policyAccepted: true,
+    serviceIds: ["standard"],
+    pair: { brand: "Nike AF1", material: "Suede", notes: "", photos: [photo] },
+    scheduleMethod: "pickup",
+    address: { ...EMPTY_ADDRESS, address: "123 Main St", city: "New York", state: "NY", zip: "10001" },
+    pickupSelection: { date: new Date(2026, 9, 3), time: "4:30 PM – 5:00 PM" },
+    mailInDate: null,
+    contact: { ...EMPTY_CONTACT, name: "Jordan", email: "j@example.com", phone: "2125550142" },
+    rush: false,
+    ...overrides,
+  };
+}
+
+describe("buildOrderRequestBody", () => {
+  it("sends the pickup date as the local calendar day and blanks as null", () => {
+    const body = buildOrderRequestBody(submission(), ["k"]);
+    expect(body.fulfillment).toEqual({
+      method: "PICKUP",
+      address: { line1: "123 Main St", line2: null, city: "New York", state: "NY", zip: "10001" },
+      date: "2026-10-03",
+      slot: "4:30 PM – 5:00 PM",
+    });
+    expect(body.item).toEqual({ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] });
+  });
+
+  it("sends Mail-In with an optional preferred date", () => {
+    expect(buildOrderRequestBody(submission({ scheduleMethod: "mail-in", pickupSelection: null }), []).fulfillment).toMatchObject({
+      method: "MAIL_IN",
+      preferredDate: null,
+    });
+  });
+
+  it("refuses a pickup with no date chosen", () => {
+    expect(() => buildOrderRequestBody(submission({ pickupSelection: null }), [])).toThrow(BookingSubmitError);
+  });
+});
+
+type Call = { url: string; init: RequestInit };
+
+function fakeFetch(responses: Record<string, () => Response>) {
+  const calls: Call[] = [];
+  const impl = (async (url: string, init: RequestInit) => {
+    calls.push({ url, init });
+    const respond = responses[url];
+    if (!respond) throw new TypeError("network down");
+    return respond();
+  }) as unknown as typeof fetch;
+  return { impl, calls };
+}
+
+const uploadsOk = () =>
+  Response.json(
+    { uploads: [{ key: "bookings/b/0.jpg", url: "https://bucket.test", fields: { key: "bookings/b/0.jpg", Policy: "p" } }] },
+    { status: 201 },
+  );
+
+describe("submitBooking", () => {
+  it("uploads photos to their targets, then submits the keys with the Idempotency-Key", async () => {
+    const orderResponse = { order: { reference: "ABC12345" }, paymentInstructions: { zelle: null } };
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () => Response.json(orderResponse, { status: 201 }),
+    });
+
+    const result = await submitBooking(submission(), impl);
+
+    expect(result).toEqual(orderResponse);
+    expect(calls.map((c) => c.url)).toEqual(["/api/v1/uploads", "https://bucket.test", "/api/v1/orders"]);
+    const form = calls[1]!.init.body as FormData;
+    expect([...form.keys()]).toEqual(["key", "Policy", "file"]); // file last, as S3 requires
+    const orderCall = calls[2]!;
+    expect((orderCall.init.headers as Record<string, string>)["Idempotency-Key"]).toBe(submission().submissionKey);
+    expect(JSON.parse(orderCall.init.body as string).item.photoKeys).toEqual(["bookings/b/0.jpg"]);
+  });
+
+  it("surfaces the server's validation message", async () => {
+    const { impl } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () => Response.json({ error: "Enter a valid 5-digit zip code." }, { status: 400 }),
+    });
+    await expect(submitBooking(submission(), impl)).rejects.toThrow("Enter a valid 5-digit zip code.");
+  });
+
+  it("stops before submitting when a photo upload fails", async () => {
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 403 }),
+    });
+    await expect(submitBooking(submission(), impl)).rejects.toThrow(/photos didn't upload/);
+    expect(calls.some((c) => c.url === "/api/v1/orders")).toBe(false);
+  });
+
+  it("turns a network failure into a friendly error", async () => {
+    const { impl } = fakeFetch({});
+    await expect(submitBooking(submission(), impl)).rejects.toThrow(BookingSubmitError);
+  });
+});

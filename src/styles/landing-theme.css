@@ -2420,6 +2420,61 @@
   line-height: 1.4;
 }
 
+/* Always rendered so screen readers announce the warning when it appears. */
+.booking-page-form-warning:empty {
+  margin: 0;
+}
+
+.booking-page-form-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+  margin: 10px 0 0;
+}
+
+.landing[data-theme="dark"] .booking-page-form-error {
+  color: #f87171;
+}
+
+.booking-page-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  margin: 4px 0 14px;
+  cursor: pointer;
+}
+
+.booking-page-policy input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.booking-page-policy a {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.booking-page-confirmation-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.booking-page-confirmation-title svg {
+  color: var(--blue);
+  flex: none;
+}
+
 .booking-page-terms {
   font-size: 11.5px;
   color: var(--ink-soft);

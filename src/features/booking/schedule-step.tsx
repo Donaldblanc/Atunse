@@ -1,8 +1,10 @@
 "use client";
 
-import { ArrowRight, Info, Package, Truck } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Info, Package, Truck, TriangleAlert } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";
+import { isValidZip } from "./contact-rules";
 import { PICKUP_STATES, US_STATES } from "./pickup-window";
 
 export function ScheduleStep({
@@ -26,6 +28,10 @@ export function ScheduleStep({
   onChangeMailInDate: (selection: PickupSelection) => void;
   onContinue: () => void;
 }) {
+  const [attempted, setAttempted] = useState(false);
+  const problem = scheduleProblem(method, pickupAddress, pickupSelection);
+  const showWarning = attempted && problem !== null;
+
   return (
     <>
       <div className="booking-page-section-head">
@@ -46,7 +52,7 @@ export function ScheduleStep({
           <Package size={20} aria-hidden="true" />
           <span>
             <strong>Mail in</strong>
-            <span>We&rsquo;ll send you a prepaid label after checkout.</span>
+            <span>We&rsquo;ll email you where to ship after checkout.</span>
           </span>
         </button>
       </div>
@@ -140,10 +146,47 @@ export function ScheduleStep({
         </>
       )}
 
-      <button type="button" className="landing-btn-primary booking-page-continue-btn" onClick={onContinue}>
-        Continue to review
+      <button
+        type="button"
+        className="landing-btn-primary booking-page-continue-btn"
+        onClick={() => {
+          if (problem) {
+            setAttempted(true);
+            return;
+          }
+          onContinue();
+        }}
+        aria-describedby={showWarning ? "schedule-step-warning" : undefined}
+      >
+        Continue to your info
         <ArrowRight size={14} aria-hidden="true" />
       </button>
+      {showWarning && (
+        <p className="booking-page-form-warning" id="schedule-step-warning" role="status" aria-live="polite">
+          <TriangleAlert size={14} aria-hidden="true" />
+          {problem}
+        </p>
+      )}
     </>
   );
+}
+
+// Mirrors submitOrder's address/schedule rules so the customer finds out
+// here, not after uploading photos at the Review step.
+function scheduleProblem(
+  method: ScheduleMethod,
+  address: PickupAddress,
+  pickupSelection: PickupSelection | null,
+): string | null {
+  if (!address.address.trim() || !address.city.trim() || !address.state) {
+    return "Enter your street address, city and state to continue.";
+  }
+  if (!isValidZip(address.zip)) return "Enter a valid 5-digit zip code to continue.";
+  if (method === "pickup") {
+    if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
+      return "Pickup is only available in NY, NJ and CT. Choose Mail in instead.";
+    }
+    if (!pickupSelection) return "Choose a pickup date and time to continue.";
+  }
+  return null;
 }

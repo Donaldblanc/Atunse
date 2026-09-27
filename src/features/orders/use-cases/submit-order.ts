@@ -1,5 +1,6 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { isValidEmail, isValidUsPhone, isValidZip } from "@/features/booking/contact-rules";
 import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "@/features/booking/pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
@@ -53,8 +54,6 @@ export class BookingValidationError extends Error {
 
 // The shop runs on New York time, so "today" for past-date checks is NY's.
 const SHOP_TIMEZONE = "America/New_York";
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ZIP_PATTERN = /^\d{5}(-\d{4})?$/;
 const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -127,11 +126,8 @@ function validateContact(contact: SubmitOrderInput["contact"]) {
   const email = contact.email.trim();
   const phone = contact.phone.trim();
   if (!name) throw new BookingValidationError("Enter your name.");
-  if (!EMAIL_PATTERN.test(email)) throw new BookingValidationError("Enter a valid email address.");
-  const digits = phone.replace(/\D/g, "");
-  if (!(digits.length === 10 || (digits.length === 11 && digits.startsWith("1")))) {
-    throw new BookingValidationError("Enter a valid 10-digit US phone number.");
-  }
+  if (!isValidEmail(email)) throw new BookingValidationError("Enter a valid email address.");
+  if (!isValidUsPhone(phone)) throw new BookingValidationError("Enter a valid 10-digit US phone number.");
   return { name, email, phone };
 }
 
@@ -144,7 +140,7 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     zip: fulfillment.address.zip.trim(),
   };
   if (!address.line1 || !address.city) throw new BookingValidationError("Enter your street address and city.");
-  if (!ZIP_PATTERN.test(address.zip)) throw new BookingValidationError("Enter a valid 5-digit zip code.");
+  if (!isValidZip(address.zip)) throw new BookingValidationError("Enter a valid 5-digit zip code.");
 
   if (fulfillment.method === "PICKUP") {
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
