@@ -1,7 +1,7 @@
 ATUNSE — BEFORE/AFTER WEB ASSETS
 
-12 individual JPEG images:
-- 6 restoration pairs
+16 individual JPEG images:
+- 8 restoration pairs
 - matching *-before.jpg / *-after.jpg filenames
 
 Optimization:
@@ -9,6 +9,8 @@ Optimization:
 - Progressive JPEG
 - 4:4:4 chroma (subsampling disabled)
 - Original selected crop dimensions retained
+- Portrait crops at a ~0.56 width:height ratio; crops leave out any
+  "Before"/"After" labels baked into the source (the carousel adds its own)
 - No additional image scaling
 - Suitable for responsive desktop/mobile delivery
 

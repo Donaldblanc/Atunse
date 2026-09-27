@@ -46,8 +46,13 @@ export interface BeforeAfterImage {
 // serviceLine promotes which service produced the result, with price, so
 // the section informs pricing instead of just showing photos. The price
 // comes from SERVICE_CATALOG, like every other price on the site.
-function serviceLine(serviceId: string): string {
+function serviceLine(serviceId: string, part?: string): string {
   const service = catalogService(serviceId);
+  // A priced part of the Service (e.g. Oxidation's "Sole"), when the photo
+  // shows that part rather than the Service's headline price.
+  const partPrice = part ? service.alsoFrom?.find((p) => p.label === part) : undefined;
+  if (part && !partPrice) throw new Error(`${serviceId} has no "${part}" price in SERVICE_CATALOG`);
+  if (partPrice) return `${service.name} · ${part} from ${formatPrice(partPrice.cents, true)}`;
   const price = formatPrice(service.baseCents, service.isMinimum);
   return `${service.name} · ${service.isMinimum ? `From ${price}` : price}`;
 }
@@ -59,6 +64,10 @@ export const BEFORE_AFTER_IMAGES: BeforeAfterImage[] = [
   { beforeKey: "jordan11-concord-before.jpg", afterKey: "jordan11-concord-after.jpg", caption: 'Air Jordan 11 "Concord"', serviceLine: serviceLine("standard") },
   { beforeKey: "bottega-veneta-orbit-before.jpg", afterKey: "bottega-veneta-orbit-after.jpg", caption: "Bottega Veneta Orbit", serviceLine: serviceLine("premium") },
   { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"', serviceLine: serviceLine("oxidation") },
+  { beforeKey: "jordan5-sole-before.jpg", afterKey: "jordan5-sole-after.jpg", caption: "Air Jordan 5", serviceLine: serviceLine("oxidation", "Sole") },
+  // Lace replacement isn't a bookable Service in SERVICE_CATALOG yet, so
+  // there's no price to show; add it to the catalog to price it here.
+  { beforeKey: "jordan4-militaryblack-before.jpg", afterKey: "jordan4-militaryblack-after.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: "Shoe Lace Replacement" },
 ];
 
 export function getGalleryImageUrl(key: string): string {
