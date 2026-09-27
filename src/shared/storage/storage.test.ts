@@ -53,6 +53,27 @@ describe("LocalFileStorage", () => {
     await expect(storage.receive(formFrom(fields, jpeg()))).rejects.toThrow(/expired/);
   });
 
+  it("serves a file only through an unexpired, untampered view link", async () => {
+    const { fields } = await target();
+    await storage.receive(formFrom(fields, jpeg()));
+
+    const link = new URL(await storage.createViewUrl("bookings/b/0.jpg"), "http://localhost");
+    const file = await storage.read(link.searchParams);
+    expect(file.contentType).toBe("image/jpeg");
+    expect(file.body.length).toBe(3);
+
+    const tampered = new URLSearchParams(link.searchParams);
+    tampered.set("key", "bookings/b/1.jpg");
+    await expect(storage.read(tampered)).rejects.toThrow(/Invalid signature/);
+
+    // An upload signature must never work as a view link.
+    const forged = new URLSearchParams({ key: fields.key!, expires: fields.expires!, signature: fields.signature! });
+    await expect(storage.read(forged)).rejects.toThrow(/Invalid signature/);
+
+    now = new Date(now.getTime() + 6 * 60 * 1000);
+    await expect(storage.read(link.searchParams)).rejects.toThrow(/expired/);
+  });
+
   it("refuses a correctly signed key that escapes the upload directory", async () => {
     const { fields } = await storage.createUploadTarget({ key: "../escape.jpg", contentType: "image/jpeg", maxBytes: 10 });
     await expect(storage.receive(formFrom(fields, jpeg()))).rejects.toThrow(/Invalid key/);
@@ -73,6 +94,19 @@ describe("S3FileStorage", () => {
     expect(fields["Content-Type"]).toBe("image/jpeg");
     const policy = JSON.parse(Buffer.from(fields.Policy!, "base64").toString());
     expect(policy.conditions).toContainEqual(["content-length-range", 1, 10]);
+  });
+
+  it("issues a short-lived presigned GET for viewing, path-style on a custom endpoint", async () => {
+    const storage = new S3FileStorage({
+      bucket: "atunse-images",
+      region: "us-east-2",
+      endpoint: "https://storage.example.test",
+      credentials: { accessKeyId: "nak_example", secretAccessKey: "secret" },
+    });
+    const url = new URL(await storage.createViewUrl("bookings/b/0.jpg"));
+    expect(url.origin + url.pathname).toBe("https://storage.example.test/atunse-images/bookings/b/0.jpg");
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("300");
+    expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
   });
 
   it("addresses an S3-compatible endpoint path-style, since bucket subdomains don't resolve there", async () => {

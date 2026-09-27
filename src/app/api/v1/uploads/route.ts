@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "files must be a list of { contentType, size }" }, { status: 400 });
   }
 
-  // Guest until sessions exist (ADR-0005), same as POST /api/v1/orders.
+  // Anonymous on purpose: a key only gains an owner when submitOrder
+  // attaches it to an Order (ADR-0014), and a key can be attached once.
   const actingUser = { accountId: null, role: "GUEST" as const };
 
   try {

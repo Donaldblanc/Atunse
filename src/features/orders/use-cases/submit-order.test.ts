@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderReference } from "../domain";
-import { BookingValidationError, PolicyNotAcceptedError, submitOrder } from "./submit-order";
+import { BookingValidationError, PolicyNotAcceptedError, SignInRequiredError, submitOrder } from "./submit-order";
 import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -27,6 +27,58 @@ describe("submitOrder", () => {
     await expect(submitOrder(bookingDeps(), { accountId: "acc_1", role: "ADMIN" }, validBookingInput())).rejects.toThrow(
       UnauthorizedError,
     );
+  });
+
+  describe("account ownership (ADR-0014)", () => {
+    it("creates a Customer Account for a new email, stored lowercased", async () => {
+      const deps = bookingDeps();
+      const input = validBookingInput({ contact: { name: "Jordan", email: "Jordan@Example.com", phone: "2125550142" } });
+      const order = await submitOrder(deps, guest, input);
+
+      expect(order.accountId).toBe(deps.orders.accountIdsByEmail.get("jordan@example.com"));
+      expect(order.contactEmail).toBe("Jordan@Example.com");
+    });
+
+    it("with customer login ON, asks a signed-out booking with a registered email to sign in, creating nothing", async () => {
+      const deps = bookingDeps({ customerSignInEnabled: true });
+      await submitOrder(deps, guest, validBookingInput());
+
+      const again = validBookingInput({ contact: { name: "Other", email: "CUSTOMER@example.com", phone: "2125550199" } });
+      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      await expect(submitOrder(deps, guest, again)).rejects.toThrow(SignInRequiredError);
+      expect(deps.orders.orders.size).toBe(1);
+    });
+
+    it("with customer login OFF, attaches a registered email's booking to that Account", async () => {
+      const deps = bookingDeps({ customerSignInEnabled: false });
+      const first = await submitOrder(deps, guest, validBookingInput());
+
+      const again = validBookingInput();
+      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      const second = await submitOrder(deps, guest, again);
+      expect(second.accountId).toBe(first.accountId);
+      expect(deps.orders.orders.size).toBe(2);
+    });
+
+    it("books a signed-in customer into their own Account, whatever contact email they enter", async () => {
+      const deps = bookingDeps({ customerSignInEnabled: true });
+      const first = await submitOrder(deps, guest, validBookingInput());
+      const customer = { accountId: first.accountId, role: "CUSTOMER" as const };
+
+      const again = validBookingInput({ contact: { name: "Jordan", email: "work@example.com", phone: "2125550142" } });
+      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      const second = await submitOrder(deps, customer, again);
+      expect(second.accountId).toBe(first.accountId);
+      expect(deps.orders.accountIdsByEmail.has("work@example.com")).toBe(false);
+    });
+
+    it("refuses photo keys already attached to another booking", async () => {
+      const deps = bookingDeps();
+      await submitOrder(deps, guest, validBookingInput());
+
+      const stolen = validBookingInput({ contact: { name: "Eve", email: "eve@example.com", phone: "2125550100" } });
+      await expect(submitOrder(deps, guest, stolen)).rejects.toThrow(/already attached to another booking/);
+    });
   });
 
   describe("pricing", () => {

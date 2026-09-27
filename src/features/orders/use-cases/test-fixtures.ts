@@ -23,6 +23,7 @@ export function bookingDeps<O extends Partial<SubmitOrderDeps> = object>(overrid
     orders: new InMemoryOrderRepository(),
     notifications: new RecordingNotificationService(),
     paymentInstructions: { zelle: { recipient: "pay@restoredbydj.com", name: "RestoredByDJ" } } as PaymentInstructions,
+    customerSignInEnabled: false, // the production default
     now: () => FIXED_NOW,
   };
   // Keep the concrete test doubles' types (e.g. `.sent`) unless overridden.

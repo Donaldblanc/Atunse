@@ -3,7 +3,7 @@
 // strategy's split between fast unit tests and real-DB integration tests.
 
 import type { AuditEntry, Item, Order } from "../domain";
-import type { NewOrderInput, OrderRepository } from "./order-repository";
+import { AccountExistsError, type NewOrderInput, type OrderRepository } from "./order-repository";
 
 let nextId = 0;
 function fakeId(prefix: string): string {
@@ -15,6 +15,8 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
+  /** email -> accountId; stands in for the accounts table's unique email. */
+  readonly accountIdsByEmail = new Map<string, string>();
 
   async create(input: NewOrderInput): Promise<{ order: Order; created: boolean }> {
     if (input.submissionKey) {
@@ -22,13 +24,24 @@ export class InMemoryOrderRepository implements OrderRepository {
       if (existingId) return { order: this.orders.get(existingId)!, created: false };
     }
 
+    let accountId: string;
+    if ("accountId" in input.owner) {
+      accountId = input.owner.accountId;
+    } else {
+      const registered = this.accountIdsByEmail.get(input.owner.newCustomer.email);
+      if (registered && input.owner.ifEmailRegistered === "fail") throw new AccountExistsError();
+      accountId = registered ?? fakeId("account");
+      this.accountIdsByEmail.set(input.owner.newCustomer.email, accountId);
+    }
+
     const orderId = fakeId("order");
     const order: Order = {
       id: orderId,
-      accountId: input.accountId,
+      accountId,
       contactName: input.contactName,
-      guestEmail: input.guestEmail,
-      guestPhone: input.guestPhone,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      createdAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,
       fulfillment: input.fulfillment,
       rush: input.rush,
@@ -59,6 +72,20 @@ export class InMemoryOrderRepository implements OrderRepository {
 
   async findById(orderId: string): Promise<Order | null> {
     return this.orders.get(orderId) ?? null;
+  }
+
+  async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
+    const orderId = this.orderIdsBySubmissionKey.get(submissionKey);
+    return orderId ? (this.orders.get(orderId) ?? null) : null;
+  }
+
+  async findByAccountId(accountId: string): Promise<Order[]> {
+    return [...this.orders.values()].filter((order) => order.accountId === accountId).reverse();
+  }
+
+  async findPhotoKeysInUse(photoKeys: string[]): Promise<string[]> {
+    const inUse = new Set([...this.orders.values()].flatMap((order) => order.items.flatMap((item) => item.photoKeys)));
+    return photoKeys.filter((key) => inUse.has(key));
   }
 
   async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {

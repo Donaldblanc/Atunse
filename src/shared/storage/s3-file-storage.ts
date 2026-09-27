@@ -1,6 +1,7 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
-import { UPLOAD_TARGET_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { UPLOAD_TARGET_TTL_SECONDS, VIEW_URL_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
 
 export interface S3FileStorageConfig {
   bucket: string;
@@ -41,5 +42,11 @@ export class S3FileStorage implements FileStorage {
       Expires: UPLOAD_TARGET_TTL_SECONDS,
     });
     return { url, fields };
+  }
+
+  async createViewUrl(key: string): Promise<string> {
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: VIEW_URL_TTL_SECONDS,
+    });
   }
 }

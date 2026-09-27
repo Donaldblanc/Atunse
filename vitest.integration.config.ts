@@ -14,6 +14,9 @@ export default defineConfig({
     include: ["**/*.integration.test.ts"],
     exclude: ["**/node_modules/**", "demo_mock/**"],
     testTimeout: 20_000,
+    // Every integration file resets the same tables in beforeEach, so files
+    // must not run concurrently against the shared database.
+    fileParallelism: false,
     // See vitest.config.ts — the scaffold PR has no integration tests yet
     // either (they land in [2/4]).
     passWithNoTests: true,

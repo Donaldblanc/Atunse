@@ -5,7 +5,7 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import type { NewOrderInput } from "./order-repository";
+import { AccountExistsError, type NewOrderInput } from "./order-repository";
 import { PrismaOrderRepository } from "./prisma-order-repository";
 
 const prisma = new PrismaClient();
@@ -15,7 +15,15 @@ beforeEach(async () => {
   await prisma.itemAuditEntry.deleteMany();
   await prisma.item.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.signInCode.deleteMany();
+  await prisma.account.deleteMany({ where: { role: "CUSTOMER" } });
 });
+
+let emailCounter = 0;
+/** A fresh new-customer owner per call, so tests don't collide on email. */
+function newCustomer(ifEmailRegistered: "fail" | "attach" = "fail", email = `customer${++emailCounter}@example.com`) {
+  return { newCustomer: { email, phone: "2125550142" }, ifEmailRegistered };
+}
 
 afterAll(async () => {
   await prisma.$disconnect();
@@ -23,10 +31,10 @@ afterAll(async () => {
 
 function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
   return {
-    accountId: null,
+    owner: newCustomer(),
     contactName: "Jordan Smith",
-    guestEmail: "customer@example.com",
-    guestPhone: null,
+    contactEmail: "customer@example.com",
+    contactPhone: "2125550142",
     policyAcceptedAt: new Date(),
     fulfillment: {
       method: "PICKUP",
@@ -111,6 +119,46 @@ describe("PrismaOrderRepository (integration)", () => {
       preferredDate: "2026-11-15",
     });
     expect((await repo.findById(withoutDate.order.id))?.fulfillment).toMatchObject({ preferredDate: null });
+  });
+
+  it("creates the new customer's Account with the Order", async () => {
+    const { order } = await repo.create(newOrder({ owner: newCustomer("fail", "new@example.com") }));
+    const account = await prisma.account.findUniqueOrThrow({ where: { id: order.accountId } });
+    expect(account).toMatchObject({ email: "new@example.com", phone: "2125550142", role: "CUSTOMER" });
+  });
+
+  it("refuses a second Account for a registered email, and writes nothing", async () => {
+    await repo.create(newOrder({ owner: newCustomer("fail", "taken@example.com") }));
+    await expect(repo.create(newOrder({ owner: newCustomer("fail", "taken@example.com") }))).rejects.toThrow(
+      AccountExistsError,
+    );
+    expect(await prisma.order.count()).toBe(1);
+  });
+
+  it("attaches to the registered Account when asked to, including under a concurrent first booking", async () => {
+    const results = await Promise.all([
+      repo.create(newOrder({ owner: newCustomer("attach", "same@example.com") })),
+      repo.create(newOrder({ owner: newCustomer("attach", "same@example.com") })),
+    ]);
+    expect(new Set(results.map((r) => r.order.accountId)).size).toBe(1);
+    expect(await prisma.account.count({ where: { email: "same@example.com" } })).toBe(1);
+    expect(await prisma.order.count()).toBe(2);
+  });
+
+  it("books a signed-in customer's Order into their existing Account", async () => {
+    const first = await repo.create(newOrder());
+    const second = await repo.create(newOrder({ owner: { accountId: first.order.accountId } }));
+    expect(second.order.accountId).toBe(first.order.accountId);
+    expect((await repo.findByAccountId(first.order.accountId)).map((o) => o.id)).toEqual([
+      second.order.id,
+      first.order.id,
+    ]);
+  });
+
+  it("reports which photo keys are already attached to an Item", async () => {
+    await repo.create(newOrder({ item: { ...newOrder().item, photoKeys: ["k1", "k2"] } }));
+    expect(await repo.findPhotoKeysInUse(["k2", "k3"])).toEqual(["k2"]);
+    expect(await repo.findPhotoKeysInUse([])).toEqual([]);
   });
 
   it("returns the existing order for a repeated submissionKey instead of inserting a duplicate", async () => {

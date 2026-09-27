@@ -12,6 +12,11 @@ export interface UploadTarget {
 
 export interface FileStorage {
   createUploadTarget(params: { key: string; contentType: string; maxBytes: number }): Promise<UploadTarget>;
+  /**
+   * A short-lived link that shows one private object. The bucket itself is
+   * never publicly readable; callers must authorize the viewer first.
+   */
+  createViewUrl(key: string): Promise<string>;
 }
 
 export class StorageNotConfiguredError extends Error {
@@ -23,3 +28,6 @@ export class StorageNotConfiguredError extends Error {
 
 /** How long an issued upload target stays valid. */
 export const UPLOAD_TARGET_TTL_SECONDS = 10 * 60;
+
+/** How long a photo view link works. */
+export const VIEW_URL_TTL_SECONDS = 5 * 60;
