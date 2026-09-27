@@ -4,7 +4,7 @@
 
 import type { SubmitOrderResponse } from "@/features/orders/api/submit-order-request";
 import type { PickupSelection } from "./pickup-date-picker";
-import { toCalendarDate } from "@/features/orders/pickup-window";
+import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod } from "./booking-types";
 
 export type { SubmitOrderResponse };
@@ -55,14 +55,14 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
     fulfillment = {
       method: "PICKUP" as const,
       address: orderAddress,
-      date: toCalendarDate(submission.pickupSelection.date),
+      date: calendarDateInLocalTime(submission.pickupSelection.date),
       slot: submission.pickupSelection.time,
     };
   } else {
     fulfillment = {
       method: "MAIL_IN" as const,
       address: orderAddress,
-      preferredDate: submission.mailInDate ? toCalendarDate(submission.mailInDate.date) : null,
+      preferredDate: submission.mailInDate ? calendarDateInLocalTime(submission.mailInDate.date) : null,
     };
   }
 

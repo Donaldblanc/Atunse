@@ -48,8 +48,8 @@ export interface Address {
   zip: string;
 }
 
-/** Calendar dates travel as "YYYY-MM-DD" so no timezone can shift them. */
-export type CalendarDate = string;
+import type { CalendarDate } from "./calendar-date";
+export type { CalendarDate } from "./calendar-date";
 
 export type Fulfillment =
   | { method: "PICKUP"; address: Address; date: CalendarDate; slot: string }

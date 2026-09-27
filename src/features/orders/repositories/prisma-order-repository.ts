@@ -1,6 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
-import type { Order, Item, AuditEntry, Fulfillment, CalendarDate } from "../domain";
+import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
+import type { Order, Item, AuditEntry, Fulfillment } from "../domain";
 import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
 
 // Prisma's generated shape never leaks past this file (ADR-0011/0013) —
@@ -11,16 +12,6 @@ const ORDER_INCLUDE = { items: { include: ITEM_INCLUDE } } satisfies Prisma.Orde
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
-
-// @db.Date columns come back as UTC midnight; keep them as plain calendar
-// dates so a customer's "Oct 3" never becomes "Oct 2" in another timezone.
-function toCalendarDate(date: Date): CalendarDate {
-  return date.toISOString().slice(0, 10);
-}
-
-function fromCalendarDate(date: CalendarDate): Date {
-  return new Date(`${date}T00:00:00Z`);
-}
 
 function toDomainItem(row: ItemRow): Item {
   return {
@@ -50,11 +41,11 @@ function toDomainFulfillment(row: OrderRow): Fulfillment {
     return {
       method: "PICKUP",
       address,
-      date: row.pickupDate ? toCalendarDate(row.pickupDate) : "",
+      date: row.pickupDate ? calendarDateFromUtcMidnight(row.pickupDate) : "",
       slot: row.pickupSlot ?? "",
     };
   }
-  return { method: "MAIL_IN", address, preferredDate: row.mailInDate ? toCalendarDate(row.mailInDate) : null };
+  return { method: "MAIL_IN", address, preferredDate: row.mailInDate ? calendarDateFromUtcMidnight(row.mailInDate) : null };
 }
 
 function toDomainOrder(row: OrderRow): Order {
@@ -129,11 +120,11 @@ export class PrismaOrderRepository implements OrderRepository {
         city: fulfillment.address.city,
         state: fulfillment.address.state,
         zip: fulfillment.address.zip,
-        pickupDate: fulfillment.method === "PICKUP" ? fromCalendarDate(fulfillment.date) : null,
+        pickupDate: fulfillment.method === "PICKUP" ? calendarDateToUtcMidnight(fulfillment.date) : null,
         pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
         mailInDate:
           fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
-            ? fromCalendarDate(fulfillment.preferredDate)
+            ? calendarDateToUtcMidnight(fulfillment.preferredDate)
             : null,
         rush: input.rush,
         estimateCents: input.estimate.cents,

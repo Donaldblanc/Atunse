@@ -29,13 +29,6 @@ function buildTimeSlots() {
 
 export const PICKUP_TIME_SLOTS: readonly string[] = buildTimeSlots();
 
-/** A local calendar day as "YYYY-MM-DD" (no UTC conversion). */
-export function toCalendarDate(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
 /** Mail-In is nationwide: the 50 states plus DC. */
 export const US_STATES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS",

@@ -3,7 +3,8 @@ import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
 import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
+import { calendarDateInShopTime, isCalendarDate, type CalendarDate } from "../calendar-date";
+import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
@@ -74,9 +75,6 @@ export class BookingValidationError extends Error {
   }
 }
 
-// The shop runs on New York time, so "today" for past-date checks is NY's.
-const SHOP_TIMEZONE = "America/New_York";
-const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Phase 1 vertical slice, step 1: a customer books one pair through
@@ -103,7 +101,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     if (existing) return sendConfirmationOnce(deps, existing, now);
   }
 
-  const today = shopToday(now);
+  const today = calendarDateInShopTime(now);
   const contact = validateContact(input.contact);
   const fulfillment = validateFulfillment(input.fulfillment, today);
   const material = validateMaterial(input.item.material);
@@ -235,7 +233,7 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
       throw new BookingValidationError("Pickup is only available in NY, NJ and CT. Choose Mail-In instead.");
     }
-    if (!isValidCalendarDate(fulfillment.date) || fulfillment.date < today) {
+    if (!isCalendarDate(fulfillment.date) || fulfillment.date < today) {
       throw new BookingValidationError("Choose a pickup date from today onward.");
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
@@ -248,7 +246,7 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     throw new BookingValidationError("Choose a US state for your shipping address.");
   }
   const { preferredDate } = fulfillment;
-  if (preferredDate !== null && (!isValidCalendarDate(preferredDate) || preferredDate < today)) {
+  if (preferredDate !== null && (!isCalendarDate(preferredDate) || preferredDate < today)) {
     throw new BookingValidationError("Choose a mail-in date from today onward.");
   }
   return { method: "MAIL_IN", address, preferredDate };
@@ -269,17 +267,6 @@ function validatePhotoKeys(photoKeys: string[]) {
     throw new BookingValidationError(`Add at most ${MAX_PHOTOS_PER_ITEM} photos per pair.`);
   }
   if (!photoKeys.every(isBookingPhotoKey)) throw new BookingValidationError("One or more photos weren't uploaded.");
-}
-
-function isValidCalendarDate(value: string): boolean {
-  if (!CALENDAR_DATE_PATTERN.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
-}
-
-function shopToday(now: Date): CalendarDate {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", { timeZone: SHOP_TIMEZONE }).format(now);
 }
 
 function blankToNull(value: string | null): string | null {
