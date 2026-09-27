@@ -8,13 +8,14 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  pull-requests: write
+# Least privilege: nothing by default; each job asks for what it needs.
+permissions: {}
 
 jobs:
   tag-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version tag and create the GitHub Release
     steps:
       # fetch-tags: default checkout is shallow and skips tags entirely, so
       # the "does this tag already exist" check below always says no even
@@ -58,6 +59,9 @@ jobs:
   back-merge-to-develop:
     needs: tag-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the back-merge branch
+      pull-requests: write # open the back-merge PR
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

@@ -5,12 +5,13 @@ on:
     branches: [main, develop]
   pull_request:
 
-# Least privilege: these jobs only read the repo (vulnerability scan).
-permissions:
-  contents: read
+# Least privilege: nothing by default; each job asks for what it needs.
+permissions: {}
 
 jobs:
   test:
+    permissions:
+      contents: read # checkout
     runs-on: ubuntu-latest
 
     # Real Postgres service container (ADR-0007) — repository/migration

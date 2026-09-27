@@ -8,9 +8,8 @@ on:
   pull_request:
     branches: [main]
 
-# Least privilege: these jobs only read the repo (vulnerability scan).
-permissions:
-  contents: read
+# Least privilege: this job only reads the PR's branch name from the event.
+permissions: {}
 
 jobs:
   check-source-branch:
