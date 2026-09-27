@@ -44,13 +44,32 @@ npm run dev              # Next.js dev server
 npm run typecheck
 npm run lint
 npm test                 # unit tests (no DB required)
-npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres
+npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres (see below)
 npm run build
 ```
 
+### Run integration tests against a separate database
+Integration tests **delete every order and customer account** in the
+database they run against. Point them at a throwaway database, not
+`atunse_dev`:
+
+```bash
+createdb -h localhost -U atunse atunse_test   # once
+DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npx prisma migrate deploy
+DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:integration
+```
+
+### Customer sign-in codes in development
+Set `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true` in `.env` to try the booking
+flow's customer login. Without `RESEND_API_KEY`/`EMAIL_FROM`, codes aren't
+emailed: the dev server log shows them as
+`[notification] to=… subject="123456 is your Atunṣe sign-in code"`.
+
 ## API surface (Phase 1)
 - `POST /api/v1/uploads` — presigned upload targets for a booking's photos (one per photo; JPEG/PNG/WebP/HEIC, under 15 MB, at most 10)
-- `POST /api/v1/orders` — customer-facing order submission from `/booking` (guest today; ties to an Account once auth is wired). Send an `Idempotency-Key: <uuid>` header to make retries safe
+- `POST /api/v1/orders` — customer-facing order submission from `/booking`. Creates the customer's Account on their first booking (ADR-0014). Send an `Idempotency-Key: <uuid>` header to make retries safe. `409 SIGN_IN_REQUIRED` means the email already has an Account (with customer sign-in on)
+- `POST /api/v1/auth/code/request`, `POST /api/v1/auth/code/verify` — customer email-code sign-in (404 unless `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true`)
+- `GET /api/v1/orders/:orderId/photos` — 5-minute photo view links, for the Order's owner or an admin
 - `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
 - `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
 - `POST /api/v1/auth/sign-out` — clears the session cookie

@@ -23,7 +23,8 @@ what replaces it later.
    | `DATABASE_URL` | Neon production branch connection string | Neon preview/dev branch string (see below) |
    | `SESSION_SECRET` | `openssl rand -hex 32` (unique, real secret) | same or a separate dev value |
    | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | only needed if you run `prisma:seed` manually — not read at runtime | — |
-   | `RESEND_API_KEY` | leave unset until ADR-0006's provider is actually wired; `ConsoleNotificationService` is still what's used today | — |
+   | `RESEND_API_KEY` / `EMAIL_FROM` | Resend API key and a sender on a verified domain; without both, emails (booking confirmations, sign-in codes) are only logged | unset, or a test key |
+   | `FEATURE_CUSTOMER_SIGN_IN_ENABLED` | `false` until Resend is live, then `true` (ADR-0014) | same |
    | `STORAGE_DRIVER` | `s3` (the default in production; `local` is refused) | `s3` |
    | `S3_BUCKET` | the photo bucket (Neon storage: `atunse-images`) | a separate preview bucket, or the same one |
    | `S3_REGION` or `AWS_REGION` | the bucket's region | same |

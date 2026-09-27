@@ -23,7 +23,7 @@ basis for this build.
 - **Approval Gate**: every Item, no exceptions, is manually priced/reviewed by the owner before the customer can pay on it (ADR-0001) — no auto-priced "standard" tier in MVP.
 - **Deposit**: one 50% payment per Order at submission, based on published/estimated prices.
 - **Balance Delta**: if a custom-quoted Item's final price exceeds its deposit estimate, the delta is folded into the Balance due at completion (deposit never re-charged/refunded) and the customer is notified as soon as the Quote is sent — no surprise at pickup.
-- **Guest Order / Customer Account / Account Linking**: guests can order without an account; creating an account auto-matches (by email/phone) and offers past guest orders to link, customer confirms.
+- **Customer Account** (ADR-0014): every booking belongs to an Account, created automatically by the first booking from its email and phone. There are no guest orders and no Account Linking. A signed-out booking whose email already has an Account must sign in with an emailed **Sign-in Code** (the booking flow's own login screen), behind the `FEATURE_CUSTOMER_SIGN_IN_ENABLED` toggle. Customers can only ever see their own photos, through short-lived links.
 - **Manual Payment Confirmation**: Zelle/Cash payments only advance an Order once the owner marks them received in admin (ADR-0002); Apple Pay/card (Stripe, once toggled on) confirms automatically.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
@@ -47,6 +47,7 @@ basis for this build.
 | 0011 | Code organized by **feature** first, layers (use-cases/repositories/adapters) inside each feature — refines ADR-0003's layering to avoid global layer folders |
 | 0012 | Money (integer-cents value type), idempotency keys, per-use-case authorization, and audit records are explicit domain concerns designed in from the first vertical slice — not infrastructure retrofitted later |
 | 0013 | Prisma for the ORM/migrations; Vitest for both unit and integration tests. `PrismaClient` is only imported inside repositories |
+| 0014 | Every booking belongs to an Account (created at first booking; no guest orders). Customers sign in with emailed codes, only when a booking's email already has an Account; photos are viewable only by their Account's owner or an admin, through 5-minute presigned links. Customer login is behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED` |
 
 ## Guiding build principle
 **Establish architectural boundaries early; implement the domain
@@ -74,10 +75,11 @@ prove it against.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
 - `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).
 - `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key.
-- Notifications still go through `ConsoleNotificationService` (logs only; no Resend adapter yet).
+- **Customer Accounts (ADR-0014).** Every booking creates or uses a Customer Account (`orders.accountId` is required). With `FEATURE_CUSTOMER_SIGN_IN_ENABLED` on, a signed-out booking whose email already has an Account gets the booking flow's email-code login screen (`POST /api/v1/auth/code/request` and `/verify`). With it off (the default), that booking attaches to the existing Account.
+- **Photo viewing**: `GET /api/v1/orders/:orderId/photos` issues 5-minute presigned GET links to the Order's Account owner or an admin only. A photo key can belong to only one Order.
+- Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
 - Not built yet:
   - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
-  - Resend adapter.
   - Any admin working screen. `/admin` is a dashboard listing the planned screens, with placeholder stats.
 
 **Customer site (marketing + booking UI).**
@@ -99,7 +101,7 @@ prove it against.
 - Narrow initial schema: just enough for the one workflow below (Order, Item, Customer/Account) — not the full domain model up front
 
 **Phase 1 — One real vertical slice, fully engineered** (in progress: backend use-cases and API only)
-Pick the core workflow: guest submits an Order with one Item and photos →
+Pick the core workflow: a customer submits an Order with one Item and photos →
 owner reviews and sends a quote → customer pays the deposit manually
 (Zelle/Cash, ADR-0002) → owner confirms payment → Item moves through the
 Status Pipeline to Completed. Build this **one path** all the way through,
@@ -116,7 +118,7 @@ This slice is the thing that proves the architecture, not a diagram.
 **Phase 2 — Generalize to the rest of the domain**
 - Multi-item orders, the remaining Services, Balance Delta logic
 - Remaining Item Status Pipeline transitions and admin queues (Under-Review, Awaiting-payment)
-- Customer account creation + guest-order linking
+- Customer "my bookings" page (the photo endpoint and customer sessions already exist, ADR-0014)
 - Full admin screen inventory (Orders queue, Customers, Settings)
 
 **Phase 3 — Reliability and scale-out of what Phase 1 stubbed**
@@ -131,7 +133,7 @@ This slice is the thing that proves the architecture, not a diagram.
 2. **Item detail** — photos, condition notes, service selection, price/quote entry, status transitions, payment status (incl. manual Zelle/Cash confirmation per ADR-0002), and messages scoped to this item (see below)
 3. **Under-Review / needs-action queue** — items awaiting a quote (every item requires manual review, ADR-0001) — where the owner's daily work starts
 4. **Awaiting payment confirmation queue** — Zelle/Cash items with a deposit/balance not yet marked received
-5. **Customers** — list + detail (contact info, order history, linked guest orders)
+5. **Customers** — list + detail (contact info, order history)
 6. **Settings** — service/pricing reference list, policy documents. Feature toggles (Stripe, SMS) are **env-var/config-only**, not an admin UI control.
 
 Messaging in MVP lives inside Item detail only — no cross-order inbox yet
