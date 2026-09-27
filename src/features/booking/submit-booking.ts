@@ -4,7 +4,7 @@
 
 import type { SubmitOrderResponse } from "@/features/orders/api/submit-order-request";
 import type { PickupSelection } from "./pickup-date-picker";
-import { toCalendarDate } from "./pickup-window";
+import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod } from "./booking-types";
 
 export type { SubmitOrderResponse };
@@ -31,11 +31,16 @@ export class BookingSubmitError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    /** With SUBMISSION_CONFLICT: the booking that already went through. */
+    readonly existing?: SubmitOrderResponse,
   ) {
     super(message);
     this.name = "BookingSubmitError";
   }
 }
+
+/** Server answers meaning "upload the photos again", not "resend the same keys". */
+const REUPLOAD_CODES = ["PHOTOS_IN_USE", "PHOTOS_NOT_UPLOADED"];
 
 const GENERIC_FAILURE = "Something went wrong submitting your booking. Please try again.";
 
@@ -55,14 +60,14 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
     fulfillment = {
       method: "PICKUP" as const,
       address: orderAddress,
-      date: toCalendarDate(submission.pickupSelection.date),
+      date: calendarDateInLocalTime(submission.pickupSelection.date),
       slot: submission.pickupSelection.time,
     };
   } else {
     fulfillment = {
       method: "MAIL_IN" as const,
       address: orderAddress,
-      preferredDate: submission.mailInDate ? toCalendarDate(submission.mailInDate.date) : null,
+      preferredDate: submission.mailInDate ? calendarDateInLocalTime(submission.mailInDate.date) : null,
     };
   }
 
@@ -83,46 +88,61 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeys: 
 
 async function errorFrom(res: Response): Promise<BookingSubmitError> {
   try {
-    const body = (await res.json()) as { error?: unknown; code?: unknown };
+    const body = (await res.json()) as { error?: unknown; code?: unknown; existing?: SubmitOrderResponse };
     return new BookingSubmitError(
       typeof body.error === "string" ? body.error : GENERIC_FAILURE,
       typeof body.code === "string" ? body.code : undefined,
+      body.existing,
     );
   } catch {
     return new BookingSubmitError(GENERIC_FAILURE);
   }
 }
 
-async function uploadPhotos(photos: File[], fetchImpl: typeof fetch): Promise<string[]> {
-  const res = await fetchImpl("/api/v1/uploads", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ files: photos.map((photo) => ({ contentType: photo.type, size: photo.size })) }),
-  });
-  if (!res.ok) throw await errorFrom(res);
-  const { uploads } = (await res.json()) as { uploads: { key: string; url: string; fields: Record<string, string> }[] };
+/**
+ * Storage keys of photos already uploaded during this booking (#78), keyed
+ * by the File the customer picked. Retries reuse them instead of uploading
+ * every photo again, which also keeps the submitted booking identical, so
+ * a retry is recognized as the same submission (#76).
+ */
+export type UploadedPhotoKeys = WeakMap<File, string>;
 
-  await Promise.all(
-    uploads.map(async (upload, index) => {
-      const form = new FormData();
-      for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
-      form.append("file", photos[index]!); // storage requires the file last
-      const uploaded = await fetchImpl(upload.url, { method: "POST", body: form });
-      if (!uploaded.ok) throw new BookingSubmitError("One of your photos didn't upload. Please try again.");
-    }),
-  );
-  return uploads.map((upload) => upload.key);
+async function uploadPhotos(photos: File[], uploaded: UploadedPhotoKeys, fetchImpl: typeof fetch): Promise<string[]> {
+  const pending = photos.filter((photo) => !uploaded.has(photo));
+  if (pending.length > 0) {
+    const res = await fetchImpl("/api/v1/uploads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: pending.map((photo) => ({ contentType: photo.type, size: photo.size })) }),
+    });
+    if (!res.ok) throw await errorFrom(res);
+    const { uploads } = (await res.json()) as { uploads: { key: string; url: string; fields: Record<string, string> }[] };
+
+    await Promise.all(
+      uploads.map(async (upload, index) => {
+        const photo = pending[index]!;
+        const form = new FormData();
+        for (const [name, value] of Object.entries(upload.fields)) form.append(name, value);
+        form.append("file", photo); // storage requires the file last
+        const res = await fetchImpl(upload.url, { method: "POST", body: form });
+        if (!res.ok) throw new BookingSubmitError("One of your photos didn't upload. Please try again.");
+        uploaded.set(photo, upload.key); // only once it's really in storage
+      }),
+    );
+  }
+  return photos.map((photo) => uploaded.get(photo)!);
 }
 
 export async function submitBooking(
   submission: BookingSubmission,
+  uploaded: UploadedPhotoKeys = new WeakMap(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<SubmitOrderResponse> {
   // Validate the request shape before spending time on uploads.
   buildOrderRequestBody(submission, []);
 
-  try {
-    const photoKeys = await uploadPhotos(submission.pair.photos, fetchImpl);
+  const attempt = async () => {
+    const photoKeys = await uploadPhotos(submission.pair.photos, uploaded, fetchImpl);
     const res = await fetchImpl("/api/v1/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Idempotency-Key": submission.submissionKey },
@@ -130,6 +150,20 @@ export async function submitBooking(
     });
     if (!res.ok) throw await errorFrom(res);
     return (await res.json()) as SubmitOrderResponse;
+  };
+
+  try {
+    try {
+      return await attempt();
+    } catch (err) {
+      // The server can't use the photo keys this booking remembered: gone
+      // from storage (e.g. cleaned up while the tab sat open), or already
+      // attached to another booking. Resending them would fail forever, so
+      // forget them and upload once more.
+      if (!(err instanceof BookingSubmitError && REUPLOAD_CODES.includes(err.code ?? ""))) throw err;
+      for (const photo of submission.pair.photos) uploaded.delete(photo);
+      return await attempt();
+    }
   } catch (err) {
     if (err instanceof BookingSubmitError) throw err;
     throw new BookingSubmitError(GENERIC_FAILURE); // network failure

@@ -1,7 +1,14 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { UPLOAD_TARGET_TTL_SECONDS, VIEW_URL_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
+import {
+  INSPECT_HEAD_BYTES,
+  UPLOAD_TARGET_TTL_SECONDS,
+  VIEW_URL_TTL_SECONDS,
+  type FileStorage,
+  type StoredObject,
+  type UploadTarget,
+} from "./file-storage";
 
 export interface S3FileStorageConfig {
   bucket: string;
@@ -9,6 +16,28 @@ export interface S3FileStorageConfig {
   /** Set for S3-compatible providers (e.g. Neon storage); unset for AWS. */
   endpoint?: string;
   credentials?: { accessKeyId: string; secretAccessKey: string };
+}
+
+/**
+ * A missing object: NoSuchKey (404), or 403 for keys without s3:ListBucket,
+ * which AWS returns instead of 404 for a missing object (GetObject docs).
+ * Our keys are server-minted and shape-checked, so a 403 here means "not
+ * uploaded", not a permissions problem.
+ */
+function isMissingObject(err: unknown): boolean {
+  const e = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+  return err instanceof NoSuchKey || e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404 || e.$metadata?.httpStatusCode === 403;
+}
+
+export function s3ClientFor(config: S3FileStorageConfig): S3Client {
+  return new S3Client({
+    region: config.region,
+    endpoint: config.endpoint,
+    credentials: config.credentials,
+    // S3-compatible endpoints don't serve bucket subdomains
+    // (bucket.endpoint), so address the bucket in the path instead.
+    forcePathStyle: Boolean(config.endpoint),
+  });
 }
 
 // Presigned POST rather than PUT: its policy can enforce a size range and
@@ -20,14 +49,7 @@ export class S3FileStorage implements FileStorage {
 
   constructor(config: S3FileStorageConfig) {
     this.bucket = config.bucket;
-    this.client = new S3Client({
-      region: config.region,
-      endpoint: config.endpoint,
-      credentials: config.credentials,
-      // S3-compatible endpoints don't serve bucket subdomains
-      // (bucket.endpoint), so address the bucket in the path instead.
-      forcePathStyle: Boolean(config.endpoint),
-    });
+    this.client = s3ClientFor(config);
   }
 
   async createUploadTarget(params: { key: string; contentType: string; maxBytes: number }): Promise<UploadTarget> {
@@ -42,6 +64,40 @@ export class S3FileStorage implements FileStorage {
       Expires: UPLOAD_TARGET_TTL_SECONDS,
     });
     return { url, fields };
+  }
+
+  async inspect(key: string): Promise<StoredObject | null> {
+    try {
+      // One ranged GET gives the first bytes, the stored type, and (from
+      // Content-Range) the full size.
+      const res = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=0-${INSPECT_HEAD_BYTES - 1}` }),
+      );
+      // Capped even if an endpoint ignores Range and sends the whole object.
+      const head = res.Body ? (await res.Body.transformToByteArray()).slice(0, INSPECT_HEAD_BYTES) : new Uint8Array();
+      const total = res.ContentRange?.match(/\/(\d+)$/)?.[1];
+      return { size: total ? Number(total) : (res.ContentLength ?? head.length), contentType: res.ContentType ?? null, head };
+    } catch (err) {
+      if (isMissingObject(err)) return null;
+      throw err;
+    }
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<boolean> {
+    try {
+      await this.client.send(
+        new CopyObjectCommand({
+          Bucket: this.bucket,
+          Key: toKey,
+          CopySource: `${this.bucket}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
+          MetadataDirective: "COPY", // keeps the pinned Content-Type
+        }),
+      );
+      return true;
+    } catch (err) {
+      if (isMissingObject(err)) return false;
+      throw err;
+    }
   }
 
   async createViewUrl(key: string): Promise<string> {

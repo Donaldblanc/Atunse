@@ -25,10 +25,13 @@ let counter = 0;
 function newCustomer(email = `customer${++counter}@example.com`) {
   return { newCustomer: { email, phone: "2125550142" } };
 }
-/** Unique photo keys per call: item_photos.key is unique across all Items. */
-function photoKeys(n = 1) {
+/** Fresh photos per call: both item_photos.key and .uploadKey are unique. */
+function photos(n = 1) {
   counter += 1;
-  return Array.from({ length: n }, (_, i) => `bookings/run-${counter}/${i}.jpg`);
+  return Array.from({ length: n }, (_, i) => ({
+    key: `photos/run-${counter}/${i}.jpg`,
+    uploadKey: `bookings/run-${counter}/${i}.jpg`,
+  }));
 }
 
 afterAll(async () => {
@@ -53,6 +56,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     estimateIsMinimum: false,
     deposit: Money.fromCents(1500),
     submissionKey: null,
+    submissionFingerprint: null,
     item: {
       brand: null,
       model: null,
@@ -60,7 +64,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
       material: null,
       serviceIds: ["standard"],
       estimate: Money.fromCents(3000),
-      photoKeys: photoKeys(),
+      photos: photos(),
     },
     ...overrides,
   };
@@ -80,7 +84,10 @@ describe("PrismaOrderRepository (integration)", () => {
           material: "Suede",
           serviceIds: ["standard"],
           estimate: Money.fromCents(4000),
-          photoKeys: ["k1", "k2"],
+          photos: [
+            { key: "photos/k/1.jpg", uploadKey: "bookings/k/1.jpg" },
+            { key: "photos/k/2.jpg", uploadKey: "bookings/k/2.jpg" },
+          ],
         },
       }),
     );
@@ -91,7 +98,7 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(order.items[0]?.price).toBeNull();
 
     const reloaded = await repo.findById(order.id);
-    expect(reloaded?.items[0]?.photoKeys).toEqual(["k1", "k2"]);
+    expect(reloaded?.items[0]?.photoKeys).toEqual(["photos/k/1.jpg", "photos/k/2.jpg"]);
     expect(reloaded?.items[0]?.serviceIds).toEqual(["standard"]);
     expect(reloaded?.items[0]?.material).toBe("Suede");
     expect(reloaded?.items[0]?.estimate.cents).toBe(4000);
@@ -160,23 +167,30 @@ describe("PrismaOrderRepository (integration)", () => {
   });
 
   it("stores photos in order and round-trips them", async () => {
-    const keys = photoKeys(3);
-    const { order } = await repo.create(newOrder({ item: { ...newOrder().item, photoKeys: keys } }));
-    expect((await repo.findById(order.id))?.items[0]?.photoKeys).toEqual(keys);
+    const three = photos(3);
+    const { order } = await repo.create(newOrder({ item: { ...newOrder().item, photos: three } }));
+    expect((await repo.findById(order.id))?.items[0]?.photoKeys).toEqual(three.map((p) => p.key));
   });
 
-  it("lets exactly one of two concurrent bookings claim a photo key (20 runs)", async () => {
+  it("lets exactly one of two concurrent bookings claim an upload (20 runs)", async () => {
     for (let run = 0; run < 20; run++) {
-      const shared = photoKeys();
+      // Same upload, each booking with its own copy, as submitOrder makes them.
+      const [upload] = photos();
       const results = await Promise.allSettled([
-        repo.create(newOrder({ item: { ...newOrder().item, photoKeys: shared } })),
-        repo.create(newOrder({ item: { ...newOrder().item, photoKeys: shared } })),
+        repo.create(newOrder({ item: { ...newOrder().item, photos: [{ key: `${upload!.key}.a`, uploadKey: upload!.uploadKey }] } })),
+        repo.create(newOrder({ item: { ...newOrder().item, photos: [{ key: `${upload!.key}.b`, uploadKey: upload!.uploadKey }] } })),
       ]);
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
       const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
       expect(rejected.reason).toBeInstanceOf(PhotoKeyInUseError);
-      expect(await prisma.itemPhoto.count({ where: { key: shared[0] } })).toBe(1);
+      expect(await prisma.itemPhoto.count({ where: { uploadKey: upload!.uploadKey } })).toBe(1);
     }
+  });
+
+  it("stores the submission fingerprint with the key and finds the Order by key", async () => {
+    const { order } = await repo.create(newOrder({ submissionKey: "fp-key", submissionFingerprint: "abc123" }));
+    expect((await repo.findBySubmissionKey("fp-key"))?.id).toBe(order.id);
+    expect((await repo.findById(order.id))?.submissionFingerprint).toBe("abc123");
   });
 
   it("returns the existing order for a repeated submissionKey instead of inserting a duplicate", async () => {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import { BOOKING_SERVICES } from "@/features/booking/services-data";
 import {
+  formatServicePrice,
+  serviceNotes,
   estimateItem,
   estimateOrder,
   InvalidServiceSelectionError,
@@ -54,20 +56,23 @@ describe("estimateOrder", () => {
   });
 });
 
-// services-data.ts carries the customer-facing price strings; the catalog
-// carries the cents the Deposit is computed from. They must never disagree.
-describe("catalog / booking display parity", () => {
-  it.each(BOOKING_SERVICES.map((s) => [s.id, s] as const))("%s matches its display price", (id, display) => {
-    const catalog = SERVICE_CATALOG.find((s) => s.id === id);
-    expect(catalog, `no catalog entry for ${id}`).toBeDefined();
-    const leadingDollars = parseInt(display.price.match(/\d+/)![0], 10);
-    expect(catalog!.baseCents).toBe(leadingDollars * 100);
-    expect(catalog!.isMinimum).toBe(display.price.endsWith("+"));
-    expect(catalog!.suedeFee).toBe(Boolean(display.suedeFee));
-    expect(catalog!.isCleaningTier).toBe(display.category === "cleaning");
+// Every price string the site shows is formatted from the catalog. These
+// pin the published wording, so a formatting change is a visible decision.
+describe("catalog display prices", () => {
+  it("formats each Service's headline price and notes as published", () => {
+    const shown = Object.fromEntries(
+      SERVICE_CATALOG.map((s) => [s.id, { price: formatServicePrice(s), notes: serviceNotes(s) }]),
+    );
+    expect(shown).toEqual({
+      standard: { price: "$30", notes: ["+$10 for Suede"] },
+      premium: { price: "$50", notes: ["+$10 for Suede"] },
+      oxidation: { price: "Midsole from $25+", notes: ["Sole from $40+"] },
+      painting: { price: "Starting at $40+", notes: [] },
+      reglue: { price: "Starting at $50+", notes: [] },
+    });
   });
 
-  it("has no catalog entry the booking UI can't show", () => {
+  it("has a catalog entry for every Service the booking flow offers, and no others", () => {
     expect(SERVICE_CATALOG.map((s) => s.id).sort()).toEqual(BOOKING_SERVICES.map((s) => s.id).sort());
   });
 });

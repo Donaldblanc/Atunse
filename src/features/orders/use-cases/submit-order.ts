@@ -1,11 +1,15 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
-import { isValidEmail, isValidUsPhone, isValidZip } from "@/features/booking/contact-rules";
-import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "@/features/booking/pickup-window";
+import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
+import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
+import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
-import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
+import type { FileStorage } from "@/shared/storage";
+import { randomUUID } from "node:crypto";
+import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
+import { submissionFingerprint } from "../submission-fingerprint";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
   EmailTakenError,
@@ -41,6 +45,9 @@ export interface SubmitOrderDeps {
   orders: OrderRepository;
   /** Customer Accounts only: Admin Accounts are a separate identity (ADR-0014). */
   accounts: AccountRepository;
+  /** Where the booking's photos were uploaded; copied and checked before the Order is created (#77). */
+  storage: FileStorage;
+  newId?: () => string;
   notifications: NotificationService;
   paymentInstructions: PaymentInstructions;
   /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
@@ -66,17 +73,62 @@ export class SignInRequiredError extends Error {
   }
 }
 
+/**
+ * The submission key already created an Order, but with different booking
+ * details (#76). Returning that Order would show the customer a booking
+ * they've since changed, so they're pointed at the one that went through.
+ */
+export class SubmissionConflictError extends Error {
+  readonly reference: string;
+
+  /** `existing` is the Order the key created, so the client can show it. */
+  constructor(readonly existing: Order) {
+    const reference = orderReference(existing.id);
+    super(
+      `We already received this booking (reference ${reference}) before your changes. ` +
+        "Check your email for its details, and reply there to change anything.",
+    );
+    this.name = "SubmissionConflictError";
+    this.reference = reference;
+  }
+}
+
 /** The booking breaks a domain rule; `message` is safe to show the customer. */
 export class BookingValidationError extends Error {
+  /** Set when the client can do something specific about it. */
+  readonly code?: string;
+
   constructor(message: string) {
     super(message);
     this.name = "BookingValidationError";
   }
 }
 
-// The shop runs on New York time, so "today" for past-date checks is NY's.
-const SHOP_TIMEZONE = "America/New_York";
-const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * A photo the booking names isn't in storage (never finished uploading, or
+ * cleaned up since). The code tells the booking client to upload the
+ * photos again rather than resend the same keys.
+ */
+export class PhotosNotUploadedError extends BookingValidationError {
+  override readonly code = "PHOTOS_NOT_UPLOADED";
+
+  constructor() {
+    super("One or more photos didn't finish uploading. Please try again.");
+  }
+}
+
+/**
+ * A photo is already attached to another booking. The code tells the
+ * booking client to upload its photos again rather than resend the keys.
+ */
+export class PhotosInUseError extends BookingValidationError {
+  override readonly code = "PHOTOS_IN_USE";
+
+  constructor() {
+    super("One or more photos are already attached to another booking. Upload them again.");
+  }
+}
+
 
 /**
  * Phase 1 vertical slice, step 1: a customer books one pair through
@@ -97,15 +149,16 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   const now = deps.now?.() ?? new Date();
 
   // A retry of a submission that already went through gets its Order back
-  // before any other check: its photo keys are, by design, already in use.
+  // before any other check: its photo keys are, by design, already in use,
+  // and a date that was valid then may have passed since (#76).
+  const fingerprint = input.submissionKey ? submissionFingerprint(input) : null;
   if (input.submissionKey) {
     const existing = await deps.orders.findBySubmissionKey(input.submissionKey);
-    if (existing) return sendConfirmationOnce(deps, existing, now);
+    if (existing) return sendConfirmationOnce(deps, await sameSubmission(deps, existing, fingerprint, now), now);
   }
 
-  const today = shopToday(now);
   const contact = validateContact(input.contact);
-  const fulfillment = validateFulfillment(input.fulfillment, today);
+  const fulfillment = validateFulfillment(input.fulfillment, now);
   const material = validateMaterial(input.item.material);
   validatePhotoKeys(input.item.photoKeys);
 
@@ -117,6 +170,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     throw err;
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
+  const photos = await keepVerifiedPhotos(deps, input.item.photoKeys);
 
   const newOrder = (owner: OrderOwner) =>
     deps.orders.create({
@@ -131,6 +185,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       estimateIsMinimum: orderEstimate.isMinimum,
       deposit: orderEstimate.deposit,
       submissionKey: input.submissionKey,
+      submissionFingerprint: fingerprint,
       item: {
         brand: blankToNull(input.item.brand),
         model: null, // the booking form's single "Brand / Model" field lands in `brand`
@@ -138,7 +193,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
         material,
         serviceIds: input.item.serviceIds,
         estimate: itemEstimate.estimate,
-        photoKeys: input.item.photoKeys,
+        photos,
       },
     });
 
@@ -155,13 +210,29 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   } catch (err) {
     // The database's unique photo key: a photo belongs to exactly one
     // booking, so another Order can never gain view access to it.
-    if (err instanceof PhotoKeyInUseError) {
-      throw new BookingValidationError("One or more photos are already attached to another booking. Upload them again.");
-    }
+    if (err instanceof PhotoKeyInUseError) throw new PhotosInUseError();
     throw err;
   }
 
-  return sendConfirmationOnce(deps, created.order, now);
+  // created is false when a concurrent request with the same key won.
+  const order = created.created ? created.order : await sameSubmission(deps, created.order, fingerprint, now);
+  return sendConfirmationOnce(deps, order, now);
+}
+
+/**
+ * The existing Order for a reused submission key, if it was the same
+ * booking (#76). If the details changed, the customer is refused and told
+ * to check their email for the booking that went through, so that email
+ * must actually go out first. A failed first send is the likeliest reason
+ * they edited and retried. Best effort: the refusal stands even if the
+ * send fails again, and a later retry tries once more.
+ */
+async function sameSubmission(deps: SubmitOrderDeps, existing: Order, fingerprint: string | null, now: Date): Promise<Order> {
+  if (existing.submissionFingerprint !== null && existing.submissionFingerprint !== fingerprint) {
+    await sendConfirmationOnce(deps, existing, now).catch(() => undefined);
+    throw new SubmissionConflictError(existing);
+  }
+  return existing;
 }
 
 /**
@@ -220,7 +291,10 @@ function validateContact(contact: SubmitOrderInput["contact"]) {
   return { name, email, phone };
 }
 
-function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Fulfillment {
+function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
+  // "Today" and slot availability are the shop's (New York's), the same
+  // rules the booking picker uses (pickup-window.ts, #75).
+  const today = calendarDateInShopTime(now);
   const address = {
     line1: fulfillment.address.line1.trim(),
     line2: blankToNull(fulfillment.address.line2),
@@ -235,11 +309,16 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
       throw new BookingValidationError("Pickup is only available in NY, NJ and CT. Choose Mail-In instead.");
     }
-    if (!isValidCalendarDate(fulfillment.date) || fulfillment.date < today) {
+    if (!isCalendarDate(fulfillment.date) || fulfillment.date < today) {
       throw new BookingValidationError("Choose a pickup date from today onward.");
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
       throw new BookingValidationError("Choose a pickup time between 4:30 PM and 10:00 PM.");
+    }
+    if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
+      throw new BookingValidationError(
+        `That pickup time is no longer available. Same-day pickups need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
+      );
     }
     return { method: "PICKUP", address, date: fulfillment.date, slot: fulfillment.slot };
   }
@@ -248,10 +327,39 @@ function validateFulfillment(fulfillment: Fulfillment, today: CalendarDate): Ful
     throw new BookingValidationError("Choose a US state for your shipping address.");
   }
   const { preferredDate } = fulfillment;
-  if (preferredDate !== null && (!isValidCalendarDate(preferredDate) || preferredDate < today)) {
+  if (preferredDate !== null && (!isCalendarDate(preferredDate) || preferredDate < today)) {
     throw new BookingValidationError("Choose a mail-in date from today onward.");
   }
   return { method: "MAIL_IN", address, preferredDate };
+}
+
+/**
+ * Copies each uploaded photo to a key no upload target can write to, then
+ * checks the copy: it must exist, and its bytes and stored Content-Type
+ * must be the image type its key promises (#77). Checking the copy, not
+ * the upload, matters: an upload target stays usable for a few minutes, so
+ * the upload itself could still be overwritten after any check of it. A
+ * key alone proves nothing: it doesn't show the upload finished, and a
+ * target's pinned Content-Type is only a label on whatever bytes were sent.
+ */
+async function keepVerifiedPhotos(
+  deps: SubmitOrderDeps,
+  uploadKeys: string[],
+): Promise<{ key: string; uploadKey: string }[]> {
+  const batchId = (deps.newId ?? randomUUID)();
+  const photos = uploadKeys.map((uploadKey, i) => ({ key: storedPhotoKey(batchId, i, uploadKey), uploadKey }));
+
+  const copied = await Promise.all(photos.map((photo) => deps.storage.copy(photo.uploadKey, photo.key)));
+  if (copied.includes(false)) throw new PhotosNotUploadedError();
+
+  const stored = await Promise.all(photos.map((photo) => deps.storage.inspect(photo.key)));
+  if (stored.some((object) => object === null || object.size === 0)) throw new PhotosNotUploadedError();
+  const valid = stored.every(
+    (object, i) =>
+      photoMatchesKey(photos[i]!.key, object!.head) && object!.contentType === photoKeyContentType(photos[i]!.key),
+  );
+  if (!valid) throw new BookingValidationError("One or more photos aren't valid JPEG, PNG, WebP or HEIC images.");
+  return photos;
 }
 
 function validateMaterial(material: string | null): Material | null {
@@ -269,17 +377,6 @@ function validatePhotoKeys(photoKeys: string[]) {
     throw new BookingValidationError(`Add at most ${MAX_PHOTOS_PER_ITEM} photos per pair.`);
   }
   if (!photoKeys.every(isBookingPhotoKey)) throw new BookingValidationError("One or more photos weren't uploaded.");
-}
-
-function isValidCalendarDate(value: string): boolean {
-  if (!CALENDAR_DATE_PATTERN.test(value)) return false;
-  const parsed = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
-}
-
-function shopToday(now: Date): CalendarDate {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", { timeZone: SHOP_TIMEZONE }).format(now);
 }
 
 function blankToNull(value: string | null): string | null {

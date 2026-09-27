@@ -2,10 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { parseSubmitOrderRequest, toSubmitOrderResponse } from "@/features/orders/api/submit-order-request";
 import { customerFromCookies } from "@/features/accounts/acting-user";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 import {
   BookingValidationError,
   PolicyNotAcceptedError,
   SignInRequiredError,
+  SubmissionConflictError,
   submitOrder,
 } from "@/features/orders/use-cases/submit-order";
 
@@ -17,8 +19,12 @@ import {
 // books like any signed-out customer, ADR-0014). An `Idempotency-Key`
 // header (UUID) makes retries return the same Order. A 409 with code
 // SIGN_IN_REQUIRED means the email already has a Customer Account: the
-// booking flow shows its login screen.
+// booking flow shows its login screen. A 409 with code SUBMISSION_CONFLICT
+// means the key already created an Order with different details (#76).
 export async function POST(req: NextRequest) {
+  const limited = await limitByIp(req, RATE_LIMITS.orders);
+  if (limited) return limited;
+
   let body: unknown;
   try {
     body = await req.json();
@@ -38,8 +44,24 @@ export async function POST(req: NextRequest) {
     const order = await submitOrder(deps, actingUser, parsed.value);
     return NextResponse.json(toSubmitOrderResponse(order, deps.paymentInstructions), { status: 201 });
   } catch (err) {
-    if (err instanceof PolicyNotAcceptedError || err instanceof BookingValidationError) {
+    if (err instanceof PolicyNotAcceptedError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    if (err instanceof BookingValidationError) {
+      return NextResponse.json({ error: err.message, ...(err.code ? { code: err.code } : {}) }, { status: 400 });
+    }
+    if (err instanceof SubmissionConflictError) {
+      // `existing` lets the booking flow show the Order that did go
+      // through. Only the browser holding this submission key gets it.
+      return NextResponse.json(
+        {
+          error: err.message,
+          code: "SUBMISSION_CONFLICT",
+          reference: err.reference,
+          existing: toSubmitOrderResponse(err.existing, deps.paymentInstructions),
+        },
+        { status: 409 },
+      );
     }
     if (err instanceof SignInRequiredError) {
       return NextResponse.json({ error: err.message, code: "SIGN_IN_REQUIRED" }, { status: 409 });

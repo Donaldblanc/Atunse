@@ -4,8 +4,9 @@ import { useState } from "react";
 import { ArrowRight, Info, Package, Truck, TriangleAlert } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";
-import { isValidZip } from "./contact-rules";
-import { PICKUP_STATES, US_STATES } from "./pickup-window";
+import { isValidZip } from "@/features/orders/contact-rules";
+import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, US_STATES } from "@/features/orders/pickup-window";
 
 export function ScheduleStep({
   method,
@@ -187,6 +188,11 @@ function scheduleProblem(
       return "Pickup is only available in NY, NJ and CT. Choose Mail in instead.";
     }
     if (!pickupSelection) return "Choose a pickup date and time to continue.";
+    // The picker only offers bookable slots, but one can lapse while the
+    // customer fills in the form (same-day notice, #75).
+    if (!availablePickupSlots(calendarDateInLocalTime(pickupSelection.date), new Date()).includes(pickupSelection.time)) {
+      return `That pickup time is no longer available (same-day pickups need ${PICKUP_LEAD_MINUTES / 60} hours' notice). Choose another.`;
+    }
   }
   return null;
 }

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderReference } from "../domain";
-import { BookingValidationError, PolicyNotAcceptedError, SignInRequiredError, submitOrder } from "./submit-order";
+import {
+  BookingValidationError,
+  PolicyNotAcceptedError,
+  SignInRequiredError,
+  SubmissionConflictError,
+  submitOrder,
+} from "./submit-order";
+import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
 import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -128,6 +135,7 @@ describe("submitOrder", () => {
 
       const stolen = validBookingInput({ contact: { name: "Eve", email: "eve@example.com", phone: "2125550100" } });
       await expect(submitOrder(deps, guest, stolen)).rejects.toThrow(/already attached to another booking/);
+      await expect(submitOrder(deps, guest, stolen)).rejects.toMatchObject({ code: "PHOTOS_IN_USE" });
     });
   });
 
@@ -169,6 +177,48 @@ describe("submitOrder", () => {
     });
   });
 
+  describe("uploaded photo verification (#77)", () => {
+    const uploadKey = "bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg";
+    const withPhoto = (key: string) => {
+      const input = validBookingInput();
+      input.item = { ...input.item, photoKeys: [key] };
+      return input;
+    };
+
+    it("refuses a photo key with nothing uploaded behind it, with a code telling the client to re-upload", async () => {
+      const deps = bookingDeps();
+      const attempt = submitOrder(deps, guest, withPhoto(uploadKey));
+      await expect(attempt).rejects.toThrow(/didn't finish uploading/);
+      await expect(attempt).rejects.toMatchObject({ code: "PHOTOS_NOT_UPLOADED" });
+      expect(deps.orders.orders.size).toBe(0);
+    });
+
+    it("refuses bytes that aren't the image type the key promises", async () => {
+      const deps = bookingDeps();
+      deps.storage.put(uploadKey, new TextEncoder().encode("<html>not a photo</html>"), "image/jpeg");
+      await expect(submitOrder(deps, guest, withPhoto(uploadKey))).rejects.toThrow(/aren't valid/);
+      expect(deps.orders.orders.size).toBe(0);
+    });
+
+    it("refuses a stored Content-Type that isn't the key's image type, even with image bytes", async () => {
+      const deps = bookingDeps();
+      deps.storage.put(uploadKey, JPEG_BYTES, "text/html");
+      await expect(submitOrder(deps, guest, withPhoto(uploadKey))).rejects.toThrow(/aren't valid/);
+    });
+
+    it("keeps a verified copy the upload target can't reach, so overwriting the upload afterwards changes nothing", async () => {
+      const deps = bookingDeps();
+      deps.storage.put(uploadKey);
+      const order = await submitOrder(deps, guest, withPhoto(uploadKey));
+
+      const [storedKey] = order.items[0]!.photoKeys;
+      expect(storedKey).toMatch(/^photos\/[0-9a-f-]{36}\/0\.jpg$/);
+      // The upload target is still valid for a few minutes: swap the bytes.
+      deps.storage.put(uploadKey, new TextEncoder().encode("<html>swapped</html>"), "image/jpeg");
+      expect(deps.storage.objects.get(storedKey!)?.bytes).toEqual(JPEG_BYTES);
+    });
+  });
+
   describe("fulfillment", () => {
     it("rejects Pickup outside NY/NJ/CT", async () => {
       const input = validBookingInput({
@@ -197,6 +247,39 @@ describe("submitOrder", () => {
       await expect(
         submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, slot: "9:00 AM – 9:30 AM" } })),
       ).rejects.toThrow(BookingValidationError);
+    });
+
+    it("rejects a same-day pickup slot that has passed or is under 2 hours away (#75)", async () => {
+      const base = validBookingInput().fulfillment;
+      if (base.method !== "PICKUP") throw new Error("fixture must be a pickup");
+      const at = (iso: string) => bookingDeps({ now: () => new Date(iso) });
+
+      // 9:45 PM EDT: today's 4:30 PM slot is long gone.
+      await expect(
+        submitOrder(at("2026-10-02T01:45:00Z"), guest, validBookingInput({ fulfillment: { ...base, date: "2026-10-01" } })),
+      ).rejects.toThrow(/no longer available/);
+      // 3:00 PM EDT: 4:30 PM is only 1.5 hours away, 5:00 PM is exactly 2.
+      await expect(
+        submitOrder(at("2026-10-01T19:00:00Z"), guest, validBookingInput({ fulfillment: { ...base, date: "2026-10-01" } })),
+      ).rejects.toThrow(/no longer available/);
+      await expect(
+        submitOrder(
+          at("2026-10-01T19:00:00Z"),
+          guest,
+          validBookingInput({ fulfillment: { ...base, date: "2026-10-01", slot: "5:00 PM – 5:30 PM" } }),
+        ),
+      ).resolves.toBeDefined();
+    });
+
+    it("judges 'today' by New York's date, not the customer's (#75)", async () => {
+      const mailIn = (preferredDate: string) =>
+        validBookingInput({ fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate } });
+      // 12:30 AM Oct 2 in New York = 9:30 PM Oct 1 in California: Oct 1 is past.
+      const pastMidnight = bookingDeps({ now: () => new Date("2026-10-02T04:30:00Z") });
+      await expect(submitOrder(pastMidnight, guest, mailIn("2026-10-01"))).rejects.toThrow(/from today onward/);
+      // 11:30 PM Oct 1 in New York (already Oct 2 in UTC): Oct 1 is still today.
+      const lateNight = bookingDeps({ now: () => new Date("2026-10-02T03:30:00Z") });
+      await expect(submitOrder(lateNight, guest, mailIn("2026-10-01"))).resolves.toBeDefined();
     });
 
     it("accepts a nationwide Mail-In order with no preferred date", async () => {
@@ -253,6 +336,62 @@ describe("submitOrder", () => {
       expect(retry.id).toBe(first.id);
       expect(deps.orders.orders.size).toBe(1);
       expect(deps.notifications.sent).toHaveLength(1);
+    });
+
+    it("refuses a reused submission key whose booking details changed, naming the booking received (#76)", async () => {
+      const deps = bookingDeps();
+      const key = "5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b";
+      const first = await submitOrder(deps, guest, validBookingInput({ submissionKey: key }));
+
+      const edited = validBookingInput({ submissionKey: key, rush: true });
+      const attempt = submitOrder(deps, guest, edited);
+      await expect(attempt).rejects.toThrow(SubmissionConflictError);
+      await expect(attempt).rejects.toMatchObject({ reference: orderReference(first.id) });
+      expect(deps.orders.orders.size).toBe(1);
+    });
+
+    it("sends the pending confirmation before refusing an edited retry, since the 409 says to check email", async () => {
+      const deps = bookingDeps();
+      const key = "7b8c9d0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e";
+      deps.notifications.failing = true;
+      await expect(submitOrder(deps, guest, validBookingInput({ submissionKey: key }))).rejects.toThrow(/email provider/);
+      expect(deps.notifications.sent).toHaveLength(0);
+
+      deps.notifications.failing = false;
+      const edited = (phone: string) =>
+        submitOrder(deps, guest, validBookingInput({ submissionKey: key, contact: { name: "Jordan", email: "customer@example.com", phone } }));
+      for (const phone of ["2125550100", "2125550101", "2125550102"]) {
+        await expect(edited(phone)).rejects.toThrow(SubmissionConflictError);
+      }
+      expect(deps.notifications.sent).toHaveLength(1); // sent once, on the first edited retry
+      await expect(edited("2125550103")).rejects.toMatchObject({ existing: { id: [...deps.orders.orders.keys()][0] } });
+    });
+
+    it("does the same when a concurrent request with the key won the race", async () => {
+      const deps = bookingDeps();
+      const key = "8c9d0e1f-2a3b-4c4d-9e5f-6a7b8c9d0e1f";
+      deps.notifications.failing = true;
+      await submitOrder(deps, guest, validBookingInput({ submissionKey: key })).catch(() => undefined);
+      deps.notifications.failing = false;
+      // The up-front lookup misses (the other request hadn't committed yet); create() then finds it.
+      const lookup = deps.orders.findBySubmissionKey.bind(deps.orders);
+      let lookups = 0;
+      deps.orders.findBySubmissionKey = async (k) => (++lookups === 1 ? null : lookup(k));
+      await expect(submitOrder(deps, guest, validBookingInput({ submissionKey: key, rush: true }))).rejects.toThrow(
+        SubmissionConflictError,
+      );
+      expect(deps.notifications.sent).toHaveLength(1);
+    });
+
+    it("returns the Order for an identical retry even after its pickup date has passed (#76)", async () => {
+      const deps = bookingDeps();
+      const key = "6f7a8b9c-0d1e-4f2a-9b3c-4d5e6f7a8b9c";
+      const input = validBookingInput({ submissionKey: key }); // pickup Oct 3
+      const first = await submitOrder(deps, guest, input);
+
+      const weekLater = { ...deps, now: () => new Date("2026-10-08T15:00:00Z") };
+      const retry = await submitOrder(weekLater, guest, input);
+      expect(retry.id).toBe(first.id);
     });
 
     it("sends the email on retry when the first send failed after the order was created", async () => {

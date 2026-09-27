@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { ArrowRight, Sparkles, TriangleAlert } from "lucide-react";
 import type { ContactInfo } from "./booking-types";
-import { isValidEmail, isValidUsPhone } from "./contact-rules";
+import { isValidEmail, isValidUsPhone } from "@/features/orders/contact-rules";
+import { RUSH_FEE_CENTS } from "@/features/orders/service-catalog";
+import { Money } from "@/shared/money/money";
 import { formatList } from "./format-list";
 
 // Captures the order's contact info — previously nowhere in this flow,
 // which meant the review step always showed a hardcoded "John Doe" /
 // "john@example.com" placeholder (docs/TODO.md). Name/email/phone are
-// required; rush is an optional +$20 add-on.
+// required; rush is an optional flat-fee add-on (RUSH_FEE_CENTS).
 export function ContactStep({
   contact,
   onChangeContact,
@@ -98,7 +100,7 @@ export function ContactStep({
       >
         <Sparkles size={20} aria-hidden="true" />
         <span>
-          <strong>Add rush service &mdash; +$20</strong>
+          <strong>Add rush service &mdash; +{Money.fromCents(RUSH_FEE_CENTS).format()}</strong>
           <span>Cuts standard turnaround roughly in half.</span>
         </span>
       </button>

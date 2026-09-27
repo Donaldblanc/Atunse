@@ -1,6 +1,8 @@
-// Contact checks shared by the booking UI (contact-step.tsx) and the
-// server's submitOrder validation, so the form never lets through what the
-// server will reject. Pure: no React.
+// Contact rules for a booking: the server's submitOrder validation owns
+// them, and the booking UI (contact-step.tsx) imports them so the form
+// never lets through what the server will reject. They live in
+// features/orders, next to service-catalog.ts, so a UI refactor can't
+// silently change server validation. Pure: no React.
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

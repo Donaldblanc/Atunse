@@ -25,7 +25,7 @@ export class EmailTakenError extends Error {
   }
 }
 
-/** A photo key is already attached to an Item (unique item_photos.key). Nothing was written. */
+/** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
 export class PhotoKeyInUseError extends Error {
   constructor() {
     super("A photo is already attached to another booking.");
@@ -45,6 +45,7 @@ export interface NewOrderInput {
   estimateIsMinimum: boolean;
   deposit: Money;
   submissionKey: string | null;
+  submissionFingerprint: string | null;
   item: {
     brand: string | null;
     model: string | null;
@@ -52,7 +53,8 @@ export interface NewOrderInput {
     material: string | null;
     serviceIds: string[];
     estimate: Money;
-    photoKeys: string[];
+    /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
+    photos: { key: string; uploadKey: string }[];
   };
 }
 

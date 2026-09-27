@@ -1,7 +1,8 @@
-// The server's source of truth for Service prices (CONTEXT.md: Service,
-// Suede Fee, Rush, Deposit). The booking UI's display strings live in
-// src/features/booking/services-data.ts; service-catalog.test.ts keeps the
-// two in step. Pure — no React, no icons — so the use-case can import it.
+// The one source of truth for Service prices (CONTEXT.md: Service, Suede
+// Fee, Rush, Deposit): the server computes estimates from it, and every
+// price the site shows (booking flow, Services page) is formatted from it
+// by the helpers at the bottom. Pure — no React, no icons — so the
+// use-case can import it.
 
 import { Money } from "@/shared/money/money";
 
@@ -15,12 +16,25 @@ export interface CatalogService {
   isMinimum: boolean;
   /** Carries the Suede Fee when the pair's material is Suede. */
   suedeFee: boolean;
+  /** What a minimum price covers when the Service prices parts separately, e.g. "Midsole". */
+  minimumLabel?: string;
+  /** Other published "from" prices for parts of the Service (display only; the estimate uses baseCents). */
+  alsoFrom?: { label: string; cents: number }[];
 }
 
 export const SERVICE_CATALOG: CatalogService[] = [
   { id: "standard", name: "Standard Clean", isCleaningTier: true, baseCents: 3000, isMinimum: false, suedeFee: true },
   { id: "premium", name: "Premium Clean", isCleaningTier: true, baseCents: 5000, isMinimum: false, suedeFee: true },
-  { id: "oxidation", name: "Oxidation Restoration", isCleaningTier: false, baseCents: 2500, isMinimum: true, suedeFee: false },
+  {
+    id: "oxidation",
+    name: "Oxidation Restoration",
+    isCleaningTier: false,
+    baseCents: 2500,
+    isMinimum: true,
+    suedeFee: false,
+    minimumLabel: "Midsole",
+    alsoFrom: [{ label: "Sole", cents: 4000 }],
+  },
   { id: "painting", name: "Sneaker Painting & Dyeing", isCleaningTier: false, baseCents: 4000, isMinimum: true, suedeFee: false },
   { id: "reglue", name: "Reglue", isCleaningTier: false, baseCents: 5000, isMinimum: true, suedeFee: false },
 ];
@@ -83,4 +97,43 @@ export function estimateOrder(params: { items: ItemEstimate[]; rush: boolean }):
     isMinimum: params.items.some((item) => item.isMinimum),
     deposit: estimate.percentage(DEPOSIT_FRACTION),
   };
+}
+
+// ---- Display: every price string the site shows is formatted here ----
+
+export function catalogService(id: string): CatalogService {
+  const service = SERVICE_CATALOG.find((s) => s.id === id);
+  if (!service) throw new InvalidServiceSelectionError(`Unknown service: ${id}`);
+  return service;
+}
+
+/** A price as the site shows it: "$30" when flat, "$25+" when it's a minimum. */
+export function formatPrice(cents: number, isMinimum: boolean): string {
+  return `${Money.fromCents(cents).format()}${isMinimum ? "+" : ""}`;
+}
+
+/** A Service's headline price: "$30", "Starting at $40+", "Midsole from $25+". */
+export function formatServicePrice(service: CatalogService): string {
+  if (!service.isMinimum) return formatPrice(service.baseCents, false);
+  const lead = service.minimumLabel ? `${service.minimumLabel} from` : "Starting at";
+  return `${lead} ${formatPrice(service.baseCents, true)}`;
+}
+
+/** A Service's other published "from" prices, e.g. ["Sole from $40+"]. */
+export function alsoFromNotes(service: CatalogService): string[] {
+  return (service.alsoFrom ?? []).map((part) => `${part.label} from ${formatPrice(part.cents, true)}`);
+}
+
+/** Secondary price lines for a Service, e.g. ["+$10 for Suede"] or ["Sole from $40+"]. */
+export function serviceNotes(service: CatalogService): string[] {
+  return [...alsoFromNotes(service), ...(service.suedeFee ? [suedeFeeNote(false)] : [])];
+}
+
+export function suedeFeeNote(applied: boolean): string {
+  const fee = Money.fromCents(SUEDE_FEE_CENTS).format();
+  return applied ? `Includes +${fee} Suede fee` : `+${fee} for Suede`;
+}
+
+export function rushFeeNote(): string {
+  return `+${Money.fromCents(RUSH_FEE_CENTS).format()} rush`;
 }

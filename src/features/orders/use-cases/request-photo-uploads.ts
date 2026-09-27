@@ -36,7 +36,9 @@ export async function requestPhotoUploads(
         throw new BookingValidationError(`Each photo must be under ${MAX_PHOTO_BYTES / 1024 / 1024} MB.`);
       }
       const key = newPhotoKey(batchId, index, file.contentType);
-      const target = await deps.storage.createUploadTarget({ key, contentType: file.contentType, maxBytes: MAX_PHOTO_BYTES });
+      // Capped at the size the browser declared, not the 15 MB ceiling, so a
+      // target can't carry more than the photo it was issued for (#77).
+      const target = await deps.storage.createUploadTarget({ key, contentType: file.contentType, maxBytes: file.size });
       return { key, ...target };
     }),
   );

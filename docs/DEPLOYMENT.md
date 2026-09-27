@@ -42,6 +42,18 @@ what replaces it later.
    it with a presigned POST (ADR-0004). Keep the bucket private: no public
    read, block all public access on.
 
+   **Bucket settings are applied by script, not by the app** (#77):
+   - `STORAGE_ALLOWED_ORIGINS=https://<prod>,https://*.vercel.app,http://localhost:3000 npm run storage:configure -- --apply` restricts CORS to those origins and `POST` only. Run it without `--apply` first to see the current and proposed rules.
+   - `STORAGE_CLEANUP_DATABASE_URL=<database for this bucket> npm run storage:cleanup` lists photos older than 48 hours that no order references; add `-- --apply` to delete them. The database must be given explicitly (it never falls back to `DATABASE_URL`), and deletion is refused if none of the database's photos are in the bucket.
+
+   **Rate limits** (per client IP, stored hashed in `rate_limit_buckets`):
+   - uploads: 20 per 10 minutes;
+   - orders: 10 per 10 minutes;
+   - sign-in code requests: 10 per 15 minutes;
+   - sign-in code guesses: 20 per 15 minutes.
+
+   Over the limit returns 429 with `Retry-After`. Change them in `src/shared/rate-limit/rate-limiter.ts`.
+
    The bucket is currently **Neon's S3-compatible storage**. Its setup
    hands out the `AWS_*` names above, which the app reads as-is. Verified
    2026-09-26: presigned POST works path-style, Neon enforces the POST

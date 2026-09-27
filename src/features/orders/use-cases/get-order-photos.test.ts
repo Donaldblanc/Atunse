@@ -1,18 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
-import type { FileStorage } from "@/shared/storage";
+import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { getOrderPhotos, OrderNotFoundError } from "./get-order-photos";
 import { submitOrder } from "./submit-order";
 import { bookingDeps, validBookingInput } from "./test-fixtures";
 
-const storage: FileStorage = {
-  async createUploadTarget() {
-    throw new Error("not used");
-  },
-  async createViewUrl(key) {
-    return `https://storage.test/signed/${key}`;
-  },
-};
+const storage = new InMemoryFileStorage();
 
 async function seed(customerSignInEnabled = true) {
   const deps = bookingDeps({ customerSignInEnabled });
