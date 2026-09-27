@@ -3,6 +3,7 @@
 
 import type { NotificationService } from "@/features/notifications/notification-service";
 import type { PaymentInstructions } from "../payment-instructions";
+import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import type { SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
 
@@ -19,8 +20,12 @@ export class RecordingNotificationService implements NotificationService {
 }
 
 export function bookingDeps<O extends Partial<SubmitOrderDeps> = object>(overrides?: O) {
+  // One accounts table shared by the order repository (which creates new
+  // Customer Accounts) and submitOrder's lookups, like the real database.
+  const accounts = new InMemoryAccounts();
   const base = {
-    orders: new InMemoryOrderRepository(),
+    accounts,
+    orders: new InMemoryOrderRepository(accounts),
     notifications: new RecordingNotificationService(),
     paymentInstructions: { zelle: { recipient: "pay@restoredbydj.com", name: "RestoredByDJ" } } as PaymentInstructions,
     customerSignInEnabled: false, // the production default

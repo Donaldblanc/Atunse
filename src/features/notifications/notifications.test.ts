@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { notificationServiceFromEnv } from ".";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { emailDeliveryConfigured, notificationServiceFromEnv } from ".";
 import { ConsoleNotificationService } from "./notification-service";
 import { ResendNotificationService } from "./resend-notification-service";
 
@@ -44,5 +44,35 @@ describe("notificationServiceFromEnv", () => {
     expect(notificationServiceFromEnv({ NODE_ENV: "test", RESEND_API_KEY: " ", EMAIL_FROM: "a@example.com" })).toBeInstanceOf(
       ConsoleNotificationService,
     );
+  });
+});
+
+describe("console fallback", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("never writes email subjects (which carry sign-in codes) to production logs", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await notificationServiceFromEnv({ NODE_ENV: "production" }).sendEmail({
+      to: "jordan@example.com",
+      subject: "123456 is your Atunṣe sign-in code",
+      body: "Your sign-in code is 123456.",
+    });
+    expect(log.mock.calls.flat().join(" ")).not.toContain("123456");
+    expect(log.mock.calls.flat().join(" ")).toContain("jordan@example.com");
+  });
+
+  it("shows subjects in development, where reading codes from the log is the point", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    await notificationServiceFromEnv({ NODE_ENV: "development" }).sendEmail({ to: "a@b.co", subject: "123456 is your code", body: "" });
+    expect(log.mock.calls.flat().join(" ")).toContain("123456");
+  });
+
+  it("reports email delivery as configured only with both RESEND_API_KEY and EMAIL_FROM", () => {
+    expect(emailDeliveryConfigured({ NODE_ENV: "test", RESEND_API_KEY: "k", EMAIL_FROM: "a@b.co" })).toBe(true);
+    expect(emailDeliveryConfigured({ NODE_ENV: "test", RESEND_API_KEY: "k" })).toBe(false);
   });
 });

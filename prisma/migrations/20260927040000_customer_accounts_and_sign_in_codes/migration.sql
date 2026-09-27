@@ -6,8 +6,15 @@
 ALTER TABLE "orders" RENAME COLUMN "guestEmail" TO "contactEmail";
 ALTER TABLE "orders" RENAME COLUMN "guestPhone" TO "contactPhone";
 
+-- Admin and Customer Accounts are separate identities (ADR-0014): the same
+-- email can have one of each. Must happen before the backfill, so an old
+-- order placed with the admin's email gets its own Customer Account.
+DROP INDEX "accounts_email_key";
+CREATE UNIQUE INDEX "accounts_email_role_key" ON "accounts"("email", "role");
+
 -- Give each existing account-less order a Customer Account, one per
--- (lowercased) email; an email that already has an Account reuses it.
+-- (lowercased) email; an email that already has a Customer Account reuses
+-- it. Orders never attach to an Admin Account.
 INSERT INTO "accounts" ("id", "role", "email", "phone", "createdAt")
 SELECT
   gen_random_uuid()::text,
@@ -18,12 +25,12 @@ SELECT
 FROM "orders" o
 WHERE o."accountId" IS NULL AND o."contactEmail" IS NOT NULL
 GROUP BY lower(o."contactEmail")
-ON CONFLICT ("email") DO NOTHING;
+ON CONFLICT ("email", "role") DO NOTHING;
 
 UPDATE "orders" o
 SET "accountId" = a."id"
 FROM "accounts" a
-WHERE o."accountId" IS NULL AND a."email" = lower(o."contactEmail");
+WHERE o."accountId" IS NULL AND a."email" = lower(o."contactEmail") AND a."role" = 'CUSTOMER';
 
 DO $$
 BEGIN

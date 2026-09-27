@@ -1,15 +1,15 @@
-// Account lookups for the sign-in use-cases (ADR-0003/0011: use-cases
-// depend on this interface, never on Prisma directly).
+// Customer Account lookups for the booking and sign-in use-cases
+// (ADR-0003/0011: use-cases depend on this interface, never on Prisma).
+// Only Customer Accounts are ever returned: Admin Accounts are a separate
+// identity (ADR-0014), even when they share an email with a customer.
 
-import type { Role } from "../authz";
-
-export interface AccountRecord {
+export interface CustomerAccount {
   id: string;
-  role: Exclude<Role, "GUEST">;
   email: string;
 }
 
 export interface AccountRepository {
   /** `email` is matched case-insensitively (emails are stored lowercased). */
-  findByEmail(email: string): Promise<AccountRecord | null>;
+  findCustomerByEmail(email: string): Promise<CustomerAccount | null>;
+  findCustomerById(accountId: string): Promise<CustomerAccount | null>;
 }

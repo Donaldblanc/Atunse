@@ -6,21 +6,30 @@ import type { Money } from "@/shared/money/money";
 import type { AuditEntry, Fulfillment, Order } from "../domain";
 
 /**
- * Who the Order belongs to: a signed-in customer's existing Account, or the
- * booking's email. For an email, a Customer Account is created in the same
- * transaction as the Order; if the email is already registered, `fail`
- * throws AccountExistsError (customer login on: they must sign in) and
- * `attach` adds the Order to that Account (login off, ADR-0014).
+ * Who the Order belongs to: an existing Customer Account, or a new one the
+ * repository creates in the same transaction as the Order. Deciding which
+ * (and what to do when an email is taken) is submitOrder's policy, not the
+ * repository's (ADR-0014).
  */
-export type OrderOwner =
-  | { accountId: string }
-  | { newCustomer: { email: string; phone: string }; ifEmailRegistered: "fail" | "attach" };
+export type OrderOwner = { accountId: string } | { newCustomer: { email: string; phone: string } };
 
-/** `create` was asked to make a Customer Account for an email that already has one. */
-export class AccountExistsError extends Error {
+/**
+ * A new Customer Account's email was taken between submitOrder's lookup and
+ * the insert (a concurrent first booking won). Nothing was written; the
+ * caller resolves the owner again.
+ */
+export class EmailTakenError extends Error {
   constructor() {
-    super("An account with this email already exists.");
-    this.name = "AccountExistsError";
+    super("A Customer Account with this email was just created.");
+    this.name = "EmailTakenError";
+  }
+}
+
+/** A photo key is already attached to an Item (unique item_photos.key). Nothing was written. */
+export class PhotoKeyInUseError extends Error {
+  constructor() {
+    super("A photo is already attached to another booking.");
+    this.name = "PhotoKeyInUseError";
   }
 }
 
@@ -49,23 +58,17 @@ export interface NewOrderInput {
 
 export interface OrderRepository {
   /**
-   * Creates the Order with its Item, and the owner's Account when it's a new
-   * customer, all in one transaction. Retry-safe (ADR-0012): if an Order
-   * with the same `submissionKey` already exists, returns that Order with
-   * `created: false` instead of inserting a duplicate. Throws
-   * AccountExistsError if a new customer's email is already registered.
+   * Creates the Order with its Item and photos, and the owner's Account when
+   * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
+   * an Order with the same `submissionKey` already exists, returns that
+   * Order with `created: false` instead of inserting a duplicate. Throws
+   * EmailTakenError or PhotoKeyInUseError, having written nothing.
    */
   create(input: NewOrderInput): Promise<{ order: Order; created: boolean }>;
   findById(orderId: string): Promise<Order | null>;
 
   /** The Order a submission key already created, if any (ADR-0012 retries). */
   findBySubmissionKey(submissionKey: string): Promise<Order | null>;
-
-  /** A customer's own Orders, newest first. */
-  findByAccountId(accountId: string): Promise<Order[]>;
-
-  /** The keys among `photoKeys` already attached to some Item. */
-  findPhotoKeysInUse(photoKeys: string[]): Promise<string[]>;
 
   /** Records that the booking confirmation email was sent. */
   markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void>;

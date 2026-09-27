@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { parseSubmitOrderRequest, toSubmitOrderResponse } from "@/features/orders/api/submit-order-request";
-import { actingUserFromSessionCookie } from "@/features/accounts/acting-user";
-import { UnauthorizedError } from "@/features/accounts/authz";
-import { SESSION_COOKIE_NAME } from "@/features/accounts/session";
+import { customerFromCookies } from "@/features/accounts/acting-user";
 import {
   BookingValidationError,
   PolicyNotAcceptedError,
@@ -15,9 +13,11 @@ import {
 // vertical slice (/booking's "Confirm Booking"). Publicly reachable
 // (signed out, or a signed-in Customer); the authorization check itself
 // still lives in the use-case (ADR-0012), not here — this route just
-// derives who's calling. An `Idempotency-Key` header (UUID) makes retries
-// return the same Order. A 409 with code SIGN_IN_REQUIRED means the email
-// already has an Account: the booking flow shows its login screen.
+// derives who's calling (the customer session only: a signed-in admin
+// books like any signed-out customer, ADR-0014). An `Idempotency-Key`
+// header (UUID) makes retries return the same Order. A 409 with code
+// SIGN_IN_REQUIRED means the email already has a Customer Account: the
+// booking flow shows its login screen.
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const actingUser = await actingUserFromSessionCookie(req.cookies.get(SESSION_COOKIE_NAME)?.value);
+  const actingUser = await customerFromCookies(req.cookies);
 
   const deps = buildOrderUseCaseDeps();
   try {
@@ -43,9 +43,6 @@ export async function POST(req: NextRequest) {
     }
     if (err instanceof SignInRequiredError) {
       return NextResponse.json({ error: err.message, code: "SIGN_IN_REQUIRED" }, { status: 409 });
-    }
-    if (err instanceof UnauthorizedError) {
-      return NextResponse.json({ error: "Sign out of the admin dashboard to book as a customer." }, { status: 403 });
     }
     throw err;
   }

@@ -1,9 +1,12 @@
 // Test double for the OrderRepository seam — lets use-case unit tests
 // (ADR-0012's vertical slice) run with no real Postgres, per the build
 // strategy's split between fast unit tests and real-DB integration tests.
+// New Customer Accounts go into the shared InMemoryAccounts table, the
+// same one the sign-in use-cases read, so tests can book → sign in → rebook.
 
+import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import type { AuditEntry, Item, Order } from "../domain";
-import { AccountExistsError, type NewOrderInput, type OrderRepository } from "./order-repository";
+import { EmailTakenError, PhotoKeyInUseError, type NewOrderInput, type OrderRepository } from "./order-repository";
 
 let nextId = 0;
 function fakeId(prefix: string): string {
@@ -15,23 +18,30 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
-  /** email -> accountId; stands in for the accounts table's unique email. */
-  readonly accountIdsByEmail = new Map<string, string>();
+
+  constructor(readonly accounts: InMemoryAccounts = new InMemoryAccounts()) {}
 
   async create(input: NewOrderInput): Promise<{ order: Order; created: boolean }> {
     if (input.submissionKey) {
-      const existingId = this.orderIdsBySubmissionKey.get(input.submissionKey);
-      if (existingId) return { order: this.orders.get(existingId)!, created: false };
+      const existing = await this.findBySubmissionKey(input.submissionKey);
+      if (existing) return { order: existing, created: false };
     }
+
+    // Mirror the database's unique indexes, checking before writing
+    // anything, like the single Prisma transaction.
+    const keysInUse = new Set([...this.orders.values()].flatMap((o) => o.items.flatMap((i) => i.photoKeys)));
+    if (input.item.photoKeys.some((key) => keysInUse.has(key))) throw new PhotoKeyInUseError();
 
     let accountId: string;
     if ("accountId" in input.owner) {
       accountId = input.owner.accountId;
     } else {
-      const registered = this.accountIdsByEmail.get(input.owner.newCustomer.email);
-      if (registered && input.owner.ifEmailRegistered === "fail") throw new AccountExistsError();
-      accountId = registered ?? fakeId("account");
-      this.accountIdsByEmail.set(input.owner.newCustomer.email, accountId);
+      try {
+        accountId = this.accounts.add({ role: "CUSTOMER", ...input.owner.newCustomer }).id;
+      } catch (err) {
+        if (err instanceof InMemoryEmailTakenError) throw new EmailTakenError();
+        throw err;
+      }
     }
 
     const orderId = fakeId("order");
@@ -77,15 +87,6 @@ export class InMemoryOrderRepository implements OrderRepository {
   async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
     const orderId = this.orderIdsBySubmissionKey.get(submissionKey);
     return orderId ? (this.orders.get(orderId) ?? null) : null;
-  }
-
-  async findByAccountId(accountId: string): Promise<Order[]> {
-    return [...this.orders.values()].filter((order) => order.accountId === accountId).reverse();
-  }
-
-  async findPhotoKeysInUse(photoKeys: string[]): Promise<string[]> {
-    const inUse = new Set([...this.orders.values()].flatMap((order) => order.items.flatMap((item) => item.photoKeys)));
-    return photoKeys.filter((key) => inUse.has(key));
   }
 
   async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {

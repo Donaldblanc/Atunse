@@ -30,12 +30,20 @@ describe("submitOrder", () => {
   });
 
   describe("account ownership (ADR-0014)", () => {
+    const secondPhoto = (input: ReturnType<typeof validBookingInput>) => {
+      input.item = { ...input.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      return input;
+    };
+
     it("creates a Customer Account for a new email, stored lowercased", async () => {
       const deps = bookingDeps();
       const input = validBookingInput({ contact: { name: "Jordan", email: "Jordan@Example.com", phone: "2125550142" } });
       const order = await submitOrder(deps, guest, input);
 
-      expect(order.accountId).toBe(deps.orders.accountIdsByEmail.get("jordan@example.com"));
+      expect(await deps.accounts.findCustomerByEmail("jordan@example.com")).toEqual({
+        id: order.accountId,
+        email: "jordan@example.com",
+      });
       expect(order.contactEmail).toBe("Jordan@Example.com");
     });
 
@@ -43,8 +51,7 @@ describe("submitOrder", () => {
       const deps = bookingDeps({ customerSignInEnabled: true });
       await submitOrder(deps, guest, validBookingInput());
 
-      const again = validBookingInput({ contact: { name: "Other", email: "CUSTOMER@example.com", phone: "2125550199" } });
-      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      const again = secondPhoto(validBookingInput({ contact: { name: "Other", email: "CUSTOMER@example.com", phone: "2125550199" } }));
       await expect(submitOrder(deps, guest, again)).rejects.toThrow(SignInRequiredError);
       expect(deps.orders.orders.size).toBe(1);
     });
@@ -52,24 +59,67 @@ describe("submitOrder", () => {
     it("with customer login OFF, attaches a registered email's booking to that Account", async () => {
       const deps = bookingDeps({ customerSignInEnabled: false });
       const first = await submitOrder(deps, guest, validBookingInput());
-
-      const again = validBookingInput();
-      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
-      const second = await submitOrder(deps, guest, again);
+      const second = await submitOrder(deps, guest, secondPhoto(validBookingInput()));
       expect(second.accountId).toBe(first.accountId);
       expect(deps.orders.orders.size).toBe(2);
     });
 
-    it("books a signed-in customer into their own Account, whatever contact email they enter", async () => {
+    it.each([true, false])(
+      "books an admin's email into a separate Customer Account, never the Admin Account (login %s)",
+      async (customerSignInEnabled) => {
+        const deps = bookingDeps({ customerSignInEnabled });
+        const admin = deps.accounts.add({ role: "ADMIN", email: "owner@restoredbydj.com" });
+
+        const order = await submitOrder(
+          deps,
+          guest,
+          validBookingInput({ contact: { name: "DJ", email: "Owner@RestoredByDJ.com", phone: "2125550100" } }),
+        );
+        expect(order.accountId).not.toBe(admin.id);
+        expect(deps.accounts.accounts.find((a) => a.id === order.accountId)).toMatchObject({
+          role: "CUSTOMER",
+          email: "owner@restoredbydj.com",
+        });
+      },
+    );
+
+    it("books a signed-in customer into their own Account when the email is theirs", async () => {
       const deps = bookingDeps({ customerSignInEnabled: true });
       const first = await submitOrder(deps, guest, validBookingInput());
       const customer = { accountId: first.accountId, role: "CUSTOMER" as const };
 
-      const again = validBookingInput({ contact: { name: "Jordan", email: "work@example.com", phone: "2125550142" } });
-      again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
-      const second = await submitOrder(deps, customer, again);
+      const second = await submitOrder(deps, customer, secondPhoto(validBookingInput()));
       expect(second.accountId).toBe(first.accountId);
-      expect(deps.orders.accountIdsByEmail.has("work@example.com")).toBe(false);
+    });
+
+    it("ignores a signed-in session when the booking is under someone else's email (shared browser)", async () => {
+      const deps = bookingDeps({ customerSignInEnabled: true });
+      const first = await submitOrder(deps, guest, validBookingInput());
+      const customer = { accountId: first.accountId, role: "CUSTOMER" as const };
+
+      const friend = secondPhoto(validBookingInput({ contact: { name: "Friend", email: "friend@example.com", phone: "2125550177" } }));
+      const second = await submitOrder(deps, customer, friend);
+      expect(second.accountId).not.toBe(first.accountId);
+      expect((await deps.accounts.findCustomerByEmail("friend@example.com"))?.id).toBe(second.accountId);
+    });
+
+    it("recovers when a concurrent first booking takes the email between lookup and insert", async () => {
+      const deps = bookingDeps({ customerSignInEnabled: false });
+      // The lookup says "new", but the account appears before the insert.
+      const lookup = deps.accounts.findCustomerByEmail.bind(deps.accounts);
+      let calls = 0;
+      deps.accounts.findCustomerByEmail = async (email) => {
+        calls += 1;
+        if (calls === 1) {
+          deps.accounts.add({ role: "CUSTOMER", email });
+          return null;
+        }
+        return lookup(email);
+      };
+
+      const order = await submitOrder(deps, guest, validBookingInput());
+      expect(order.accountId).toBe((await lookup("customer@example.com"))?.id);
+      expect(deps.accounts.accounts.filter((a) => a.email === "customer@example.com")).toHaveLength(1);
     });
 
     it("refuses photo keys already attached to another booking", async () => {

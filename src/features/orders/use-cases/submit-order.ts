@@ -6,7 +6,13 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
-import { AccountExistsError, type OrderRepository } from "../repositories/order-repository";
+import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
+import {
+  EmailTakenError,
+  PhotoKeyInUseError,
+  type OrderOwner,
+  type OrderRepository,
+} from "../repositories/order-repository";
 import {
   estimateItem,
   estimateOrder,
@@ -33,6 +39,8 @@ export interface SubmitOrderInput {
 
 export interface SubmitOrderDeps {
   orders: OrderRepository;
+  /** Customer Accounts only: Admin Accounts are a separate identity (ADR-0014). */
+  accounts: AccountRepository;
   notifications: NotificationService;
   paymentInstructions: PaymentInstructions;
   /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
@@ -52,7 +60,7 @@ export class PolicyNotAcceptedError extends Error {
  * booking flow's login screen) and resubmits (ADR-0014).
  */
 export class SignInRequiredError extends Error {
-  constructor(readonly email: string) {
+  constructor() {
     super("You already have an account with this email. Sign in to finish your booking.");
     this.name = "SignInRequiredError";
   }
@@ -72,9 +80,8 @@ const CALENDAR_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Phase 1 vertical slice, step 1: a customer books one pair through
- * /booking. Every Order belongs to an Account (ADR-0014): a signed-in
- * customer's own, or a Customer Account created with the Order from the
- * booking's email and phone. Every ADR-0012 concern is present: authz
+ * /booking. Every Order belongs to a Customer Account (ADR-0014), resolved
+ * by resolveOwner below: never an Admin Account, even for an admin's email. Every ADR-0012 concern is present: authz
  * (anyone can submit, but the check is still explicit), business rules
  * enforced server-side (Policy Acceptance, Pickup area, Service rules),
  * money computed from the server's own catalog, idempotency on the
@@ -111,26 +118,8 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
 
-  // A photo belongs to exactly one booking, so another Order can never gain
-  // view access to it by quoting its key (ADR-0014).
-  if ((await deps.orders.findPhotoKeysInUse(input.item.photoKeys)).length > 0) {
-    throw new BookingValidationError("One or more photos are already attached to another booking. Upload them again.");
-  }
-
-  const owner =
-    actingUser.role === "CUSTOMER" && actingUser.accountId
-      ? { accountId: actingUser.accountId }
-      : {
-          newCustomer: { email: contact.email.toLowerCase(), phone: contact.phone },
-          // With customer login on, an existing email must sign in first;
-          // with it off, nobody can sign in to see anything, so attaching
-          // the Order to the existing Account exposes nothing.
-          ifEmailRegistered: deps.customerSignInEnabled ? ("fail" as const) : ("attach" as const),
-        };
-
-  let created;
-  try {
-    created = await deps.orders.create({
+  const newOrder = (owner: OrderOwner) =>
+    deps.orders.create({
       owner,
       contactName: contact.name,
       contactEmail: contact.email,
@@ -152,12 +141,57 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
         photoKeys: input.item.photoKeys,
       },
     });
+
+  let created;
+  try {
+    try {
+      created = await newOrder(await resolveOwner(deps, actingUser, contact));
+    } catch (err) {
+      // A concurrent first booking created this email's Customer Account
+      // after our lookup: resolve again, now against that Account.
+      if (!(err instanceof EmailTakenError)) throw err;
+      created = await newOrder(await resolveOwner(deps, actingUser, contact));
+    }
   } catch (err) {
-    if (err instanceof AccountExistsError) throw new SignInRequiredError(contact.email);
+    // The database's unique photo key: a photo belongs to exactly one
+    // booking, so another Order can never gain view access to it.
+    if (err instanceof PhotoKeyInUseError) {
+      throw new BookingValidationError("One or more photos are already attached to another booking. Upload them again.");
+    }
     throw err;
   }
 
   return sendConfirmationOnce(deps, created.order, now);
+}
+
+/**
+ * Which Customer Account the booking belongs to (ADR-0014):
+ * - A signed-in customer booking under their own email: their Account.
+ *   Under a different email (e.g. someone else on a shared browser), the
+ *   session is ignored and the booking is treated as signed out, so it
+ *   never lands in the wrong person's Account.
+ * - Signed out, new email: a new Customer Account.
+ * - Signed out, an email with a Customer Account: with customer login on,
+ *   they must sign in first; with it off, the Order attaches (nobody can
+ *   sign in to see it, so nothing is exposed).
+ * Admin Accounts never come into it: an admin's email books like any
+ * other, into a Customer Account of its own.
+ */
+async function resolveOwner(
+  deps: SubmitOrderDeps,
+  actingUser: ActingUser,
+  contact: { email: string; phone: string },
+): Promise<OrderOwner> {
+  const email = contact.email.toLowerCase();
+  if (actingUser.role === "CUSTOMER" && actingUser.accountId) {
+    const session = await deps.accounts.findCustomerById(actingUser.accountId);
+    if (session?.email === email) return { accountId: session.id };
+  }
+
+  const existing = await deps.accounts.findCustomerByEmail(email);
+  if (!existing) return { newCustomer: { email, phone: contact.phone } };
+  if (deps.customerSignInEnabled) throw new SignInRequiredError();
+  return { accountId: existing.id };
 }
 
 // Sent until it succeeds once: a retry after a failed send (the route
