@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ArrowRight, Sparkles, TriangleAlert } from "lucide-react";
 import type { ContactInfo } from "./booking-types";
-import { isValidEmail, isValidUsPhone } from "./contact-rules";
+import { isValidEmail, isValidUsPhone } from "@/features/orders/contact-rules";
 import { formatList } from "./format-list";
 
 // Captures the order's contact info — previously nowhere in this flow,

@@ -2,7 +2,7 @@
 
 import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
 import { useState } from "react";
-import { PICKUP_TIME_SLOTS } from "./pickup-window";
+import { PICKUP_TIME_SLOTS } from "@/features/orders/pickup-window";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";

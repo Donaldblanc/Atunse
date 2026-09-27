@@ -4,8 +4,8 @@ import { useState } from "react";
 import { ArrowRight, Info, Package, Truck, TriangleAlert } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";
-import { isValidZip } from "./contact-rules";
-import { PICKUP_STATES, US_STATES } from "./pickup-window";
+import { isValidZip } from "@/features/orders/contact-rules";
+import { PICKUP_STATES, US_STATES } from "@/features/orders/pickup-window";
 
 export function ScheduleStep({
   method,

@@ -1,6 +1,8 @@
-// Pickup rules shared by the booking UI (pickup-date-picker.tsx,
-// schedule-step.tsx) and the server's submitOrder validation, so the two
-// can't disagree about which slots or states exist. Pure: no React.
+// Pickup rules: the server's submitOrder validation owns them, and the
+// booking UI (pickup-date-picker.tsx, schedule-step.tsx) imports them, so
+// the two can't disagree about which slots or states exist. They live in
+// features/orders, next to service-catalog.ts, so a UI refactor can't
+// silently change server validation. Pure: no React.
 
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;

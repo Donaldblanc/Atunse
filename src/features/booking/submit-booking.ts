@@ -4,7 +4,7 @@
 
 import type { SubmitOrderResponse } from "@/features/orders/api/submit-order-request";
 import type { PickupSelection } from "./pickup-date-picker";
-import { toCalendarDate } from "./pickup-window";
+import { toCalendarDate } from "@/features/orders/pickup-window";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod } from "./booking-types";
 
 export type { SubmitOrderResponse };

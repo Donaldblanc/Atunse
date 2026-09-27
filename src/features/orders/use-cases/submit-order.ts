@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
-import { isValidEmail, isValidUsPhone, isValidZip } from "@/features/booking/contact-rules";
-import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "@/features/booking/pickup-window";
+import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
+import { PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { orderReference, type CalendarDate, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
