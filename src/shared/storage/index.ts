@@ -29,10 +29,12 @@ export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorag
     const bucket = env.S3_BUCKET;
     const region = env.S3_REGION || env.AWS_REGION;
     if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION (or AWS_REGION) must be set.");
+    const accessKeyId = env.S3_ACCESS_KEY_ID || env.AWS_ACCESS_KEY_ID;
+    const secretAccessKey = env.S3_SECRET_ACCESS_KEY || env.AWS_SECRET_ACCESS_KEY;
     const credentials =
-      env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY
-        ? { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY }
-        : undefined; // fall back to the SDK's default chain (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)
+      accessKeyId && secretAccessKey
+        ? { accessKeyId, secretAccessKey }
+        : undefined; // e.g. an IAM role on the host: the SDK's default chain finds it
     const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
     return new S3FileStorage({ bucket, region, endpoint, credentials });
   }
