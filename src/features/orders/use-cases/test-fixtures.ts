@@ -10,7 +10,10 @@ export const FIXED_NOW = new Date("2026-10-01T15:00:00Z"); // Oct 1, 11 AM in Ne
 
 export class RecordingNotificationService implements NotificationService {
   readonly sent: { to: string; subject: string; body: string }[] = [];
+  /** Set to make the next sends throw, like a provider outage. */
+  failing = false;
   async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
+    if (this.failing) throw new Error("email provider unavailable");
     this.sent.push(params);
   }
 }

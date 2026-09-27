@@ -122,6 +122,15 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(await prisma.order.count()).toBe(1);
   });
 
+  it("records when the confirmation email was sent", async () => {
+    const { order } = await repo.create(newOrder());
+    expect(order.confirmationEmailSentAt).toBeNull();
+
+    const sentAt = new Date("2026-10-01T15:00:00Z");
+    await repo.markConfirmationEmailSent(order.id, sentAt);
+    expect((await repo.findById(order.id))?.confirmationEmailSentAt).toEqual(sentAt);
+  });
+
   it("dedupes concurrent submits with the same key", async () => {
     const results = await Promise.all([
       repo.create(newOrder({ submissionKey: "booking-2" })),

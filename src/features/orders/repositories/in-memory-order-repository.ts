@@ -35,6 +35,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       estimate: input.estimate,
       estimateIsMinimum: input.estimateIsMinimum,
       deposit: input.deposit,
+      confirmationEmailSentAt: null,
       items: [
         {
           id: fakeId("item"),
@@ -58,6 +59,11 @@ export class InMemoryOrderRepository implements OrderRepository {
 
   async findById(orderId: string): Promise<Order | null> {
     return this.orders.get(orderId) ?? null;
+  }
+
+  async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {
+    const order = this.orders.get(orderId);
+    if (order) order.confirmationEmailSentAt = sentAt;
   }
 
   async transitionItemStatus(params: {

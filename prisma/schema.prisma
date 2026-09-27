@@ -95,6 +95,11 @@ model Order {
   // with the same key returns the existing Order instead of a duplicate.
   submissionKey String? @unique
 
+  // Set once the booking confirmation email has actually gone out. A retry
+  // of the same submission sends it while this is still null, so a failed
+  // send (e.g. a provider outage) isn't lost for good.
+  confirmationEmailSentAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

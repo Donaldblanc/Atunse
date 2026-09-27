@@ -83,6 +83,7 @@ export interface Order {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  confirmationEmailSentAt: Date | null;
   items: Item[];
 }
 

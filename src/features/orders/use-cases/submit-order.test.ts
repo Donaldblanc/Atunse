@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderReference } from "../domain";
 import { BookingValidationError, PolicyNotAcceptedError, submitOrder } from "./submit-order";
-import { bookingDeps, validBookingInput } from "./test-fixtures";
+import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
 const mailInAddress = { line1: "1 Elm St", line2: null, city: "Austin", state: "TX", zip: "73301" };
@@ -150,6 +150,25 @@ describe("submitOrder", () => {
 
       expect(retry.id).toBe(first.id);
       expect(deps.orders.orders.size).toBe(1);
+      expect(deps.notifications.sent).toHaveLength(1);
+    });
+
+    it("sends the email on retry when the first send failed after the order was created", async () => {
+      const deps = bookingDeps();
+      const input = validBookingInput({ submissionKey: "7a2e9c41-5b3d-4f6a-8e1c-2d4b6f8a0c3e" });
+
+      deps.notifications.failing = true;
+      await expect(submitOrder(deps, guest, input)).rejects.toThrow("email provider unavailable");
+      expect(deps.orders.orders.size).toBe(1);
+      expect([...deps.orders.orders.values()][0]?.confirmationEmailSentAt).toBeNull();
+
+      deps.notifications.failing = false;
+      const retry = await submitOrder(deps, guest, input);
+      expect(deps.orders.orders.size).toBe(1);
+      expect(deps.notifications.sent).toHaveLength(1);
+      expect(retry.confirmationEmailSentAt).toEqual(FIXED_NOW);
+
+      await submitOrder(deps, guest, input);
       expect(deps.notifications.sent).toHaveLength(1);
     });
   });

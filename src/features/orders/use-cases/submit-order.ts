@@ -71,7 +71,8 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     throw new PolicyNotAcceptedError();
   }
 
-  const today = shopToday(deps.now?.() ?? new Date());
+  const now = deps.now?.() ?? new Date();
+  const today = shopToday(now);
   const contact = validateContact(input.contact);
   const fulfillment = validateFulfillment(input.fulfillment, today);
   const material = validateMaterial(input.item.material);
@@ -86,12 +87,12 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
 
-  const { order, created } = await deps.orders.create({
+  const { order } = await deps.orders.create({
     accountId: actingUser.accountId,
     contactName: contact.name,
     guestEmail: contact.email,
     guestPhone: contact.phone,
-    policyAcceptedAt: new Date(),
+    policyAcceptedAt: now,
     fulfillment,
     rush: input.rush,
     estimate: orderEstimate.estimate,
@@ -109,13 +110,16 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     },
   });
 
-  // A retried submission already sent its email the first time.
-  if (created) {
+  // Sent until it succeeds once: a retry after a failed send (the route
+  // returned 500) sends it, and a retry after a successful one doesn't.
+  if (!order.confirmationEmailSentAt) {
     await deps.notifications.sendEmail({
       to: contact.email,
       subject: `We received your booking (${orderReference(order.id)})`,
       body: confirmationEmailBody(order, deps.paymentInstructions),
     });
+    await deps.orders.markConfirmationEmailSent(order.id, now);
+    order.confirmationEmailSentAt = now;
   }
 
   return order;

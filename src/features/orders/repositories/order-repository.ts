@@ -37,6 +37,9 @@ export interface OrderRepository {
   create(input: NewOrderInput): Promise<{ order: Order; created: boolean }>;
   findById(orderId: string): Promise<Order | null>;
 
+  /** Records that the booking confirmation email was sent. */
+  markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void>;
+
   /**
    * Atomically transitions one Item's status and appends its audit entry
    * in the same transaction. Returns null if `idempotencyKey` was already

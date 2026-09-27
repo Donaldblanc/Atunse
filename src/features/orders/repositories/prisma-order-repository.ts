@@ -67,6 +67,7 @@ function toDomainOrder(row: OrderRow): Order {
     estimate: Money.fromCents(row.estimateCents),
     estimateIsMinimum: row.estimateIsMinimum,
     deposit: Money.fromCents(row.depositCents),
+    confirmationEmailSentAt: row.confirmationEmailSentAt,
     items: row.items.map(toDomainItem),
   };
 }
@@ -150,6 +151,10 @@ export class PrismaOrderRepository implements OrderRepository {
       include: { items: true },
     });
     return row ? toDomainOrder(row) : null;
+  }
+
+  async markConfirmationEmailSent(orderId: string, sentAt: Date): Promise<void> {
+    await this.prisma.order.update({ where: { id: orderId }, data: { confirmationEmailSentAt: sentAt } });
   }
 
   async transitionItemStatus(params: {
