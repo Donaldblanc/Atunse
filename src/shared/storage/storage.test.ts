@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { S3Client } from "@aws-sdk/client-s3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getFileStorage, StorageNotConfiguredError } from ".";
 import { LocalFileStorage, LocalUploadRejectedError } from "./local-file-storage";
@@ -93,6 +94,45 @@ describe("getFileStorage", () => {
 
   it("uses S3 when configured", () => {
     expect(getFileStorage({ NODE_ENV: "production", S3_BUCKET: "b", S3_REGION: "us-east-1" })).toBeInstanceOf(S3FileStorage);
+  });
+
+  it("treats a blank STORAGE_DRIVER as unset", () => {
+    expect(getFileStorage({ NODE_ENV: "development", STORAGE_DRIVER: "", SESSION_SECRET: "s" })).toBeInstanceOf(
+      LocalFileStorage,
+    );
+    expect(getFileStorage({ NODE_ENV: "production", STORAGE_DRIVER: " ", S3_BUCKET: "b", S3_REGION: "r" })).toBeInstanceOf(
+      S3FileStorage,
+    );
+  });
+
+  it("prefers S3_* over AWS_* when both are set", async () => {
+    const storage = getFileStorage({
+      NODE_ENV: "production",
+      S3_BUCKET: "b",
+      S3_REGION: "us-east-1",
+      AWS_REGION: "us-west-2",
+      S3_ACCESS_KEY_ID: "s3-key",
+      S3_SECRET_ACCESS_KEY: "s3-secret",
+      AWS_ACCESS_KEY_ID: "aws-key",
+      AWS_SECRET_ACCESS_KEY: "aws-secret",
+    }) as unknown as { client: S3Client };
+    const credentials = await storage.client.config.credentials();
+    expect(credentials.accessKeyId).toBe("s3-key");
+    expect(credentials.secretAccessKey).toBe("s3-secret");
+    expect(await storage.client.config.region()).toBe("us-east-1");
+  });
+
+  it("never pairs half an S3_* credential with an AWS_* one", () => {
+    expect(() =>
+      getFileStorage({
+        NODE_ENV: "production",
+        S3_BUCKET: "b",
+        S3_REGION: "us-east-1",
+        S3_ACCESS_KEY_ID: "s3-key",
+        AWS_ACCESS_KEY_ID: "aws-key",
+        AWS_SECRET_ACCESS_KEY: "aws-secret",
+      }),
+    ).toThrow(StorageNotConfiguredError);
   });
 
   it("accepts Neon storage's AWS_* variable names", async () => {

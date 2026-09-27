@@ -16,7 +16,8 @@ const LOCAL_UPLOAD_DIR = ".uploads";
  */
 export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorage {
   const isProduction = env.NODE_ENV === "production";
-  const driver = env.STORAGE_DRIVER ?? (isProduction ? "s3" : "local");
+  // Blank counts as unset: .env.example ships `STORAGE_DRIVER=`.
+  const driver = env.STORAGE_DRIVER?.trim() || (isProduction ? "s3" : "local");
 
   if (driver === "local") {
     if (isProduction) throw new StorageNotConfiguredError("The local storage driver can't be used in production.");
@@ -29,12 +30,7 @@ export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorag
     const bucket = env.S3_BUCKET;
     const region = env.S3_REGION || env.AWS_REGION;
     if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION (or AWS_REGION) must be set.");
-    const accessKeyId = env.S3_ACCESS_KEY_ID || env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = env.S3_SECRET_ACCESS_KEY || env.AWS_SECRET_ACCESS_KEY;
-    const credentials =
-      accessKeyId && secretAccessKey
-        ? { accessKeyId, secretAccessKey }
-        : undefined; // e.g. an IAM role on the host: the SDK's default chain finds it
+    const credentials = s3Credentials(env) ?? awsCredentials(env);
     const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
     return new S3FileStorage({ bucket, region, endpoint, credentials });
   }
@@ -48,4 +44,26 @@ export function getLocalFileStorage(env: NodeJS.ProcessEnv = process.env): Local
   const secret = env.SESSION_SECRET;
   if (!secret) throw new StorageNotConfiguredError("SESSION_SECRET must be set to sign local upload targets.");
   return new LocalFileStorage(path.join(process.cwd(), LOCAL_UPLOAD_DIR), secret);
+}
+
+type Credentials = { accessKeyId: string; secretAccessKey: string };
+
+// Credentials are taken as a whole pair so S3_* and AWS_* halves never mix.
+// That matters on Vercel, which injects AWS_* values that aren't usable
+// credentials: a half-set S3_* pair would otherwise silently pair with them
+// and fail later as a signature error. Neither pair set means the SDK's
+// default chain (e.g. an IAM role on the host).
+function s3Credentials(env: NodeJS.ProcessEnv): Credentials | undefined {
+  const accessKeyId = env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = env.S3_SECRET_ACCESS_KEY;
+  if (!accessKeyId !== !secretAccessKey) {
+    throw new StorageNotConfiguredError("Set both S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY, or neither.");
+  }
+  return accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
+}
+
+function awsCredentials(env: NodeJS.ProcessEnv): Credentials | undefined {
+  const accessKeyId = env.AWS_ACCESS_KEY_ID;
+  const secretAccessKey = env.AWS_SECRET_ACCESS_KEY;
+  return accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined;
 }
