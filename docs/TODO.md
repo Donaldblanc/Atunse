@@ -14,6 +14,7 @@
   - Multi-item Orders for Bundles (three pairs), which the Phase 1 API doesn't support (Phase 2).
   - A decision on whether booking prices stay hard-coded in `services-data.ts` or move server-side, since the Deposit is based on them.
 - [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.
+- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now: `chore/back-merge-ce98fe9` (0.2.2 `package.json` bump) needs a manual PR into `develop`.
 
 ## Client feedback — landing page & booking flow (2026-09-26)
 Raw feedback checked against current code. Items already done or already
