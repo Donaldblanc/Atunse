@@ -63,7 +63,9 @@ DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:
 Set `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true` in `.env` to try the booking
 flow's customer login. Without `RESEND_API_KEY`/`EMAIL_FROM`, codes aren't
 emailed: the dev server log shows them as
-`[notification] to=… subject="123456 is your Atunṣe sign-in code"`.
+`[notification] to=… subject="123456 is your Atunṣe sign-in code"`. The
+customer session is its own cookie (`atunse_customer_session`), separate
+from the admin one, so you can be signed in as both.
 
 ## API surface (Phase 1)
 - `POST /api/v1/uploads` — presigned upload targets for a booking's photos (one per photo; JPEG/PNG/WebP/HEIC, under 15 MB, at most 10)
