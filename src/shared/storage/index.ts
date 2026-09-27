@@ -24,14 +24,17 @@ export function getFileStorage(env: NodeJS.ProcessEnv = process.env): FileStorag
   }
 
   if (driver === "s3") {
+    // S3_* wins; the AWS_* names are what Neon's storage setup (and the
+    // AWS SDK's own conventions) provide, so they work unchanged.
     const bucket = env.S3_BUCKET;
-    const region = env.S3_REGION;
-    if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION must be set.");
+    const region = env.S3_REGION || env.AWS_REGION;
+    if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION (or AWS_REGION) must be set.");
     const credentials =
       env.S3_ACCESS_KEY_ID && env.S3_SECRET_ACCESS_KEY
         ? { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY }
-        : undefined; // fall back to the SDK's default credential chain
-    return new S3FileStorage(bucket, region, credentials);
+        : undefined; // fall back to the SDK's default chain (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)
+    const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
+    return new S3FileStorage({ bucket, region, endpoint, credentials });
   }
 
   throw new StorageNotConfiguredError(`Unknown STORAGE_DRIVER: ${driver}`);

@@ -13,6 +13,13 @@
 - [ ] **Launch blocker: real policy pages.** The Policy Acceptance checkbox asks customers to agree to a Terms of Service, Refund Policy, Restoration Disclaimer and Payment Policy that don't exist yet (links go to `/coming-soon`). Content comes from the owner.
 - [ ] **Bundle submission (Phase 2).** Bundles are three Items in one Order. The Bundle Review step currently offers the single-pair flow instead of a Confirm button. Needs multi-item `submitOrder`, Bundle pricing in `service-catalog.ts`, and per-pair photo uploads.
 - [ ] **Where Mail-In customers ship to.** The confirmation and email say "We'll email you where to ship your pair", but nothing sends that email yet. Decide whether the shop address goes on the confirmation directly.
+- [ ] **Upload security hardening** (findings from testing presigned POST against the Neon bucket, 2026-09-26). Already solid: targets are presigned POSTs, Neon enforces their policy (oversized, wrong-type and re-keyed uploads are rejected), keys are server-minted and unguessable, and anonymous GET/LIST on the bucket return 403. Open:
+  - **Tighten the bucket CORS.** It allows any origin (`*`) and `GET/PUT/POST/HEAD/DELETE`. Limit it to the site's origins (production domain, preview domains, `http://localhost:3000`) and to `POST` (plus `GET` once admin views photos).
+  - **Pin each target to the declared size.** `content-length-range` is the flat 15 MB cap, not the size the browser declared, so every target accepts up to 15 MB.
+  - **Check what was actually uploaded.** The stored Content-Type is the label the target pins, not the bytes: a target issued for a PNG accepted JPEG bytes and stored them as `image/png`. `submitOrder` also only checks key shape, not that the object exists. Verify each key with a HEAD (size and type), and sniff magic bytes, before accepting the Order.
+  - **Rate-limit `POST /api/v1/uploads`.** It's public, so anyone can mint targets and fill the bucket (10 × 15 MB per call).
+  - **Scope the storage keys** to this one bucket, write-only for the app (plus read for admin later), if Neon's key settings allow it.
+  - **Shorter target lifetime.** 10 minutes today; a few minutes is enough for one upload batch.
 - [ ] **Orphaned uploads.** Photos uploaded for a booking that's never submitted stay in storage. Add an S3 lifecycle rule (or a cleanup job) for `bookings/` objects with no Order once admin photo viewing exists.
 - [ ] **Rate limiting** on the public `POST /api/v1/uploads` and `POST /api/v1/orders`.
 - [ ] Remaining `/coming-soon` placeholders: the "Process" nav link, footer "Contact", and the Terms and Privacy links.

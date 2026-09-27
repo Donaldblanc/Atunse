@@ -60,7 +60,11 @@ describe("LocalFileStorage", () => {
 
 describe("S3FileStorage", () => {
   it("issues a presigned POST pinned to the key and content type", async () => {
-    const storage = new S3FileStorage("atunse-test", "us-east-1", { accessKeyId: "AKIDEXAMPLE", secretAccessKey: "secret" });
+    const storage = new S3FileStorage({
+      bucket: "atunse-test",
+      region: "us-east-1",
+      credentials: { accessKeyId: "AKIDEXAMPLE", secretAccessKey: "secret" },
+    });
     const { url, fields } = await storage.createUploadTarget({ key: "bookings/b/0.jpg", contentType: "image/jpeg", maxBytes: 10 });
 
     expect(url).toContain("atunse-test");
@@ -68,6 +72,17 @@ describe("S3FileStorage", () => {
     expect(fields["Content-Type"]).toBe("image/jpeg");
     const policy = JSON.parse(Buffer.from(fields.Policy!, "base64").toString());
     expect(policy.conditions).toContainEqual(["content-length-range", 1, 10]);
+  });
+
+  it("addresses an S3-compatible endpoint path-style, since bucket subdomains don't resolve there", async () => {
+    const storage = new S3FileStorage({
+      bucket: "atunse-images",
+      region: "us-east-2",
+      endpoint: "https://storage.example.test",
+      credentials: { accessKeyId: "nak_example", secretAccessKey: "secret" },
+    });
+    const { url } = await storage.createUploadTarget({ key: "bookings/b/0.jpg", contentType: "image/jpeg", maxBytes: 10 });
+    expect(url).toBe("https://storage.example.test/atunse-images");
   });
 });
 
@@ -78,6 +93,19 @@ describe("getFileStorage", () => {
 
   it("uses S3 when configured", () => {
     expect(getFileStorage({ NODE_ENV: "production", S3_BUCKET: "b", S3_REGION: "us-east-1" })).toBeInstanceOf(S3FileStorage);
+  });
+
+  it("accepts Neon storage's AWS_* variable names", async () => {
+    const storage = getFileStorage({
+      NODE_ENV: "production",
+      S3_BUCKET: "atunse-images",
+      AWS_REGION: "us-east-2",
+      AWS_ENDPOINT_URL_S3: "https://storage.example.test",
+      AWS_ACCESS_KEY_ID: "nak_example",
+      AWS_SECRET_ACCESS_KEY: "secret",
+    });
+    const { url } = await storage.createUploadTarget({ key: "bookings/b/0.jpg", contentType: "image/jpeg", maxBytes: 10 });
+    expect(url).toBe("https://storage.example.test/atunse-images");
   });
 
   it("fails loudly in production without S3 config, and never falls back to local disk", () => {

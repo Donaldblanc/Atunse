@@ -39,3 +39,7 @@ and deleting are added when the admin Item detail screen needs them.
   `.uploads/`. `STORAGE_DRIVER` selects the driver; production refuses the
   local driver and fails with a clear 503 when S3 isn't configured, rather
   than accepting photos it can't keep.
+- **S3-compatible providers.** The bucket is Neon's S3-compatible storage.
+  `S3FileStorage` takes an optional endpoint (`S3_ENDPOINT` or
+  `AWS_ENDPOINT_URL_S3`) and switches to path-style URLs when one is set,
+  since bucket subdomains don't resolve there. No other code changes.
