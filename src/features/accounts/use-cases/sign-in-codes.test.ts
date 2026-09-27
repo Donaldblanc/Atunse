@@ -123,7 +123,7 @@ describe("book → sign in → rebook (one shared accounts table)", () => {
     expect(accountId).toBe(first.accountId);
 
     const again = validBookingInput();
-    again.item = { ...again.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+    again.items = [{ ...again.items[0]!, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] }];
     const second = await submitOrder(booking, { accountId, role: "CUSTOMER" }, again);
     expect(second.accountId).toBe(first.accountId);
   });

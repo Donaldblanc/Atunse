@@ -85,6 +85,8 @@ export interface Order {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /** The Bundle bought (service-catalog.ts BUNDLE_CATALOG), or null for a single pair. */
+  bundleId: string | null;
   confirmationEmailSentAt: Date | null;
   /** What was submitted with its submission key (#76); null for older Orders. */
   submissionFingerprint: string | null;
@@ -107,4 +109,9 @@ export interface AuditEntry {
   actorAccountId: string | null;
   idempotencyKey: string | null;
   metadata?: Record<string, unknown>;
+}
+
+/** How customer-facing copy refers to an Order's sneakers: "your pair" or "your 3 pairs". */
+export function pairsPhrase(pairCount: number): string {
+  return pairCount === 1 ? "your pair" : `your ${pairCount} pairs`;
 }

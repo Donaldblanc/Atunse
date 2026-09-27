@@ -5,7 +5,7 @@ import { validBookingInput } from "./use-cases/test-fixtures";
 describe("submissionFingerprint", () => {
   it("is stable for the same booking, whatever the key order", () => {
     const input = validBookingInput();
-    const reordered = JSON.parse(JSON.stringify({ item: input.item, rush: input.rush, fulfillment: input.fulfillment, contact: input.contact }));
+    const reordered = JSON.parse(JSON.stringify({ items: input.items, bundleId: input.bundleId, rush: input.rush, fulfillment: input.fulfillment, contact: input.contact }));
     expect(submissionFingerprint({ ...reordered, submissionKey: null, policyAccepted: true })).toBe(submissionFingerprint(input));
   });
 

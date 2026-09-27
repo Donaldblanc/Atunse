@@ -6,7 +6,7 @@ import type { PaymentInstructions } from "../payment-instructions";
 import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
 import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
-import type { SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
+import type { PairInput, SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
 
 export const FIXED_NOW = new Date("2026-10-01T15:00:00Z"); // Oct 1, 11 AM in New York
 
@@ -52,13 +52,29 @@ export function validBookingInput(overrides: Partial<SubmitOrderInput> = {}): Su
       slot: "4:30 PM – 5:00 PM",
     },
     rush: false,
-    item: {
-      brand: "Nike Air Force 1",
-      material: "Leather",
-      notes: "scuffed toe box",
-      serviceIds: ["standard"],
-      photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/0.jpg"],
-    },
+    bundleId: null,
+    items: [validPair()],
     ...overrides,
   };
+}
+
+/** One pair that passes every rule; `photo` picks one of the pre-uploaded photos. */
+export function validPair(overrides: Partial<PairInput> = {}, photo = 0): PairInput {
+  return {
+    brand: "Nike Air Force 1",
+    material: "Leather",
+    notes: "scuffed toe box",
+    serviceIds: ["standard"],
+    photoKeys: [`bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/${photo}.jpg`],
+    ...overrides,
+  };
+}
+
+/** A valid three-pair Bundle booking: each pair has its own photo. */
+export function validBundleInput(bundleId = "revival", overrides: Partial<SubmitOrderInput> = {}): SubmitOrderInput {
+  return validBookingInput({
+    bundleId,
+    items: [0, 1, 2].map((photo) => validPair({ serviceIds: [] }, photo)),
+    ...overrides,
+  });
 }

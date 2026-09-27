@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
-import { orderReference } from "../domain";
+import { orderReference, pairsPhrase } from "../domain";
+import { BUNDLE_PAIR_SERVICE_IDS } from "../service-catalog";
 import {
   BookingValidationError,
   PolicyNotAcceptedError,
@@ -9,7 +10,7 @@ import {
   submitOrder,
 } from "./submit-order";
 import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
-import { bookingDeps, FIXED_NOW, validBookingInput } from "./test-fixtures";
+import { bookingDeps, FIXED_NOW, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
 const mailInAddress = { line1: "1 Elm St", line2: null, city: "Austin", state: "TX", zip: "73301" };
@@ -38,7 +39,7 @@ describe("submitOrder", () => {
 
   describe("account ownership (ADR-0014)", () => {
     const secondPhoto = (input: ReturnType<typeof validBookingInput>) => {
-      input.item = { ...input.item, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] };
+      input.items = [{ ...input.items[0]!, photoKeys: ["bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/1.jpg"] }];
       return input;
     };
 
@@ -142,7 +143,7 @@ describe("submitOrder", () => {
   describe("pricing", () => {
     it("computes the estimate and 50% Deposit from the server catalog, with Suede and Rush", async () => {
       const input = validBookingInput({ rush: true });
-      input.item = { ...input.item, material: "Suede", serviceIds: ["standard", "oxidation"] };
+      input.items = [{ ...input.items[0]!, material: "Suede", serviceIds: ["standard", "oxidation"] }];
       const order = await submitOrder(bookingDeps(), guest, input);
 
       // 30 standard + 25 oxidation + 10 suede = 65 per pair; + 20 rush = 85
@@ -154,13 +155,13 @@ describe("submitOrder", () => {
 
     it("rejects invalid Service selections as a booking validation error", async () => {
       const input = validBookingInput();
-      input.item = { ...input.item, serviceIds: ["standard", "premium"] };
+      input.items = [{ ...input.items[0]!, serviceIds: ["standard", "premium"] }];
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
 
     it("rejects an unknown material", async () => {
       const input = validBookingInput();
-      input.item = { ...input.item, material: "Velvet" };
+      input.items = [{ ...input.items[0]!, material: "Velvet" }];
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
   });
@@ -172,7 +173,7 @@ describe("submitOrder", () => {
       ["too many photos", Array.from({ length: 11 }, (_, i) => `bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/${i}.jpg`)],
     ])("rejects %s", async (_label, photoKeys) => {
       const input = validBookingInput();
-      input.item = { ...input.item, photoKeys };
+      input.items = [{ ...input.items[0]!, photoKeys }];
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
   });
@@ -181,7 +182,7 @@ describe("submitOrder", () => {
     const uploadKey = "bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg";
     const withPhoto = (key: string) => {
       const input = validBookingInput();
-      input.item = { ...input.item, photoKeys: [key] };
+      input.items = [{ ...input.items[0]!, photoKeys: [key] }];
       return input;
     };
 
@@ -411,6 +412,110 @@ describe("submitOrder", () => {
 
       await submitOrder(deps, guest, input);
       expect(deps.notifications.sent).toHaveLength(1);
+    });
+  });
+
+  describe("Bundles (three pairs, one Order)", () => {
+    it("books three Items, each Premium Clean, recording the Bundle and keeping the pairs in order", async () => {
+      const input = validBundleInput("revival");
+      input.items = input.items.map((pair, i) => ({ ...pair, brand: `Pair ${i + 1}` }));
+      const order = await submitOrder(bookingDeps(), guest, input);
+
+      expect(order.bundleId).toBe("revival");
+      expect(order.items.map((item) => item.brand)).toEqual(["Pair 1", "Pair 2", "Pair 3"]);
+      expect(order.items.every((item) => item.serviceIds.join() === "premium")).toBe(true);
+      expect(order.items.map((item) => item.estimate.cents)).toEqual([5000, 5000, 5000]);
+      expect(order.estimate.cents).toBe(15000);
+      expect(order.estimateIsMinimum).toBe(false);
+      expect(order.deposit.cents).toBe(7500);
+    });
+
+    it("splits a price that doesn't divide by three with the leftover cent on the first pair", async () => {
+      const order = await submitOrder(bookingDeps(), guest, validBundleInput("restoration"));
+      expect(order.items.map((item) => item.estimate.cents)).toEqual([5834, 5833, 5833]);
+      expect(order.estimate.cents).toBe(17500);
+      expect(order.deposit.cents).toBe(8750);
+    });
+
+    it("waives the Suede Fee and adds Rush once", async () => {
+      const input = validBundleInput("collector", { rush: true });
+      input.items = input.items.map((pair) => ({ ...pair, material: "Suede" }));
+      const order = await submitOrder(bookingDeps(), guest, input);
+      expect(order.estimate.cents).toBe(20000 + 2000);
+    });
+
+    it("keeps each pair's photos with that pair, each as its own verified copy", async () => {
+      const order = await submitOrder(bookingDeps(), guest, validBundleInput());
+      const keys = order.items.map((item) => item.photoKeys);
+      expect(keys.every((pairKeys) => pairKeys.length === 1 && pairKeys[0]!.startsWith("photos/"))).toBe(true);
+      expect(new Set(keys.flat()).size).toBe(3);
+    });
+
+    it("names the Bundle and all the pairs in the confirmation email", async () => {
+      const deps = bookingDeps();
+      await submitOrder(deps, guest, validBundleInput("revival"));
+      expect(deps.notifications.sent[0]!.body).toContain("The Revival Pack");
+      expect(deps.notifications.sent[0]!.body).toContain("your 3 pairs");
+    });
+
+    it.each([
+      ["two pairs", () => validBundleInput("revival", { items: [validPair({ serviceIds: [] }, 0), validPair({ serviceIds: [] }, 1)] })],
+      ["an unknown Bundle", () => validBundleInput("mystery")],
+      ["Services chosen per pair", () => validBundleInput("revival", { items: [0, 1, 2].map((i) => validPair({}, i)) })],
+      ["the same photo on two pairs", () => validBundleInput("revival", { items: [0, 0, 1].map((i) => validPair({ serviceIds: [] }, i)) })],
+      ["three pairs without a Bundle", () => validBookingInput({ items: [0, 1, 2].map((i) => validPair({}, i)) })],
+    ])("rejects %s", async (_label, input) => {
+      await expect(submitOrder(bookingDeps(), guest, input())).rejects.toThrow(BookingValidationError);
+    });
+
+    it("says which pair is missing its photos", async () => {
+      const input = validBundleInput();
+      input.items = [input.items[0]!, { ...input.items[1]!, photoKeys: [] }, input.items[2]!];
+      await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow("Add at least one photo of pair 2.");
+    });
+  });
+
+  describe("Bundle review fixes (#85)", () => {
+    it("gives each Bundle Item its own services array, never the catalog constant", async () => {
+      const order = await submitOrder(bookingDeps(), guest, validBundleInput("revival"));
+      const [a, b, c] = order.items.map((item) => item.serviceIds);
+      expect(a).toEqual(["premium"]);
+      expect(a).not.toBe(b);
+      expect(b).not.toBe(c);
+      expect(a).not.toBe(BUNDLE_PAIR_SERVICE_IDS);
+    });
+
+    it("never has more than 10 storage calls in flight for a 30-photo Bundle", async () => {
+      const deps = bookingDeps();
+      const keys = Array.from({ length: 30 }, (_, i) => `bookings/5a4f3c2d-1e0f-4a8b-9c7d-6e5f4a3b2c1d/${i}.jpg`);
+      for (const key of keys) deps.storage.put(key);
+      let inFlight = 0;
+      let peak = 0;
+      const track = <T>(call: () => Promise<T>) => async () => {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 1));
+        try {
+          return await call();
+        } finally {
+          inFlight -= 1;
+        }
+      };
+      const { copy, inspect } = deps.storage;
+      deps.storage.copy = (from, to) => track(() => copy.call(deps.storage, from, to))();
+      deps.storage.inspect = (key) => track(() => inspect.call(deps.storage, key))();
+
+      const input = validBundleInput("revival");
+      input.items = input.items.map((item, pair) => ({ ...item, photoKeys: keys.slice(pair * 10, pair * 10 + 10) }));
+      const order = await submitOrder(deps, guest, input);
+
+      expect(order.items.flatMap((item) => item.photoKeys)).toHaveLength(30);
+      expect(peak).toBeLessThanOrEqual(10);
+    });
+
+    it("words the pairs the same way everywhere", () => {
+      expect(pairsPhrase(1)).toBe("your pair");
+      expect(pairsPhrase(3)).toBe("your 3 pairs");
     });
   });
 });

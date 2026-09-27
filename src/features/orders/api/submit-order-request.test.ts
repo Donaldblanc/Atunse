@@ -11,7 +11,7 @@ const body = {
     slot: "4:30 PM – 5:00 PM",
   },
   rush: false,
-  item: { brand: "Nike", material: "Leather", serviceIds: ["standard"], photoKeys: ["bookings/x/0.jpg"] },
+  items: [{ brand: "Nike", material: "Leather", serviceIds: ["standard"], photoKeys: ["bookings/x/0.jpg"] }],
 };
 
 const key = "3c1f0e2a-7d4b-4a8e-9f6c-1b2d3e4f5a6b";
@@ -22,7 +22,8 @@ describe("parseSubmitOrderRequest", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.submissionKey).toBe(key);
-    expect(result.value.item.notes).toBeNull();
+    expect(result.value.items[0]!.notes).toBeNull();
+    expect(result.value.bundleId).toBeNull();
     expect(result.value.fulfillment.address.line2).toBeNull();
   });
 
@@ -45,12 +46,33 @@ describe("parseSubmitOrderRequest", () => {
   });
 
   it("ignores any client-sent price", () => {
-    const result = parseSubmitOrderRequest({ ...body, estimateCents: 1, item: { ...body.item, priceCents: 1 } }, null);
+    const result = parseSubmitOrderRequest({ ...body, estimateCents: 1, items: [{ ...body.items[0], priceCents: 1 }] }, null);
     expect(result.ok).toBe(true);
     expect(JSON.stringify(result)).not.toContain("priceCents");
   });
 
+  it("parses a three-pair Bundle", () => {
+    const pair = { ...body.items[0], serviceIds: [] };
+    const result = parseSubmitOrderRequest({ ...body, bundleId: "revival", items: [pair, pair, pair] }, null);
+    expect(result.ok && result.value).toMatchObject({ bundleId: "revival", items: { length: 3 } });
+  });
+
+  it("rejects no pairs, or more pairs than a Bundle holds", () => {
+    expect(parseSubmitOrderRequest({ ...body, items: [] }, null).ok).toBe(false);
+    expect(parseSubmitOrderRequest({ ...body, items: Array(4).fill(body.items[0]) }, null).ok).toBe(false);
+  });
+
   it("rejects a non-UUID Idempotency-Key", () => {
     expect(parseSubmitOrderRequest(body, "retry-please")).toEqual({ ok: false, error: expect.stringContaining("UUID") });
+  });
+
+  it("still accepts the pre-Bundle single `item` body from tabs loaded before the deploy", () => {
+    const { items: _items, bundleId: _bundle, ...rest } = body as Record<string, unknown>;
+    const legacy = { ...rest, item: (body as { items: unknown[] }).items[0] };
+    const result = parseSubmitOrderRequest(legacy, null);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.bundleId).toBeNull();
+    expect(result.value.items).toHaveLength(1);
   });
 });

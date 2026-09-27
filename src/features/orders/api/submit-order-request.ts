@@ -7,6 +7,7 @@
 import { z } from "zod";
 import { orderReference, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
+import { BUNDLE_PAIRS, findBundle } from "../service-catalog";
 import type { SubmitOrderInput } from "../use-cases/submit-order";
 
 const text = (max: number) => z.string().max(max);
@@ -30,21 +31,40 @@ const submitOrderBody = z.object({
     z.object({ method: z.literal("MAIL_IN"), address, preferredDate: calendarDate.nullish().transform((v) => v ?? null) }),
   ]),
   rush: z.boolean(),
-  item: z.object({
-    brand: optionalText(200),
-    material: optionalText(40),
-    notes: optionalText(2000),
-    serviceIds: z.array(text(40)).max(10),
-    photoKeys: z.array(text(200)).max(10),
-  }),
+  // A Bundle id for three pairs; absent or null for a single pair.
+  bundleId: text(40).nullish().transform((v) => v ?? null),
+  items: z
+    .array(
+      z.object({
+        brand: optionalText(200),
+        material: optionalText(40),
+        notes: optionalText(2000),
+        serviceIds: z.array(text(40)).max(10),
+        photoKeys: z.array(text(200)).max(10),
+      }),
+    )
+    .min(1)
+    .max(BUNDLE_PAIRS),
 });
 
 const submissionKey = z.string().uuid();
 
 export type ParseResult = { ok: true; value: SubmitOrderInput } | { ok: false; error: string };
 
+/**
+ * Booking tabs loaded before Bundles shipped send one `item` instead of
+ * `items`. Accept that for a release, so those customers don't hit
+ * "items: Required" and have to re-enter everything. Remove once no such
+ * tab can still be open.
+ */
+function upgradeLegacyBody(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || "items" in body || !("item" in body)) return body;
+  const { item, ...rest } = body as { item: unknown };
+  return { ...rest, bundleId: null, items: [item] };
+}
+
 export function parseSubmitOrderRequest(body: unknown, idempotencyKey: string | null): ParseResult {
-  const parsed = submitOrderBody.safeParse(body);
+  const parsed = submitOrderBody.safeParse(upgradeLegacyBody(body));
   if (!parsed.success) {
     const issue = parsed.error.issues[0]!;
     return { ok: false, error: `${issue.path.join(".") || "body"}: ${issue.message}` };
@@ -65,6 +85,9 @@ export function toSubmitOrderResponse(order: Order, paymentInstructions: Payment
       estimateCents: order.estimate.cents,
       estimateIsMinimum: order.estimateIsMinimum,
       depositCents: order.deposit.cents,
+      pairCount: order.items.length,
+      /** The Bundle's name, or null for a single pair. */
+      bundleName: findBundle(order.bundleId)?.name ?? null,
     },
     paymentInstructions,
   };

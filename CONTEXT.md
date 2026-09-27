@@ -22,6 +22,7 @@ A unit of cleaning or restoration work that can be attached to an Item: Standard
 
 ## Bundle
 A fixed-price package of Services covering three pairs booked together. Each pair in a Bundle is still its own Item.
+Every pair gets Premium Clean; the Bundle's perks that cover only some pairs (e.g. "Oxidation touch-up on 1 pair") are assigned by the shop after inspection, so the Order records which Bundle was bought. The Bundle price is split evenly across its three Items (any leftover cent on the first), so the Items always sum to the Bundle price.
 
 ## Rush
 An optional faster turnaround a customer can request for a flat extra fee.

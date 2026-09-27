@@ -4,8 +4,9 @@ import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
 import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
-import { orderReference, type Fulfillment, type Order } from "../domain";
+import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
+import { mapWithConcurrency } from "@/shared/concurrency";
 import type { FileStorage } from "@/shared/storage";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
@@ -18,10 +19,15 @@ import {
   type OrderRepository,
 } from "../repositories/order-repository";
 import {
+  BUNDLE_PAIR_SERVICE_IDS,
+  BUNDLE_PAIRS,
+  estimateBundleItems,
   estimateItem,
   estimateOrder,
+  findBundle,
   InvalidServiceSelectionError,
   MATERIALS,
+  type ItemEstimate,
   type Material,
 } from "../service-catalog";
 
@@ -32,13 +38,19 @@ export interface SubmitOrderInput {
   contact: { name: string; email: string; phone: string };
   fulfillment: Fulfillment;
   rush: boolean;
-  item: {
-    brand: string | null;
-    material: string | null;
-    notes: string | null;
-    serviceIds: string[];
-    photoKeys: string[]; // from presigned uploads (ADR-0004) — never raw file bytes
-  };
+  /** A Bundle id (service-catalog.ts) for three pairs, or null for a single pair. */
+  bundleId: string | null;
+  /** One entry per pair: exactly one without a Bundle, BUNDLE_PAIRS with one. */
+  items: PairInput[];
+}
+
+export interface PairInput {
+  brand: string | null;
+  material: string | null;
+  notes: string | null;
+  /** The pair's Services. Empty in a Bundle: its Services come from the catalog. */
+  serviceIds: string[];
+  photoKeys: string[]; // from presigned uploads (ADR-0004) — never raw file bytes
 }
 
 export interface SubmitOrderDeps {
@@ -131,8 +143,8 @@ export class PhotosInUseError extends BookingValidationError {
 
 
 /**
- * Phase 1 vertical slice, step 1: a customer books one pair through
- * /booking. Every Order belongs to a Customer Account (ADR-0014), resolved
+ * Phase 1 vertical slice, step 1: a customer books one pair, or a
+ * three-pair Bundle, through /booking. Every Order belongs to a Customer Account (ADR-0014), resolved
  * by resolveOwner below: never an Admin Account, even for an admin's email. Every ADR-0012 concern is present: authz
  * (anyone can submit, but the check is still explicit), business rules
  * enforced server-side (Policy Acceptance, Pickup area, Service rules),
@@ -159,18 +171,9 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
 
   const contact = validateContact(input.contact);
   const fulfillment = validateFulfillment(input.fulfillment, now);
-  const material = validateMaterial(input.item.material);
-  validatePhotoKeys(input.item.photoKeys);
-
-  let itemEstimate;
-  try {
-    itemEstimate = estimateItem({ serviceIds: input.item.serviceIds, material });
-  } catch (err) {
-    if (err instanceof InvalidServiceSelectionError) throw new BookingValidationError(err.message);
-    throw err;
-  }
-  const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
-  const photos = await keepVerifiedPhotos(deps, input.item.photoKeys);
+  const pairs = pricePairs(input);
+  const orderEstimate = estimateOrder({ items: pairs.map((pair) => pair.estimate), rush: input.rush });
+  const photos = await keepVerifiedPhotos(deps, input.items.map((item) => item.photoKeys));
 
   const newOrder = (owner: OrderOwner) =>
     deps.orders.create({
@@ -186,15 +189,16 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       deposit: orderEstimate.deposit,
       submissionKey: input.submissionKey,
       submissionFingerprint: fingerprint,
-      item: {
-        brand: blankToNull(input.item.brand),
+      bundleId: input.bundleId,
+      items: input.items.map((item, i) => ({
+        brand: blankToNull(item.brand),
         model: null, // the booking form's single "Brand / Model" field lands in `brand`
-        description: blankToNull(input.item.notes),
-        material,
-        serviceIds: input.item.serviceIds,
-        estimate: itemEstimate.estimate,
-        photos,
-      },
+        description: blankToNull(item.notes),
+        material: pairs[i]!.material,
+        serviceIds: pairs[i]!.serviceIds,
+        estimate: pairs[i]!.estimate.estimate,
+        photos: photos[i]!,
+      })),
     });
 
   let created;
@@ -342,24 +346,33 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
  * key alone proves nothing: it doesn't show the upload finished, and a
  * target's pinned Content-Type is only a label on whatever bytes were sent.
  */
+/** Storage calls in flight at once while copying and checking photos. */
+const STORAGE_CONCURRENCY = 10;
+
 async function keepVerifiedPhotos(
   deps: SubmitOrderDeps,
-  uploadKeys: string[],
-): Promise<{ key: string; uploadKey: string }[]> {
+  uploadKeysByPair: string[][],
+): Promise<{ key: string; uploadKey: string }[][]> {
   const batchId = (deps.newId ?? randomUUID)();
-  const photos = uploadKeys.map((uploadKey, i) => ({ key: storedPhotoKey(batchId, i, uploadKey), uploadKey }));
+  // One running index across the pairs, so every copy gets its own key.
+  let index = 0;
+  const byPair = uploadKeysByPair.map((uploadKeys) =>
+    uploadKeys.map((uploadKey) => ({ key: storedPhotoKey(batchId, index++, uploadKey), uploadKey })),
+  );
+  const photos = byPair.flat();
 
-  const copied = await Promise.all(photos.map((photo) => deps.storage.copy(photo.uploadKey, photo.key)));
+  // A Bundle can carry 30 photos; bounded so the calls don't all start at once.
+  const copied = await mapWithConcurrency(photos, STORAGE_CONCURRENCY, (photo) => deps.storage.copy(photo.uploadKey, photo.key));
   if (copied.includes(false)) throw new PhotosNotUploadedError();
 
-  const stored = await Promise.all(photos.map((photo) => deps.storage.inspect(photo.key)));
+  const stored = await mapWithConcurrency(photos, STORAGE_CONCURRENCY, (photo) => deps.storage.inspect(photo.key));
   if (stored.some((object) => object === null || object.size === 0)) throw new PhotosNotUploadedError();
   const valid = stored.every(
     (object, i) =>
       photoMatchesKey(photos[i]!.key, object!.head) && object!.contentType === photoKeyContentType(photos[i]!.key),
   );
   if (!valid) throw new BookingValidationError("One or more photos aren't valid JPEG, PNG, WebP or HEIC images.");
-  return photos;
+  return byPair;
 }
 
 function validateMaterial(material: string | null): Material | null {
@@ -371,8 +384,44 @@ function validateMaterial(material: string | null): Material | null {
   return value as Material;
 }
 
-function validatePhotoKeys(photoKeys: string[]) {
-  if (photoKeys.length === 0) throw new BookingValidationError("Add at least one photo of your pair.");
+/**
+ * Each pair's material, Services and estimate, from the server's own
+ * catalog. A single pair is priced from its Services; a Bundle's three pairs
+ * each get the Bundle's Services and an even share of its fixed price, with
+ * the Suede Fee waived (CONTEXT.md: Bundle).
+ */
+function pricePairs(input: SubmitOrderInput): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
+  const pairLabel = (i: number) => (input.bundleId === null ? "your pair" : `pair ${i + 1}`);
+  const materials = input.items.map((item) => validateMaterial(item.material));
+  input.items.forEach((item, i) => validatePhotoKeys(item.photoKeys, pairLabel(i)));
+  const allKeys = input.items.flatMap((item) => item.photoKeys);
+  if (new Set(allKeys).size !== allKeys.length) throw new BookingValidationError("The same photo can't be added twice.");
+
+  try {
+    if (input.bundleId === null) {
+      if (input.items.length !== 1) throw new BookingValidationError(`Book one pair, or choose a Bundle for ${BUNDLE_PAIRS}.`);
+      const { serviceIds } = input.items[0]!;
+      return [{ material: materials[0]!, serviceIds, estimate: estimateItem({ serviceIds, material: materials[0]! }) }];
+    }
+    if (input.items.length !== BUNDLE_PAIRS) {
+      throw new BookingValidationError(`A Bundle covers exactly ${BUNDLE_PAIRS} pairs.`);
+    }
+    if (input.items.some((item) => item.serviceIds.length > 0)) {
+      throw new BookingValidationError("A Bundle's Services come with it: don't choose Services per pair.");
+    }
+    return estimateBundleItems(input.bundleId).map((estimate, i) => ({
+      material: materials[i]!,
+      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS], // each Item its own array, never the catalog's
+      estimate,
+    }));
+  } catch (err) {
+    if (err instanceof InvalidServiceSelectionError) throw new BookingValidationError(err.message);
+    throw err;
+  }
+}
+
+function validatePhotoKeys(photoKeys: string[], pairLabel: string) {
+  if (photoKeys.length === 0) throw new BookingValidationError(`Add at least one photo of ${pairLabel}.`);
   if (photoKeys.length > MAX_PHOTOS_PER_ITEM) {
     throw new BookingValidationError(`Add at most ${MAX_PHOTOS_PER_ITEM} photos per pair.`);
   }
@@ -390,12 +439,17 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
   const howToPay = payment.zelle
     ? `Pay the ${order.deposit.format()} deposit by Zelle to ${payment.zelle.recipient} (${payment.zelle.name}) with "${reference}" in the memo.`
     : `We'll email you how to pay the ${order.deposit.format()} deposit.`;
+  const pairs = pairsPhrase(order.items.length);
   const nextStep =
     order.fulfillment.method === "PICKUP"
-      ? `We'll pick up your pair on ${order.fulfillment.date}, ${order.fulfillment.slot}.`
-      : "We'll email you where to ship your pair.";
+      ? `We'll pick up ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}.`
+      : `We'll email you where to ship ${pairs}.`;
+  const bundle = findBundle(order.bundleId);
   return [
     `Thanks, ${order.contactName}. Your booking ${reference} was received.`,
+    ...(bundle
+      ? [`Bundle: ${bundle.name} (${bundle.perks.join(", ")}). We'll decide which pairs get its extras once we've inspected them.`]
+      : []),
     `Estimated total: ${estimate}. Deposit due: ${order.deposit.format()}.`,
     howToPay,
     nextStep,

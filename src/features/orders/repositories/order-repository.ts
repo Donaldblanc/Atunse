@@ -46,21 +46,26 @@ export interface NewOrderInput {
   deposit: Money;
   submissionKey: string | null;
   submissionFingerprint: string | null;
-  item: {
-    brand: string | null;
-    model: string | null;
-    description: string | null;
-    material: string | null;
-    serviceIds: string[];
-    estimate: Money;
-    /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
-    photos: { key: string; uploadKey: string }[];
-  };
+  /** The Bundle bought, or null for a single pair. */
+  bundleId: string | null;
+  /** One per pair, in the order the customer entered them. */
+  items: NewItemInput[];
+}
+
+export interface NewItemInput {
+  brand: string | null;
+  model: string | null;
+  description: string | null;
+  material: string | null;
+  serviceIds: string[];
+  estimate: Money;
+  /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
+  photos: { key: string; uploadKey: string }[];
 }
 
 export interface OrderRepository {
   /**
-   * Creates the Order with its Item and photos, and the owner's Account when
+   * Creates the Order with its Items and their photos, and the owner's Account when
    * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
    * an Order with the same `submissionKey` already exists, returns that
    * Order with `created: false` instead of inserting a duplicate. Throws

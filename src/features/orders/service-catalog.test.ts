@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { RATE_LIMITS } from "@/shared/rate-limit/rate-limiter";
 import { Money } from "@/shared/money/money";
 import { BOOKING_SERVICES } from "@/features/booking/services-data";
 import {
+  BUNDLE_CATALOG,
+  BUNDLE_PAIRS,
+  estimateBundleItems,
   formatServicePrice,
   serviceNotes,
   estimateItem,
@@ -41,6 +45,22 @@ describe("estimateItem", () => {
   });
 });
 
+describe("estimateBundleItems", () => {
+  it("splits every Bundle into three flat shares that sum to exactly its price", () => {
+    for (const bundle of BUNDLE_CATALOG) {
+      const shares = estimateBundleItems(bundle.id);
+      expect(shares).toHaveLength(BUNDLE_PAIRS);
+      expect(shares.reduce((sum, share) => sum + share.estimate.cents, 0)).toBe(bundle.priceCents);
+      expect(Math.max(...shares.map((s) => s.estimate.cents)) - Math.min(...shares.map((s) => s.estimate.cents))).toBeLessThanOrEqual(1);
+      expect(shares.every((share) => !share.isMinimum)).toBe(true);
+    }
+  });
+
+  it("rejects an unknown Bundle", () => {
+    expect(() => estimateBundleItems("mystery")).toThrow(InvalidServiceSelectionError);
+  });
+});
+
 describe("estimateOrder", () => {
   it("adds Rush once per Order and takes a 50% Deposit", () => {
     const item = estimateItem({ serviceIds: ["standard"], material: "Leather" });
@@ -74,5 +94,11 @@ describe("catalog display prices", () => {
 
   it("has a catalog entry for every Service the booking flow offers, and no others", () => {
     expect(SERVICE_CATALOG.map((s) => s.id).sort()).toEqual(BOOKING_SERVICES.map((s) => s.id).sort());
+  });
+});
+
+describe("upload rate limit vs Bundles (#85)", () => {
+  it("allows ~20 Bundle attempts: one uploads request per pair per attempt", () => {
+    expect(RATE_LIMITS.uploads.limit).toBeGreaterThanOrEqual(20 * BUNDLE_PAIRS);
   });
 });

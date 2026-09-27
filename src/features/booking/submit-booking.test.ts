@@ -8,8 +8,9 @@ function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmissi
   return {
     submissionKey: "3c1f0e2a-7d4b-4a8e-9f6c-1b2d3e4f5a6b",
     policyAccepted: true,
+    bundleId: null,
     serviceIds: ["standard"],
-    pair: { brand: "Nike AF1", material: "Suede", notes: "", photos: [photo] },
+    pairs: [{ brand: "Nike AF1", material: "Suede", notes: "", photos: [photo] }],
     scheduleMethod: "pickup",
     address: { ...EMPTY_ADDRESS, address: "123 Main St", city: "New York", state: "NY", zip: "10001" },
     pickupSelection: { date: new Date(2026, 9, 3), time: "4:30 PM – 5:00 PM" },
@@ -22,14 +23,29 @@ function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmissi
 
 describe("buildOrderRequestBody", () => {
   it("sends the pickup date as the local calendar day and blanks as null", () => {
-    const body = buildOrderRequestBody(submission(), ["k"]);
+    const body = buildOrderRequestBody(submission(), [["k"]]);
     expect(body.fulfillment).toEqual({
       method: "PICKUP",
       address: { line1: "123 Main St", line2: null, city: "New York", state: "NY", zip: "10001" },
       date: "2026-10-03",
       slot: "4:30 PM – 5:00 PM",
     });
-    expect(body.item).toEqual({ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] });
+    expect(body.bundleId).toBeNull();
+    expect(body.items).toEqual([{ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] }]);
+  });
+
+  it("sends a Bundle as its three pairs, each with its own photo keys and no Services of its own", () => {
+    const pair = (brand: string) => ({ brand, material: "", notes: "", photos: [photo] });
+    const body = buildOrderRequestBody(
+      submission({ bundleId: "revival", serviceIds: [], pairs: [pair("A"), pair("B"), pair("C")] }),
+      [["a"], ["b"], ["c"]],
+    );
+    expect(body.bundleId).toBe("revival");
+    expect(body.items.map((item) => [item.brand, item.serviceIds, item.photoKeys])).toEqual([
+      ["A", [], ["a"]],
+      ["B", [], ["b"]],
+      ["C", [], ["c"]],
+    ]);
   });
 
   it("sends Mail-In with an optional preferred date", () => {
@@ -80,7 +96,7 @@ describe("submitBooking", () => {
     expect([...form.keys()]).toEqual(["key", "Policy", "file"]); // file last, as S3 requires
     const orderCall = calls[2]!;
     expect((orderCall.init.headers as Record<string, string>)["Idempotency-Key"]).toBe(submission().submissionKey);
-    expect(JSON.parse(orderCall.init.body as string).item.photoKeys).toEqual(["bookings/b/0.jpg"]);
+    expect(JSON.parse(orderCall.init.body as string).items[0].photoKeys).toEqual(["bookings/b/0.jpg"]);
   });
 
   it("surfaces the server's validation message", async () => {
@@ -140,7 +156,7 @@ describe("retries reuse uploaded photos (#78)", () => {
     expect(calls.filter((c) => c.url === "/api/v1/uploads")).toHaveLength(1);
     expect(calls.filter((c) => c.url === "https://bucket.test")).toHaveLength(1);
     const orderBodies = calls.filter((c) => c.url === "/api/v1/orders").map((c) => JSON.parse(c.init.body as string));
-    expect(orderBodies[1].item.photoKeys).toEqual(orderBodies[0].item.photoKeys);
+    expect(orderBodies[1].items[0].photoKeys).toEqual(orderBodies[0].items[0].photoKeys);
   });
 
   it("uploads only the photos that aren't in storage yet", async () => {
@@ -153,11 +169,35 @@ describe("retries reuse uploaded photos (#78)", () => {
       "/api/v1/orders": () => Response.json({ order: {}, paymentInstructions: { zelle: null } }, { status: 201 }),
     });
 
-    await submitBooking(submission({ pair: { ...submission().pair, photos: [photo, second] } }), uploaded, impl);
+    await submitBooking(submission({ pairs: [{ ...submission().pairs[0]!, photos: [photo, second] }] }), uploaded, impl);
 
     expect(JSON.parse(calls[0]!.init.body as string).files).toHaveLength(1); // only side.jpg
     const order = JSON.parse(calls.find((c) => c.url === "/api/v1/orders")!.init.body as string);
-    expect(order.item.photoKeys).toEqual(["bookings/earlier/0.jpg", "bookings/b/0.jpg"]);
+    expect(order.items[0].photoKeys).toEqual(["bookings/earlier/0.jpg", "bookings/b/0.jpg"]);
+  });
+
+  it("uploads a Bundle's photos one pair per request and submits each pair's keys with it", async () => {
+    let batch = 0;
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": () => {
+        const key = `bookings/pair-${batch++}/0.jpg`;
+        return Response.json({ uploads: [{ key, url: "https://bucket.test", fields: { key } }] }, { status: 201 });
+      },
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () => Response.json({ order: {}, paymentInstructions: { zelle: null } }, { status: 201 }),
+    });
+    const pair = () => ({ brand: "", material: "", notes: "", photos: [new File([new Uint8Array(4)], "p.jpg", { type: "image/jpeg" })] });
+
+    await submitBooking(submission({ bundleId: "revival", serviceIds: [], pairs: [pair(), pair(), pair()] }), new WeakMap(), impl);
+
+    expect(calls.filter((c) => c.url === "/api/v1/uploads")).toHaveLength(3);
+    const order = JSON.parse(calls.find((c) => c.url === "/api/v1/orders")!.init.body as string);
+    expect(order.bundleId).toBe("revival");
+    expect(order.items.map((item: { photoKeys: string[] }) => item.photoKeys)).toEqual([
+      ["bookings/pair-0/0.jpg"],
+      ["bookings/pair-1/0.jpg"],
+      ["bookings/pair-2/0.jpg"],
+    ]);
   });
 
   it("doesn't remember a photo whose upload failed", async () => {
@@ -189,8 +229,8 @@ describe("photos missing on the server (#77)", () => {
 
     expect(result.order.reference).toBe("ABC12345");
     const bodies = calls.filter((c) => c.url === "/api/v1/orders").map((c) => JSON.parse(c.init.body as string));
-    expect(bodies[0].item.photoKeys).toEqual(["bookings/cleaned-up/0.jpg"]);
-    expect(bodies[1].item.photoKeys[0]).toMatch(/^bookings\/fresh-/);
+    expect(bodies[0].items[0].photoKeys).toEqual(["bookings/cleaned-up/0.jpg"]);
+    expect(bodies[1].items[0].photoKeys[0]).toMatch(/^bookings\/fresh-/);
   });
 
   it("gives up after one fresh attempt", async () => {
@@ -236,5 +276,28 @@ describe("server answers the booking flow acts on", () => {
     expect(result.order.reference).toBe("NEW00001");
     expect(calls.filter((c) => c.url === "/api/v1/uploads")).toHaveLength(1); // only the retry uploads
     expect(uploaded.get(photo)).toBe("bookings/b/0.jpg");
+  });
+});
+
+describe("Bundle photo uploads (#85)", () => {
+  it("uploads the pairs in parallel, not one after another", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const impl = (async (url: string) => {
+      if (url === "/api/v1/uploads") {
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight -= 1;
+        return Response.json({ uploads: [{ key: `bookings/${Math.random()}/0.jpg`, url: "https://bucket.test", fields: {} }] }, { status: 201 });
+      }
+      if (url === "https://bucket.test") return new Response(null, { status: 204 });
+      return Response.json({ order: { reference: "B" }, paymentInstructions: { zelle: null } }, { status: 201 });
+    }) as unknown as typeof fetch;
+    const pair = (name: string) => ({ brand: name, material: "", notes: "", photos: [new File([new Uint8Array(4)], `${name}.jpg`, { type: "image/jpeg" })] });
+
+    await submitBooking(submission({ bundleId: "revival", serviceIds: [], pairs: [pair("A"), pair("B"), pair("C")] }), new WeakMap(), impl);
+
+    expect(peak).toBe(3);
   });
 });
