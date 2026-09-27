@@ -27,8 +27,7 @@ export default function ProcessPage() {
             <p className="process-eyebrow">Our Process</p>
             <h1 className="process-h1">
               Premium Care,
-              <br />
-              From Your Door to On Feet.
+              <span>From Your Door to On Feet.</span>
             </h1>
             <p className="process-lede">
               A simple, seamless process to get your sneakers looking their best. Book online, schedule a

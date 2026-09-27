@@ -6,7 +6,7 @@
  * scratch/ (not committed), keeping the site's nav, footer and buttons.
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Anton&family=Playfair+Display:wght@500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Anton&display=swap");
 
 .landing {
   --blue: #2955ff;
@@ -3915,8 +3915,8 @@
 
 /* ---------- process page (/process) ----------
    Follows its own approved design (scratch/image copy 8.png), not the
-   landing mock: warm neutrals and a serif display face. Buttons stay the
-   site's own (.landing-btn-primary).
+   landing mock: warm neutrals and a photo-led hero. Fonts, heading style
+   and buttons stay the site's own (Inter, .landing-btn-primary).
    The hero photo fades out with a mask, so it sits on either theme. */
 
 .landing .process-page {
@@ -3985,18 +3985,23 @@
   margin: 0 0 18px;
 }
 
+/* Same heading style as the Services page hero. */
 .landing .process-h1 {
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: clamp(38px, 4.2vw, 62px);
-  font-weight: 600;
-  line-height: 1.06;
-  letter-spacing: -0.015em;
+  font-size: clamp(36px, 4.2vw, 56px);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   color: var(--ink);
   margin: 0 0 20px;
 }
 
 .landing[data-theme="dark"] .process-h1 {
-  color: var(--ink);
+  color: #fff;
+}
+
+.process-h1 span {
+  display: block;
+  color: var(--blue);
 }
 
 .process-lede {
@@ -4055,10 +4060,10 @@
 }
 
 .process-step-title {
-  font-family: "Playfair Display", Georgia, serif;
-  font-size: clamp(20px, 1.8vw, 25px);
-  font-weight: 500;
-  line-height: 1.2;
+  font-size: clamp(18px, 1.5vw, 21px);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
   margin: 6px 0 10px;
   color: var(--ink);
 }
@@ -4131,7 +4136,7 @@
     mask-image: linear-gradient(to top, transparent 0%, #000 35%);
   }
   .landing .process-h1 {
-    font-size: clamp(32px, 9vw, 40px);
+    font-size: clamp(30px, 8vw, 38px);
   }
   .process-lede {
     font-size: 15px;
