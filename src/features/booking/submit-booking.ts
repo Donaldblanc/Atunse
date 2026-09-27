@@ -40,7 +40,7 @@ export class BookingSubmitError extends Error {
 }
 
 /** Server answers meaning "upload the photos again", not "resend the same keys". */
-const REUPLOAD_CODES = ["PHOTOS_IN_USE"];
+const REUPLOAD_CODES = ["PHOTOS_IN_USE", "PHOTOS_NOT_UPLOADED"];
 
 const GENERIC_FAILURE = "Something went wrong submitting your booking. Please try again.";
 
@@ -156,9 +156,10 @@ export async function submitBooking(
     try {
       return await attempt();
     } catch (err) {
-      // The server can't use the photo keys this booking remembered (e.g.
-      // already attached to another booking): resending them would fail
-      // forever, so forget them and upload once more.
+      // The server can't use the photo keys this booking remembered: gone
+      // from storage (e.g. cleaned up while the tab sat open), or already
+      // attached to another booking. Resending them would fail forever, so
+      // forget them and upload once more.
       if (!(err instanceof BookingSubmitError && REUPLOAD_CODES.includes(err.code ?? ""))) throw err;
       for (const photo of submission.pair.photos) uploaded.delete(photo);
       return await attempt();

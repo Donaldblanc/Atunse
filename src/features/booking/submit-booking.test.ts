@@ -168,6 +168,42 @@ describe("retries reuse uploaded photos (#78)", () => {
   });
 });
 
+describe("photos missing on the server (#77)", () => {
+  it("forgets the remembered keys, uploads again once, and books", async () => {
+    let orderAttempts = 0;
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": () =>
+        Response.json(
+          { uploads: [{ key: `bookings/fresh-${calls.length}/0.jpg`, url: "https://bucket.test", fields: { key: "k" } }] },
+          { status: 201 },
+        ),
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () =>
+        ++orderAttempts === 1
+          ? Response.json({ error: "One or more photos didn't finish uploading.", code: "PHOTOS_NOT_UPLOADED" }, { status: 400 })
+          : Response.json({ order: { reference: "ABC12345" }, paymentInstructions: { zelle: null } }, { status: 201 }),
+    });
+    const uploaded = new WeakMap<File, string>([[photo, "bookings/cleaned-up/0.jpg"]]);
+
+    const result = await submitBooking(submission(), uploaded, impl);
+
+    expect(result.order.reference).toBe("ABC12345");
+    const bodies = calls.filter((c) => c.url === "/api/v1/orders").map((c) => JSON.parse(c.init.body as string));
+    expect(bodies[0].item.photoKeys).toEqual(["bookings/cleaned-up/0.jpg"]);
+    expect(bodies[1].item.photoKeys[0]).toMatch(/^bookings\/fresh-/);
+  });
+
+  it("gives up after one fresh attempt", async () => {
+    const { impl, calls } = fakeFetch({
+      "/api/v1/uploads": uploadsOk,
+      "https://bucket.test": () => new Response(null, { status: 204 }),
+      "/api/v1/orders": () => Response.json({ error: "Missing.", code: "PHOTOS_NOT_UPLOADED" }, { status: 400 }),
+    });
+    await expect(submitBooking(submission(), new WeakMap(), impl)).rejects.toMatchObject({ code: "PHOTOS_NOT_UPLOADED" });
+    expect(calls.filter((c) => c.url === "/api/v1/orders")).toHaveLength(2);
+  });
+});
+
 describe("server answers the booking flow acts on", () => {
   it("carries the existing booking with SUBMISSION_CONFLICT, so the flow can show it", async () => {
     const existing = { order: { reference: "ABC12345" }, paymentInstructions: { zelle: null } };

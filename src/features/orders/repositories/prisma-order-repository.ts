@@ -95,7 +95,7 @@ export class PrismaOrderRepository implements OrderRepository {
         if (existing) return { order: existing, created: false };
       }
       if (fields?.includes("email")) throw new EmailTakenError();
-      if (fields?.includes("key")) throw new PhotoKeyInUseError();
+      if (fields?.includes("uploadKey") || fields?.includes("key")) throw new PhotoKeyInUseError();
       throw err;
     }
   }
@@ -142,7 +142,9 @@ export class PrismaOrderRepository implements OrderRepository {
               material: input.item.material,
               serviceIds: input.item.serviceIds,
               estimateCents: input.item.estimate.cents,
-              photos: { create: input.item.photoKeys.map((key, position) => ({ key, position })) },
+              photos: {
+                create: input.item.photos.map((photo, position) => ({ key: photo.key, uploadKey: photo.uploadKey, position })),
+              },
               status: "REQUEST_SUBMITTED",
             },
           ],

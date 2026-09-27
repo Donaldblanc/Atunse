@@ -149,15 +149,21 @@ model Item {
 }
 
 // One condition photo on an Item: a storage key from the FileStorage
-// adapter (ADR-0004), not a URL. `key` is unique, so a photo belongs to
-// exactly one Item and quoting another booking's key can never grant view
-// access to it (ADR-0014).
+// adapter (ADR-0004), not a URL.
+// - `key` is where the photo lives: a copy made when the booking was
+//   submitted, which no upload target can write to, so the verified bytes
+//   can't be swapped afterwards (#77).
+// - `uploadKey` is the key the browser uploaded to. It's unique, so an
+//   upload belongs to exactly one Item, and quoting another booking's key
+//   can never grant view access to it (ADR-0014).
+// Orders from before #77 have key = uploadKey.
 model ItemPhoto {
-  id       String @id @default(cuid())
-  itemId   String
-  item     Item   @relation(fields: [itemId], references: [id])
-  key      String @unique
-  position Int
+  id        String @id @default(cuid())
+  itemId    String
+  item      Item   @relation(fields: [itemId], references: [id])
+  key       String @unique
+  uploadKey String @unique
+  position  Int
 
   @@index([itemId])
   @@map("item_photos")
@@ -198,4 +204,17 @@ model SignInCode {
 
   @@index([accountId, createdAt])
   @@map("sign_in_codes")
+}
+
+// Fixed-window request counters for per-IP rate limits on the public
+// routes (#77). `key` is "<policy>:<HMAC of the client IP>": raw IPs are
+// never stored. Old windows are pruned as new ones are written.
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
 }

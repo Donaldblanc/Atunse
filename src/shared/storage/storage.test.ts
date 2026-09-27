@@ -7,6 +7,11 @@ import { getFileStorage, StorageNotConfiguredError } from ".";
 import { LocalFileStorage, LocalUploadRejectedError } from "./local-file-storage";
 import { S3FileStorage } from "./s3-file-storage";
 
+/** Replaces the S3 client's network call, to simulate provider responses. */
+function stubSend(storage: S3FileStorage, send: () => Promise<unknown>) {
+  (storage as unknown as { client: { send: () => Promise<unknown> } }).client.send = send;
+}
+
 function formFrom(fields: Record<string, string>, file: Blob | null): FormData {
   const form = new FormData();
   for (const [name, value] of Object.entries(fields)) form.append(name, value);
@@ -74,6 +79,23 @@ describe("LocalFileStorage", () => {
     await expect(storage.read(link.searchParams)).rejects.toThrow(/expired/);
   });
 
+  it("inspects what was actually uploaded: size, type and first bytes; null when nothing is there", async () => {
+    const { fields } = await target();
+    await storage.receive(formFrom(fields, jpeg(3)));
+    const stored = await storage.inspect("bookings/b/0.jpg");
+    expect(stored).toMatchObject({ size: 3, contentType: "image/jpeg" });
+    expect(stored?.head.length).toBe(3);
+    expect(await storage.inspect("bookings/b/9.jpg")).toBeNull();
+  });
+
+  it("copies an object with its stored Content-Type, and reports a missing source", async () => {
+    const { fields } = await target();
+    await storage.receive(formFrom(fields, jpeg(3)));
+    expect(await storage.copy("bookings/b/0.jpg", "photos/p/0.jpg")).toBe(true);
+    expect(await storage.inspect("photos/p/0.jpg")).toMatchObject({ size: 3, contentType: "image/jpeg" });
+    expect(await storage.copy("bookings/b/9.jpg", "photos/p/9.jpg")).toBe(false);
+  });
+
   it("refuses a correctly signed key that escapes the upload directory", async () => {
     const { fields } = await storage.createUploadTarget({ key: "../escape.jpg", contentType: "image/jpeg", maxBytes: 10 });
     await expect(storage.receive(formFrom(fields, jpeg()))).rejects.toThrow(/Invalid key/);
@@ -107,6 +129,27 @@ describe("S3FileStorage", () => {
     expect(url.origin + url.pathname).toBe("https://storage.example.test/atunse-images/bookings/b/0.jpg");
     expect(url.searchParams.get("X-Amz-Expires")).toBe("300");
     expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
+  });
+
+  it("treats a 403 (keys without s3:ListBucket) as a missing object, for inspect and copy", async () => {
+    const storage = new S3FileStorage({ bucket: "b", region: "us-east-1", credentials: { accessKeyId: "k", secretAccessKey: "s" } });
+    stubSend(storage, async () => {
+      throw Object.assign(new Error("Access Denied"), { name: "AccessDenied", $metadata: { httpStatusCode: 403 } });
+    });
+    expect(await storage.inspect("bookings/b/0.jpg")).toBeNull();
+    expect(await storage.copy("bookings/b/0.jpg", "photos/p/0.jpg")).toBe(false);
+  });
+
+  it("caps inspect's head at 16 bytes even if the endpoint ignores Range", async () => {
+    const storage = new S3FileStorage({ bucket: "b", region: "us-east-1", credentials: { accessKeyId: "k", secretAccessKey: "s" } });
+    stubSend(storage, async () => ({
+      ContentLength: 5000,
+      ContentType: "image/jpeg",
+      Body: { transformToByteArray: async () => new Uint8Array(5000) },
+    }));
+    const stored = await storage.inspect("bookings/b/0.jpg");
+    expect(stored?.head.length).toBe(16);
+    expect(stored?.size).toBe(5000);
   });
 
   it("addresses an S3-compatible endpoint path-style, since bucket subdomains don't resolve there", async () => {

@@ -4,6 +4,7 @@
 import type { NotificationService } from "@/features/notifications/notification-service";
 import type { PaymentInstructions } from "../payment-instructions";
 import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
+import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import type { SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
 
@@ -23,7 +24,11 @@ export function bookingDeps<O extends Partial<SubmitOrderDeps> = object>(overrid
   // One accounts table shared by the order repository (which creates new
   // Customer Accounts) and submitOrder's lookups, like the real database.
   const accounts = new InMemoryAccounts();
+  // Every photo key the fixtures use is "uploaded" as a real JPEG header.
+  const storage = new InMemoryFileStorage();
+  for (let i = 0; i < 12; i++) storage.put(`bookings/0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f/${i}.jpg`);
   const base = {
+    storage,
     accounts,
     orders: new InMemoryOrderRepository(accounts),
     notifications: new RecordingNotificationService(),

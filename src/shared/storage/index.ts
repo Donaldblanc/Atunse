@@ -1,7 +1,7 @@
 import path from "node:path";
 import { StorageNotConfiguredError, type FileStorage } from "./file-storage";
 import { LocalFileStorage } from "./local-file-storage";
-import { S3FileStorage } from "./s3-file-storage";
+import { S3FileStorage, type S3FileStorageConfig } from "./s3-file-storage";
 
 export {
   StorageNotConfiguredError,
@@ -33,19 +33,8 @@ export function getFileStorage(
     return getLocalFileStorage(env);
   }
 
-  if (driver === "s3") {
-    // S3_* wins; the AWS_* names are what Neon's storage setup (and the
-    // AWS SDK's own conventions) provide, so they work unchanged.
-    const bucket = env.S3_BUCKET;
-    const region = env.S3_REGION || env.AWS_REGION;
-    if (!bucket || !region)
-      throw new StorageNotConfiguredError(
-        "S3_BUCKET and S3_REGION (or AWS_REGION) must be set.",
-      );
-    const credentials = s3Credentials(env) ?? awsCredentials(env);
-    const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
-    return new S3FileStorage({ bucket, region, endpoint, credentials });
-  }
+  if (driver === "s3") return new S3FileStorage(s3ConfigFromEnv(env));
+
 
   throw new StorageNotConfiguredError(`Unknown STORAGE_DRIVER: ${driver}`);
 }
@@ -95,4 +84,19 @@ function awsCredentials(env: NodeJS.ProcessEnv): Credentials | undefined {
   return accessKeyId && secretAccessKey
     ? { accessKeyId, secretAccessKey }
     : undefined;
+}
+
+/**
+ * The bucket, region, endpoint and credentials from env. S3_* wins; the
+ * AWS_* names are what Neon's storage setup (and the AWS SDK's own
+ * conventions) provide, so they work unchanged. Shared by the app and the
+ * storage maintenance scripts, so both always talk to the same bucket.
+ */
+export function s3ConfigFromEnv(env: NodeJS.ProcessEnv = process.env): S3FileStorageConfig {
+  const bucket = env.S3_BUCKET;
+  const region = env.S3_REGION || env.AWS_REGION;
+  if (!bucket || !region) throw new StorageNotConfiguredError("S3_BUCKET and S3_REGION (or AWS_REGION) must be set.");
+  const credentials = s3Credentials(env) ?? awsCredentials(env);
+  const endpoint = env.S3_ENDPOINT || env.AWS_ENDPOINT_URL_S3 || undefined;
+  return { bucket, region, endpoint, credentials };
 }

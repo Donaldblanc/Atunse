@@ -1,7 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { UPLOAD_TARGET_TTL_SECONDS, VIEW_URL_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
+import {
+  INSPECT_HEAD_BYTES,
+  UPLOAD_TARGET_TTL_SECONDS,
+  VIEW_URL_TTL_SECONDS,
+  type FileStorage,
+  type StoredObject,
+  type UploadTarget,
+} from "./file-storage";
 
 // Development stand-in for S3 so /booking works with no AWS account. It
 // mimics a presigned POST: the target carries an HMAC over the key, type,
@@ -35,13 +42,9 @@ function signaturesMatch(given: string, expectedHex: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-const CONTENT_TYPES_BY_EXTENSION: Record<string, string> = {
-  jpg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  heic: "image/heic",
-  heif: "image/heif",
-};
+// Like S3's object metadata, each file's Content-Type (the one its upload
+// target pinned) is kept beside it, in "<file>.content-type".
+const CONTENT_TYPE_SUFFIX = ".content-type";
 
 export class LocalFileStorage implements FileStorage {
   constructor(
@@ -66,6 +69,24 @@ export class LocalFileStorage implements FileStorage {
     return `${LOCAL_UPLOAD_URL}?${query}`;
   }
 
+  async inspect(key: string): Promise<StoredObject | null> {
+    let file;
+    try {
+      file = await open(this.resolveKey(key), "r");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
+    try {
+      const { size } = await file.stat();
+      const buffer = Buffer.alloc(Math.min(INSPECT_HEAD_BYTES, size));
+      await file.read(buffer, 0, buffer.length, 0);
+      return { size, contentType: await this.storedContentType(key), head: new Uint8Array(buffer) };
+    } finally {
+      await file.close();
+    }
+  }
+
   /** Verifies a view link from createViewUrl and reads its file. */
   async read(params: URLSearchParams): Promise<{ body: Buffer; contentType: string }> {
     const key = params.get("key") ?? "";
@@ -75,8 +96,31 @@ export class LocalFileStorage implements FileStorage {
     }
     if (Number(expires) < this.now().getTime()) throw new LocalUploadRejectedError("View link expired");
     const destination = this.resolveKey(key);
-    const extension = key.split(".").pop() ?? "";
-    return { body: await readFile(destination), contentType: CONTENT_TYPES_BY_EXTENSION[extension] ?? "application/octet-stream" };
+    return { body: await readFile(destination), contentType: (await this.storedContentType(key)) ?? "application/octet-stream" };
+  }
+
+  async copy(fromKey: string, toKey: string): Promise<boolean> {
+    const from = this.resolveKey(fromKey);
+    const to = this.resolveKey(toKey);
+    try {
+      await mkdir(path.dirname(to), { recursive: true });
+      await copyFile(from, to);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw err;
+    }
+    const contentType = await this.storedContentType(fromKey);
+    if (contentType) await writeFile(to + CONTENT_TYPE_SUFFIX, contentType);
+    return true;
+  }
+
+  private async storedContentType(key: string): Promise<string | null> {
+    try {
+      return (await readFile(this.resolveKey(key) + CONTENT_TYPE_SUFFIX, "utf8")).trim() || null;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
   }
 
   private resolveKey(key: string): string {
@@ -107,5 +151,6 @@ export class LocalFileStorage implements FileStorage {
     const destination = this.resolveKey(fields.key);
     await mkdir(path.dirname(destination), { recursive: true });
     await writeFile(destination, Buffer.from(await file.arrayBuffer()));
+    await writeFile(destination + CONTENT_TYPE_SUFFIX, fields.contentType);
   }
 }

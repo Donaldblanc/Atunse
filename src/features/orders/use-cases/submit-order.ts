@@ -6,7 +6,9 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
-import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
+import type { FileStorage } from "@/shared/storage";
+import { randomUUID } from "node:crypto";
+import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
@@ -43,6 +45,9 @@ export interface SubmitOrderDeps {
   orders: OrderRepository;
   /** Customer Accounts only: Admin Accounts are a separate identity (ADR-0014). */
   accounts: AccountRepository;
+  /** Where the booking's photos were uploaded; copied and checked before the Order is created (#77). */
+  storage: FileStorage;
+  newId?: () => string;
   notifications: NotificationService;
   paymentInstructions: PaymentInstructions;
   /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
@@ -100,6 +105,19 @@ export class BookingValidationError extends Error {
 }
 
 /**
+ * A photo the booking names isn't in storage (never finished uploading, or
+ * cleaned up since). The code tells the booking client to upload the
+ * photos again rather than resend the same keys.
+ */
+export class PhotosNotUploadedError extends BookingValidationError {
+  override readonly code = "PHOTOS_NOT_UPLOADED";
+
+  constructor() {
+    super("One or more photos didn't finish uploading. Please try again.");
+  }
+}
+
+/**
  * A photo is already attached to another booking. The code tells the
  * booking client to upload its photos again rather than resend the keys.
  */
@@ -152,6 +170,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     throw err;
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
+  const photos = await keepVerifiedPhotos(deps, input.item.photoKeys);
 
   const newOrder = (owner: OrderOwner) =>
     deps.orders.create({
@@ -174,7 +193,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
         material,
         serviceIds: input.item.serviceIds,
         estimate: itemEstimate.estimate,
-        photoKeys: input.item.photoKeys,
+        photos,
       },
     });
 
@@ -312,6 +331,35 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
     throw new BookingValidationError("Choose a mail-in date from today onward.");
   }
   return { method: "MAIL_IN", address, preferredDate };
+}
+
+/**
+ * Copies each uploaded photo to a key no upload target can write to, then
+ * checks the copy: it must exist, and its bytes and stored Content-Type
+ * must be the image type its key promises (#77). Checking the copy, not
+ * the upload, matters: an upload target stays usable for a few minutes, so
+ * the upload itself could still be overwritten after any check of it. A
+ * key alone proves nothing: it doesn't show the upload finished, and a
+ * target's pinned Content-Type is only a label on whatever bytes were sent.
+ */
+async function keepVerifiedPhotos(
+  deps: SubmitOrderDeps,
+  uploadKeys: string[],
+): Promise<{ key: string; uploadKey: string }[]> {
+  const batchId = (deps.newId ?? randomUUID)();
+  const photos = uploadKeys.map((uploadKey, i) => ({ key: storedPhotoKey(batchId, i, uploadKey), uploadKey }));
+
+  const copied = await Promise.all(photos.map((photo) => deps.storage.copy(photo.uploadKey, photo.key)));
+  if (copied.includes(false)) throw new PhotosNotUploadedError();
+
+  const stored = await Promise.all(photos.map((photo) => deps.storage.inspect(photo.key)));
+  if (stored.some((object) => object === null || object.size === 0)) throw new PhotosNotUploadedError();
+  const valid = stored.every(
+    (object, i) =>
+      photoMatchesKey(photos[i]!.key, object!.head) && object!.contentType === photoKeyContentType(photos[i]!.key),
+  );
+  if (!valid) throw new BookingValidationError("One or more photos aren't valid JPEG, PNG, WebP or HEIC images.");
+  return photos;
 }
 
 function validateMaterial(material: string | null): Material | null {

@@ -3,10 +3,13 @@ import { z } from "zod";
 import { requestPhotoUploads } from "@/features/orders/use-cases/request-photo-uploads";
 import { BookingValidationError } from "@/features/orders/use-cases/submit-order";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
+import { MAX_PHOTOS_PER_ITEM } from "@/features/orders/photo-keys";
+import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 import { StorageNotConfiguredError } from "@/shared/storage";
 
 const body = z.object({
-  files: z.array(z.object({ contentType: z.string().max(100), size: z.number().int() })).max(20),
+  // The same cap as requestPhotoUploads, so the route can't admit more (#77).
+  files: z.array(z.object({ contentType: z.string().max(100), size: z.number().int() })).max(MAX_PHOTOS_PER_ITEM),
 });
 
 // POST /api/v1/uploads — presigned upload targets for /booking's photos
@@ -14,6 +17,9 @@ const body = z.object({
 // POSTs each file straight to its target, then submits the keys with
 // POST /api/v1/orders.
 export async function POST(req: NextRequest) {
+  const limited = await limitByIp(req, RATE_LIMITS.uploads);
+  if (limited) return limited;
+
   let json: unknown;
   try {
     json = await req.json();
@@ -22,7 +28,10 @@ export async function POST(req: NextRequest) {
   }
   const parsed = body.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: "files must be a list of { contentType, size }" }, { status: 400 });
+    return NextResponse.json(
+      { error: `files must be a list of at most ${MAX_PHOTOS_PER_ITEM} { contentType, size }` },
+      { status: 400 },
+    );
   }
 
   // Anonymous on purpose: a key only gains an owner when submitOrder
