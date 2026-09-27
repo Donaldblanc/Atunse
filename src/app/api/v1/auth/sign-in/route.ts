@@ -10,7 +10,7 @@ import {
 // POST /api/v1/auth/sign-in — interim credential login (ADR-0005 addendum).
 // Publicly reachable; there's nothing to authorize yet, only to
 // authenticate. On success, sets the signed session cookie that
-// checkAdminAccess (src/middleware.ts) later verifies.
+// checkAdminAccess (src/proxy.ts) later verifies.
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {

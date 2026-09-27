@@ -145,6 +145,7 @@ function PhotoThumb({ photo, onRemove }: { photo: File; onRemove: () => void }) 
   // Object URLs hold the file in memory until revoked.
   useEffect(() => {
     const objectUrl = URL.createObjectURL(photo);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is created here so the cleanup can revoke it
     setUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [photo]);

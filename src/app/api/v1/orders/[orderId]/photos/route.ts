@@ -9,11 +9,12 @@ import { StorageNotConfiguredError } from "@/shared/storage";
 // Order's photos (ADR-0014). Signed in only: an Admin (admin session)
 // sees any Order's photos, a Customer (customer session) only their own.
 // The use-case makes that decision.
-export async function GET(req: NextRequest, { params }: { params: { orderId: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ orderId: string }> }) {
+  const { orderId } = await params;
   const actingUser = await actingUserFromCookies(req.cookies);
 
   try {
-    const photos = await getOrderPhotos(buildOrderUseCaseDeps(), actingUser, params.orderId);
+    const photos = await getOrderPhotos(buildOrderUseCaseDeps(), actingUser, orderId);
     return NextResponse.json(photos, { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: "Sign in to view photos." }, { status: 401 });

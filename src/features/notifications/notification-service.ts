@@ -17,7 +17,6 @@ export class ConsoleNotificationService implements NotificationService {
 
   async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
     const subject = this.options.logSubjects ? ` subject="${params.subject}"` : " (subject withheld)";
-    // eslint-disable-next-line no-console
     console.log(`[notification] to=${params.to}${subject}`);
   }
 }

@@ -8,12 +8,12 @@ import type { RateLimitPolicy, RateLimiter } from "./rate-limiter";
 export { RATE_LIMITS, type RateLimitPolicy, type RateLimiter } from "./rate-limiter";
 
 /**
- * The caller's IP: Vercel sets `req.ip` (and a trustworthy first
- * X-Forwarded-For entry, since it overwrites that header); locally there's
- * none, so everyone is "local".
+ * The caller's IP from X-Forwarded-For, which Vercel overwrites with the
+ * real client address so it can't be spoofed (Next 15 removed `req.ip`,
+ * which read the same value). Locally there's none, so everyone is "local".
  */
 export function clientIp(req: NextRequest): string {
-  return req.ip ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? req.headers.get("x-real-ip") ?? "local";
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
 }
 
 /**

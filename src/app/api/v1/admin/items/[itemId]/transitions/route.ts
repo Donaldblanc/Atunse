@@ -13,11 +13,12 @@ import {
 // approved, ...) goes through this one endpoint (ADR-0001: every Item is
 // reviewed; the generalized transitionItemStatus use-case backs every step).
 //
-// Reachable only past src/middleware.ts's admin guard (matcher includes
+// Reachable only past src/proxy.ts's admin guard (matcher includes
 // /api/v1/admin/:path*) — but the authz check here is a second, independent
 // gate via the same checkAdminAccess, since a use-case must never trust a
 // route just because middleware let the request through (ADR-0012).
-export async function POST(req: NextRequest, { params }: { params: { itemId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ itemId: string }> }) {
+  const { itemId } = await params;
   const { allowed, accountId } = await checkAdminAccess(req);
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { itemId: str
 
   try {
     const item = await transitionItemStatus(buildOrderUseCaseDeps(), actingUser, {
-      itemId: params.itemId,
+      itemId,
       ...parsed.value,
     });
     if (item === null) {

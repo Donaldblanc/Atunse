@@ -4,7 +4,8 @@ import { checkAdminAccess } from "@/features/accounts/admin-check";
 // Admin routes are protected from the FIRST deployment, not a later phase.
 // The actual decision lives in checkAdminAccess (features/accounts) so it's
 // unit-testable on its own; this file just wires it into Next's routing.
-export async function middleware(req: NextRequest) {
+// Next 16 renamed middleware to proxy (it runs on the Node.js runtime).
+export async function proxy(req: NextRequest) {
   const { allowed } = await checkAdminAccess(req);
   if (!allowed) {
     const signInUrl = new URL("/sign-in", req.url);
