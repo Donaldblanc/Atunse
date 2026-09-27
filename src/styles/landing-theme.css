@@ -120,6 +120,13 @@
   background: var(--blue-deep);
 }
 
+/* White text on every theme: without this, `.landing a { color: inherit }`
+   outranks .landing-btn-primary and link buttons (e.g. "Book Now") take
+   the page's ink color. */
+.landing .landing-btn-primary {
+  color: #fff;
+}
+
 /* ---------- theme toggle (sliding switch) ---------- */
 
 .theme-switch {
