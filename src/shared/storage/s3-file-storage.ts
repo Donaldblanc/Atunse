@@ -1,7 +1,14 @@
-import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, NoSuchKey, S3Client } from "@aws-sdk/client-s3";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { UPLOAD_TARGET_TTL_SECONDS, VIEW_URL_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
+import {
+  INSPECT_HEAD_BYTES,
+  UPLOAD_TARGET_TTL_SECONDS,
+  VIEW_URL_TTL_SECONDS,
+  type FileStorage,
+  type StoredObject,
+  type UploadTarget,
+} from "./file-storage";
 
 export interface S3FileStorageConfig {
   bucket: string;
@@ -42,6 +49,22 @@ export class S3FileStorage implements FileStorage {
       Expires: UPLOAD_TARGET_TTL_SECONDS,
     });
     return { url, fields };
+  }
+
+  async inspect(key: string): Promise<StoredObject | null> {
+    try {
+      // One ranged GET gives the first bytes, the stored type, and (from
+      // Content-Range) the full size.
+      const res = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: `bytes=0-${INSPECT_HEAD_BYTES - 1}` }),
+      );
+      const head = res.Body ? await res.Body.transformToByteArray() : new Uint8Array();
+      const total = res.ContentRange?.match(/\/(\d+)$/)?.[1];
+      return { size: total ? Number(total) : (res.ContentLength ?? head.length), contentType: res.ContentType ?? null, head };
+    } catch (err) {
+      if (err instanceof NoSuchKey || (err as { name?: string }).name === "NoSuchKey") return null;
+      throw err;
+    }
   }
 
   async createViewUrl(key: string): Promise<string> {

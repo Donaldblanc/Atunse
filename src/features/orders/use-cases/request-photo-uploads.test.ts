@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { FileStorage } from "@/shared/storage";
+import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { isBookingPhotoKey, MAX_PHOTO_BYTES } from "../photo-keys";
 import { requestPhotoUploads } from "./request-photo-uploads";
 import { BookingValidationError } from "./submit-order";
 
-const storage: FileStorage = {
-  async createUploadTarget({ key }) {
-    return { url: "https://storage.test/upload", fields: { key } };
-  },
-  async createViewUrl(key) {
-    return `https://storage.test/view/${key}`;
-  },
-};
+const storage = new InMemoryFileStorage();
 const deps = { storage, newBatchId: () => "0b6e8c1e-3f7a-4c2d-9e1b-5a4f3c2d1e0f" };
 const guest = { accountId: null, role: "GUEST" as const };
 
@@ -27,6 +20,8 @@ describe("requestPhotoUploads", () => {
     ]);
     expect(uploads.every((u) => isBookingPhotoKey(u.key))).toBe(true);
     expect(uploads[0]?.url).toBe("https://storage.test/upload");
+    // Each target is capped at the size the browser declared (#77).
+    expect(storage.issuedTargets.slice(-2).map((t) => t.maxBytes)).toEqual([1000, 2000]);
   });
 
   it.each([

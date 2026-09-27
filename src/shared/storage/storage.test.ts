@@ -74,6 +74,15 @@ describe("LocalFileStorage", () => {
     await expect(storage.read(link.searchParams)).rejects.toThrow(/expired/);
   });
 
+  it("inspects what was actually uploaded: size, type and first bytes; null when nothing is there", async () => {
+    const { fields } = await target();
+    await storage.receive(formFrom(fields, jpeg(3)));
+    const stored = await storage.inspect("bookings/b/0.jpg");
+    expect(stored).toMatchObject({ size: 3, contentType: "image/jpeg" });
+    expect(stored?.head.length).toBe(3);
+    expect(await storage.inspect("bookings/b/9.jpg")).toBeNull();
+  });
+
   it("refuses a correctly signed key that escapes the upload directory", async () => {
     const { fields } = await storage.createUploadTarget({ key: "../escape.jpg", contentType: "image/jpeg", maxBytes: 10 });
     await expect(storage.receive(formFrom(fields, jpeg()))).rejects.toThrow(/Invalid key/);

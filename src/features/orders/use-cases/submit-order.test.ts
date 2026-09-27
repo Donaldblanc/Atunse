@@ -175,6 +175,26 @@ describe("submitOrder", () => {
     });
   });
 
+  describe("uploaded photo verification (#77)", () => {
+    it("refuses a photo key with nothing uploaded behind it, creating nothing", async () => {
+      const deps = bookingDeps();
+      const input = validBookingInput();
+      input.item = { ...input.item, photoKeys: ["bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg"] };
+      await expect(submitOrder(deps, guest, input)).rejects.toThrow(/didn't finish uploading/);
+      expect(deps.orders.orders.size).toBe(0);
+    });
+
+    it("refuses bytes that aren't the image type the key promises", async () => {
+      const deps = bookingDeps();
+      const key = "bookings/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d/0.jpg";
+      deps.storage.put(key, new TextEncoder().encode("<html>not a photo</html>"), "image/jpeg");
+      const input = validBookingInput();
+      input.item = { ...input.item, photoKeys: [key] };
+      await expect(submitOrder(deps, guest, input)).rejects.toThrow(/aren't valid/);
+      expect(deps.orders.orders.size).toBe(0);
+    });
+  });
+
   describe("fulfillment", () => {
     it("rejects Pickup outside NY/NJ/CT", async () => {
       const input = validBookingInput({

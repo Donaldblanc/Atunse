@@ -1,7 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { UPLOAD_TARGET_TTL_SECONDS, VIEW_URL_TTL_SECONDS, type FileStorage, type UploadTarget } from "./file-storage";
+import {
+  INSPECT_HEAD_BYTES,
+  UPLOAD_TARGET_TTL_SECONDS,
+  VIEW_URL_TTL_SECONDS,
+  type FileStorage,
+  type StoredObject,
+  type UploadTarget,
+} from "./file-storage";
 
 // Development stand-in for S3 so /booking works with no AWS account. It
 // mimics a presigned POST: the target carries an HMAC over the key, type,
@@ -64,6 +71,27 @@ export class LocalFileStorage implements FileStorage {
     const expires = String(this.now().getTime() + VIEW_URL_TTL_SECONDS * 1000);
     const query = new URLSearchParams({ key, expires, signature: signView(this.secret, key, expires) });
     return `${LOCAL_UPLOAD_URL}?${query}`;
+  }
+
+  async inspect(key: string): Promise<StoredObject | null> {
+    let file;
+    try {
+      file = await open(this.resolveKey(key), "r");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
+    try {
+      const { size } = await file.stat();
+      const buffer = Buffer.alloc(Math.min(INSPECT_HEAD_BYTES, size));
+      await file.read(buffer, 0, buffer.length, 0);
+      // Local files keep no metadata; the upload was checked against its
+      // pinned type on the way in (receive), so report that type.
+      const extension = key.split(".").pop() ?? "";
+      return { size, contentType: CONTENT_TYPES_BY_EXTENSION[extension] ?? null, head: new Uint8Array(buffer) };
+    } finally {
+      await file.close();
+    }
   }
 
   /** Verifies a view link from createViewUrl and reads its file. */

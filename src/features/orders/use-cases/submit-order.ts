@@ -6,7 +6,8 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
-import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM } from "../photo-keys";
+import type { FileStorage } from "@/shared/storage";
+import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoMatchesKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
@@ -43,6 +44,8 @@ export interface SubmitOrderDeps {
   orders: OrderRepository;
   /** Customer Accounts only: Admin Accounts are a separate identity (ADR-0014). */
   accounts: AccountRepository;
+  /** Where the booking's photos were uploaded; checked before the Order is created (#77). */
+  storage: FileStorage;
   notifications: NotificationService;
   paymentInstructions: PaymentInstructions;
   /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
@@ -132,6 +135,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     throw err;
   }
   const orderEstimate = estimateOrder({ items: [itemEstimate], rush: input.rush });
+  await verifyUploadedPhotos(deps.storage, input.item.photoKeys);
 
   const newOrder = (owner: OrderOwner) =>
     deps.orders.create({
@@ -286,6 +290,22 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
     throw new BookingValidationError("Choose a mail-in date from today onward.");
   }
   return { method: "MAIL_IN", address, preferredDate };
+}
+
+/**
+ * Every photo must really be in storage and really be the image type its
+ * key promises (#77). Keys are server-minted, but a key alone doesn't prove
+ * the upload finished, and a target's pinned Content-Type is only a label
+ * on whatever bytes were sent.
+ */
+async function verifyUploadedPhotos(storage: FileStorage, photoKeys: string[]) {
+  const stored = await Promise.all(photoKeys.map((key) => storage.inspect(key)));
+  if (stored.some((object) => object === null || object.size === 0)) {
+    throw new BookingValidationError("One or more photos didn't finish uploading. Please try again.");
+  }
+  if (stored.some((object, i) => !photoMatchesKey(photoKeys[i]!, object!.head))) {
+    throw new BookingValidationError("One or more photos aren't valid JPEG, PNG, WebP or HEIC images.");
+  }
 }
 
 function validateMaterial(material: string | null): Material | null {

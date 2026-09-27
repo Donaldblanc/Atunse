@@ -17,7 +17,23 @@ export interface FileStorage {
    * never publicly readable; callers must authorize the viewer first.
    */
   createViewUrl(key: string): Promise<string>;
+  /**
+   * What's actually stored under `key`: its size, stored Content-Type and
+   * first bytes (for checking the file really is what it claims), or null
+   * if nothing was uploaded there. One request per object.
+   */
+  inspect(key: string): Promise<StoredObject | null>;
 }
+
+export interface StoredObject {
+  size: number;
+  contentType: string | null;
+  /** The first INSPECT_HEAD_BYTES bytes (fewer if the file is shorter). */
+  head: Uint8Array;
+}
+
+/** Enough bytes to recognize every allowed image format's signature. */
+export const INSPECT_HEAD_BYTES = 16;
 
 export class StorageNotConfiguredError extends Error {
   constructor(message: string) {
@@ -26,8 +42,12 @@ export class StorageNotConfiguredError extends Error {
   }
 }
 
-/** How long an issued upload target stays valid. */
-export const UPLOAD_TARGET_TTL_SECONDS = 10 * 60;
+/**
+ * How long an issued upload target stays valid. Storage checks it when an
+ * upload starts, and a booking's photos upload in parallel right away, so
+ * a few minutes is plenty; a leaked target is useless soon after (#77).
+ */
+export const UPLOAD_TARGET_TTL_SECONDS = 5 * 60;
 
 /** How long a photo view link works. */
 export const VIEW_URL_TTL_SECONDS = 5 * 60;
