@@ -1,5 +1,127 @@
 # TODO
 
+## Launch checklist (merged 2026-09-28)
+The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
+
+### Launch blockers found while merging
+- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin dashboard's Orders queue is still "Next up" (`src/app/admin/page.tsx`), so today a new booking is only visible in the database. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
+
+### Legal & policies
+- [x] **Privacy Policy**: `public/legal/privacy/2026-09-27-v1.pdf`, linked from the footer, the booking Review step and the contact form's consent. (Its drafting notes still need the legal review above.)
+- [x] **Terms of Service**: the Terms of Service & Restoration Agreement, `public/legal/terms/2026-09-27-v1.pdf`, accepted at booking with recorded evidence (ADR-0015); in the footer too.
+- [ ] **Refund / cancellation policy**: covered today only by the Terms' section 13 ("Cancellation and Refunds"). Decide whether that's enough or a separate, linked Refund Policy is needed; if so, add it to `src/shared/legal-documents.ts` (it would join the footer automatically).
+- [ ] **Cookie policy / consent banner**: decide. The site sets only strictly necessary cookies (the admin and customer session cookies) plus a `localStorage` theme preference; no analytics, ads or pixels. A banner isn't needed for that in the US; revisit before adding analytics or pixels (the Privacy Policy's section 3 says it will be updated then).
+- [x] **Consent checkboxes**: booking (four risk acknowledgments plus the Terms Agreement: none pre-checked, Confirm Booking disabled until all are ticked, enforced again by `submitOrder`) and the contact form (consent required client- and server-side). Covered by tests.
+- [x] **Terms / Privacy links where customers submit**: the booking Review step links the Terms PDF (from its checkbox) and the Privacy Policy; the contact form links the Privacy Policy; the footer links both on every page. There are no online payments yet (see Payments).
+- [ ] **Business details**: the footer shows only "RestoredByDJ · New York, NY". Add the legal business name and a public contact method (email and/or phone); the Contact page shows no email address yet.
+
+### Content & claims
+- [x] **Unsupported claims removed**: every guarantee (results, safety, timing) is gone (#106), fulfillment copy matches the business (#105, #108), and `copy-rules.test.ts` fails if they come back.
+- [ ] **Placeholder / demo content**:
+  - the home page reviews look invented (publishing invented testimonials is a legal risk: replace with real reviews or remove);
+  - the Process page's step-1 phone photo shows made-up menu prices;
+  - the Process and Contact photos are low-resolution crops from the design mockups (replace with originals);
+  - confirm the brand list's Fendi and Alexander McQueen (see the client-feedback entry below).
+- [ ] **Pricing and service descriptions**: every price on the site comes from `SERVICE_CATALOG` (#81, #105), and descriptions were reworded in #106. The owner should still confirm the catalog prices, Bundle perks and Add-ons are current. Policies are covered by the legal review.
+- [ ] **Proofread** every page for spelling and grammar.
+
+### Accessibility
+- [ ] **Alt text**: meaningful photos have alt text, and decorative ones use `alt=""` on purpose (3). A full audit is still to do.
+- [ ] **Colour contrast**: not audited (both themes).
+- [ ] **Keyboard navigation**: not tested end to end (nav, drawer, booking flow, date picker modal, FAQ accordions).
+- [ ] **Visible focus states**: `.landing a:focus-visible` / `button:focus-visible` outlines exist; check they're visible on every control and in dark mode.
+- [ ] **Every input has a label**: the booking and contact forms use `<label>`s, but not audited.
+- [ ] **Heading hierarchy** (H1 → H2 → H3): not audited.
+- [ ] **200% zoom**: not tested.
+- [ ] **Errors not by colour alone**: booking and contact errors show an icon and text. Related: warnings aren't announced by screen readers yet (client-feedback entry below).
+
+### Booking & forms
+- [ ] **Full booking flow, start to finish, on production**: automated tests cover submission, and headless runs reached the Review step on the dev server. A real booking on production hasn't been placed.
+- [x] **Required fields and validation**: server-side rules in `submitOrder` and `validateContactMessage`, mirrored client-side, with unit tests for invalid email, phone, address, zip, state, dates, services and photos.
+- [x] **Consent can't be bypassed**: the button stays disabled and the server refuses the booking without every acknowledgment, the Terms Agreement and the current agreement version (ADR-0015).
+- [ ] **Editing before submission**: the Review step's Edit links exist (service, each pair, schedule, contact); do a manual pass.
+- [x] **Order summary and totals**: client and server compute the same estimate. Parity tests cover every Service combination × Add-ons × material × Rush, plus Bundles with Add-ons. There are no discounts; tax is the blocker above.
+- [ ] **Confirmation page**: manual pass on production.
+- [ ] **Confirmation emails**: blocked on Resend (`RESEND_API_KEY` / `EMAIL_FROM`, above).
+- [ ] **Cancellation / rescheduling**: no customer-facing flow exists. Decide: by email/contact form for launch (per the Terms' section 13), or build it.
+- [ ] **"My bookings" / customer account**: not built (tracked above).
+
+### Payments
+Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (off). Deposits are paid by Zelle and confirmed manually by the owner (ADR-0002).
+- [x] **No double submission**: a per-booking idempotency key returns the same Order on retry (ADR-0012), and a changed retry is refused (#76).
+- [x] **Amount matches the displayed total**: the estimate and 50% Deposit are computed server-side from the catalog, and parity tests keep the page's total identical.
+- [ ] **Successful / declined / abandoned payment, refunds, production keys, test-mode cleanup**: all wait on the Stripe integration. For Zelle launch: set `ZELLE_RECIPIENT` / `ZELLE_NAME` (above) and decide how refunds are handled (manually, per the Terms' section 13).
+
+### Security & authentication
+- [x] **HTTPS everywhere**: live, HTTP redirects to HTTPS (308), and HSTS is sent (`max-age=63072000; includeSubDomains`) along with nosniff, frame, referrer and permissions headers (#88).
+- [ ] **Production secrets**: set in Vercel; mark them "Sensitive" there, and keep secrets out of `NEXT_PUBLIC_*` (today only `NEXT_PUBLIC_ASSETS_BASE_URL` is public).
+- [x] **Customer auth and sessions**: email sign-in codes and HMAC-signed session cookies (ADR-0014), kept separate from admin sessions.
+- [x] **Admin routes require server-side authorization**: `src/proxy.ts`, a second check in the admin layout, and a role check in each use-case (#88), with tests.
+- [x] **Customers can't see others' bookings**: the photos endpoint checks ownership and answers 404 otherwise (tests). Re-check when "My bookings" is built.
+- [x] **Customers can't reach admin pages or APIs**: admin and customer are separate roles, sessions and cookies (ADR-0014), with tests.
+- [x] **Rate limiting**: uploads, orders, contact, sign-in code requests and guesses, and admin sign-in (per IP and per account), in `src/shared/rate-limit`.
+- [x] **Server-side input validation**: zod request shapes plus the use-case rules on every public route.
+- [x] **CORS**: the photo bucket allows only the site's origins, POST only (#107); the API sends no CORS headers (same-origin only).
+- [x] **Cookie flags**: session cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax`.
+- [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning and push protection are still off (entry above).
+
+### SEO & social
+- [ ] **Unique page titles**: every page has its own title except home, which uses the generic "Atunṣe".
+- [ ] **Meta descriptions**: only the one site-wide description; add one per page.
+- [ ] **Open Graph / social sharing metadata**: none.
+- [ ] **Favicon**: none (`/favicon.ico` answers 404).
+- [ ] **Canonical URLs**: none; set once the custom domain is decided.
+- [ ] **`robots.txt`** and **sitemap**: none (both 404).
+- [ ] **Indexable, no staging noindex**: production sends no `noindex`, so it's indexable. The unlinked `/coming-soon` placeholder is still public; remove it or mark it `noindex` before launch.
+
+### Mobile & browser testing
+- [ ] **Layouts**: pages were checked in headless Chromium at 390, 820, 1280 and 1440 px (light and dark) while they were built. Still to do: real iPhone (Safari), Android (Chrome), tablet, and desktop Safari and Firefox, including the nav and drawer at every breakpoint, and the booking and contact forms on mobile.
+
+### Performance
+- [ ] **Large images**: `hero-travis-scott-aj1-low.png` (2.1 MB) and `coming-soon-hero.png` (1.9 MB) are served as-is. Images use plain `<img>`, not `next/image`, so nothing is resized per device.
+- [ ] **Lazy loading**: step and FAQ photos load lazily; audit the rest.
+- [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
+- [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
+
+### Links & navigation
+- [ ] **Every nav and footer link**: checked in headless runs (Services, Gallery, Process, About, Contact, and the Terms and Privacy PDFs). Do a full manual pass.
+- [ ] **Refund Policy and Cookie Policy links**: don't exist yet (see Legal).
+- [x] **No links to placeholders**: nothing on the site links to `/coming-soon` any more.
+- [x] **Logo returns to the homepage** (`SiteNav` brand links to `/`).
+- [ ] **Custom 404 page**: missing today is Next's default, unstyled "404: This page could not be found."
+
+### Production & operations
+- [ ] **Production database**: Neon, set through Vercel; confirm the Neon Vercel integration (entry above).
+- [ ] **Database backups**: confirm Neon's point-in-time restore and retention window on the current plan.
+- [ ] **Domain and DNS**: production is only `atunse-five.vercel.app`. When a custom domain is added, also add it to the photo bucket's CORS (entry above).
+- [x] **SSL certificate**: Vercel-managed and valid on `atunse-five.vercel.app` (HTTPS verified); a custom domain gets one automatically.
+- [ ] **Error monitoring and logging**: none (only Vercel's own logs). Add one (e.g. Sentry) before launch.
+- [ ] **Transactional email provider and sender authentication**: Resend isn't configured (entry above); verifying the sending domain in Resend sets up SPF and DKIM.
+- [ ] **Uptime monitoring**: none.
+- [ ] **Remove test accounts and data**: production may still hold smoke-test Orders (see "Legacy orders with a blank `contactPhone`" above). Check for them, and any test Customer Accounts, and remove them before launch.
+- [x] **No debug logging**: the only log output is the console email fallback, which masks recipients and hides subjects in production.
+- [x] **No development-only endpoints**: the local-storage upload route (`/api/v1/uploads/local`) refuses to run in production.
+- [ ] **Analytics**: none. Decide; adding it means updating the Privacy Policy and the cookie decision above.
+- [ ] **Production environment variables**: the full list is in `docs/DEPLOYMENT.md`; still missing are Resend, `CONTACT_EMAIL` and Zelle (entries above).
+- [ ] **Final production smoke test** (below).
+
+### Final launch test (manual, on production, desktop then mobile)
+- [ ] Visit the homepage as a new customer.
+- [ ] Browse services and pricing.
+- [ ] Start a booking.
+- [ ] Select services and add-ons.
+- [ ] Review and edit the order.
+- [ ] Accept the required agreements.
+- [ ] Complete checkout. *Today: the booking submits and shows Zelle deposit instructions; there's no online payment.*
+- [ ] Confirm payment. *Today: the owner marks the Zelle deposit received; that admin screen isn't built yet.*
+- [ ] Confirm the booking appears in the customer's account. *Needs "My bookings".*
+- [ ] Confirm the customer receives the confirmation email. *Needs Resend.*
+- [ ] Confirm the booking appears in the admin dashboard. *Needs the Orders queue (blocker above).*
+- [ ] Test admin actions on the booking.
+- [ ] Test the cancellation and refund path.
+- [ ] Repeat the critical flow on mobile.
+
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).
 - [x] `/booking`'s contact step now checks email and US phone format with the same rules `submitOrder` enforces server-side (`src/features/booking/contact-rules.ts`).
@@ -40,7 +162,7 @@
 Raw feedback checked against current code. Items already done or already
 tracked elsewhere are marked; everything else is new.
 
-- [x] **Separate cleaning vs. restoration turnaround messaging.** Services page now shows its own "72-hour turnaround" badge on Cleaning and "5–10 business day turnaround" badge on Restoration.
+- [x] **Separate cleaning vs. restoration turnaround messaging.** Services page shows its own badge on Cleaning ("Typically 72 hours") and Restoration ("Typically 5–10 business days"); worded as estimates since #106.
 - [x] **"Brands we restore" list** — already matches the requested list (Nike, Jordan, Adidas, New Balance, Gucci, Prada, Dior, Balenciaga, Louis Vuitton) plus Fendi and Alexander McQueen, in `src/features/landing/brand-logos.ts`. Confirm the two extras are wanted before launch, otherwise trim to exactly the requested list.
 - [x] **Brand lockup copy** — "Atunṣe" + "RESTORE & REVIVE" changed to "Atunṣe" + "POWERED BY RESTOREDBYDJ" in the nav/footer brand mark and the mock.
 - [x] **Suede fee** now real — `computePricing`/`computeMultiServicePricing` in `booking-flow.tsx` adds the fee only for `suedeFee: true` services when Suede is actually selected.
@@ -52,7 +174,7 @@ tracked elsewhere are marked; everything else is new.
 - [x] **Social media is linked** — footer's Instagram/TikTok/YouTube icons are real `<a href>`s to `@RestoredByDJ`/`@RestoredByDj` now, in both the real app and the mock.
 - [x] **CTA copy: "Book a restoration" → "Book Now."** Done in `src/features/landing/book-restoration-cta.tsx`.
 - [ ] **Continue-button warnings may not be announced by screen readers.** The `role="status"` warning in `contact-step.tsx`, `details-step.tsx` and `service-step.tsx` mounts together with its text on the first failed click. Render the element always (empty until needed) so the change is announced.
-- [ ] **Photo dropzone nits** (`src/features/booking/pair-form.tsx`): a drop that misses the dropzone itself still makes the browser open the file (a window-level `dragover`/`drop` guard would cover that); there's also no per-photo remove control, so a wrongly picked photo can't be removed short of reloading the page and losing the whole booking.
+- [ ] **Photo dropzone nit** (`src/features/booking/pair-form.tsx`): a drop that misses the dropzone itself still makes the browser open the file (a window-level `dragover`/`drop` guard would cover that). (The per-photo remove control this entry also asked for exists now.)
 
 ## Still to grill (architecture/design/decisions not yet interviewed)
 - [x] **Return leg** (decided 2026-09-28): the local Fulfillment Method is **Local Drop-Off** (renamed from "Pickup" on the site and in the docs): DJ collects the pair at a booked time and drops it back off. Mail-In pairs are shipped back. The status reads "Ready for Drop-Off/Shipping"; code names (`PICKUP`, `READY_FOR_PICKUP_SHIPPING`, `pickupDate`) are unchanged, so no migration.
