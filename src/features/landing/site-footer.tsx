@@ -16,7 +16,6 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
               {link.label}
             </Link>
           ))}
-          <Link href="/coming-soon">Contact</Link>
         </div>
         <div className="landing-footer-social">
           <a
