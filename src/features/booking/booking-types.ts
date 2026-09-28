@@ -10,6 +10,8 @@ export type ScheduleMethod = "pickup" | "mail-in";
 export type PairDetails = { brand: string; material: string; notes: string; photos: File[]; addOnIds: string[] };
 export type PickupAddress = { address: string; apt: string; city: string; state: string; zip: string };
 export type ContactInfo = { name: string; email: string; phone: string };
+/** What the customer ticked on the Review step (CONTEXT.md: Policy Acceptance). */
+export type TermsAcceptance = { policyAccepted: boolean; acknowledgedTerms: string[] };
 
 export const EMPTY_PAIR: PairDetails = { brand: "", material: "", notes: "", photos: [], addOnIds: [] };
 export const EMPTY_ADDRESS: PickupAddress = { address: "", apt: "", city: "", state: "", zip: "" };

@@ -1,12 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, ImagePlus, Info, Mail, MapPin, Package, Phone, Truck, TriangleAlert, User, type LucideIcon } from "lucide-react";
+import {
+  ArrowRight,
+  ExternalLink,
+  FileText,
+  ImagePlus,
+  Info,
+  Mail,
+  MapPin,
+  Package,
+  Phone,
+  Truck,
+  TriangleAlert,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
-import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step } from "./booking-types";
+import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsAcceptance } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
+import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
+import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export function ReviewStep({
   isBundle,
@@ -39,24 +55,28 @@ export function ReviewStep({
   onEdit: (step: Step) => void;
   /** Opens the Details step on pair `index`. */
   onEditPair: (index: number) => void;
-  onConfirm: (policyAccepted: boolean) => Promise<void>;
+  onConfirm: (terms: TermsAcceptance) => Promise<void>;
 }) {
+  // Every risk acknowledgment and the Terms Agreement are required
+  // (CONTEXT.md: Policy Acceptance); submitOrder refuses the booking
+  // otherwise too. Only the Terms Agreement accepts the contract.
+  const [acknowledged, setAcknowledged] = useState<string[]>([]);
+  // Confirm Booking stays disabled until all of them are ticked.
   const [policyAccepted, setPolicyAccepted] = useState(false);
-  const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const showPolicyWarning = attempted && !policyAccepted;
+  const termsAccepted = policyAccepted && acknowledgesAll(acknowledged);
+
+  function toggleAcknowledgment(id: string) {
+    setAcknowledged((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+  }
 
   async function confirm() {
-    if (submitting) return;
-    if (!policyAccepted) {
-      setAttempted(true);
-      return;
-    }
+    if (submitting || !termsAccepted) return;
     setSubmitting(true);
     setError(null);
     try {
-      await onConfirm(policyAccepted);
+      await onConfirm({ policyAccepted, acknowledgedTerms: acknowledged });
     } catch (err) {
       setError(err instanceof BookingSubmitError ? err.message : "Something went wrong. Please try again.");
       setSubmitting(false);
@@ -164,36 +184,67 @@ export function ReviewStep({
         </div>
       </div>
 
-      <label className="booking-page-policy">
-        <input
-          type="checkbox"
-          checked={policyAccepted}
-          onChange={(e) => setPolicyAccepted(e.target.checked)}
-          aria-describedby={showPolicyWarning ? "review-step-policy-warning" : undefined}
-        />
-        <span>
-          I agree to the <Link href="/coming-soon">Terms of Service</Link>, Refund Policy, Restoration Disclaimer, and
-          Payment Policy.
+      <section className="booking-page-terms-card" aria-labelledby="booking-acknowledgments-heading">
+        <span className="booking-page-terms-icon" aria-hidden="true">
+          <FileText size={24} />
         </span>
-      </label>
+        <div className="booking-page-terms-body">
+          <h3 id="booking-acknowledgments-heading">
+            Pricing &amp; Restoration Acknowledgment{" "}
+            <span className="booking-page-required" aria-hidden="true">
+              *
+            </span>
+          </h3>
+          {BOOKING_ACKNOWLEDGMENTS.map((ack) => (
+            <label className="booking-page-policy" key={ack.id}>
+              <input
+                type="checkbox"
+                required
+                checked={acknowledged.includes(ack.id)}
+                onChange={() => toggleAcknowledgment(ack.id)}
+              />
+              <span>
+                <strong>{ack.lead}</strong> {ack.detail}
+              </span>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="booking-page-terms-agreement" aria-labelledby="booking-terms-agreement-heading">
+        <h3 id="booking-terms-agreement-heading">
+          Terms Agreement{" "}
+          <span className="booking-page-required" aria-hidden="true">
+            *
+          </span>
+        </h3>
+        <label className="booking-page-policy">
+          <input type="checkbox" required checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} />
+          <span>
+            I have read and agree to the{" "}
+            <a className="booking-page-agreement-link" href={TERMS_AGREEMENT.href} target="_blank" rel="noopener noreferrer">
+              {TERMS_AGREEMENT.title}
+              <ExternalLink size={13} aria-hidden="true" />
+              <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
+            </a>{" "}
+            and acknowledge the restoration risks described above.
+          </span>
+        </label>
+      </section>
 
       <button
         type="button"
         className="landing-btn-primary booking-page-continue-btn"
         onClick={confirm}
-        disabled={submitting}
+        disabled={submitting || !termsAccepted}
         aria-busy={submitting}
+        aria-describedby={termsAccepted ? undefined : "review-step-policy-warning"}
       >
         {submitting ? "Submitting…" : "Confirm Booking"}
         {!submitting && <ArrowRight size={14} aria-hidden="true" />}
       </button>
-      <p className="booking-page-form-warning" id="review-step-policy-warning" role="status" aria-live="polite">
-        {showPolicyWarning && (
-          <>
-            <TriangleAlert size={14} aria-hidden="true" />
-            Please accept the policies to confirm your booking.
-          </>
-        )}
+      <p className="booking-page-form-hint" id="review-step-policy-warning" role="status" aria-live="polite">
+        {!termsAccepted && "Tick each acknowledgment and the Terms Agreement to confirm your booking."}
       </p>
       {error && (
         <p className="booking-page-form-error" role="alert">
@@ -202,7 +253,12 @@ export function ReviewStep({
         </p>
       )}
       <p className="booking-page-terms">
-        See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
+        See our{" "}
+        <a href={PRIVACY_POLICY.href} target="_blank" rel="noopener noreferrer">
+          {PRIVACY_POLICY.title}
+          <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
+        </a>{" "}
+        for how we handle your details.
       </p>
     </>
   );

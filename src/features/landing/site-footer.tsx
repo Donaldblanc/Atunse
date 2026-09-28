@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
+import { LEGAL_DOCUMENTS } from "@/shared/legal-documents";
 
 export function SiteFooter({ active }: { active?: NavActive } = {}) {
   return (
@@ -64,6 +65,15 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
       </footer>
       <div className="landing-footer-bottom">
         <span>&copy; 2026 Atunṣe. All rights reserved.</span>
+        {/* The legal PDFs, open in a new tab (shared/legal-documents.ts). */}
+        <nav className="landing-footer-legal" aria-label="Legal">
+          {LEGAL_DOCUMENTS.map((doc) => (
+            <a key={doc.href} href={doc.href} target="_blank" rel="noopener noreferrer">
+              {doc.title}
+              <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
+            </a>
+          ))}
+        </nav>
         <span>RestoredByDJ &middot; New York, NY</span>
       </div>
     </>

@@ -31,6 +31,16 @@ describe("submitOrder", () => {
     );
   });
 
+  it.each([
+    ["none", []],
+    ["only some", ["pricing-after-inspection", "results-may-vary"]],
+    ["unknown ids", ["pricing-after-inspection", "results-may-vary", "inherent-material-risks", "something-else"]],
+  ])("rejects a booking that acknowledged %s of the risks, even with the Terms Agreement ticked", async (_label, acknowledgedTerms) => {
+    const deps = bookingDeps();
+    await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow(PolicyNotAcceptedError);
+    await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow("Reload the page");
+  });
+
   it("rejects an admin trying to submit an order as themselves", async () => {
     await expect(submitOrder(bookingDeps(), { accountId: "acc_1", role: "ADMIN" }, validBookingInput())).rejects.toThrow(
       UnauthorizedError,

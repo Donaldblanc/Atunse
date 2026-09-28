@@ -11,6 +11,7 @@ import type { FileStorage } from "@/shared/storage";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
+import { acknowledgesAll } from "../booking-terms";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
   EmailTakenError,
@@ -35,6 +36,8 @@ export interface SubmitOrderInput {
   /** Client-generated once per booking; a retry with the same key is a no-op (ADR-0012). */
   submissionKey: string | null;
   policyAccepted: boolean; // captured at submission itself, not deferred
+  /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked: all of them, or the booking is refused. */
+  acknowledgedTerms: string[];
   contact: { name: string; email: string; phone: string };
   fulfillment: Fulfillment;
   rush: boolean;
@@ -72,7 +75,12 @@ export interface SubmitOrderDeps {
 
 export class PolicyNotAcceptedError extends Error {
   constructor() {
-    super("Order cannot be submitted without accepting the required policies.");
+    // A booking tab opened before the acknowledgments shipped doesn't
+    // show them, hence the reload hint.
+    super(
+      "Tick each acknowledgment and agree to the Terms of Service & Restoration Agreement to confirm your booking. " +
+        "Don't see them? Reload the page.",
+    );
   }
 }
 
@@ -157,7 +165,7 @@ export class PhotosInUseError extends BookingValidationError {
 export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser, input: SubmitOrderInput): Promise<Order> {
   requireRole(actingUser, "GUEST", "CUSTOMER");
 
-  if (!input.policyAccepted) {
+  if (!input.policyAccepted || !acknowledgesAll(input.acknowledgedTerms)) {
     throw new PolicyNotAcceptedError();
   }
 
