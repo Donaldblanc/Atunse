@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertDatabaseMatchesBucket, corsRulesFor, selectOrphans } from "./maintenance";
+import { assertDatabaseMatchesBucket, corsRulesFor, selectOrphans, parseCorsBackup } from "./maintenance";
 
 describe("corsRulesFor", () => {
   it("allows only POST, from the given origins, deduplicated and without trailing slashes", () => {
@@ -47,5 +47,23 @@ describe("assertDatabaseMatchesBucket", () => {
   it("allows a matching pair, and an empty bucket", () => {
     expect(() => assertDatabaseMatchesBucket(new Set(["photos/p/0.jpg"]), new Set(["photos/p/0.jpg"]))).not.toThrow();
     expect(() => assertDatabaseMatchesBucket(new Set(), new Set(["photos/p/0.jpg"]))).not.toThrow();
+  });
+});
+
+describe("parseCorsBackup", () => {
+  const rules = [{ AllowedOrigins: ["*"], AllowedMethods: ["GET", "PUT", "POST", "HEAD", "DELETE"], AllowedHeaders: ["*"] }];
+
+  it("returns a backup's rules for the same bucket, including an empty set", () => {
+    expect(parseCorsBackup({ bucket: "atunse-images", savedAt: "2026-09-28T00:00:00Z", rules }, "atunse-images")).toEqual(rules);
+    expect(parseCorsBackup({ bucket: "atunse-images", savedAt: "x", rules: [] }, "atunse-images")).toEqual([]);
+  });
+
+  it("refuses a backup of another bucket", () => {
+    expect(() => parseCorsBackup({ bucket: "other-bucket", savedAt: "x", rules }, "atunse-images")).toThrow(/Refusing/);
+  });
+
+  it("refuses anything that isn't a well-formed backup", () => {
+    expect(() => parseCorsBackup(rules, "atunse-images")).toThrow(/Not a CORS backup/);
+    expect(() => parseCorsBackup({ bucket: "atunse-images", rules: [{ AllowedOrigins: [] }] }, "atunse-images")).toThrow(/AllowedMethods/);
   });
 });

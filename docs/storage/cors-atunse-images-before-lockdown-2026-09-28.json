@@ -1,0 +1,25 @@
+{
+  "bucket": "atunse-images",
+  "savedAt": "2026-09-28T03:30:46.570Z",
+  "rules": [
+    {
+      "AllowedMethods": [
+        "GET",
+        "PUT",
+        "POST",
+        "HEAD",
+        "DELETE"
+      ],
+      "AllowedOrigins": [
+        "*"
+      ],
+      "AllowedHeaders": [
+        "*"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

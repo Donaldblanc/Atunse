@@ -44,7 +44,20 @@ what replaces it later.
    read, block all public access on.
 
    **Bucket settings are applied by script, not by the app** (#77):
-   - `STORAGE_ALLOWED_ORIGINS=https://<prod>,https://*.vercel.app,http://localhost:3000 npm run storage:configure -- --apply` restricts CORS to those origins and `POST` only. Run it without `--apply` first to see the current and proposed rules.
+   - `STORAGE_ALLOWED_ORIGINS=https://<prod>,https://*.vercel.app,http://localhost:3000 npm run storage:configure -- --apply` restricts CORS to those origins and `POST` only. Run it without `--apply` first to see the current and proposed rules. Every `--apply` first saves the bucket's current rules to `.storage-backups/` (git-ignored) and prints the file name.
+
+   **Current bucket CORS** (applied 2026-09-28 to `atunse-images`): origins `https://atunse-five.vercel.app`, `https://*.vercel.app` (previews: Neon honours the wildcard) and `http://localhost:3000`; method `POST` only. Checked after applying: those origins get `POST` from a preflight, `PUT`/`DELETE` and every other origin get `403`, and a real browser upload from the production site succeeded (`204`; the test object was deleted). Before this the bucket allowed any origin (`*`) with GET/PUT/POST/HEAD/DELETE; that rule is saved in `docs/storage/cors-atunse-images-before-lockdown-2026-09-28.json`.
+
+   **Adding an origin** (e.g. a custom domain): re-run the command above with the full new list; it replaces the rule, and the old one is backed up first. Until the custom domain is added, photo uploads from it fail in the browser.
+
+   **Reverting the bucket's CORS** (if uploads break after a change):
+   1. Dry run, to see what would be restored: `npm run storage:configure -- --restore docs/storage/cors-atunse-images-before-lockdown-2026-09-28.json` (or any file in `.storage-backups/`).
+   2. Restore: add `--apply` to the same command. It backs up the rules it replaces, writes the saved ones, and prints what the bucket now has. A backup of "no rules" removes the CORS configuration entirely.
+   3. Check with a preflight: `curl -s -o /dev/null -w "%{http_code}\n" -X OPTIONS <S3 endpoint>/<bucket> -H "Origin: https://atunse-five.vercel.app" -H "Access-Control-Request-Method: POST"` should print `200`.
+
+   The script refuses a backup made for a different bucket. It uses the storage credentials in `.env` (currently the production bucket), so check which bucket the dry run names before adding `--apply`.
+
+   CORS is defence in depth here, not the lock on the bucket: the bucket is private, and every upload needs a presigned POST that only `POST /api/v1/uploads` issues (rate-limited, 5-minute expiry, size and type pinned). CORS decides which web pages' scripts may talk to the bucket and read its answers.
    - `STORAGE_CLEANUP_DATABASE_URL=<database for this bucket> npm run storage:cleanup` lists photos older than 48 hours that no order references; add `-- --apply` to delete them. The database must be given explicitly (it never falls back to `DATABASE_URL`), and deletion is refused if none of the database's photos are in the bucket.
 
    **Rate limits** (per client IP, stored hashed in `rate_limit_buckets`):
