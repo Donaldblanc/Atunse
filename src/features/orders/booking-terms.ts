@@ -44,11 +44,16 @@ export const BOOKING_ACKNOWLEDGMENTS: readonly BookingAcknowledgment[] = [
   },
 ];
 
-/** The contract the Terms Agreement checkbox accepts. */
+/**
+ * The contract the Terms Agreement checkbox accepts: the owner's PDF,
+ * served from public/legal/ at a stable URL. The version is printed in the
+ * PDF itself; replace the file (same name) to publish a new version, and
+ * update `version` to match.
+ */
 export const TERMS_AGREEMENT = {
   title: "Terms of Service & Restoration Agreement",
-  /** Served from public/legal/. The owner supplies the PDF. */
   href: "/legal/terms-of-service-and-restoration-agreement.pdf",
+  version: "2026-09-27-v1",
 } as const;
 
 /** True when every current acknowledgment is among `ids`. */
