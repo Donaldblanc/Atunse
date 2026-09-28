@@ -14,7 +14,7 @@ export const CONTACT_HERO_IMAGE: GalleryImage = {
 
 export const CONTACT_FAQ_IMAGE: GalleryImage = {
   key: "contact-faq.jpg",
-  alt: "Freshly cleaned sneakers on a studio shelf beside boxes, under a “Restore, Revive, Repeat” sign",
+  alt: "Freshly cleaned sneakers on a shelf beside boxes, under a “Restore, Revive, Repeat” sign",
 };
 
 export const CONTACT_FAQS: Faq[] = [
