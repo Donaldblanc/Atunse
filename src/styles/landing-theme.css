@@ -992,6 +992,22 @@
   padding-top: 18px;
 }
 
+.landing-footer-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.landing .landing-footer-legal a {
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.landing .landing-footer-legal a:hover {
+  color: var(--ink);
+}
+
 .landing a:focus-visible,
 .landing button:focus-visible {
   outline: 2px solid var(--blue);
@@ -2653,7 +2669,7 @@
   color: var(--blue-deep);
 }
 
-.booking-page-visually-hidden {
+.landing-visually-hidden {
   position: absolute;
   width: 1px;
   height: 1px;

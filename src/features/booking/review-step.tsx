@@ -21,7 +21,8 @@ import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsAcceptance } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
-import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS, TERMS_AGREEMENT } from "@/features/orders/booking-terms";
+import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
+import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export function ReviewStep({
   isBundle,
@@ -224,7 +225,7 @@ export function ReviewStep({
             <a className="booking-page-agreement-link" href={TERMS_AGREEMENT.href} target="_blank" rel="noopener noreferrer">
               {TERMS_AGREEMENT.title}
               <ExternalLink size={13} aria-hidden="true" />
-              <span className="booking-page-visually-hidden"> (PDF, opens in a new tab)</span>
+              <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
             </a>{" "}
             and acknowledge the restoration risks described above.
           </span>
@@ -252,7 +253,12 @@ export function ReviewStep({
         </p>
       )}
       <p className="booking-page-terms">
-        See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
+        See our{" "}
+        <a href={PRIVACY_POLICY.href} target="_blank" rel="noopener noreferrer">
+          {PRIVACY_POLICY.title}
+          <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
+        </a>{" "}
+        for how we handle your details.
       </p>
     </>
   );

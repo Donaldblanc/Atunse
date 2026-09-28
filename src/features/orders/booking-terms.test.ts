@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS, TERMS_AGREEMENT } from "./booking-terms";
+import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "./booking-terms";
 
 describe("booking acknowledgments", () => {
   it("lists the four published risk acknowledgments, in order, with unique ids", () => {
@@ -22,11 +20,4 @@ describe("booking acknowledgments", () => {
     expect(acknowledgesAll([])).toBe(false);
   });
 
-  it("links the agreement as a same-site PDF that ships with the app", () => {
-    expect(TERMS_AGREEMENT.href).toMatch(/^\/legal\/[a-z-]+\.pdf$/);
-    const pdf = readFileSync(path.join(process.cwd(), "public", TERMS_AGREEMENT.href));
-    expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
-    // The agreement itself (its title metadata), not some other PDF.
-    expect(pdf.toString("latin1")).toContain("Atunse Terms of Service & Restoration Agreement");
-  });
 });

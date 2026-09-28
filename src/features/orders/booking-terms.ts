@@ -3,8 +3,8 @@
 //   required checkbox each. They record that the customer understood each
 //   risk; none of them is acceptance of the contract on its own.
 // - Terms Agreement: the one checkbox that accepts the contract, the
-//   Terms of Service & Restoration Agreement (a PDF), and acknowledges the
-//   risks above.
+//   Terms of Service & Restoration Agreement (TERMS_AGREEMENT, a PDF), and
+//   acknowledges the risks above.
 // Shared by the booking flow (which shows them) and submitOrder (which
 // refuses a booking without every acknowledgment and the agreement), so
 // the list can't drift between the two. Changing the wording is a policy
@@ -43,18 +43,6 @@ export const BOOKING_ACKNOWLEDGMENTS: readonly BookingAcknowledgment[] = [
       "I understand that restored footwear may still contain deterioration caused by age, wear, manufacturing defects, previous repairs, or material degradation and may not be suitable for athletic or strenuous use.",
   },
 ];
-
-/**
- * The contract the Terms Agreement checkbox accepts: the owner's PDF,
- * served from public/legal/ at a stable URL. The version is printed in the
- * PDF itself; replace the file (same name) to publish a new version, and
- * update `version` to match.
- */
-export const TERMS_AGREEMENT = {
-  title: "Terms of Service & Restoration Agreement",
-  href: "/legal/terms-of-service-and-restoration-agreement.pdf",
-  version: "2026-09-27-v1",
-} as const;
 
 /** True when every current acknowledgment is among `ids`. */
 export function acknowledgesAll(ids: readonly string[]): boolean {
