@@ -44,6 +44,8 @@ export const RATE_LIMITS = {
    * features/orders keeps it in step with BUNDLE_PAIRS.
    */
   uploads: { name: "uploads", limit: 60, windowSeconds: 10 * 60 },
+  /** Contact form messages: plenty for a real conversation, too few to spam the shop's inbox. */
+  contact: { name: "contact", limit: 5, windowSeconds: 60 * 60 },
   /** Booking submissions, including retries. */
   orders: { name: "orders", limit: 10, windowSeconds: 10 * 60 },
   /** Sign-in code emails, across all emails a caller tries. */

@@ -8,12 +8,24 @@ export type Faq = {
   answer: string;
 };
 
-export function FaqAccordion({ faqs }: { faqs: Faq[] }) {
+export function FaqAccordion({
+  faqs,
+  title = "FAQs",
+  subtitle,
+  id,
+}: {
+  faqs: Faq[];
+  title?: string;
+  subtitle?: string;
+  /** An anchor for links like "View all FAQs" (/#faq). */
+  id?: string;
+}) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <div>
-      <h2>FAQs</h2>
+    <div id={id}>
+      <h2>{title}</h2>
+      {subtitle && <p className="landing-faq-subtitle">{subtitle}</p>}
       {faqs.map((faq, index) => {
         const isOpen = openIndex === index;
         return (

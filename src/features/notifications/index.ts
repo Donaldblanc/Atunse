@@ -1,7 +1,7 @@
 import { ConsoleNotificationService, type NotificationService } from "./notification-service";
 import { ResendNotificationService } from "./resend-notification-service";
 
-export type { NotificationService } from "./notification-service";
+export type { EmailMessage, NotificationService } from "./notification-service";
 
 /** Whether emails can actually reach people (Resend is configured). */
 export function emailDeliveryConfigured(env: NodeJS.ProcessEnv = process.env): boolean {

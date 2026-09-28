@@ -27,6 +27,19 @@ describe("ResendNotificationService", () => {
     });
   });
 
+  it("sets reply_to only when the email has a replyTo", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(init.body as string));
+      return new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    const resend = new ResendNotificationService("re_key", "a@example.com", fetchImpl);
+    await resend.sendEmail({ to: "shop@example.com", subject: "s", body: "b", replyTo: "jordan@example.com" });
+    await resend.sendEmail({ to: "shop@example.com", subject: "s", body: "b" });
+    expect(bodies[0]!.reply_to).toBe("jordan@example.com");
+    expect(bodies[1]).not.toHaveProperty("reply_to");
+  });
+
   it("throws when Resend rejects the email, so callers can retry", async () => {
     const fetchImpl = (async () => new Response("domain not verified", { status: 403 })) as unknown as typeof fetch;
     await expect(
