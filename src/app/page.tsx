@@ -26,7 +26,7 @@ const FAQS = [
   {
     question: "How does the process work?",
     answer:
-      "Schedule a pickup or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+      "Book a Local Drop-Off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
   },
   {
     question: "How long does restoration take?",
@@ -35,7 +35,7 @@ const FAQS = [
   {
     question: "How do I get my sneakers to you?",
     answer:
-      "We'll pick them up from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the US. Choose Mail-In when you book and we'll email you where to send them.",
+      "In the NY/NJ/CT area, book a Local Drop-Off: DJ collects them from your address and drops them back off when they're done. Anywhere else in the US, choose Mail-In: we'll email you where to send them, and ship them back when they're done.",
   },
   {
     question: "What if I'm not happy with the results?",
@@ -103,7 +103,7 @@ export default function HomePage() {
             MOVES YOU.
           </h1>
           <p className="landing-lede">
-            NYC-based sneaker cleaning, restoration and protection, with pickup across NY / NJ / CT and
+            NYC-based sneaker cleaning, restoration and protection, with Local Drop-Off across NY / NJ / CT and
             mail-in nationwide. Keep your favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
@@ -141,7 +141,7 @@ export default function HomePage() {
           <span>
             <strong>NY / NJ / CT</strong>
             <br />
-            Local pickup
+            Local Drop-Off
           </span>
         </div>
         <div className="landing-trust-item">

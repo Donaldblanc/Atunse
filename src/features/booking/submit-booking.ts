@@ -64,7 +64,7 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
 
   let fulfillment;
   if (submission.scheduleMethod === "pickup") {
-    if (!submission.pickupSelection) throw new BookingSubmitError("Choose a pickup date and time.");
+    if (!submission.pickupSelection) throw new BookingSubmitError("Choose a collection date and time.");
     fulfillment = {
       method: "PICKUP" as const,
       address: orderAddress,

@@ -22,20 +22,20 @@ type BookingModeConfig = {
 
 const MODES: Record<BookingMode, BookingModeConfig> = {
   pickup: {
-    label: "Pickup",
+    label: "Local Drop-Off",
     rows: [
-      { icon: MapPin, title: "NY / NJ / CT pickup", subtitle: "We'll collect from your address" },
+      { icon: MapPin, title: "NY / NJ / CT", subtitle: "DJ collects from your address and drops it back off" },
       { icon: Clock, title: "Cleanings typically take about 72 hours", subtitle: "Timelines are estimates" },
       { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],
     cta: "View pricing & book now",
-    href: "/booking?method=pickup",
+    href: "/booking?method=drop-off",
   },
   "mail-in": {
     label: "Mail-In",
     rows: [
       // ADR-0010: the customer arranges their own shipping; we don't send labels.
-      { icon: Package, title: "Ships anywhere in the US", subtitle: "We'll email you where to send your pair" },
+      { icon: Package, title: "Ships anywhere in the US", subtitle: "We'll email you where to send it, and ship it back" },
       { icon: Clock, title: "Typically 5–10 business days round trip", subtitle: "Estimated, including transit both ways" },
       { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],

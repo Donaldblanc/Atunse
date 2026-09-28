@@ -2,16 +2,17 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-// CONTEXT.md: Fulfillment Method is Pickup or Mail-In only: customers never
-// bring sneakers in, and Mail-In customers arrange their own shipping
-// (ADR-0010, no labels). Customer-facing copy on the marketing pages and in
-// the booking flow must never promise otherwise. Nor does the copy
+// CONTEXT.md: the Fulfillment Methods are Local Drop-Off (DJ collects the
+// pair and drops it back off) and Mail-In. Customers never bring sneakers
+// in, and Mail-In customers arrange their own shipping (ADR-0010, no
+// labels). Customer-facing copy on the marketing pages and in the booking
+// flow must never promise otherwise. Nor does the copy
 // guarantee results, safety or timing: the Terms of Service & Restoration
 // Agreement says results aren't guaranteed and turnaround times are
 // estimates, and nothing on the site may contradict it. Code comments are
 // skipped: they may name what doesn't exist.
 const FORBIDDEN = [
-  /drop(ped)?[\s-]?off/i,
+  /\bdropped off a pair|drop (it|them|your pair) off at|bring (it|them|your pair) (in|to us)/i,
   /prepaid/i,
   /shipping label/i,
   /mail-in label/i,
@@ -53,6 +54,21 @@ describe("customer-facing copy", () => {
 
   it("finds the pages to check", () => {
     expect(files.some((f) => f.endsWith(path.join("src", "app", "page.tsx")))).toBe(true);
+  });
+
+  // "Pickup" is only a code name now (FulfillmentMethod "PICKUP", pickupDate…),
+  // so this checks text customers read (string literals and JSX text, plus
+  // server messages and emails in features/orders), not identifiers: a
+  // phrase containing the word, or the bare label "Pickup".
+  it("never says pickup to customers: it's Local Drop-Off", () => {
+    const TEXT = /"([^"\\\n]*)"|'([^'\\\n]*)'|`([^`]*)`|>([^<>{}"'();=]+)</g; // JSX text never holds code punctuation
+    const offenders = [...DIRS, "src/features/orders"].flatMap(sourceFiles).flatMap((file) =>
+      [...withoutComments(readFileSync(file, "utf8")).matchAll(TEXT)]
+        .map((m) => (m[1] ?? m[2] ?? m[3] ?? m[4] ?? "").trim())
+        .filter((text) => /\bpick[\s-]?ups?\b/i.test(text) && (/\s/.test(text) || text === "Pickup"))
+        .map((text) => `${path.relative(ROOT, file)}: ${text.slice(0, 80)}`),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it.each(FORBIDDEN.map((pattern) => [String(pattern), pattern] as const))("never says %s", (_label, pattern) => {

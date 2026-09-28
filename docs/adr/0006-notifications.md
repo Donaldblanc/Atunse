@@ -7,7 +7,7 @@ Accepted
 Both email and SMS are required, triggered off many points in the Item
 Status Pipeline and payment flow (submission, quote ready, approval needed,
 deposit received, sneakers received, status changes, completion, ready for
-pickup/shipping, tracking available, plus reminders). Notifications need a
+drop-off/shipping, tracking available, plus reminders). Notifications need a
 provider adapter (per ADR-0003) and a decision on how status-change
 use-cases actually trigger them.
 

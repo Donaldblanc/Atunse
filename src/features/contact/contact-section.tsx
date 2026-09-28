@@ -47,7 +47,7 @@ const CARDS: Card[] = [
   {
     icon: MapPin,
     title: "Service Area",
-    description: "Local pickup in NY / NJ / CT, plus nationwide mail-in.",
+    description: "Local Drop-Off in NY / NJ / CT, plus nationwide mail-in.",
     action: "View our process",
     href: "/process",
   },

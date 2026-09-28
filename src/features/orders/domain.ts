@@ -36,9 +36,18 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return FORWARD_TRANSITIONS[from].includes(to);
 }
 
-/** CONTEXT.md: exactly two Fulfillment Methods. There is no drop-off. */
+/**
+ * CONTEXT.md: exactly two Fulfillment Methods. PICKUP is the code name for
+ * **Local Drop-Off**: DJ collects the pair from the customer's address
+ * (NY/NJ/CT) at a booked time and drops it back off when it's done. The
+ * code name predates the customer-facing one and is kept so stored Orders
+ * and the API stay unchanged; customers never see the word "pickup".
+ */
 export const FULFILLMENT_METHODS = ["PICKUP", "MAIL_IN"] as const;
 export type FulfillmentMethod = (typeof FULFILLMENT_METHODS)[number];
+
+/** What customers see for each Fulfillment Method, everywhere (site and emails). */
+export const FULFILLMENT_LABELS: Record<FulfillmentMethod, string> = { PICKUP: "Local Drop-Off", MAIL_IN: "Mail-In" };
 
 export interface Address {
   line1: string;

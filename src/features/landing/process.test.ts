@@ -13,10 +13,10 @@ describe("process page", () => {
     }
   });
 
-  it("never offers a drop-off: pairs come in by Pickup or Mail-In only", () => {
+  it("offers Local Drop-Off and Mail-In, and never says pickup or asks customers to come in", () => {
     const copy = PROCESS_STEPS.map((step) => `${step.title} ${step.description}`).join(" ");
-    expect(copy).not.toMatch(/drop[\s-]?off|our store/i);
-    expect(copy).toMatch(/pickup/i);
+    expect(copy).not.toMatch(/pick[\s-]?up|our store/i);
+    expect(copy).toMatch(/Local Drop-Off/);
     expect(copy).toMatch(/mail in/i);
   });
 
