@@ -16,7 +16,7 @@ Two required parts, presented once, at the final review-and-submit step of order
 - **Pricing & Restoration Acknowledgments** — four risk acknowledgments, each its own checkbox: final pricing is determined after inspection (additional charges need the customer's approval first); results may vary; restoration involves inherent material risks; restoration doesn't guarantee structural or performance restoration. They record that the customer understood each risk. None of them, alone or together, is acceptance of the contract.
 - **Terms Agreement** — one checkbox: "I have read and agree to the Terms of Service & Restoration Agreement and acknowledge the restoration risks described above." This is the contractual acceptance. The **Terms of Service & Restoration Agreement** is a PDF, linked from the checkbox.
 
-No Order is submitted without every acknowledgment and the Terms Agreement. No per-policy contextual acceptance elsewhere in the flow.
+No box is ever pre-checked, and no Order is submitted without every acknowledgment and the Terms Agreement. No per-policy contextual acceptance elsewhere in the flow. Each Order keeps its **Terms Acceptance** as evidence: when it was accepted, which agreement version (its permanent URL and the PDF's SHA-256), and each acknowledgment — see [ADR-0015](docs/adr/0015-terms-acceptance-evidence.md).
 
 ## Balance Delta
 The difference between an Item's final price (set when its Quote is sent) and the rough estimate its share of the Deposit was based on. Handled by adjusting the Balance due at completion — the Deposit already paid is never re-charged or refunded for this; the customer is notified of the real total the moment the Quote is sent (not held back until pickup).

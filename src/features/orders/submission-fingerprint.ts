@@ -7,11 +7,11 @@ import type { SubmitOrderInput } from "./use-cases/submit-order";
  * Order; the same key with different details (e.g. the first Confirm went
  * through but its response was lost, and the customer then edited the
  * address) is refused instead of silently returning the stale Order.
- * The key, the policy checkbox and the acknowledgments aren't part of
- * the booking itself.
+ * The key and the terms (the agreement checkbox, the acknowledgments and
+ * the agreement's version) aren't part of the booking itself.
  */
 export function submissionFingerprint(input: SubmitOrderInput): string {
-  const { submissionKey: _key, policyAccepted: _policy, acknowledgedTerms: _terms, ...booking } = input;
+  const { submissionKey: _key, policyAccepted: _policy, acknowledgedTerms: _terms, termsVersion: _version, ...booking } = input;
   return createHash("sha256").update(canonicalJson(booking)).digest("hex");
 }
 

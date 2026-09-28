@@ -16,7 +16,7 @@ import {
   type PickupAddress,
   type ScheduleMethod,
   type Step,
-  type TermsAcceptance,
+  type TermsSelection,
 } from "./booking-types";
 import { ServiceStep } from "./service-step";
 import { DetailsStep } from "./details-step";
@@ -92,7 +92,7 @@ export function BookingFlow() {
   // Set when this booking's submission key already created an Order with
   // other details (#76): the customer keeps that booking or books anew.
   const [conflict, setConflict] = useState<{ message: string; existing: SubmitOrderResponse } | null>(null);
-  const termsRef = useRef<TermsAcceptance>({ policyAccepted: false, acknowledgedTerms: [] });
+  const termsRef = useRef<TermsSelection>({ policyAccepted: false, acknowledgedTerms: [], termsVersion: "" });
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedStackableIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
@@ -123,7 +123,7 @@ export function BookingFlow() {
     }
   }
 
-  async function confirmBooking(terms: TermsAcceptance) {
+  async function confirmBooking(terms: TermsSelection) {
     termsRef.current = terms;
     submissionKey.current ??= crypto.randomUUID();
     let result: SubmitOrderResponse;

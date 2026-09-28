@@ -14,6 +14,8 @@ export interface BookingSubmission {
   policyAccepted: boolean;
   /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked on the Review step. */
   acknowledgedTerms: string[];
+  /** The TERMS_AGREEMENT version the Review step showed (ADR-0015). */
+  termsVersion: string;
   /** The Bundle chosen, or null for a single pair. */
   bundleId: string | null;
   /** The single pair's Services; empty for a Bundle, whose Services come with it. */
@@ -80,6 +82,7 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
   return {
     policyAccepted: submission.policyAccepted,
     acknowledgedTerms: submission.acknowledgedTerms,
+    termsVersion: submission.termsVersion,
     contact: submission.contact,
     fulfillment,
     rush: submission.rush,

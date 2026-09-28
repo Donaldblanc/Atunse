@@ -2,7 +2,7 @@
 // Phase 0's "repository and migration integration tests" requirement.
 // Requires DATABASE_URL (see .env.example); run with `npm run test:integration`.
 
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import {
@@ -45,6 +45,13 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
+const TERMS = {
+  version: "2026-09-27-v1",
+  url: "/legal/terms/2026-09-27-v1.pdf",
+  sha256: "65c9ad00d15279d81fb433299e235176281ea12efd8d141826066b1528395874",
+  acknowledgments: { pricing: true, restorationResults: true, materialRisks: true, structuralLimitations: true },
+};
+
 function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
   return {
     owner: newCustomer(),
@@ -52,6 +59,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     contactEmail: "customer@example.com",
     contactPhone: "2125550142",
     policyAcceptedAt: new Date(),
+    terms: TERMS,
     fulfillment: {
       method: "PICKUP",
       address: { line1: "123 Main St", line2: "Apt 4B", city: "New York", state: "NY", zip: "10001" },
@@ -121,6 +129,22 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(reloaded?.rush).toBe(true);
     expect(reloaded?.estimate.cents).toBe(5000);
     expect(reloaded?.deposit.cents).toBe(2500);
+  });
+
+  it("keeps the terms acceptance with the Order: version, URL, SHA-256, acknowledgments and when (ADR-0015)", async () => {
+    const acceptedAt = new Date("2026-09-27T23:48:32.000Z");
+    const { order } = await repo.create(newOrder({ policyAcceptedAt: acceptedAt }));
+    const found = await repo.findById(order.id);
+    expect(found?.termsAcceptance).toEqual({ ...TERMS, acceptedAt });
+  });
+
+  it("reads an Order from before the agreement existed as having no terms acceptance", async () => {
+    const { order } = await repo.create(newOrder());
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { termsVersion: null, termsUrl: null, termsSha256: null, termsAcknowledgments: Prisma.DbNull },
+    });
+    expect((await repo.findById(order.id))?.termsAcceptance).toBeNull();
   });
 
   it("stores Pickup dates as calendar dates, with no timezone shift", async () => {
