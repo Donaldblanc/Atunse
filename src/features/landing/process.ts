@@ -34,13 +34,13 @@ export const PROCESS_STEPS: ProcessStep[] = [
   {
     icon: Sparkles,
     title: "We Inspect and Clean",
-    description: "Our team carefully inspects, cleans, and restores your sneakers using premium, material-safe methods.",
+    description: "Our team carefully inspects, cleans, and restores your sneakers, choosing methods for each material.",
     image: { key: "process-step-clean.jpg", alt: "A gloved hand scrubbing a white sneaker with a brush and foam" },
   },
   {
     icon: Package,
     title: "Wear Your Sneakers",
-    description: "Your sneakers come back to you clean, fresh, and ready to wear.",
+    description: "Once your pair passes our final quality check, we get it back to you.",
     image: { key: "process-step-wear.jpg", alt: "A freshly cleaned pair of sneakers beside an Atunṣe box" },
   },
 ];

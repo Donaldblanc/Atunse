@@ -21,7 +21,7 @@ export const CONTACT_FAQS: Faq[] = [
   {
     question: "How long does a restoration take?",
     answer:
-      "Cleanings take about 72 hours. Restorations usually take 5–10 business days, depending on the work and how busy we are. Need it sooner? Add Rush when you book.",
+      "Cleanings usually take about 72 hours, and restorations 5–10 business days, depending on the work and how busy we are. Timelines are estimates. Need it sooner? Add Rush when you book.",
   },
   {
     question: "Do you offer local pickup?",
