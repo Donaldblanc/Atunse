@@ -24,6 +24,38 @@ export function corsRulesFor(origins: string[]): CORSRule[] {
   return [{ AllowedOrigins: cleaned, AllowedMethods: ["POST"], AllowedHeaders: ["*"], ExposeHeaders: ["ETag"], MaxAgeSeconds: 3000 }];
 }
 
+/** A saved copy of a bucket's CORS rules: what `storage:configure --apply` writes before changing them. */
+export interface CorsBackup {
+  bucket: string;
+  savedAt: string;
+  rules: CORSRule[];
+}
+
+/**
+ * A backup file's contents, checked before `storage:configure --restore`
+ * puts them back: the right bucket, and rules that are well-formed (each
+ * with origins and methods). An empty list is valid: the bucket had no
+ * CORS configuration.
+ */
+export function parseCorsBackup(json: unknown, bucket: string): CORSRule[] {
+  const backup = json as Partial<CorsBackup> | null;
+  if (!backup || typeof backup !== "object" || !Array.isArray(backup.rules)) {
+    throw new Error("Not a CORS backup: expected { bucket, savedAt, rules: [...] }");
+  }
+  if (backup.bucket !== bucket) {
+    throw new Error(`This backup is for bucket "${backup.bucket}", not "${bucket}". Refusing to restore it.`);
+  }
+  for (const rule of backup.rules) {
+    const valid =
+      Array.isArray(rule?.AllowedOrigins) &&
+      rule.AllowedOrigins.length > 0 &&
+      Array.isArray(rule?.AllowedMethods) &&
+      rule.AllowedMethods.length > 0;
+    if (!valid) throw new Error("Every rule in the backup needs AllowedOrigins and AllowedMethods.");
+  }
+  return backup.rules;
+}
+
 /**
  * Refuses a cleanup whose database doesn't belong with the bucket (#77):
  * if the bucket has photos but none of the database's photos are among
