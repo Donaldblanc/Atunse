@@ -800,9 +800,9 @@
 
 .landing-faq-item {
   border-bottom: 1px solid var(--line);
-  padding: 13px 0;
 }
 
+/* The padding is on the button, so the whole row is tappable. */
 .landing-faq-q {
   display: flex;
   justify-content: space-between;
@@ -811,10 +811,10 @@
   font-weight: 600;
   gap: 10px;
   width: 100%;
+  padding: 13px 0;
   background: none;
   border: none;
   text-align: left;
-  padding: 0;
   color: inherit;
   cursor: pointer;
 }
@@ -848,7 +848,8 @@
 
 .landing-faq-item[data-open="true"] .landing-faq-a {
   max-height: 200px;
-  margin-top: 10px;
+  margin-top: -3px;
+  padding-bottom: 13px;
 }
 
 .landing-booking {
@@ -1619,6 +1620,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px; /* matches .landing-btn-primary beside it */
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -1932,19 +1934,6 @@
     text-align: left;
     margin-top: 20px;
   }
-  .booking-page-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .booking-page-form-grid,
-  .booking-page-form-grid-thirds,
-  .booking-page-shipping-grid,
-  .booking-page-qr-grid,
-  .booking-page-zelle-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .booking-page-how-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .services-page-hero {
     grid-template-columns: 1fr;
   }
@@ -1995,15 +1984,17 @@
   background: var(--bg);
   z-index: 100;
   transform: translateX(100%);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
   padding: 18px 20px 24px;
   display: flex;
   flex-direction: column;
-  box-shadow: -12px 0 28px rgba(0, 0, 0, 0.2);
 }
 
+/* The shadow is only on the open drawer: closed, it sits just past the
+   right edge and the shadow showed as a grey band down every page. */
 .landing-drawer[data-open="true"] {
   transform: translateX(0);
+  box-shadow: -12px 0 28px rgba(0, 0, 0, 0.2);
 }
 
 .landing-drawer-top {
@@ -2175,11 +2166,13 @@
   min-width: 0;
 }
 
+/* A step's name stays on one line ("Your Info" broke in two). */
 .booking-page-step-text strong {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .booking-page-step-text span {
@@ -2374,6 +2367,28 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 11px 12px;
+}
+
+/* Inputs and selects are 44px tall, the touch-target minimum (inputs
+   were 40px, a step shorter than the selects beside them). */
+.booking-page-field input:not([type="checkbox"]):not([type="radio"]),
+.booking-page-field select {
+  min-height: 44px;
+}
+
+/* Safari ignores padding on native selects (they rendered 21px tall), so
+   draw our own chevron. */
+.booking-page-field select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235b6070' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.landing[data-theme="dark"] .booking-page-field select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b4bcd6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 .booking-page-field textarea {
@@ -2691,13 +2706,16 @@
 
 /* The contract: an obvious link, not fine print. */
 .landing .booking-page-agreement-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
   color: var(--blue-text);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.booking-page-agreement-link svg {
+  display: inline;
+  vertical-align: -2px;
+  margin-left: 3px;
 }
 
 .landing[data-theme="dark"] .booking-page-agreement-link {
@@ -3424,7 +3442,10 @@
   top: 50%;
   transform: translate(-50%, -50%);
   width: min(92vw, 480px);
+  /* dvh is the visible viewport: on iOS Safari vh ignores the toolbars,
+     so a vh-sized sheet ran under them. vh is the fallback. */
   max-height: 86vh;
+  max-height: 86dvh;
   overflow-y: auto;
   background: var(--bg);
   border-radius: 20px;
@@ -3755,6 +3776,26 @@
   display: none;
 }
 
+/* Tablets: the booking page stacks into one column. These rules must come
+   after the booking base rules above; in the earlier 900px block they were
+   overridden, so tablets got two cramped columns and the step indicator ran
+   under the summary. */
+@media (max-width: 900px) {
+  .booking-page-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .booking-page-form-grid,
+  .booking-page-form-grid-thirds,
+  .booking-page-shipping-grid,
+  .booking-page-qr-grid,
+  .booking-page-zelle-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .booking-page-how-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (max-width: 640px) {
   .landing-navlinks {
     display: none;
@@ -4079,6 +4120,7 @@
     transform: none;
     width: 100%;
     max-height: 90vh;
+    max-height: 90dvh;
     border-radius: 20px 20px 0 0;
     padding: 12px 20px 24px;
   }
@@ -4698,5 +4740,135 @@
   }
   .contact-form-card .booking-page-form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- tablets and touch screens (device testing, 2026-09-28) ---------- */
+
+/* Between the phone layout (640px and under) and desktop, the full nav row
+   crowded: "Contact" ran into the theme toggle and "Book Now" wrapped. */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .landing-nav {
+    padding: 16px 24px;
+    gap: 16px;
+  }
+  .landing-navlinks {
+    gap: 18px;
+  }
+  .landing-nav-actions {
+    gap: 10px;
+  }
+}
+
+.landing-nav-actions .landing-btn-primary {
+  white-space: nowrap;
+}
+
+/* Small tablets (641–820px): the full nav row doesn't fit, so the links
+   move into the menu (as on phones) while Book Now stays in the header. */
+@media (min-width: 641px) and (max-width: 820px) {
+  .landing-navlinks {
+    display: none;
+  }
+  .landing-hamburger {
+    display: flex;
+  }
+}
+
+/* Tablets and small laptops (641–1180px): the booking step indicator
+   compacts as on phones. With the subtitles its five steps need about
+   620px, so they squeezed to four-line labels and, beside the summary
+   (901px and up), ran underneath it. */
+@media (min-width: 641px) and (max-width: 1180px) {
+  .booking-page-steps {
+    gap: 8px;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .booking-page-step-rule {
+    min-width: 12px;
+  }
+  .booking-page-step-text span {
+    display: none;
+  }
+}
+
+/* Touch screens: iOS Safari zooms the page into any field with text under
+   16px when it's tapped, and leaves it zoomed. */
+@media (pointer: coarse) {
+  .booking-page-field input,
+  .booking-page-field select,
+  .booking-page-field textarea {
+    font-size: 16px;
+  }
+}
+
+/* Touch screens: small text links and buttons get a 44px tap area (Apple's
+   and Google's guidance) without changing how they look. */
+@media (pointer: coarse) {
+  .landing-navlinks a,
+  .landing-footer-links a,
+  .landing-footer-legal a,
+  .landing .landing-link-arrow,
+  .landing .contact-card-action,
+  .landing-ba-more,
+  .landing .booking-page-edit-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  /* Icon buttons and segmented toggles keep their size; an invisible
+     ::after stretches the tap area to 44px tall (as wide as the gap to the
+     next button allows, so neighbours don't overlap). */
+  .landing-hamburger,
+  .landing-social-icon,
+  .landing-ba-nav,
+  .landing-review-nav-btn,
+  .landing-booking-toggle button,
+  .booking-page-flow-switch button {
+    position: relative;
+  }
+  .landing-hamburger::after,
+  .landing-social-icon::after,
+  .landing-ba-nav::after,
+  .landing-review-nav-btn::after,
+  .landing-booking-toggle button::after,
+  .booking-page-flow-switch button::after {
+    content: "";
+    position: absolute;
+  }
+  .landing-hamburger::after {
+    inset: -2px;
+  }
+  .landing-social-icon::after {
+    inset: -6px -5px;
+  }
+  .landing-ba-nav::after {
+    inset: -5px;
+  }
+  .landing-review-nav-btn::after {
+    inset: -5px -4px;
+  }
+  .landing-booking-toggle button::after,
+  .booking-page-flow-switch button::after {
+    inset: -7px 0;
+  }
+}
+
+/* 320px phones (iPhone SE 1st gen, small Androids): the booking panel's
+   padding left "View pricing & book now" 7px short, so it wrapped. */
+@media (max-width: 360px) {
+  .landing-booking {
+    padding: 22px 16px;
+  }
+}
+
+/* Phones: the fixed tab bar (and Book Now bar) cover the bottom of the
+   screen, so anything scrolled or tabbed into view stops above them
+   (WCAG 2.4.11 Focus Not Obscured). */
+@media (max-width: 640px) {
+  html {
+    scroll-padding-bottom: 150px;
   }
 }
