@@ -353,8 +353,8 @@ export function BookingFlow() {
         <div className="booking-page-summary-note">
           <Info size={16} aria-hidden="true" />
           <span>
-            <strong>No surprises.</strong>
-            We&rsquo;ll inspect your sneakers and confirm final pricing before any work begins.
+            <strong>Pricing confirmed first.</strong>
+            We&rsquo;ll inspect your sneakers and confirm final pricing with you before any work begins.
           </span>
         </div>
 

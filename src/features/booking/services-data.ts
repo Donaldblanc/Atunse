@@ -44,7 +44,7 @@ export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "oxidation",
     name: "Oxidation Restoration",
-    description: "Reduces yellowing and discoloration, restoring the clean, bright appearance of oxidized soles.",
+    description: "Treats yellowing and discoloration to brighten oxidized soles.",
     icon: Sparkles,
     category: "restoration",
   },
@@ -58,7 +58,7 @@ export const BOOKING_SERVICES: BookingService[] = [
   {
     id: "reglue",
     name: "Reglue",
-    description: "Professional sole separation repair to securely reattach and restore your sneakers.",
+    description: "Professional repair for sole separation, reattaching soles that have come loose.",
     icon: Droplet,
     category: "restoration",
   },

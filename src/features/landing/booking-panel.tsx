@@ -25,7 +25,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
     label: "Pickup",
     rows: [
       { icon: MapPin, title: "NY / NJ / CT pickup", subtitle: "We'll collect from your address" },
-      { icon: Clock, title: "Most pairs ready in 72 hours" },
+      { icon: Clock, title: "Cleanings typically take about 72 hours", subtitle: "Timelines are estimates" },
       { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],
     cta: "View pricing & book now",
@@ -36,7 +36,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
     rows: [
       // ADR-0010: the customer arranges their own shipping; we don't send labels.
       { icon: Package, title: "Ships anywhere in the US", subtitle: "We'll email you where to send your pair" },
-      { icon: Clock, title: "5-10 business days round trip", subtitle: "Includes transit time both ways" },
+      { icon: Clock, title: "Typically 5–10 business days round trip", subtitle: "Estimated, including transit both ways" },
       { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],
     cta: "Book a mail-in",

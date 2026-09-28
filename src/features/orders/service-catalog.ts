@@ -98,7 +98,7 @@ export const BUNDLE_CATALOG: CatalogBundle[] = [
       "Oxidation midsole (2 pairs)",
       "Reglue inspection",
       "Paint/dye touch-up on 1 pair",
-      "VIP turnaround (48–72 hours)",
+      "VIP turnaround (typically 48–72 hours)",
     ],
   },
 ];

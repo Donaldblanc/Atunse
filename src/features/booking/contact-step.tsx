@@ -101,7 +101,7 @@ export function ContactStep({
         <Sparkles size={20} aria-hidden="true" />
         <span>
           <strong>Add rush service &mdash; +{Money.fromCents(RUSH_FEE_CENTS).format()}</strong>
-          <span>Cuts standard turnaround roughly in half.</span>
+          <span>Moves your pairs up our queue for a faster turnaround.</span>
         </span>
       </button>
 

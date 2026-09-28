@@ -5,9 +5,33 @@ import { describe, expect, it } from "vitest";
 // CONTEXT.md: Fulfillment Method is Pickup or Mail-In only: customers never
 // bring sneakers in, and Mail-In customers arrange their own shipping
 // (ADR-0010, no labels). Customer-facing copy on the marketing pages and in
-// the booking flow must never promise otherwise. Code comments are
+// the booking flow must never promise otherwise. Nor does the copy
+// guarantee results, safety or timing: the Terms of Service & Restoration
+// Agreement says results aren't guaranteed and turnaround times are
+// estimates, and nothing on the site may contradict it. Code comments are
 // skipped: they may name what doesn't exist.
-const FORBIDDEN = [/drop(ped)?[\s-]?off/i, /prepaid/i, /shipping label/i, /mail-in label/i, /walk[\s-]?in/i, /in[\s-]person/i, /\bstudio\b/i];
+const FORBIDDEN = [
+  /drop(ped)?[\s-]?off/i,
+  /prepaid/i,
+  /shipping label/i,
+  /mail-in label/i,
+  /walk[\s-]?in/i,
+  /in[\s-]person/i,
+  /\bstudio\b/i,
+  // No guarantees.
+  /guarantee/i,
+  /warrant(y|ies)/i,
+  /make it right/i,
+  /no extra cost/i,
+  /money[\s-]back/i,
+  /satisfaction/i,
+  /no surprises/i,
+  /material[\s-]safe|\bsafe for\b/i,
+  /like[\s-]new|good as new/i,
+  /\bready in\b/i,
+  /\d+[\s-]hour turnaround/i,
+  /cuts .*turnaround/i,
+];
 
 const ROOT = process.cwd();
 const DIRS = ["src/app", "src/features/landing", "src/features/booking", "src/features/contact"];

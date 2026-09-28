@@ -19,7 +19,7 @@ export const SERVICES: ServiceCategory[] = [
   {
     id: "cleaning",
     title: "Cleaning",
-    description: "Deep clean for a like-new look.",
+    description: "A deep clean for a fresher look.",
     image: SERVICE_IMAGES[0],
     icon: Droplets,
   },

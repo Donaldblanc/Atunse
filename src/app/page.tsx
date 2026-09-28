@@ -30,7 +30,7 @@ const FAQS = [
   },
   {
     question: "How long does restoration take?",
-    answer: "Most restorations take 5-10 business days depending on the service and current order volume.",
+    answer: "Restorations usually take 5–10 business days, depending on the service and current order volume. Timelines are estimates.",
   },
   {
     question: "How do I get my sneakers to you?",
@@ -39,7 +39,8 @@ const FAQS = [
   },
   {
     question: "What if I'm not happy with the results?",
-    answer: "Let us know within 7 days of pickup or delivery and we'll make it right at no extra cost.",
+    answer:
+      "Contact us as soon as your pair is back, with your order reference and photos, and we'll look into it. Results vary with each pair's age and condition; our Terms of Service & Restoration Agreement explains how we handle concerns.",
   },
 ];
 
@@ -130,9 +131,9 @@ export default function HomePage() {
         <div className="landing-trust-item">
           <Clock className="landing-trust-icon" size={18} aria-hidden="true" />
           <span>
-            <strong>72-HOUR</strong>
+            <strong>~72-HOUR</strong>
             <br />
-            Turnaround
+            Typical turnaround
           </span>
         </div>
         <div className="landing-trust-item">

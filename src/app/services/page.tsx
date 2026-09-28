@@ -49,7 +49,7 @@ const CLEANING_PLANS = [
       "Targeted stain treatment",
       "Careful handling of premium materials",
       "Detailed & meticulous finishing",
-      "Safe for designer & luxury pairs",
+      "Extra care for designer & luxury pairs",
     ],
     cta: "Book Premium Clean",
     badge: "MOST POPULAR" as string | undefined,
@@ -60,7 +60,7 @@ const RESTORATION_SERVICES = [
   {
     icon: Sparkles,
     title: "OXIDATION RESTORATION",
-    description: "Reduces yellowing and discoloration, restoring the clean, bright appearance of oxidized soles and midsoles.",
+    description: "Treats yellowing and discoloration to brighten oxidized soles and midsoles.",
     subitems: [
       { label: (oxidation.minimumLabel ?? "From").toUpperCase(), price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
       ...(oxidation.alsoFrom ?? []).map((part) => ({ label: part.label.toUpperCase(), price: `From ${formatPrice(part.cents, true)}` })),
@@ -75,7 +75,7 @@ const RESTORATION_SERVICES = [
   {
     icon: Wrench,
     title: "REGLUE",
-    description: "Professional sole separation repair to securely reattach and restore your sneakers.",
+    description: "Professional repair for sole separation, reattaching soles that have come loose.",
     price: formatPrice(reglue.baseCents, reglue.isMinimum),
   },
 ];
@@ -123,7 +123,7 @@ export default function ServicesPage() {
         <p>Two levels of care. The same attention to detail.</p>
         <span className="services-page-turnaround-badge">
           <Clock size={13} aria-hidden="true" />
-          72-hour turnaround
+          Typically 72 hours
         </span>
       </div>
       <div className="services-page-grid">
@@ -153,10 +153,10 @@ export default function ServicesPage() {
 
       <div className="services-page-restoration-head">
         <p className="eyebrow-label">RESTORATION SERVICES</p>
-        <p className="sub">Specialized care for a like-new look.</p>
+        <p className="sub">Specialized care for worn, yellowed, or damaged pairs.</p>
         <span className="services-page-turnaround-badge">
           <Clock size={13} aria-hidden="true" />
-          5&ndash;10 business day turnaround
+          Typically 5&ndash;10 business days
         </span>
       </div>
       <div className="services-page-restoration-grid">
