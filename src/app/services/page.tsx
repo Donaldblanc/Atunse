@@ -84,6 +84,7 @@ export default function ServicesPage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="services" />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="services-page-hero">
         <div>
@@ -216,6 +217,8 @@ export default function ServicesPage() {
           </div>
         </div>
       </div>
+
+      </main>
 
       <SiteFooter active="services" />
       <MobileBookBar />

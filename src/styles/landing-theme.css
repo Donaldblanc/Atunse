@@ -11,6 +11,11 @@
 .landing {
   --blue: #2955ff;
   --blue-deep: #1c3fd6;
+  /* Blue for text, links and focus rings: the brand blue on light
+     backgrounds (4.6:1 or better), a lighter blue on dark ones, where the
+     brand blue is under 3.5:1 (WCAG 1.4.3 / 1.4.11). Fills keep --blue. */
+  --blue-text: #2955ff;
+  --focus-ring: #2955ff;
   --bg: #faf7f0;
   --bg-panel: #f2ecdf;
   --ink: #0b0f1a;
@@ -24,6 +29,8 @@
 }
 
 .landing[data-theme="dark"] {
+  --blue-text: #8ea2ff;
+  --focus-ring: #8ea2ff;
   --bg: #0a0e1a;
   --bg-panel: #1c2444;
   --ink: #f5f6fb;
@@ -69,7 +76,7 @@
 .landing-brand-name {
   font-weight: 800;
   font-size: 20px;
-  color: var(--blue);
+  color: var(--blue-text);
   letter-spacing: -0.01em;
 }
 
@@ -212,7 +219,7 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
-  color: var(--blue);
+  color: var(--blue-text);
   margin: 0 0 14px;
 }
 
@@ -226,7 +233,7 @@
   line-height: 0.98;
   letter-spacing: -0.02em;
   margin: 0 0 18px;
-  color: var(--blue);
+  color: var(--blue-text);
   text-wrap: balance;
 }
 
@@ -259,7 +266,7 @@
 }
 
 .landing-link-arrow:hover {
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing-hero-figure {
@@ -289,7 +296,7 @@
   font-weight: 800;
   font-style: italic;
   font-size: 13px;
-  color: var(--blue);
+  color: var(--blue-text);
   text-align: right;
   line-height: 1.25;
   transform: rotate(-4deg);
@@ -334,7 +341,7 @@
 }
 
 .landing-trust-icon {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
 }
 
@@ -421,7 +428,7 @@
 .landing-section-head h2 {
   font-size: 30px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--blue-text);
   margin: 0 0 6px;
 }
 
@@ -482,7 +489,7 @@
   border-radius: 50%;
   background: var(--card);
   border: 1px solid var(--line);
-  color: var(--blue);
+  color: var(--blue-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -509,7 +516,7 @@
 .landing-service-link {
   font-size: 12.5px;
   font-weight: 700;
-  color: var(--blue);
+  color: var(--blue-text);
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -555,7 +562,7 @@
 
 .landing-ba-head-sub {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #f0f3ff; /* 4.9:1 on the blue band (0.75 white was 3.8:1) */
   margin-top: 2px;
 }
 
@@ -648,7 +655,7 @@
   height: 30px;
   border-radius: 50%;
   background: #fff;
-  color: var(--blue);
+  color: var(--blue); /* on the white handle in both themes */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -698,7 +705,7 @@
   text-align: center;
   font-size: 12px;
   font-weight: 600;
-  color: var(--blue);
+  color: var(--blue); /* the card stays light in both themes */
 }
 
 /* ---------- lower grid: reviews / faq / booking ---------- */
@@ -716,7 +723,7 @@
   font-size: 22px;
   font-weight: 800;
   margin: 0 0 14px;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .landing-lower h2 {
@@ -724,7 +731,7 @@
 }
 
 .landing-stars {
-  color: var(--blue);
+  color: var(--blue-text);
   font-size: 15px;
   letter-spacing: 2px;
   margin-bottom: 12px;
@@ -788,7 +795,7 @@
 .landing-review-nav-btn:hover {
   background: var(--blue);
   color: #fff;
-  border-color: var(--blue);
+  border-color: var(--blue-text);
 }
 
 .landing-faq-item {
@@ -882,7 +889,7 @@
 }
 
 .landing-booking-icon {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   margin-top: 2px;
 }
@@ -924,7 +931,7 @@
 .landing-cta-banner h2 {
   font-size: 26px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--blue-text);
   margin: 0;
   line-height: 1.15;
   text-wrap: balance;
@@ -1008,9 +1015,36 @@
   color: var(--ink);
 }
 
+/* "Skip to content": off-screen until focused with the keyboard. */
+.landing .landing-skip-link {
+  position: absolute;
+  left: 16px;
+  top: -100px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.landing .landing-skip-link:focus {
+  top: 12px;
+}
+
+/* <main> takes focus from the skip link but shouldn't draw a ring. */
+.landing main:focus {
+  outline: none;
+}
+
 .landing a:focus-visible,
-.landing button:focus-visible {
-  outline: 2px solid var(--blue);
+.landing button:focus-visible,
+.landing input:focus-visible,
+.landing select:focus-visible,
+.landing textarea:focus-visible,
+.landing [tabindex]:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -1154,7 +1188,7 @@
 }
 
 .landing[data-theme="dark"] .coming-soon-h1 span {
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .coming-soon-lede {
@@ -1168,11 +1202,11 @@
 }
 
 .landing[data-theme="dark"] .coming-soon-back-link:hover {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .coming-soon-back-link .arrow {
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .coming-soon-visual-wrap::before {
@@ -1200,7 +1234,7 @@
 /* ---------- About page ---------- */
 
 .landing-navlinks a.active-link {
-  color: var(--blue);
+  color: var(--blue-text);
   position: relative;
 }
 
@@ -1239,7 +1273,7 @@
 
 .landing-about-hero h1 span {
   display: block;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing-about-tagline {
@@ -1399,7 +1433,7 @@
 .landing-timeline-year {
   font-size: 15px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--blue-text);
   margin: 0 0 2px;
 }
 
@@ -1468,7 +1502,7 @@
   height: 52px;
   border-radius: 50%;
   background: var(--bg-panel);
-  color: var(--blue);
+  color: var(--blue-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1567,7 +1601,7 @@
 
 .services-page-hero h1 span {
   display: block;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .services-page-hero h1 {
@@ -1576,7 +1610,7 @@
 
 .services-page-btn-outline {
   background: none;
-  color: var(--blue);
+  color: var(--blue-text);
   border: 1px solid var(--blue);
   padding: 11px 20px;
   border-radius: 999px;
@@ -1643,7 +1677,7 @@
   margin-top: 12px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--blue);
+  color: var(--blue-text);
   background: var(--bg-panel);
   border-radius: 999px;
   padding: 6px 12px;
@@ -1712,7 +1746,7 @@
   gap: 4px;
   font-size: 40px;
   font-weight: 900;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .services-page-price-note {
@@ -1754,7 +1788,7 @@
 }
 
 .services-page-check-icon {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   margin-top: 1px;
 }
@@ -1827,7 +1861,7 @@
 }
 
 .services-page-restoration-price strong {
-  color: var(--blue);
+  color: var(--blue-text);
   font-weight: 800;
 }
 
@@ -1853,7 +1887,7 @@
 .services-page-restoration-subitem-price {
   font-size: 16px;
   font-weight: 800;
-  color: var(--blue);
+  color: var(--blue-text);
   margin: 0 0 4px;
 }
 
@@ -2105,7 +2139,7 @@
 .booking-page-step[data-active="true"] .booking-page-step-num,
 .booking-page-step[data-done="true"] .booking-page-step-num {
   background: var(--blue);
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   color: #fff;
 }
 
@@ -2223,7 +2257,7 @@
 }
 
 .booking-page-service-row[data-active="true"] {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   background: var(--bg-panel);
 }
 
@@ -2248,7 +2282,7 @@
 
 .booking-page-service-row[data-active="true"] .booking-page-service-check {
   background: var(--blue);
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   color: #fff;
 }
 
@@ -2363,6 +2397,11 @@
   margin: 10px 0 0;
 }
 
+/* Warnings stay in the page as live regions; take no space while empty. */
+.booking-page-form-warning:empty {
+  margin: 0;
+}
+
 .landing[data-theme="dark"] .booking-page-form-warning {
   color: #fbbf24;
 }
@@ -2444,9 +2483,9 @@
 }
 
 .booking-page-dropzone[data-drag-over="true"] {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   background: var(--bg-panel);
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .booking-page-continue-btn {
@@ -2498,7 +2537,7 @@
 }
 
 .booking-page-shipping-card[data-active="true"] {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   background: var(--bg-panel);
   color: var(--ink);
 }
@@ -2567,7 +2606,7 @@
   width: 18px;
   height: 18px;
   margin: 1px 0 0;
-  accent-color: var(--blue);
+  accent-color: var(--blue-text);
   cursor: pointer;
 }
 
@@ -2655,7 +2694,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: var(--blue);
+  color: var(--blue-text);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -2709,7 +2748,7 @@
 }
 
 .booking-page-confirmation-title svg {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
 }
 
@@ -2739,7 +2778,7 @@
 .booking-page-summary-edit {
   background: none;
   border: none;
-  color: var(--blue);
+  color: var(--blue-text);
   font-size: 12.5px;
   font-weight: 700;
   padding: 0;
@@ -2827,7 +2866,7 @@
 }
 
 .booking-page-summary-note svg {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   margin-top: 1px;
 }
@@ -2897,7 +2936,7 @@
 .booking-page-edit-link {
   background: none;
   border: none;
-  color: var(--blue);
+  color: var(--blue-text);
   font-size: 12.5px;
   font-weight: 700;
   padding: 0;
@@ -2972,7 +3011,7 @@
 }
 
 .booking-page-payment-card[data-active="true"] {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   background: var(--bg-panel);
 }
 
@@ -2998,7 +3037,7 @@
 }
 
 .booking-page-payment-card[data-active="true"] .booking-page-payment-radio {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   border-width: 5px;
 }
 
@@ -3087,7 +3126,7 @@
 
 .booking-page-tap-copy {
   font-size: 12px;
-  color: var(--blue);
+  color: var(--blue-text);
   text-decoration: underline;
   background: none;
   border: none;
@@ -3115,7 +3154,7 @@
   height: 22px;
   border-radius: 50%;
   border: 1px solid var(--blue);
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   display: flex;
   align-items: center;
@@ -3142,7 +3181,7 @@
 }
 
 .booking-page-qr-steps li a {
-  color: var(--blue);
+  color: var(--blue-text);
   font-weight: 700;
 }
 
@@ -3158,7 +3197,7 @@
 }
 
 .booking-page-zelle-heading strong {
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .booking-page-zelle-grid {
@@ -3211,7 +3250,7 @@
   padding: 8px 14px;
   border-radius: 10px;
   background: var(--bg-panel);
-  color: var(--blue);
+  color: var(--blue-text);
   font-size: 12.5px;
   font-weight: 700;
   border: none;
@@ -3270,7 +3309,7 @@
 }
 
 .booking-page-next-item svg {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   margin-top: 2px;
 }
@@ -3299,7 +3338,7 @@
   height: 44px;
   border-radius: 10px;
   background: var(--bg-panel);
-  color: var(--blue);
+  color: var(--blue-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3366,7 +3405,7 @@
 }
 
 .booking-page-info-box svg {
-  color: var(--blue);
+  color: var(--blue-text);
   flex: none;
   margin-top: 1px;
 }
@@ -3542,7 +3581,7 @@
 .booking-page-time-change-btn {
   background: none;
   border: none;
-  color: var(--blue);
+  color: var(--blue-text);
   font-weight: 700;
   font-size: 13px;
 }
@@ -3577,7 +3616,7 @@
 }
 
 .booking-page-time-slot[data-active="true"] {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   background: var(--bg-panel);
 }
 
@@ -3591,7 +3630,7 @@
 }
 
 .booking-page-time-slot[data-active="true"] .booking-page-time-radio {
-  border-color: var(--blue);
+  border-color: var(--blue-text);
   border-width: 5px;
 }
 
@@ -3641,8 +3680,8 @@
 }
 
 .booking-page-pair-tabs button[data-active="true"] {
-  color: var(--blue);
-  border-bottom-color: var(--blue);
+  color: var(--blue-text);
+  border-bottom-color: var(--blue-text);
 }
 
 .booking-page-char-count {
@@ -3676,7 +3715,7 @@
   height: 26px;
   border-radius: 50%;
   border: 1px solid var(--blue);
-  color: var(--blue);
+  color: var(--blue-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3881,7 +3920,7 @@
   }
   .landing-tabbar a[data-active="true"],
   .landing-tabbar button[data-active="true"] {
-    color: var(--blue);
+    color: var(--blue-text);
   }
   .landing-tabbar-spacer {
     display: block;
@@ -4089,7 +4128,7 @@
    The hero photo fades out with a mask, so it sits on either theme. */
 
 .landing .process-page {
-  --process-accent: #a0826a;
+  --process-accent: #7f644e; /* 4.6:1 or better on the cream backgrounds */
   --process-icon-bg: #ebe1d5;
   --process-dash: #d2bfae;
   position: relative;
@@ -4170,7 +4209,7 @@
 
 .process-h1 span {
   display: block;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .process-lede {
@@ -4378,7 +4417,7 @@
 
 .contact-h1 span {
   display: block;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 /* Sits on the bright photo in both themes, so its colors stay dark. */
@@ -4448,7 +4487,7 @@
 
 .contact-card[data-active="true"] .contact-card-icon {
   background: rgba(41, 85, 255, 0.12);
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .contact-card h2 {
@@ -4474,7 +4513,7 @@
   background: none;
   font-size: 13.5px;
   font-weight: 700;
-  color: var(--blue);
+  color: var(--blue-text);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -4527,7 +4566,7 @@
 }
 
 .contact-form-card .booking-page-policy a {
-  color: var(--blue);
+  color: var(--blue-text);
   font-weight: 600;
 }
 
@@ -4552,7 +4591,7 @@
   display: inline-grid;
   place-items: center;
   background: rgba(41, 85, 255, 0.12);
-  color: var(--blue);
+  color: var(--blue-text);
   margin-bottom: 14px;
 }
 
@@ -4603,7 +4642,7 @@
 
 .contact-faq-more {
   margin-top: 18px;
-  color: var(--blue);
+  color: var(--blue-text);
 }
 
 .landing[data-theme="dark"] .contact-faq-more {

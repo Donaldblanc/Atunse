@@ -17,7 +17,7 @@ export default function ProcessPage() {
     <div className="landing" id="landing-root">
       <SiteNav active="process" />
 
-      <main className="process-page">
+      <main id="main-content" tabIndex={-1} className="process-page">
         <section className="process-hero">
           <div className="process-hero-visual" aria-hidden="true">
             {/* eslint-disable-next-line @next/next/no-img-element -- external/S3-resolved URL, not a static import next/image can optimize */}

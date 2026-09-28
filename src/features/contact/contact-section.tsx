@@ -167,19 +167,19 @@ export function ContactSection({ initialTopic }: { initialTopic: string | null }
                 <span>
                   First name <Required />
                 </span>
-                <input autoComplete="given-name" placeholder="John" value={fields.firstName} onChange={(e) => set("firstName", e.target.value)} />
+                <input required autoComplete="given-name" placeholder="John" value={fields.firstName} onChange={(e) => set("firstName", e.target.value)} />
               </label>
               <label className="booking-page-field">
                 <span>
                   Last name <Required />
                 </span>
-                <input autoComplete="family-name" placeholder="Doe" value={fields.lastName} onChange={(e) => set("lastName", e.target.value)} />
+                <input required autoComplete="family-name" placeholder="Doe" value={fields.lastName} onChange={(e) => set("lastName", e.target.value)} />
               </label>
               <label className="booking-page-field">
                 <span>
                   Email address <Required />
                 </span>
-                <input
+                <input required
                   type="email"
                   autoComplete="email"
                   placeholder="you@example.com"
@@ -203,7 +203,7 @@ export function ContactSection({ initialTopic }: { initialTopic: string | null }
               <span>
                 Topic <Required />
               </span>
-              <select value={topic} onChange={(e) => setTopic(e.target.value)}>
+              <select required value={topic} onChange={(e) => setTopic(e.target.value)}>
                 <option value="" disabled>
                   Select a topic
                 </option>
@@ -219,7 +219,7 @@ export function ContactSection({ initialTopic }: { initialTopic: string | null }
               <span>
                 Message <Required />
               </span>
-              <textarea
+              <textarea required
                 ref={messageRef}
                 maxLength={CONTACT_MESSAGE_MAX}
                 placeholder="Share as much detail as possible…"

@@ -27,14 +27,21 @@ The owner's pre-launch list, checked against the code and the live site (`atunse
 - [ ] **Proofread** every page for spelling and grammar.
 
 ### Accessibility
-- [ ] **Alt text**: meaningful photos have alt text, and decorative ones use `alt=""` on purpose (3). A full audit is still to do.
-- [ ] **Colour contrast**: not audited (both themes).
-- [ ] **Keyboard navigation**: not tested end to end (nav, drawer, booking flow, date picker modal, FAQ accordions).
-- [ ] **Visible focus states**: `.landing a:focus-visible` / `button:focus-visible` outlines exist; check they're visible on every control and in dark mode.
-- [ ] **Every input has a label**: the booking and contact forms use `<label>`s, but not audited.
-- [ ] **Heading hierarchy** (H1 → H2 → H3): not audited.
-- [ ] **200% zoom**: not tested.
-- [ ] **Errors not by colour alone**: booking and contact errors show an icon and text. Related: warnings aren't announced by screen readers yet (client-feedback entry below).
+Audited 2026-09-28 (axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice) on every page and every booking step, including the date-picker dialog and the warnings, the mobile menu, and the contact form with its error. Light and dark, desktop and phone: **0 violations** after the fixes below, and keyboard and zoom checks by hand-scripted browser runs. Re-run before launch if pages change.
+- [x] **Alt text**: every meaningful image has alt text; decorative ones use `alt=""` on purpose, and the hero photos are `aria-hidden`.
+- [x] **Colour contrast** (1.4.3 / 1.4.11): the brand blue was under 3.5:1 as text on the dark theme's backgrounds, so text, links and focus rings now use `--blue-text` / `--focus-ring` (`#2955ff` light, `#8ea2ff` dark: 4.6:1 or better everywhere). Also fixed: the Process page's tan (`#7f644e`) and the gallery subtitle (`#f0f3ff`).
+- [x] **Keyboard navigation**:
+  - a "Skip to content" link comes first, and every page's `<main id="main-content">` receives it;
+  - the gallery scroller is focusable and scrolls with the arrow keys;
+  - the theme toggle and FAQs work with Enter;
+  - the booking flow works start to finish by keyboard, including the date picker.
+- [x] **Dialogs** (mobile menu, date picker): `role="dialog"`, `aria-modal`, labelled; focus moves in on open, Tab stays inside, Escape closes, and focus returns to the trigger (`use-dialog.ts`). The closed menu is `inert`, so its links can't be reached with Tab.
+- [x] **Visible focus states**: every Tab stop on the home page shows a focus ring in both themes, including inputs, selects and textareas.
+- [x] **Every input has a label and states if it's required**: labels on every field; required fields carry `required`, since the red `*` is hidden from screen readers. Calendar days are announced as full dates ("Monday, September 28, 2026") with their selected state; time slots announce theirs.
+- [x] **Heading hierarchy and landmarks**: one H1 per page with no skipped levels (axe `heading-order`, `page-has-heading-one`); every page has a `<main>`; the nav, menu, footer and legal links are labelled landmarks.
+- [x] **200% zoom and 320 px reflow**: no horizontal scrolling on any page at 640 px (1280 px at 200%) or 320 px wide.
+- [x] **Errors not by colour alone**: every warning and error has an icon and text. Booking warnings are now always-present live regions, so screen readers announce them when they appear.
+- [ ] **Screen-reader spot check**: automated tests can't replace listening. Do one pass with VoiceOver (iPhone and Mac) through a booking before launch.
 
 ### Booking & forms
 - [ ] **Full booking flow, start to finish, on production**: automated tests cover submission, and headless runs reached the Review step on the dev server. A real booking on production hasn't been placed.
@@ -173,7 +180,7 @@ tracked elsewhere are marked; everything else is new.
 - [x] **Sticky mobile "Book Now" bar** — `mobile-book-bar.tsx`, added to every marketing page except `/booking` itself.
 - [x] **Social media is linked** — footer's Instagram/TikTok/YouTube icons are real `<a href>`s to `@RestoredByDJ`/`@RestoredByDj` now, in both the real app and the mock.
 - [x] **CTA copy: "Book a restoration" → "Book Now."** Done in `src/features/landing/book-restoration-cta.tsx`.
-- [ ] **Continue-button warnings may not be announced by screen readers.** The `role="status"` warning in `contact-step.tsx`, `details-step.tsx` and `service-step.tsx` mounts together with its text on the first failed click. Render the element always (empty until needed) so the change is announced.
+- [x] **Continue-button warnings are announced by screen readers**: each step's `role="status"` warning (service, details, schedule, contact) is now always in the page and fills in when needed, so the change is announced.
 - [ ] **Photo dropzone nit** (`src/features/booking/pair-form.tsx`): a drop that misses the dropzone itself still makes the browser open the file (a window-level `dragover`/`drop` guard would cover that). (The per-photo remove control this entry also asked for exists now.)
 
 ## Still to grill (architecture/design/decisions not yet interviewed)

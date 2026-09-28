@@ -47,7 +47,7 @@ export function MobileBookBar() {
   return (
     <>
       <div className="landing-mobile-book-bar-spacer" hidden={hidden} />
-      <div className="landing-mobile-book-bar" hidden={hidden}>
+      <div className="landing-mobile-book-bar" hidden={hidden} role="region" aria-label="Book now">
         <BookRestorationCta />
       </div>
     </>

@@ -4,12 +4,14 @@
 // inside SiteNav. Hidden above the 640px breakpoint (landing-theme.css).
 import Link from "next/link";
 import { useState } from "react";
+import { useDialog } from "./use-dialog";
 import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { BookRestorationCta } from "./book-restoration-cta";
 
 export function NavDrawer({ active }: { active?: NavActive } = {}) {
   const [open, setOpen] = useState(false);
   const isBooking = active === "booking";
+  const drawerRef = useDialog<HTMLDivElement>(open, () => setOpen(false));
 
   return (
     <>
@@ -18,6 +20,8 @@ export function NavDrawer({ active }: { active?: NavActive } = {}) {
         className="landing-hamburger"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
+        aria-expanded={open}
+        aria-controls="landing-drawer"
       >
         <svg width="18" height="18" viewBox="0 0 256 256" fill="none" aria-hidden="true">
           <path d="M40 72h176M40 128h176M40 184h176" stroke="currentColor" strokeWidth="20" strokeLinecap="round" />
@@ -31,7 +35,17 @@ export function NavDrawer({ active }: { active?: NavActive } = {}) {
         aria-hidden="true"
       />
 
-      <div className="landing-drawer" data-open={open}>
+      {/* inert while closed: off-screen links mustn't be reachable with Tab. */}
+      <div
+        className="landing-drawer"
+        id="landing-drawer"
+        data-open={open}
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+        inert={!open}
+      >
         <div className="landing-drawer-top">
           <span className="landing-brand-name">Menu</span>
           <button
@@ -45,7 +59,7 @@ export function NavDrawer({ active }: { active?: NavActive } = {}) {
             </svg>
           </button>
         </div>
-        <nav onClick={() => setOpen(false)}>
+        <nav aria-label="Menu" onClick={() => setOpen(false)}>
           {NAV_LINKS.map((link) => (
             <Link key={link.href} href={link.href} className={navLinkClass(link, active)}>
               {link.label}
