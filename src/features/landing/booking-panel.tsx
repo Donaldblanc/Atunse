@@ -4,6 +4,12 @@ import Link from "next/link";
 import { MapPin, Clock, Tag, Package, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { ArrowIcon } from "./arrow-icon";
+import { catalogService, formatPrice } from "@/features/orders/service-catalog";
+
+// The lowest price a pair can be booked at (Standard Clean), from the same
+// catalog the booking flow and the server's estimate use.
+const standard = catalogService("standard");
+const FROM_PRICE = `Pricing from ${formatPrice(standard.baseCents, standard.isMinimum)}`;
 
 type BookingMode = "pickup" | "mail-in";
 
@@ -20,7 +26,7 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
     rows: [
       { icon: MapPin, title: "NY / NJ / CT pickup", subtitle: "We'll collect from your address" },
       { icon: Clock, title: "Most pairs ready in 72 hours" },
-      { icon: Tag, title: "Pricing from $45", subtitle: "Final pricing based on condition and service" },
+      { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],
     cta: "View pricing & book now",
     href: "/booking?method=pickup",
@@ -28,11 +34,12 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
   "mail-in": {
     label: "Mail-In",
     rows: [
-      { icon: Package, title: "Ships anywhere in the US", subtitle: "We email a prepaid shipping label" },
+      // ADR-0010: the customer arranges their own shipping; we don't send labels.
+      { icon: Package, title: "Ships anywhere in the US", subtitle: "We'll email you where to send your pair" },
       { icon: Clock, title: "5-10 business days round trip", subtitle: "Includes transit time both ways" },
-      { icon: Tag, title: "Pricing from $55", subtitle: "Includes return shipping, condition-dependent" },
+      { icon: Tag, title: FROM_PRICE, subtitle: "Final pricing based on condition and service" },
     ],
-    cta: "Request a mail-in label",
+    cta: "Book a mail-in",
     href: "/booking?method=mail-in",
   },
 };

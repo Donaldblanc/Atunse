@@ -35,7 +35,7 @@ const FAQS = [
   {
     question: "How do I get my sneakers to you?",
     answer:
-      "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the country using a prepaid mail-in label.",
+      "We'll pick them up from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the US. Choose Mail-In when you book and we'll email you where to send them.",
   },
   {
     question: "What if I'm not happy with the results?",
@@ -60,7 +60,7 @@ const REVIEWS = [
   },
   {
     stars: 5,
-    quote: "Dropped off a pair I thought were done for. Got them back like they just came out of the box.",
+    quote: "Sent in a pair I thought were done for. Got them back like they just came out of the box.",
     name: "Priya R.",
     loc: "Jersey City, NJ",
     initials: "PR",
@@ -102,8 +102,8 @@ export default function HomePage() {
             MOVES YOU.
           </h1>
           <p className="landing-lede">
-            NYC&rsquo;s sneaker studio for cleaning, restoration and protection. Keep your
-            favorite pairs in rotation &mdash; longer.
+            NYC-based sneaker cleaning, restoration and protection, with pickup across NY / NJ / CT and
+            mail-in nationwide. Keep your favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
             <BookRestorationCta topCta />
