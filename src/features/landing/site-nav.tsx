@@ -5,7 +5,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { BookRestorationCta } from "./book-restoration-cta";
 
 // Shared nav across the marketing surface (/, /coming-soon, /about,
-// /services, /process, /booking). The "Book a restoration" CTA is hidden while
+// /services, /process, /contact, /booking). The "Book a restoration" CTA is hidden while
 // already on the booking flow itself — no point offering to start what
 // you're mid-way through.
 export function SiteNav({ active }: { active?: NavActive }) {

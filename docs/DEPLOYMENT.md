@@ -24,6 +24,7 @@ what replaces it later.
    | `SESSION_SECRET` | `openssl rand -hex 32` (unique, real secret) | same or a separate dev value |
    | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | only needed if you run `prisma:seed` manually — not read at runtime | — |
    | `RESEND_API_KEY` / `EMAIL_FROM` | Resend API key and a sender on a verified domain; without both, emails (booking confirmations, sign-in codes) are only logged | unset, or a test key |
+   | `CONTACT_EMAIL` | a **monitored** inbox for the `/contact` form (the Privacy Policy sends privacy requests there too); needs Resend configured to actually deliver. Unset: the form answers "unavailable" | unset (messages are only logged), or a test inbox |
    | `FEATURE_CUSTOMER_SIGN_IN_ENABLED` | `false` until Resend is live, then `true` (ADR-0014) | same |
    | `STORAGE_DRIVER` | `s3` (the default in production; `local` is refused) | `s3` |
    | `S3_BUCKET` | the photo bucket (Neon storage: `atunse-images`) | a separate preview bucket, or the same one |

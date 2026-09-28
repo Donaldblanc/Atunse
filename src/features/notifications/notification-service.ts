@@ -6,8 +6,16 @@ import { maskEmail } from "@/shared/logging/redact";
 // second notification-triggering use-case makes the reliability problem
 // real (see docs/SPEC.md Build sequence, Phase 3).
 
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  body: string;
+  /** Where replies go, e.g. the customer who wrote in through the contact form. */
+  replyTo?: string;
+}
+
 export interface NotificationService {
-  sendEmail(params: { to: string; subject: string; body: string }): Promise<void>;
+  sendEmail(params: EmailMessage): Promise<void>;
 }
 
 /** Used when Resend isn't configured (see ./index.ts): logs instead of
@@ -18,7 +26,7 @@ export interface NotificationService {
 export class ConsoleNotificationService implements NotificationService {
   constructor(private readonly options: { development: boolean } = { development: true }) {}
 
-  async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
+  async sendEmail(params: EmailMessage): Promise<void> {
     // In production, logs are no place for customer details: mask the
     // recipient and withhold the subject (it can carry a sign-in code).
     const to = this.options.development ? params.to : maskEmail(params.to);

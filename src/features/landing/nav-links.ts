@@ -3,7 +3,7 @@
 // on the home page, so it routes through "/" first when viewed elsewhere.
 // `activeKey` matches the `active` prop these components already take;
 // links without one (Gallery) never get the active-link treatment.
-export type NavActiveKey = "services" | "process" | "about";
+export type NavActiveKey = "services" | "process" | "about" | "contact";
 
 // The `active` prop SiteNav/NavDrawer/SiteFooter take — a superset of
 // NavActiveKey since "booking" has no NAV_LINKS entry (it only hides the
@@ -21,6 +21,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: "/#gallery", label: "Gallery" },
   { href: "/process", label: "Process", activeKey: "process" },
   { href: "/about", label: "About", activeKey: "about" },
+  { href: "/contact", label: "Contact", activeKey: "contact" },
 ];
 
 // Centralizes the "is this link the current page" comparison so it can't

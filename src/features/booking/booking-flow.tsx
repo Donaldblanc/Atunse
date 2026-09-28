@@ -384,7 +384,7 @@ export function BookingFlow() {
         <p className="booking-page-summary-contact">
           Questions? We&rsquo;re here to help.
           <br />
-          <Link href="/coming-soon" className="landing-link-arrow">
+          <Link href="/contact" className="landing-link-arrow">
             Contact us
             <ArrowRight size={12} aria-hidden="true" />
           </Link>

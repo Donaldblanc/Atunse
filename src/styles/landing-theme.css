@@ -4315,3 +4315,349 @@
     row-gap: 40px;
   }
 }
+
+/* ---------- contact page (/contact) ----------
+   From its approved design (scratch/image copy 9.png), in the site's own
+   type, tokens and buttons. The form reuses the booking form's fields. */
+
+.contact-page {
+  position: relative;
+  overflow-x: clip;
+}
+
+.contact-hero {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 56px 32px 64px;
+  min-height: 360px;
+}
+
+/* Bleeds off the right edge and fades into the page, on either theme. */
+.contact-hero-visual {
+  position: absolute;
+  top: 0;
+  right: calc(50% - 50vw);
+  width: min(50vw, 660px); /* the photo is 529px wide: don't stretch it further */
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.contact-hero-visual img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%), linear-gradient(to top, transparent 0%, #000 18%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 38%), linear-gradient(to top, transparent 0%, #000 18%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.contact-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+}
+
+/* Same heading style as the Services and About heroes. */
+.landing .contact-h1 {
+  font-size: clamp(36px, 4.5vw, 56px);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 18px;
+}
+
+.landing[data-theme="dark"] .contact-h1 {
+  color: #fff;
+}
+
+.contact-h1 span {
+  display: block;
+  color: var(--blue);
+}
+
+/* Sits on the bright photo in both themes, so its colors stay dark. */
+.landing .contact-hero-tagline {
+  position: absolute;
+  top: 56px;
+  right: 32px;
+  z-index: 1;
+  color: #2a2f3d;
+}
+
+.landing .contact-hero-tagline .rule {
+  background: rgba(11, 15, 26, 0.3);
+}
+
+.contact-main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 32px 56px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.contact-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-card {
+  position: relative;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.contact-card[data-active="true"] {
+  background: rgba(41, 85, 255, 0.07);
+  border-color: rgba(41, 85, 255, 0.35);
+}
+
+.landing[data-theme="dark"] .contact-card[data-active="true"] {
+  background: rgba(111, 139, 255, 0.12);
+  border-color: rgba(111, 139, 255, 0.45);
+}
+
+.contact-card-icon {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bg-panel);
+  color: var(--ink);
+}
+
+.contact-card[data-active="true"] .contact-card-icon {
+  background: rgba(41, 85, 255, 0.12);
+  color: var(--blue);
+}
+
+.contact-card h2 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 2px 0 4px;
+}
+
+.contact-card p {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+}
+
+.landing .contact-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.landing[data-theme="dark"] .contact-card-action {
+  color: #8ea2ff;
+}
+
+.contact-form-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 28px;
+  scroll-margin-top: 110px;
+}
+
+.contact-form-card h2 {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.contact-form-lede {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 0 22px;
+}
+
+.contact-field-full {
+  margin-bottom: 16px;
+}
+
+.contact-field-full textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.contact-honeypot {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.contact-form-card .booking-page-policy {
+  margin: 4px 0 18px;
+}
+
+.contact-form-card .booking-page-policy a {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.landing[data-theme="dark"] .contact-form-card .booking-page-policy a {
+  color: #8ea2ff;
+}
+
+.landing .contact-form-card .booking-page-continue-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.contact-sent {
+  text-align: center;
+  padding: 36px 8px;
+}
+
+.contact-sent-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(41, 85, 255, 0.12);
+  color: var(--blue);
+  margin-bottom: 14px;
+}
+
+.contact-sent p {
+  font-size: 14.5px;
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+}
+
+.contact-sent .landing-link-arrow {
+  border: none;
+  background: none;
+  padding: 0;
+}
+
+.contact-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  background: var(--bg-panel);
+}
+
+.contact-faq-photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  object-fit: cover;
+}
+
+.contact-faq-body {
+  padding: 40px 48px;
+  max-width: 560px;
+}
+
+.contact-faq-body h2 {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.landing-faq-subtitle {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+
+.contact-faq-more {
+  margin-top: 18px;
+  color: var(--blue);
+}
+
+.landing[data-theme="dark"] .contact-faq-more {
+  color: #8ea2ff;
+}
+
+@media (max-width: 900px) {
+  .contact-main {
+    grid-template-columns: 1fr;
+  }
+  .contact-faq {
+    grid-template-columns: 1fr;
+  }
+  .contact-faq-photo {
+    min-height: 0;
+    height: auto;
+    aspect-ratio: 542 / 342;
+  }
+  .contact-faq-body {
+    max-width: none;
+    padding: 32px 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .contact-hero {
+    padding: 0 20px 28px;
+    min-height: 0;
+  }
+  .contact-hero-visual {
+    position: relative;
+    right: auto;
+    width: auto;
+    height: auto;
+    aspect-ratio: 529 / 343;
+    margin: 0 -20px 8px;
+  }
+  .contact-hero-visual img {
+    -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 35%);
+    mask-image: linear-gradient(to top, transparent 0%, #000 35%);
+  }
+  .contact-hero-tagline {
+    display: none;
+  }
+  .landing .contact-h1 {
+    font-size: clamp(30px, 8vw, 38px);
+  }
+  .contact-main {
+    padding: 0 20px 40px;
+  }
+  .contact-form-card {
+    padding: 20px;
+  }
+  .contact-form-card .booking-page-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -198,7 +198,7 @@ export default function HomePage() {
       <div className="landing-lower">
         <ReviewsCarousel reviews={REVIEWS} />
 
-        <FaqAccordion faqs={FAQS} />
+        <FaqAccordion faqs={FAQS} id="faq" />
 
         <BookingPanel />
       </div>

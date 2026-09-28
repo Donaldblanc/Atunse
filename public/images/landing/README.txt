@@ -4,6 +4,10 @@ Process page (/process): process-hero.jpg and process-step-*.jpg are
 cropped, unscaled, from the approved design (scratch/image copy 8.png),
 exported with the settings below. They aren't part of the gallery.
 
+Contact page (/contact): contact-hero.jpg (its "Same culture." tagline
+painted out; the page renders its own) and contact-faq.jpg are cropped,
+unscaled, from the approved design (scratch/image copy 9.png).
+
 15 JPEG images:
 - 7 restoration pairs, with matching *-before.jpg / *-after.jpg filenames
 - 1 single image (the only exception): jordan4-militaryblack-laces.jpg, a

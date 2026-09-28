@@ -76,6 +76,7 @@ describe("limitByIp", () => {
       "adminSignInAccount",
       "codeRequest",
       "codeVerify",
+      "contact",
       "orders",
       "uploads",
     ]);
