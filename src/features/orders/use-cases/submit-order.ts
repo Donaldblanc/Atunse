@@ -36,7 +36,7 @@ export interface SubmitOrderInput {
   /** Client-generated once per booking; a retry with the same key is a no-op (ADR-0012). */
   submissionKey: string | null;
   policyAccepted: boolean; // captured at submission itself, not deferred
-  /** The BOOKING_ACKNOWLEDGEMENTS ids the customer ticked: all of them, or the booking is refused. */
+  /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked: all of them, or the booking is refused. */
   acknowledgedTerms: string[];
   contact: { name: string; email: string; phone: string };
   fulfillment: Fulfillment;
@@ -75,10 +75,10 @@ export interface SubmitOrderDeps {
 
 export class PolicyNotAcceptedError extends Error {
   constructor() {
-    // A booking tab opened before the acknowledgements shipped doesn't
+    // A booking tab opened before the acknowledgments shipped doesn't
     // show them, hence the reload hint.
     super(
-      "Tick each acknowledgement and agree to the terms to confirm your booking. " +
+      "Tick each acknowledgment and agree to the Terms of Service & Restoration Agreement to confirm your booking. " +
         "Don't see them? Reload the page.",
     );
   }

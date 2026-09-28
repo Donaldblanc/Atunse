@@ -12,7 +12,7 @@ export type { SubmitOrderResponse };
 export interface BookingSubmission {
   submissionKey: string;
   policyAccepted: boolean;
-  /** The BOOKING_ACKNOWLEDGEMENTS ids the customer ticked on the Review step. */
+  /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked on the Review step. */
   acknowledgedTerms: string[];
   /** The Bundle chosen, or null for a single pair. */
   bundleId: string | null;

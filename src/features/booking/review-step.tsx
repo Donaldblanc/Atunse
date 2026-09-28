@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  ExternalLink,
   FileText,
   ImagePlus,
   Info,
@@ -20,7 +21,7 @@ import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsAcceptance } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
-import { acknowledgesAll, BOOKING_ACKNOWLEDGEMENTS } from "@/features/orders/booking-terms";
+import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS, TERMS_AGREEMENT } from "@/features/orders/booking-terms";
 
 export function ReviewStep({
   isBundle,
@@ -55,8 +56,9 @@ export function ReviewStep({
   onEditPair: (index: number) => void;
   onConfirm: (terms: TermsAcceptance) => Promise<void>;
 }) {
-  // Every acknowledgement and the agree box are required (CONTEXT.md:
-  // Policy Acceptance); submitOrder refuses the booking otherwise too.
+  // Every risk acknowledgment and the Terms Agreement are required
+  // (CONTEXT.md: Policy Acceptance); submitOrder refuses the booking
+  // otherwise too. Only the Terms Agreement accepts the contract.
   const [acknowledged, setAcknowledged] = useState<string[]>([]);
   // Confirm Booking stays disabled until all of them are ticked.
   const [policyAccepted, setPolicyAccepted] = useState(false);
@@ -64,7 +66,7 @@ export function ReviewStep({
   const [error, setError] = useState<string | null>(null);
   const termsAccepted = policyAccepted && acknowledgesAll(acknowledged);
 
-  function toggleAcknowledgement(id: string) {
+  function toggleAcknowledgment(id: string) {
     setAcknowledged((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
   }
 
@@ -181,45 +183,53 @@ export function ReviewStep({
         </div>
       </div>
 
-      <section className="booking-page-terms-card" aria-labelledby="booking-terms-heading">
+      <section className="booking-page-terms-card" aria-labelledby="booking-acknowledgments-heading">
         <span className="booking-page-terms-icon" aria-hidden="true">
           <FileText size={24} />
         </span>
         <div className="booking-page-terms-body">
-          <h3 id="booking-terms-heading">
-            Terms &amp; Acknowledgement{" "}
+          <h3 id="booking-acknowledgments-heading">
+            Pricing &amp; Restoration Acknowledgment{" "}
             <span className="booking-page-required" aria-hidden="true">
               *
             </span>
           </h3>
-          {BOOKING_ACKNOWLEDGEMENTS.map((ack) => (
+          {BOOKING_ACKNOWLEDGMENTS.map((ack) => (
             <label className="booking-page-policy" key={ack.id}>
               <input
                 type="checkbox"
                 required
                 checked={acknowledged.includes(ack.id)}
-                onChange={() => toggleAcknowledgement(ack.id)}
+                onChange={() => toggleAcknowledgment(ack.id)}
               />
-              <span>{ack.text}</span>
+              <span>
+                <strong>{ack.lead}</strong> {ack.detail}
+              </span>
             </label>
           ))}
         </div>
       </section>
 
-      <label className="booking-page-policy booking-page-policy-agree">
-        <input
-          type="checkbox"
-          required
-          checked={policyAccepted}
-          onChange={(e) => setPolicyAccepted(e.target.checked)}
-        />
-        <span>
-          I understand and agree to the terms above.{" "}
+      <section className="booking-page-terms-agreement" aria-labelledby="booking-terms-agreement-heading">
+        <h3 id="booking-terms-agreement-heading">
+          Terms Agreement{" "}
           <span className="booking-page-required" aria-hidden="true">
             *
           </span>
-        </span>
-      </label>
+        </h3>
+        <label className="booking-page-policy">
+          <input type="checkbox" required checked={policyAccepted} onChange={(e) => setPolicyAccepted(e.target.checked)} />
+          <span>
+            I have read and agree to the{" "}
+            <a className="booking-page-agreement-link" href={TERMS_AGREEMENT.href} target="_blank" rel="noopener noreferrer">
+              {TERMS_AGREEMENT.title}
+              <ExternalLink size={13} aria-hidden="true" />
+              <span className="booking-page-visually-hidden"> (PDF, opens in a new tab)</span>
+            </a>{" "}
+            and acknowledge the restoration risks described above.
+          </span>
+        </label>
+      </section>
 
       <button
         type="button"
@@ -233,7 +243,7 @@ export function ReviewStep({
         {!submitting && <ArrowRight size={14} aria-hidden="true" />}
       </button>
       <p className="booking-page-form-hint" id="review-step-policy-warning" role="status" aria-live="polite">
-        {!termsAccepted && "Tick each acknowledgement and agree to the terms to confirm your booking."}
+        {!termsAccepted && "Tick each acknowledgment and the Terms Agreement to confirm your booking."}
       </p>
       {error && (
         <p className="booking-page-form-error" role="alert">
@@ -242,10 +252,7 @@ export function ReviewStep({
         </p>
       )}
       <p className="booking-page-terms">
-        By confirming, you agree to our <Link href="/coming-soon">Terms of Service</Link>,{" "}
-        <Link href="/coming-soon">Refund Policy</Link>, <Link href="/coming-soon">Restoration Disclaimer</Link>, and{" "}
-        <Link href="/coming-soon">Payment Policy</Link>. See our <Link href="/coming-soon">Privacy Policy</Link> for how we
-        handle your details.
+        See our <Link href="/coming-soon">Privacy Policy</Link> for how we handle your details.
       </p>
     </>
   );

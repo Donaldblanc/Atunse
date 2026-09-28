@@ -25,7 +25,7 @@ const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "must be YYYY-MM-DD
 
 const submitOrderBody = z.object({
   policyAccepted: z.boolean(),
-  // BOOKING_ACKNOWLEDGEMENTS ids. Missing from tabs opened before they
+  // BOOKING_ACKNOWLEDGMENTS ids. Missing from tabs opened before they
   // shipped: those bookings are refused with a reload hint (submitOrder).
   acknowledgedTerms: z.array(text(40)).max(20).default([]),
   contact: z.object({ name: text(120), email: text(254), phone: text(30) }),

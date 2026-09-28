@@ -2555,7 +2555,8 @@
   cursor: pointer;
 }
 
-/* Terms & Acknowledgement on the Review step: every box is required. */
+/* Pricing & Restoration Acknowledgment and Terms Agreement on the Review
+   step: every box is required. */
 .booking-page-terms-card {
   display: flex;
   gap: 16px;
@@ -2618,8 +2619,47 @@
   min-height: 1em;
 }
 
-.booking-page-policy-agree {
-  font-weight: 600;
+.booking-page-terms-agreement {
+  margin: 0 0 16px;
+}
+
+.booking-page-terms-agreement h3 {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+.booking-page-terms-body .booking-page-policy strong {
+  font-weight: 700;
+}
+
+/* The contract: an obvious link, not fine print. */
+.landing .booking-page-agreement-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--blue);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.landing[data-theme="dark"] .booking-page-agreement-link {
+  color: #8ea2ff;
+}
+
+.landing .booking-page-agreement-link:hover {
+  color: var(--blue-deep);
+}
+
+.booking-page-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .booking-page-required {
@@ -2635,9 +2675,9 @@
     padding: 16px;
     gap: 12px;
   }
+  /* The acknowledgments need the width more than the icon does. */
   .booking-page-terms-icon {
-    width: 40px;
-    height: 40px;
+    display: none;
   }
 }
 

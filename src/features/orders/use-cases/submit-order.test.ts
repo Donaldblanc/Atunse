@@ -33,9 +33,9 @@ describe("submitOrder", () => {
 
   it.each([
     ["none", []],
-    ["only some", ["final-pricing", "results-vary"]],
-    ["unknown ids", ["final-pricing", "additional-charges", "results-vary", "something-else"]],
-  ])("rejects a booking that acknowledged %s of the terms, even with the policy box ticked", async (_label, acknowledgedTerms) => {
+    ["only some", ["pricing-after-inspection", "results-may-vary"]],
+    ["unknown ids", ["pricing-after-inspection", "results-may-vary", "inherent-material-risks", "something-else"]],
+  ])("rejects a booking that acknowledged %s of the risks, even with the Terms Agreement ticked", async (_label, acknowledgedTerms) => {
     const deps = bookingDeps();
     await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow(PolicyNotAcceptedError);
     await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow("Reload the page");

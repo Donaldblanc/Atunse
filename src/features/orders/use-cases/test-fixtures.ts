@@ -7,7 +7,7 @@ import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-rep
 import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import type { PairInput, SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
-import { BOOKING_ACKNOWLEDGEMENTS } from "../booking-terms";
+import { BOOKING_ACKNOWLEDGMENTS } from "../booking-terms";
 
 export const FIXED_NOW = new Date("2026-10-01T15:00:00Z"); // Oct 1, 11 AM in New York
 
@@ -45,7 +45,7 @@ export function validBookingInput(overrides: Partial<SubmitOrderInput> = {}): Su
   return {
     submissionKey: null,
     policyAccepted: true,
-    acknowledgedTerms: BOOKING_ACKNOWLEDGEMENTS.map((ack) => ack.id),
+    acknowledgedTerms: BOOKING_ACKNOWLEDGMENTS.map((ack) => ack.id),
     contact: { name: "Jordan Smith", email: "customer@example.com", phone: "(212) 555-0142" },
     fulfillment: {
       method: "PICKUP",

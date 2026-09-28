@@ -19,7 +19,7 @@ describe("submissionFingerprint", () => {
     expect(submissionFingerprint(moved)).not.toBe(base);
   });
 
-  it("ignores the submission key, the policy checkbox and the acknowledgements, which aren't part of the booking", () => {
+  it("ignores the submission key, the policy checkbox and the acknowledgments, which aren't part of the booking", () => {
     expect(submissionFingerprint(validBookingInput({ submissionKey: "a" }))).toBe(
       submissionFingerprint(validBookingInput({ submissionKey: "b" })),
     );
