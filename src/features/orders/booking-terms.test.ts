@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "./booking-terms";
+import { acknowledgesAll, acknowledgmentRecord, BOOKING_ACKNOWLEDGMENTS } from "./booking-terms";
 
 describe("booking acknowledgments", () => {
   it("lists the four published risk acknowledgments, in order, with unique ids", () => {
@@ -20,4 +20,13 @@ describe("booking acknowledgments", () => {
     expect(acknowledgesAll([])).toBe(false);
   });
 
+
+  it("records each acknowledgment by id, ignoring ids it doesn't know", () => {
+    expect(acknowledgmentRecord(["materialRisks", "pricing", "bogus"])).toEqual({
+      pricing: true,
+      restorationResults: false,
+      materialRisks: true,
+      structuralLimitations: false,
+    });
+  });
 });

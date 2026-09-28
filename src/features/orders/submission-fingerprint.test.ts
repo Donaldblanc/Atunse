@@ -6,7 +6,7 @@ describe("submissionFingerprint", () => {
   it("is stable for the same booking, whatever the key order", () => {
     const input = validBookingInput();
     const reordered = JSON.parse(JSON.stringify({ items: input.items, bundleId: input.bundleId, rush: input.rush, fulfillment: input.fulfillment, contact: input.contact }));
-    expect(submissionFingerprint({ ...reordered, submissionKey: null, policyAccepted: true, acknowledgedTerms: [] })).toBe(
+    expect(submissionFingerprint({ ...reordered, submissionKey: null, policyAccepted: true, acknowledgedTerms: [], termsVersion: "" })).toBe(
       submissionFingerprint(input),
     );
   });
@@ -23,6 +23,6 @@ describe("submissionFingerprint", () => {
     expect(submissionFingerprint(validBookingInput({ submissionKey: "a" }))).toBe(
       submissionFingerprint(validBookingInput({ submissionKey: "b" })),
     );
-    expect(submissionFingerprint(validBookingInput({ acknowledgedTerms: [] }))).toBe(submissionFingerprint(validBookingInput()));
+    expect(submissionFingerprint(validBookingInput({ acknowledgedTerms: [], termsVersion: "old" }))).toBe(submissionFingerprint(validBookingInput()));
   });
 });

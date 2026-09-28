@@ -19,30 +19,38 @@ export interface BookingAcknowledgment {
 
 export const BOOKING_ACKNOWLEDGMENTS: readonly BookingAcknowledgment[] = [
   {
-    id: "pricing-after-inspection",
+    id: "pricing",
     lead: "Final pricing is determined after inspection.",
     detail:
       "I understand that severe wear, damage, specialty materials, or additional restoration needs may result in additional charges, which require my approval before additional work is performed.",
   },
   {
-    id: "results-may-vary",
+    id: "restorationResults",
     lead: "Restoration results may vary.",
     detail:
       "I understand that stains, discoloration, oxidation, yellowing, odors, scratches, creases, or other defects may not be completely removed or corrected, and some conditions may return over time.",
   },
   {
-    id: "inherent-material-risks",
+    id: "materialRisks",
     lead: "Restoration involves inherent material risks.",
     detail:
       "I understand that cleaning or restoration may reveal or worsen pre-existing deterioration, including sole separation, cracking, peeling, fading, dye bleeding, discoloration, adhesive failure, or changes to sensitive materials such as suede, nubuck, leather, mesh, or aged materials.",
   },
   {
-    id: "no-structural-guarantee",
+    id: "structuralLimitations",
     lead: "Restoration does not guarantee structural or performance restoration.",
     detail:
       "I understand that restored footwear may still contain deterioration caused by age, wear, manufacturing defects, previous repairs, or material degradation and may not be suitable for athletic or strenuous use.",
   },
 ];
+
+/**
+ * Each acknowledgment's id → whether it was ticked: the record a booking
+ * keeps (ADR-0015). Ids the list doesn't know are left out.
+ */
+export function acknowledgmentRecord(ids: readonly string[]): Record<string, boolean> {
+  return Object.fromEntries(BOOKING_ACKNOWLEDGMENTS.map((ack) => [ack.id, ids.includes(ack.id)]));
+}
 
 /** True when every current acknowledgment is among `ids`. */
 export function acknowledgesAll(ids: readonly string[]): boolean {

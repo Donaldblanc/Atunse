@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, Fulfillment, Order } from "../domain";
+import type { AuditEntry, Fulfillment, Order, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -58,6 +58,8 @@ export interface NewOrderInput {
   contactEmail: string;
   contactPhone: string;
   policyAcceptedAt: Date;
+  /** What was accepted at policyAcceptedAt (ADR-0015). */
+  terms: Omit<TermsAcceptance, "acceptedAt">;
   fulfillment: Fulfillment;
   rush: boolean;
   estimate: Money;

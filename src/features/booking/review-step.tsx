@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
-import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsAcceptance } from "./booking-types";
+import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsSelection } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
 import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
@@ -55,7 +55,7 @@ export function ReviewStep({
   onEdit: (step: Step) => void;
   /** Opens the Details step on pair `index`. */
   onEditPair: (index: number) => void;
-  onConfirm: (terms: TermsAcceptance) => Promise<void>;
+  onConfirm: (terms: TermsSelection) => Promise<void>;
 }) {
   // Every risk acknowledgment and the Terms Agreement are required
   // (CONTEXT.md: Policy Acceptance); submitOrder refuses the booking
@@ -76,7 +76,8 @@ export function ReviewStep({
     setSubmitting(true);
     setError(null);
     try {
-      await onConfirm({ policyAccepted, acknowledgedTerms: acknowledged });
+      // The version this page links to is the one the customer is accepting.
+      await onConfirm({ policyAccepted, acknowledgedTerms: acknowledged, termsVersion: TERMS_AGREEMENT.version });
     } catch (err) {
       setError(err instanceof BookingSubmitError ? err.message : "Something went wrong. Please try again.");
       setSubmitting(false);

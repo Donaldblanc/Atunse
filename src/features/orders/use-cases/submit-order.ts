@@ -11,7 +11,8 @@ import type { FileStorage } from "@/shared/storage";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
-import { acknowledgesAll } from "../booking-terms";
+import { acknowledgesAll, acknowledgmentRecord } from "../booking-terms";
+import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
   EmailTakenError,
@@ -38,6 +39,12 @@ export interface SubmitOrderInput {
   policyAccepted: boolean; // captured at submission itself, not deferred
   /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked: all of them, or the booking is refused. */
   acknowledgedTerms: string[];
+  /**
+   * The TERMS_AGREEMENT version the booking page showed. Must be the
+   * current one, so the recorded acceptance is of the agreement the
+   * customer actually saw (ADR-0015).
+   */
+  termsVersion: string;
   contact: { name: string; email: string; phone: string };
   fulfillment: Fulfillment;
   rush: boolean;
@@ -75,8 +82,9 @@ export interface SubmitOrderDeps {
 
 export class PolicyNotAcceptedError extends Error {
   constructor() {
-    // A booking tab opened before the acknowledgments shipped doesn't
-    // show them, hence the reload hint.
+    // A booking tab opened before the acknowledgments shipped, or before
+    // the agreement's current version, doesn't show them: hence the
+    // reload hint.
     super(
       "Tick each acknowledgment and agree to the Terms of Service & Restoration Agreement to confirm your booking. " +
         "Don't see them? Reload the page.",
@@ -165,7 +173,8 @@ export class PhotosInUseError extends BookingValidationError {
 export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser, input: SubmitOrderInput): Promise<Order> {
   requireRole(actingUser, "GUEST", "CUSTOMER");
 
-  if (!input.policyAccepted || !acknowledgesAll(input.acknowledgedTerms)) {
+  // Affirmative acceptance of the agreement the customer saw (ADR-0015).
+  if (!input.policyAccepted || !acknowledgesAll(input.acknowledgedTerms) || input.termsVersion !== TERMS_AGREEMENT.version) {
     throw new PolicyNotAcceptedError();
   }
 
@@ -193,6 +202,12 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       contactEmail: contact.email,
       contactPhone: contact.phone,
       policyAcceptedAt: now,
+      terms: {
+        version: TERMS_AGREEMENT.version,
+        url: TERMS_AGREEMENT.href,
+        sha256: TERMS_AGREEMENT.sha256,
+        acknowledgments: acknowledgmentRecord(input.acknowledgedTerms),
+      },
       fulfillment,
       rush: input.rush,
       estimate: orderEstimate.estimate,
@@ -464,5 +479,9 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
     howToPay,
     nextStep,
     "We'll inspect your sneakers and confirm final pricing before any work begins.",
+    // The customer's own copy of what they accepted (ADR-0015).
+    ...(order.termsAcceptance
+      ? [`You agreed to our ${TERMS_AGREEMENT.title} (version ${order.termsAcceptance.version}) when you booked.`]
+      : []),
   ].join("\n\n");
 }

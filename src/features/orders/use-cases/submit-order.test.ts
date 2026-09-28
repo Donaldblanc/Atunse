@@ -10,6 +10,7 @@ import {
   submitOrder,
 } from "./submit-order";
 import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
+import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 import { bookingDeps, FIXED_NOW, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -33,12 +34,37 @@ describe("submitOrder", () => {
 
   it.each([
     ["none", []],
-    ["only some", ["pricing-after-inspection", "results-may-vary"]],
-    ["unknown ids", ["pricing-after-inspection", "results-may-vary", "inherent-material-risks", "something-else"]],
+    ["only some", ["pricing", "restorationResults"]],
+    ["unknown ids", ["pricing", "restorationResults", "materialRisks", "something-else"]],
   ])("rejects a booking that acknowledged %s of the risks, even with the Terms Agreement ticked", async (_label, acknowledgedTerms) => {
     const deps = bookingDeps();
     await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow(PolicyNotAcceptedError);
     await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow("Reload the page");
+  });
+
+  it.each([
+    ["an older agreement version", "2026-01-01-v0"],
+    ["no version (a tab from before versions were sent)", ""],
+  ])("rejects a booking that accepted %s", async (_label, termsVersion) => {
+    await expect(submitOrder(bookingDeps(), guest, validBookingInput({ termsVersion }))).rejects.toThrow(PolicyNotAcceptedError);
+  });
+
+  it("records exactly which agreement was accepted, when, and each acknowledgment (ADR-0015)", async () => {
+    const order = await submitOrder(bookingDeps(), guest, validBookingInput());
+    expect(order.termsAcceptance).toEqual({
+      version: TERMS_AGREEMENT.version,
+      url: TERMS_AGREEMENT.href,
+      sha256: TERMS_AGREEMENT.sha256,
+      acceptedAt: FIXED_NOW,
+      acknowledgments: { pricing: true, restorationResults: true, materialRisks: true, structuralLimitations: true },
+    });
+    expect(order.policyAcceptedAt).toEqual(FIXED_NOW);
+  });
+
+  it("tells the customer in the confirmation email which agreement version they accepted", async () => {
+    const deps = bookingDeps();
+    await submitOrder(deps, guest, validBookingInput());
+    expect(deps.notifications.sent[0]!.body).toContain(`${TERMS_AGREEMENT.title} (version ${TERMS_AGREEMENT.version})`);
   });
 
   it("rejects an admin trying to submit an order as themselves", async () => {

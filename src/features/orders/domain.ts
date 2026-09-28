@@ -71,6 +71,21 @@ export interface Item {
   photoKeys: string[];
 }
 
+/**
+ * ADR-0015: the evidence that a customer affirmatively accepted a specific
+ * Terms of Service & Restoration Agreement. Recorded once, at submission.
+ */
+export interface TermsAcceptance {
+  version: string;
+  /** The PDF's permanent URL for that version. */
+  url: string;
+  /** SHA-256 of that PDF's bytes, hex. */
+  sha256: string;
+  acceptedAt: Date;
+  /** Each risk acknowledgment's id (booking-terms.ts) -> whether it was ticked. */
+  acknowledgments: Record<string, boolean>;
+}
+
 export interface Order {
   id: string;
   /** Every Order belongs to an Account (ADR-0014); there are no guest orders. */
@@ -80,6 +95,8 @@ export interface Order {
   contactPhone: string;
   createdAt: Date;
   policyAcceptedAt: Date;
+  /** Null only for Orders from before the agreement existed. */
+  termsAcceptance: TermsAcceptance | null;
   fulfillment: Fulfillment;
   rush: boolean;
   estimate: Money;

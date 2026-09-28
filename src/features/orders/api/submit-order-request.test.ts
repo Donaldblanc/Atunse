@@ -41,10 +41,10 @@ describe("parseSubmitOrderRequest", () => {
   });
 
   it("passes the acknowledged terms through, and treats a body without them as none acknowledged", () => {
-    const withTerms = parseSubmitOrderRequest({ ...body, acknowledgedTerms: ["pricing-after-inspection"] }, null);
-    expect(withTerms.ok && withTerms.value.acknowledgedTerms).toEqual(["pricing-after-inspection"]);
+    const withTerms = parseSubmitOrderRequest({ ...body, acknowledgedTerms: ["pricing"], termsVersion: "2026-09-27-v1" }, null);
+    expect(withTerms.ok && withTerms.value).toMatchObject({ acknowledgedTerms: ["pricing"], termsVersion: "2026-09-27-v1" });
     const without = parseSubmitOrderRequest(body, null);
-    expect(without.ok && without.value.acknowledgedTerms).toEqual([]);
+    expect(without.ok && without.value).toMatchObject({ acknowledgedTerms: [], termsVersion: "" });
   });
 
   it("names the offending field", () => {
