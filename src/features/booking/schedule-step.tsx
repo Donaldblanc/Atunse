@@ -67,7 +67,7 @@ export function ScheduleStep({
       <div className="booking-page-form-grid">
         <label className="booking-page-field">
           <span>Address</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. 123 Main St"
             value={pickupAddress.address}
@@ -87,7 +87,7 @@ export function ScheduleStep({
       <div className="booking-page-form-grid booking-page-form-grid-thirds">
         <label className="booking-page-field">
           <span>City</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. New York"
             value={pickupAddress.city}
@@ -96,7 +96,7 @@ export function ScheduleStep({
         </label>
         <label className="booking-page-field">
           <span>State / Province</span>
-          <select
+          <select required
             value={pickupAddress.state}
             onChange={(e) => onChangePickupAddress({ ...pickupAddress, state: e.target.value })}
           >
@@ -110,7 +110,7 @@ export function ScheduleStep({
         </label>
         <label className="booking-page-field">
           <span>Zip / Postal code</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. 10001"
             value={pickupAddress.zip}
@@ -163,12 +163,15 @@ export function ScheduleStep({
         Continue to your info
         <ArrowRight size={14} aria-hidden="true" />
       </button>
-      {showWarning && (
-        <p className="booking-page-form-warning" id="schedule-step-warning" role="status" aria-live="polite">
-          <TriangleAlert size={14} aria-hidden="true" />
-          {problem}
-        </p>
-      )}
+      {/* Always in the page, so screen readers announce the warning when it appears. */}
+      <p className="booking-page-form-warning" id="schedule-step-warning" role="status" aria-live="polite">
+        {showWarning && (
+          <>
+            <TriangleAlert size={14} aria-hidden="true" />
+            {problem}
+          </>
+        )}
+      </p>
     </>
   );
 }

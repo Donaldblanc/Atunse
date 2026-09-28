@@ -41,7 +41,8 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
           <ArrowIcon size={13} strokeWidth={26} />
         </a>
       </div>
-      <div className="landing-ba-track" ref={trackRef}>
+      {/* Scrolls sideways: focusable so keyboard users can scroll it with the arrow keys. */}
+      <div className="landing-ba-track" ref={trackRef} tabIndex={0} role="region" aria-label="Before and after gallery">
         {images.map((image) => {
           const single = "imageKey" in image;
           return (

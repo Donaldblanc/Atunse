@@ -93,6 +93,7 @@ export default function HomePage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="landing-hero">
         <div>
@@ -215,6 +216,8 @@ export default function HomePage() {
           LONGER MILES.
         </div>
       </div>
+
+      </main>
 
       <SiteFooter />
       <MobileBookBar />

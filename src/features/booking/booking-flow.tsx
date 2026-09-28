@@ -168,7 +168,7 @@ export function BookingFlow() {
     <div className="booking-page-layout">
       <div className="booking-page-main">
         {step !== "service" && !confirmation && (
-          <button type="button" className="booking-page-back-link" onClick={goBack}>
+          <button type="button" className="booking-page-back-link" onClick={goBack} aria-label="Back">
             <ArrowLeft size={14} aria-hidden="true" />
             <span className="booking-page-back-text">Back</span>
           </button>

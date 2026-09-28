@@ -78,12 +78,15 @@ export function DetailsStep({
         Continue to schedule
         <ArrowRight size={14} aria-hidden="true" />
       </button>
-      {showWarning && (
-        <p className="booking-page-form-warning" id="details-step-warning" role="status" aria-live="polite">
-          <TriangleAlert size={14} aria-hidden="true" />
-          {missingMessage}
-        </p>
-      )}
+      {/* Always in the page, so screen readers announce the warning when it appears. */}
+      <p className="booking-page-form-warning" id="details-step-warning" role="status" aria-live="polite">
+        {showWarning && (
+          <>
+            <TriangleAlert size={14} aria-hidden="true" />
+            {missingMessage}
+          </>
+        )}
+      </p>
     </>
   );
 }

@@ -37,6 +37,7 @@ export default function BookingPage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="booking" />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="landing-about-hero booking-page-hero">
         <div>
@@ -91,6 +92,8 @@ export default function BookingPage() {
           );
         })}
       </div>
+
+      </main>
 
       <SiteFooter active="booking" />
       <MobileTabBar />

@@ -18,7 +18,7 @@ export default function ComingSoonPage() {
     <div className="landing" id="landing-root">
       <SiteNav />
 
-      <main className="coming-soon-main">
+      <main id="main-content" tabIndex={-1} className="coming-soon-main">
         <div className="coming-soon-bg" aria-hidden="true" />
         <section className="coming-soon-hero">
           <div className="coming-soon-copy">

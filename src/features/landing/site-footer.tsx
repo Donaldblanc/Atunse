@@ -4,8 +4,8 @@ import { LEGAL_DOCUMENTS } from "@/shared/legal-documents";
 
 export function SiteFooter({ active }: { active?: NavActive } = {}) {
   return (
-    <>
-      <footer className="landing-footer">
+    <footer>
+      <div className="landing-footer">
         <div className="landing-brand">
           <span className="landing-brand-name">Atunṣe</span>
           <span className="landing-brand-tag">POWERED BY RESTOREDBYDJ</span>
@@ -61,7 +61,7 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
             </svg>
           </a>
         </div>
-      </footer>
+      </div>
       <div className="landing-footer-bottom">
         <span>&copy; 2026 Atunṣe. All rights reserved.</span>
         {/* The legal PDFs, open in a new tab (shared/legal-documents.ts). */}
@@ -75,6 +75,6 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
         </nav>
         <span>RestoredByDJ &middot; New York, NY</span>
       </div>
-    </>
+    </footer>
   );
 }
