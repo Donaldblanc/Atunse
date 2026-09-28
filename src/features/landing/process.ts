@@ -3,8 +3,9 @@ import type { GalleryImage } from "./gallery";
 
 // The /process page: how an Order gets from booking back onto the
 // customer's feet. The photos are cropped from the approved design
-// (public/images/landing/README.txt). There's no drop-off: a pair comes in
-// by Pickup or Mail-In only (CONTEXT.md), and the copy has to say so.
+// (public/images/landing/README.txt). A pair comes in by Local Drop-Off
+// (DJ collects it, NY/NJ/CT) or Mail-In only (CONTEXT.md), and the copy
+// has to say so.
 
 export const PROCESS_HERO_IMAGE: GalleryImage = {
   key: "process-hero.jpg",
@@ -27,8 +28,8 @@ export const PROCESS_STEPS: ProcessStep[] = [
   },
   {
     icon: Truck,
-    title: "Schedule Pickup or Mail In",
-    description: "Schedule a convenient pickup in your area, or ship your pair to us.",
+    title: "Local Drop-Off or Mail In",
+    description: "Book a Local Drop-Off and DJ collects your pair from your address, or ship it to us.",
     image: { key: "process-step-pickup.jpg", alt: "An Atunṣe shoe box ready to send" },
   },
   {
@@ -40,7 +41,7 @@ export const PROCESS_STEPS: ProcessStep[] = [
   {
     icon: Package,
     title: "Wear Your Sneakers",
-    description: "Once your pair passes our final quality check, we get it back to you.",
+    description: "Once your pair passes our final quality check, DJ drops it back off or we ship it back.",
     image: { key: "process-step-wear.jpg", alt: "A freshly cleaned pair of sneakers beside an Atunṣe box" },
   },
 ];

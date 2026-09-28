@@ -21,6 +21,7 @@ import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsSelection } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
+import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
 import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 
@@ -148,7 +149,7 @@ export function ReviewStep({
         <div className="booking-page-details-row">
           {scheduleMethod === "pickup" ? <Truck size={16} aria-hidden="true" /> : <Package size={16} aria-hidden="true" />}
           <span>
-            <strong>{scheduleMethod === "pickup" ? "Pickup" : "Mail in"}</strong>, {scheduleText}
+            <strong>{FULFILLMENT_LABELS[scheduleMethod === "pickup" ? "PICKUP" : "MAIL_IN"]}</strong>, {scheduleText}
           </span>
         </div>
         <div className="booking-page-details-row">

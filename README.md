@@ -84,14 +84,14 @@ src/
       nav-drawer.tsx             client component: mobile hamburger + slide-in drawer (hidden above 640px)
       mobile-tabbar.tsx          client component: fixed bottom tab bar simulating a native app nav (hidden above 640px)
       theme-toggle.tsx           client component: sliding light/dark switch — always defaults to light, only an explicit toggle (saved to localStorage) moves it to dark
-      booking-panel.tsx          home-page Pickup / Mail-In chooser that deep-links into /booking?method=...
+      booking-panel.tsx          home-page Local Drop-Off / Mail-In chooser that deep-links into /booking?method=...
       book-restoration-cta.tsx   shared "Book Now" CTA; `topCta` marks the one the mobile book bar watches
       mobile-book-bar.tsx        client component: sticky mobile "Book Now" bar, hidden while the page's top CTA is visible
     booking/
       booking-flow.tsx           client component: the 5-step booking flow (Service → Details → Schedule → Your Info → Review) and its pricing
-      *-step.tsx                 one component per step; pair-form.tsx and pickup-date-picker.tsx are shared pieces
+      *-step.tsx                 one component per step; pair-form.tsx and pickup-date-picker.tsx (the Local Drop-Off collection and Mail-In date picker) are shared pieces
       services-data.ts           bookable Services and 3-pair Bundles, with display prices
-      booking-types.ts           shared types (Pickup / Mail-In schedule method, pair details, contact info)
+      booking-types.ts           shared types (Local Drop-Off / Mail-In schedule method, pair details, contact info)
     orders/
       domain.ts                Order/Item types, the Item status pipeline
       deps.ts                  wires the real Prisma repository + notification adapter for use-cases

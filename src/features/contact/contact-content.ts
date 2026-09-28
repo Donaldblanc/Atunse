@@ -3,9 +3,10 @@ import type { Faq } from "@/features/landing/faq-accordion";
 
 // /contact's photos (cropped from the approved design, see
 // public/images/landing/README.txt) and its "Common questions". The
-// answers follow CONTEXT.md: Pickup is NY/NJ/CT only, Mail-In customers
-// ship the pair themselves (ADR-0010), there's no drop-off, and every pair
-// is priced by the owner before any work (the Approval Gate).
+// answers follow CONTEXT.md: Local Drop-Off (DJ collects and drops back
+// off) is NY/NJ/CT only, Mail-In customers ship the pair themselves
+// (ADR-0010) and get it shipped back, customers never come in, and every
+// pair is priced by the owner before any work (the Approval Gate).
 
 export const CONTACT_HERO_IMAGE: GalleryImage = {
   key: "contact-hero.jpg",
@@ -24,13 +25,14 @@ export const CONTACT_FAQS: Faq[] = [
       "Cleanings usually take about 72 hours, and restorations 5–10 business days, depending on the work and how busy we are. Timelines are estimates. Need it sooner? Add Rush when you book.",
   },
   {
-    question: "Do you offer local pickup?",
-    answer: "Yes. We pick up from your address anywhere in the NY / NJ / CT tri-state area. Choose a date and time when you book.",
+    question: "Do you offer Local Drop-Off?",
+    answer:
+      "Yes, anywhere in the NY / NJ / CT tri-state area. DJ collects your pair from your address at a date and time you book, and drops it back off when it's done.",
   },
   {
     question: "Can I ship my sneakers?",
     answer:
-      "Yes, from anywhere in the US. Choose Mail-In when you book, and we'll email you where to send them. You arrange the shipping yourself.",
+      "Yes, from anywhere in the US. Choose Mail-In when you book, and we'll email you where to send them. You arrange the shipping to us, and we ship them back when they're done.",
   },
   {
     question: "What brands and materials do you work with?",

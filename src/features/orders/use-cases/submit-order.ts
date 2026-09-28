@@ -337,17 +337,17 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
 
   if (fulfillment.method === "PICKUP") {
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
-      throw new BookingValidationError("Pickup is only available in NY, NJ and CT. Choose Mail-In instead.");
+      throw new BookingValidationError("Local Drop-Off is only available in NY, NJ and CT. Choose Mail-In instead.");
     }
     if (!isCalendarDate(fulfillment.date) || fulfillment.date < today) {
-      throw new BookingValidationError("Choose a pickup date from today onward.");
+      throw new BookingValidationError("Choose a collection date from today onward.");
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
-      throw new BookingValidationError("Choose a pickup time between 4:30 PM and 10:00 PM.");
+      throw new BookingValidationError("Choose a collection time between 4:30 PM and 10:00 PM.");
     }
     if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
       throw new BookingValidationError(
-        `That pickup time is no longer available. Same-day pickups need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
+        `That collection time is no longer available. Same-day collections need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
       );
     }
     return { method: "PICKUP", address, date: fulfillment.date, slot: fulfillment.slot };
@@ -467,8 +467,8 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
   const pairs = pairsPhrase(order.items.length);
   const nextStep =
     order.fulfillment.method === "PICKUP"
-      ? `We'll pick up ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}.`
-      : `We'll email you where to ship ${pairs}.`;
+      ? `Local Drop-Off: DJ will collect ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}, and drop them back off when they're done.`
+      : `Mail-In: we'll email you where to ship ${pairs}, and ship them back when they're done.`;
   const bundle = findBundle(order.bundleId);
   return [
     `Thanks, ${order.contactName}. Your booking ${reference} was received.`,

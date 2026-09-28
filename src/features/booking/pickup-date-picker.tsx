@@ -59,7 +59,7 @@ export function PickupDatePicker({
   selection,
   onConfirm,
   mode = "datetime",
-  label = "pickup",
+  label = "collection",
 }: {
   selection: PickupSelection | null;
   onConfirm: (selection: PickupSelection) => void;
@@ -167,7 +167,7 @@ export function PickupDatePicker({
                   <div className="booking-page-info-box">
                     <Clock size={16} aria-hidden="true" />
                     <span>
-                      Pickup times are available from
+                      Collection times are available from
                       <br />
                       <strong>4:30 PM &ndash; 10:00 PM.</strong>
                     </span>
@@ -195,7 +195,7 @@ export function PickupDatePicker({
             ) : (
               <>
                 <div className="booking-page-modal-head">
-                  <h3>Select a pickup time</h3>
+                  <h3>Select a collection time</h3>
                   <button type="button" className="booking-page-modal-close" onClick={() => setOpen(false)} aria-label="Close">
                     <X size={16} aria-hidden="true" />
                   </button>
@@ -209,13 +209,13 @@ export function PickupDatePicker({
                   </button>
                 </div>
                 <p className="booking-page-time-caption">
-                  Available pickup times are between 4:30 PM &ndash; 10:00 PM (New York time). Same-day pickups need at
+                  Collection times are between 4:30 PM &ndash; 10:00 PM (New York time). Same-day collections need at
                   least {PICKUP_LEAD_MINUTES / 60} hours&rsquo; notice.
                 </p>
 
                 <div className="booking-page-time-list">
                   {timeSlots.length === 0 && (
-                    <p className="booking-page-time-caption">No pickup times left on this day. Choose another date.</p>
+                    <p className="booking-page-time-caption">No collection times left on this day. Choose another date.</p>
                   )}
                   {timeSlots.map((slot) => (
                     <button
@@ -241,7 +241,7 @@ export function PickupDatePicker({
                     setOpen(false);
                   }}
                 >
-                  Confirm Pickup Time
+                  Confirm Collection Time
                   <ArrowRight size={14} aria-hidden="true" />
                 </button>
               </>

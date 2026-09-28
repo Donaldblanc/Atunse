@@ -1,4 +1,6 @@
-[Update 2026-09-26: there is no in-person drop-off service. The only Fulfillment Methods are Pickup (the shop collects from the customer's address, NY/NJ/CT) and Mail-In (nationwide). Answers below that mention drop-off (Q12, Q15, Q16, Q19, Q20) are superseded on that point. See CONTEXT.md and docs/SPEC.md. The answers are otherwise kept verbatim as the client's original record.]
+[Update 2026-09-28: the local Fulfillment Method is called **Local Drop-Off**, not "Pickup": DJ collects the pair from the customer's address (NY/NJ/CT) at a booked time and drops the finished pair back off there. Mail-In pairs are shipped back. Answers below that say "pickup" mean this. See CONTEXT.md.]
+
+[Update 2026-09-26: there is no in-person drop-off service. The only Fulfillment Methods are Local Drop-Off (then called Pickup: DJ collects from the customer's address, NY/NJ/CT) and Mail-In (nationwide). Answers below that mention drop-off (Q12, Q15, Q16, Q19, Q20) are superseded on that point. See CONTEXT.md and docs/SPEC.md. The answers are otherwise kept verbatim as the client's original record.]
 
 Please answer these questions so we can define the MVP web application, customer experience, and internal business workflow.
 

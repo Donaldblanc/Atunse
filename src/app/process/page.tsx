@@ -30,8 +30,8 @@ export default function ProcessPage() {
               <span>From Your Door to On Feet.</span>
             </h1>
             <p className="process-lede">
-              A simple, seamless process to get your sneakers looking their best. Book online, schedule a
-              pickup or mail in your pair, and let our experts handle the rest.
+              A simple, seamless process to get your sneakers looking their best. Book online, choose a
+              Local Drop-Off or mail in your pair, and let our experts handle the rest.
             </p>
           </div>
         </section>
