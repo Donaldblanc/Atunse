@@ -297,7 +297,7 @@ describe("submitOrder", () => {
         submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, date: "2026-02-30" } })),
       ).rejects.toThrow(BookingValidationError);
       await expect(
-        submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, slot: "9:00 AM – 9:30 AM" } })),
+        submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, slot: "7:30 AM – 8:00 AM" } })),
       ).rejects.toThrow(BookingValidationError);
     });
 

@@ -4,7 +4,7 @@ import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucid
 import { useState, useId } from "react";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
 import { useDialog } from "@/features/landing/use-dialog";
-import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES } from "@/features/orders/pickup-window";
+import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES, PICKUP_WINDOW_LABEL } from "@/features/orders/pickup-window";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";
@@ -176,7 +176,7 @@ export function PickupDatePicker({
                     <span>
                       Collection times are available from
                       <br />
-                      <strong>4:30 PM &ndash; 10:00 PM.</strong>
+                      <strong>{PICKUP_WINDOW_LABEL}.</strong>
                     </span>
                   </div>
                 )}
@@ -216,7 +216,7 @@ export function PickupDatePicker({
                   </button>
                 </div>
                 <p className="booking-page-time-caption">
-                  Collection times are between 4:30 PM &ndash; 10:00 PM (New York time). Same-day collections need at
+                  Collection times are between {PICKUP_WINDOW_LABEL} (New York time). Same-day collections need at
                   least {PICKUP_LEAD_MINUTES / 60} hours&rsquo; notice.
                 </p>
 
