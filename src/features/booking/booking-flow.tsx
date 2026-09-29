@@ -191,9 +191,9 @@ export function BookingFlow() {
             const isActive = index === stepIndex;
             const subtext = s.key === "service" ? selectedName : STEP_SUBTEXT[s.key](isBundle);
             return (
-              <div key={s.key} className="booking-page-step-group">
+              <div key={s.key} className="booking-page-step-group" data-reached={isDone || isActive}>
                 {index > 0 && <div className="booking-page-step-rule" />}
-                <div className="booking-page-step" data-active={isActive} data-done={isDone}>
+                <div className="booking-page-step" data-active={isActive} data-done={isDone} aria-current={isActive ? "step" : undefined}>
                   <span className="booking-page-step-num" aria-hidden="true">
                     {isDone ? <Check size={14} /> : index + 1}
                   </span>

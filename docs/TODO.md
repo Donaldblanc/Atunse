@@ -87,6 +87,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
   - The closed menu drawer's shadow showed as a grey band down the right edge of every page.
   - The booking page's tablet rules (one column at 900px and under) were overridden by later base rules, so tablets got two cramped columns; the step indicator also ran under the summary up to 1140px.
   - iOS zoom on field tap (fields were 13.5px; now 16px on touch screens); fields are 44px tall.
+  - Booking step indicator (from a customer's iPhone screenshot): on screens 1180px and under it wrapped like text (three steps, then two, with dangling rules). It's now one row of circles with names underneath, and the rules up to the current step are blue.
   - The date picker sheet uses `dvh`, so iOS Safari's toolbars don't cover it.
   - Safari drew selects 21px tall; the tablet nav crowded "Contact" into the theme toggle (links move to the menu at 641–820px); FAQ rows are tappable across their full width; content scrolled into view stops above the phone tab bar.
   - Tap areas of 44px on touch for the menu button, social icons, carousel arrows and toggles; "View pricing & book now" no longer wraps at 320px.
