@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
@@ -343,7 +343,7 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
       throw new BookingValidationError("Choose a collection date from today onward.");
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
-      throw new BookingValidationError("Choose a collection time between 4:30 PM and 10:00 PM.");
+      throw new BookingValidationError(`Choose a collection time from ${PICKUP_WINDOW_LABEL}.`);
     }
     if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
       throw new BookingValidationError(

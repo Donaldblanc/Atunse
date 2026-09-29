@@ -70,7 +70,7 @@ prove it against.
 **Phase 1 — booking submission connected end to end (single pair).**
 - `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, Local Drop-Off collection slot or preferred mail-in date, Rush and contact name.
 - The estimate and 50% Deposit are computed server-side from `src/features/orders/service-catalog.ts`. The browser's display prices in `services-data.ts` are kept in step by a parity test; client-sent prices are ignored.
-- Server-side rules: Policy Acceptance, Local Drop-Off only in NY/NJ/CT within the 4:30–10:00 PM collection window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
+- Server-side rules: Policy Acceptance, Local Drop-Off only in NY/NJ/CT within the 8:00 AM–10:00 PM collection window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
 - Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
 - `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).

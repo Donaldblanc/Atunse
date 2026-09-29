@@ -9,8 +9,8 @@ import { shopClock, type CalendarDate } from "./calendar-date";
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;
 
-// Pickup window: 4:30 PM - 10:00 PM in 30-minute slots.
-const WINDOW_START_MINUTES = 16 * 60 + 30;
+// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots.
+const WINDOW_START_MINUTES = 8 * 60;
 const WINDOW_END_MINUTES = 22 * 60;
 
 function formatClock(minutes: number) {
@@ -39,6 +39,9 @@ function buildTimeSlots(): PickupSlot[] {
 }
 
 const SLOTS = buildTimeSlots();
+
+/** The daily window as customers read it, e.g. "8:00 AM – 10:00 PM". */
+export const PICKUP_WINDOW_LABEL = `${formatClock(WINDOW_START_MINUTES)} – ${formatClock(WINDOW_END_MINUTES)}`;
 
 /** Every slot in the daily window, bookable or not. */
 export const PICKUP_TIME_SLOTS: readonly string[] = SLOTS.map((slot) => slot.label);

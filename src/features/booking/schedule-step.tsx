@@ -7,7 +7,7 @@ import type { PickupAddress, ScheduleMethod } from "./booking-types";
 import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { isValidZip } from "@/features/orders/contact-rules";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, US_STATES } from "@/features/orders/pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_WINDOW_LABEL, US_STATES } from "@/features/orders/pickup-window";
 
 export function ScheduleStep({
   method,
@@ -133,7 +133,7 @@ export function ScheduleStep({
             <span>
               DJ collects between
               <br />
-              <strong>4:30 PM &ndash; 10:00 PM.</strong>
+              <strong>{PICKUP_WINDOW_LABEL}.</strong>
             </span>
           </div>
         </>

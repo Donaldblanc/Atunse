@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { availablePickupSlots, isBookableDay, PICKUP_TIME_SLOTS } from "./pickup-window";
+import { availablePickupSlots, isBookableDay, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL } from "./pickup-window";
 
 describe("pickup window", () => {
-  it("offers 30-minute slots from 4:30 PM to 10:00 PM", () => {
-    expect(PICKUP_TIME_SLOTS).toHaveLength(11);
-    expect(PICKUP_TIME_SLOTS[0]).toBe("4:30 PM – 5:00 PM");
+  it("offers 30-minute slots from 8:00 AM to 10:00 PM", () => {
+    expect(PICKUP_TIME_SLOTS).toHaveLength(28);
+    expect(PICKUP_TIME_SLOTS[0]).toBe("8:00 AM – 8:30 AM");
+    expect(PICKUP_TIME_SLOTS).toContain("12:00 PM – 12:30 PM");
     expect(PICKUP_TIME_SLOTS.at(-1)).toBe("9:30 PM – 10:00 PM");
+    expect(PICKUP_WINDOW_LABEL).toBe("8:00 AM – 10:00 PM");
   });
 });
 
@@ -13,7 +15,7 @@ describe("bookable pickup slots and days (New York clock, 2h notice)", () => {
   const at = (iso: string) => new Date(iso);
 
   it("offers today's slots only if they start at least 2 hours from now", () => {
-    // 3:00 PM EDT: the 4:30 and 4:30–5:00 slots are under 2 hours away.
+    // 3:00 PM EDT: every slot before 5:00 PM has started or is under 2 hours away.
     const now = at("2026-10-01T19:00:00Z");
     const today = availablePickupSlots("2026-10-01", now);
     expect(today[0]).toBe("5:00 PM – 5:30 PM");
