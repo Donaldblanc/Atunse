@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, ChevronDown, Clock, Palette, Sparkles, Wrench } from "lucide-react";
+import { Check, Clock, Palette, Sparkles, Wrench } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -98,10 +98,10 @@ export default function ServicesPage() {
           </p>
           <div className="landing-cta-row">
             <BookRestorationCta topCta />
-            <a className="services-page-btn-outline" href="#pricing-cleaning">
+            <Link className="services-page-btn-outline" href="/process">
               See our process
-              <ChevronDown size={13} aria-hidden="true" />
-            </a>
+              <ArrowIcon />
+            </Link>
           </div>
         </div>
         <div className="services-page-mark">
