@@ -2187,6 +2187,11 @@
   min-width: 24px;
 }
 
+/* The rule leading to a finished or current step is blue: progress so far. */
+.booking-page-step-group[data-reached="true"] .booking-page-step-rule {
+  background: var(--blue);
+}
+
 .booking-page-section-head {
   margin-bottom: 14px;
 }
@@ -4041,17 +4046,6 @@
   .booking-page-summary {
     padding: 18px;
   }
-  .booking-page-steps {
-    gap: 8px;
-    flex-wrap: wrap;
-    row-gap: 10px;
-  }
-  .booking-page-step-rule {
-    min-width: 12px;
-  }
-  .booking-page-step-text span {
-    display: none;
-  }
   .booking-page-section-head h2 {
     font-size: 18px;
   }
@@ -4775,21 +4769,77 @@
   }
 }
 
-/* Tablets and small laptops (641–1180px): the booking step indicator
-   compacts as on phones. With the subtitles its five steps need about
-   620px, so they squeezed to four-line labels and, beside the summary
-   (901px and up), ran underneath it. */
-@media (min-width: 641px) and (max-width: 1180px) {
+/* Phones, tablets and small laptops (1180px and under): the step
+   indicator is one row of five equal columns, each a circle with its name
+   centred underneath; the subtitles are dropped. Each step's rule runs
+   from the previous circle to its own (the previous column's centre is
+   -50% of this one's width). Before, the steps wrapped like text: three,
+   then two, with rules dangling at the row starts. */
+@media (max-width: 1180px) {
   .booking-page-steps {
-    gap: 8px;
-    flex-wrap: wrap;
-    row-gap: 10px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: start;
+    gap: 0;
+  }
+  .booking-page-step-group {
+    position: relative;
+    display: block;
+  }
+  .booking-page-step {
+    flex-direction: column;
+    gap: 6px;
   }
   .booking-page-step-rule {
-    min-width: 12px;
+    position: absolute;
+    top: 15px;
+    left: calc(-50% + 21px);
+    right: calc(50% + 21px);
+    min-width: 0;
+  }
+  .booking-page-step-text {
+    align-items: center;
+    text-align: center;
+    max-width: 100%;
+  }
+  .booking-page-step-text strong {
+    color: var(--ink-soft);
+  }
+  .booking-page-step[data-active="true"] .booking-page-step-text strong {
+    color: var(--ink);
   }
   .booking-page-step-text span {
     display: none;
+  }
+}
+
+/* Phones: columns are 45–70px, so step names are a little smaller and
+   "Your Info" may take two lines. */
+@media (max-width: 480px) {
+  .booking-page-step-text strong {
+    font-size: 10px;
+    letter-spacing: 0.02em;
+    white-space: normal;
+  }
+}
+
+/* 360px and under: smaller circles, so the rules between them stay
+   visible (they shrank to dashes), and names small enough that
+   "Schedule" clears its neighbours at 320px. */
+@media (max-width: 360px) {
+  .booking-page-step-num {
+    width: 26px;
+    height: 26px;
+  }
+  .booking-page-step-rule {
+    top: 13px;
+    left: calc(-50% + 17px);
+    right: calc(50% + 17px);
+  }
+  .booking-page-step-text strong {
+    font-size: 9.5px;
+    letter-spacing: 0;
+    padding: 0 3px; /* "Your Info" wraps rather than crowding "Schedule" */
   }
 }
 
