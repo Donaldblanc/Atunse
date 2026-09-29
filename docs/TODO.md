@@ -83,7 +83,14 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Indexable, no staging noindex**: production sends no `noindex`, so it's indexable. The unlinked `/coming-soon` placeholder is still public; remove it or mark it `noindex` before launch.
 
 ### Mobile & browser testing
-- [ ] **Layouts**: pages were checked in headless Chromium at 390, 820, 1280 and 1440 px (light and dark) while they were built. Still to do: real iPhone (Safari), Android (Chrome), tablet, and desktop Safari and Firefox, including the nav and drawer at every breakpoint, and the booking and contact forms on mobile.
+- [x] **Layouts in every browser engine** (2026-09-28): every page in light and dark on WebKit (Safari's engine), Chromium and Firefox, emulating iPhone SE, iPhone 15 (portrait and landscape), Pixel 7, Galaxy S9+, iPad Mini (both orientations), iPad Pro 11 and Galaxy Tab S4, plus desktop Safari at 1280/1440 and Firefox at 1024/1280. The booking flow was walked from the service through the date picker to Review on each. Result: no horizontal scroll, overflow or nav collisions. Fixed along the way:
+  - The closed menu drawer's shadow showed as a grey band down the right edge of every page.
+  - The booking page's tablet rules (one column at 900px and under) were overridden by later base rules, so tablets got two cramped columns; the step indicator also ran under the summary up to 1140px.
+  - iOS zoom on field tap (fields were 13.5px; now 16px on touch screens); fields are 44px tall.
+  - The date picker sheet uses `dvh`, so iOS Safari's toolbars don't cover it.
+  - Safari drew selects 21px tall; the tablet nav crowded "Contact" into the theme toggle (links move to the menu at 641–820px); FAQ rows are tappable across their full width; content scrolled into view stops above the phone tab bar.
+  - Tap areas of 44px on touch for the menu button, social icons, carousel arrows and toggles; "View pricing & book now" no longer wraps at 320px.
+- [ ] **Real devices**: emulation can't show iOS Safari's toolbars, input zoom, the home-indicator area or how taps feel. Book once (up to Review) and send a contact message on a real iPhone and an Android phone, and check the menu and date picker on an iPad.
 
 ### Performance
 - [ ] **Large images**: `hero-travis-scott-aj1-low.png` (2.1 MB) and `coming-soon-hero.png` (1.9 MB) are served as-is. Images use plain `<img>`, not `next/image`, so nothing is resized per device.
