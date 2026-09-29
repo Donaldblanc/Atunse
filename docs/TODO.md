@@ -92,6 +92,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
   - Safari drew selects 21px tall; the tablet nav crowded "Contact" into the theme toggle (links move to the menu at 641–820px); FAQ rows are tappable across their full width; content scrolled into view stops above the phone tab bar.
   - Tap areas of 44px on touch for the menu button, social icons, carousel arrows and toggles; "View pricing & book now" no longer wraps at 320px.
 - [ ] **Real devices**: emulation can't show iOS Safari's toolbars, input zoom, the home-indicator area or how taps feel. Book once (up to Review) and send a contact message on a real iPhone and an Android phone, and check the menu and date picker on an iPad.
+- [ ] **Real desktop browsers**: the desktop checks ran in the browser engines (WebKit, Chromium, Firefox), not the browsers themselves. On a Mac and a Windows PC, open every page and book up to Review in Safari, Chrome, Firefox and Edge, including at a narrow window width (the menu) and with the theme toggled.
 
 ### Performance
 - [ ] **Large images**: `hero-travis-scott-aj1-low.png` (2.1 MB) and `coming-soon-hero.png` (1.9 MB) are served as-is. Images use plain `<img>`, not `next/image`, so nothing is resized per device.
@@ -101,6 +102,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 
 ### Links & navigation
 - [ ] **Every nav and footer link**: checked in headless runs (Services, Gallery, Process, About, Contact, and the Terms and Privacy PDFs). Do a full manual pass.
+- [ ] **Broken links and 404s across every page**: only the nav and footer have been checked. Crawl the production site (every page, including in-page links, buttons, images and the legal PDFs) with a link checker, e.g. `npx linkinator https://atunse-five.vercel.app --recurse`, and fix anything that answers 404 or errors. Re-run after the custom domain is live.
 - [ ] **Refund Policy and Cookie Policy links**: don't exist yet (see Legal).
 - [x] **No links to placeholders**: nothing on the site links to `/coming-soon` any more.
 - [x] **Logo returns to the homepage** (`SiteNav` brand links to `/`).
