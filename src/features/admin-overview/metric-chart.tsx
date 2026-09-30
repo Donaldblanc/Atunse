@@ -8,7 +8,8 @@ const asDate = calendarDateToUtcMidnight;
 /**
  * One measure per day of the range as a line over a light area fill, in the
  * first series colour (one series, so no legend: the dialog names it). The
- * last day, today for a range in progress, is the highlighted point.
+ * line stops at `through` (today, for a range still in progress), so days
+ * still to come don't read as zeros; that last day is the highlighted point.
  *
  * The line is stretched SVG (so it fills any width) with non-scaling strokes;
  * everything that must stay round or readable, the points and every label,
@@ -17,11 +18,14 @@ const asDate = calendarDateToUtcMidnight;
  */
 export function MetricChart({
   days,
+  through,
   ticks,
   formatTick,
   describe,
 }: {
   days: { date: CalendarDate; value: number }[];
+  /** The last day with figures: today for a range in progress, else the range's last day. */
+  through: CalendarDate;
   /** Ascending, from 0; the last is the top of the axis. */
   ticks: number[];
   formatTick: (tick: number) => string;
@@ -32,8 +36,12 @@ export function MetricChart({
   const everyDay = days.length <= 7;
   const x = (i: number) => ((i + 0.5) / days.length) * 100;
   const y = (value: number) => 100 - (value / top) * 100;
-  const line = days.map((day, i) => `${x(i)},${y(day.value)}`).join(" ");
-  const area = `${x(0)},100 ${line} ${x(days.length - 1)},100`;
+  const last = Math.max(0, days.findLastIndex((day) => day.date <= through));
+  const line = days
+    .slice(0, last + 1)
+    .map((day, i) => `${x(i)},${y(day.value)}`)
+    .join(" ");
+  const area = `${x(0)},100 ${line} ${x(last)},100`;
 
   return (
     <div className="md-chart">
@@ -59,13 +67,17 @@ export function MetricChart({
             style={{ left: `${(i / days.length) * 100}%`, width: `${100 / days.length}%` }}
             role="img"
             tabIndex={0}
-            aria-label={`${longDay.format(asDate(day.date))}: ${describe(day.value)}`}
+            aria-label={`${longDay.format(asDate(day.date))}: ${i > last ? "still to come" : describe(day.value)}`}
           >
-            <span className="md-chart-dot" data-highlight={i === days.length - 1 ? "true" : undefined} style={{ top: `${y(day.value)}%` }} />
-            <span className="ov-tooltip md-chart-tooltip" style={{ top: `${y(day.value)}%` }} aria-hidden="true">
-              <strong>{describe(day.value)}</strong>
-              <span>{shortDay.format(asDate(day.date))}</span>
-            </span>
+            {i <= last && (
+              <>
+                <span className="md-chart-dot" data-highlight={i === last ? "true" : undefined} style={{ top: `${y(day.value)}%` }} />
+                <span className="ov-tooltip md-chart-tooltip" style={{ top: `${y(day.value)}%` }} aria-hidden="true">
+                  <strong>{describe(day.value)}</strong>
+                  <span>{shortDay.format(asDate(day.date))}</span>
+                </span>
+              </>
+            )}
           </div>
         ))}
         <div className="md-chart-labels" aria-hidden="true">

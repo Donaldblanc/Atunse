@@ -1,4 +1,5 @@
 import { ChartBarIcon, PackageIcon } from "@phosphor-icons/react/dist/ssr";
+import type { CalendarDate } from "@/features/orders/calendar-date";
 import { ITEM_STATUS_LABELS } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
@@ -19,7 +20,18 @@ const ordersLabel = (count: number) => `${count} ${count === 1 ? "order" : "orde
  * tie back to the same Orders. The headline and the breakdown both leave
  * fully cancelled Orders out; those are counted beneath the list.
  */
-export function MetricDetailDialog({ metric, overview, closeHref }: { metric: OverviewMetric; overview: AdminOverview; closeHref: string }) {
+export function MetricDetailDialog({
+  metric,
+  overview,
+  through,
+  closeHref,
+}: {
+  metric: OverviewMetric;
+  overview: AdminOverview;
+  /** The chart's last day with figures (today for a range in progress). */
+  through: CalendarDate;
+  closeHref: string;
+}) {
   const { range, metricDetail: detail } = overview;
   const isOrders = metric === "orders";
   const Icon = isOrders ? PackageIcon : ChartBarIcon;
@@ -58,6 +70,7 @@ export function MetricDetailDialog({ metric, overview, closeHref }: { metric: Ov
           </h3>
           <MetricChart
             days={chartDays}
+            through={through}
             ticks={isOrders ? countTicks(peak) : dollarTicks(peak)}
             formatTick={isOrders ? String : (tick) => `$${tick.toLocaleString("en-US")}`}
             describe={isOrders ? ordersLabel : (value) => `${Money.fromCents(Math.round(value * 100)).format()} booked`}

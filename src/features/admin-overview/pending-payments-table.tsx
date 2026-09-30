@@ -71,7 +71,7 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
         <p className="ov-empty">No matching orders.</p>
       ) : (
         <div className="att-scroll" role="tabpanel">
-          <table className="ov-table att-table">
+          <table className="ov-table att-table" data-kind="payments">
             <thead>
               <tr>
                 <th scope="col">Order #</th>

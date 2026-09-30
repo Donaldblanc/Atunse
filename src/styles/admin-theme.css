@@ -2455,6 +2455,11 @@ a.admin-nav-item:hover {
   font-size: 14px;
 }
 
+/* .ov-cell-sub doesn't wrap (it's made for table cells); in a dialog a long Services line must. */
+.visit-order-lines .ov-cell-sub {
+  white-space: normal;
+}
+
 .visit-line {
   display: flex;
   align-items: flex-start;
@@ -2635,4 +2640,59 @@ a.visit-line:hover,
   font-weight: 500;
   color: var(--color-destructive);
   text-align: right;
+}
+
+/* Pending Payments on a phone: each row becomes a small card, so Mark Paid
+   stays on screen instead of past a sideways scroll. */
+@media (max-width: 720px) {
+  .att-table[data-kind="payments"] {
+    min-width: 0;
+  }
+
+  .att-table[data-kind="payments"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .att-table[data-kind="payments"] tbody {
+    display: block;
+  }
+
+  .att-table[data-kind="payments"] tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .att-table[data-kind="payments"] td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Order # and amount, then customer and method, then the booked date, then the action. */
+  .att-table[data-kind="payments"] td:nth-child(1) { grid-area: 1 / 1; }
+  .att-table[data-kind="payments"] td:nth-child(3) { grid-area: 1 / 2; text-align: right; }
+  .att-table[data-kind="payments"] td:nth-child(2) { grid-area: 2 / 1; }
+  .att-table[data-kind="payments"] td:nth-child(4) { grid-area: 2 / 2; text-align: right; }
+  .att-table[data-kind="payments"] td:nth-child(5) { grid-area: 3 / 1 / 4 / 3; color: var(--color-muted-foreground); font-size: 13px; }
+  .att-table[data-kind="payments"] td:nth-child(6) { grid-area: 4 / 1 / 5 / 3; margin-top: 6px; text-align: left; }
+
+  .att-table[data-kind="payments"] .att-action {
+    width: 100%;
+  }
+
+  .att-table[data-kind="payments"] .att-confirm {
+    display: flex;
+    justify-content: stretch;
+  }
+
+  .att-table[data-kind="payments"] .att-confirm .att-action {
+    flex: 1;
+  }
 }

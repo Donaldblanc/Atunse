@@ -57,7 +57,9 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
   const moveFocus = useRef(false);
 
   const [draft, setDraft] = useState<Draft>(() => draftFrom(selection));
-  const [month, setMonth] = useState(() => firstOfMonth(draftDays(draftFrom(selection), today).at(-1) ?? today));
+  // The month a range ends in, but never past today's: this week can end next month, whose days are all still to come.
+  const monthFor = (end: CalendarDate | undefined) => firstOfMonth(end === undefined || end > today ? today : end);
+  const [month, setMonth] = useState(() => monthFor(draftDays(draftFrom(selection), today).at(-1)));
   const [focusDate, setFocusDate] = useState<CalendarDate>(today);
 
   const days = draftDays(draft, today);
@@ -89,14 +91,14 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
   function reset() {
     const applied = draftFrom(selection);
     setDraft(applied);
-    setMonth(firstOfMonth(draftDays(applied, today).at(-1) ?? today));
+    setMonth(monthFor(draftDays(applied, today).at(-1)));
   }
 
   function pickPreset(id: OverviewPresetId) {
     setDraft({ preset: id });
     const end = rangeDays(id, today).at(-1)!;
-    setMonth(firstOfMonth(end));
-    setFocusDate(end);
+    setMonth(monthFor(end));
+    setFocusDate(end > today ? today : end);
   }
 
   function pickDay(date: CalendarDate) {

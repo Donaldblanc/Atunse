@@ -201,7 +201,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
       </aside>
 
       {/* A modal <dialog> sits in the top layer, so it doesn't take part in this grid. */}
-      {metric && <MetricDetailDialog metric={metric} overview={overview} closeHref={closeHref} />}
+      {metric && <MetricDetailDialog metric={metric} overview={overview} through={highlight} closeHref={closeHref} />}
       {visitId && <VisitDialog visit={visit} selection={selection} />}
       {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
       {attentionPanel && <AttentionPanel panel={attentionPanel} selection={selection} actingUser={actingUser} />}
