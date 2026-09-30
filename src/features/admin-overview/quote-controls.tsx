@@ -46,12 +46,26 @@ export function PairQuoteControls({
   const inputError = checked && !parsed.ok ? parsed.error : null;
   const message = [approvalState, quoteState].find((state) => state.error || state.notice);
 
+  function reviewQuote() {
+    setChecked(true);
+    if (parsed.ok) setConfirmingQuote(true);
+  }
+
   return (
     <div className="od-quote">
       {pairLabel && <p className="od-status-pair">{pairLabel}</p>}
 
       {status === "UNDER_REVIEW" && (
-        <form action={quoteAction} className="od-quote-form">
+        <form
+          action={quoteAction}
+          className="od-quote-form"
+          // Enter in the price field submits the form (it's the only text field); send only from the confirm step.
+          onSubmit={(event) => {
+            if (confirmingQuote) return;
+            event.preventDefault();
+            reviewQuote();
+          }}
+        >
           <input type="hidden" name="itemId" value={itemId} />
           <input type="hidden" name="idempotencyKey" value={quoteKey} />
           <label className="od-quote-field">
@@ -102,10 +116,7 @@ export function PairQuoteControls({
                 key="review-quote"
                 type="button"
                 className="admin-btn"
-                onClick={() => {
-                  setChecked(true);
-                  if (parsed.ok) setConfirmingQuote(true);
-                }}
+                onClick={reviewQuote}
               >
                 Review quote
               </button>

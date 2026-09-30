@@ -57,7 +57,16 @@ export function VisitScheduleForm({
 
   const verb = mode === "reschedule" ? "Move visit" : "Book return visit";
   return (
-    <form action={formAction} className="vsf">
+    <form
+      action={formAction}
+      className="vsf"
+      // Enter in the date field submits the form; save only from the confirm step.
+      onSubmit={(event) => {
+        if (confirming) return;
+        event.preventDefault();
+        if (choice.slot) setConfirming(true);
+      }}
+    >
       {Object.entries(hidden).map(([name, value]) => (
         <input key={name} type="hidden" name={name} value={value} />
       ))}
