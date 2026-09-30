@@ -64,3 +64,35 @@ export function shopClock(instant: Date): { date: CalendarDate; minutes: number 
 export function calendarDateInShopTime(instant: Date): CalendarDate {
   return shopClock(instant).date;
 }
+
+/** The day `days` after (or, negative, before) `date`. */
+export function addDays(date: CalendarDate, days: number): CalendarDate {
+  const next = calendarDateToUtcMidnight(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return calendarDateFromUtcMidnight(next);
+}
+
+/** Day of the week, 0 = Sunday ... 6 = Saturday. */
+export function dayOfWeek(date: CalendarDate): number {
+  return calendarDateToUtcMidnight(date).getUTCDay();
+}
+
+/** How far New York's wall clock is ahead of UTC at an instant, in ms (negative). */
+function shopOffsetMs(instant: Date): number {
+  const { date, minutes } = shopClock(instant);
+  const wallClock = calendarDateToUtcMidnight(date).getTime() + minutes * 60_000;
+  return wallClock - Math.floor(instant.getTime() / 60_000) * 60_000;
+}
+
+/**
+ * The instant a day starts in the shop's (New York's) time, e.g. to count
+ * the Orders booked on it. DST-safe: New York never changes clocks at
+ * midnight, so every day has exactly one midnight.
+ */
+export function shopMidnight(date: CalendarDate): Date {
+  const utcMidnight = calendarDateToUtcMidnight(date).getTime();
+  const firstGuess = utcMidnight - shopOffsetMs(new Date(utcMidnight));
+  // The offset at the real midnight can differ from the first guess's when
+  // a DST change falls between them; re-reading it there settles it.
+  return new Date(utcMidnight - shopOffsetMs(new Date(firstGuess)));
+}

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  addDays,
   calendarDateFromUtcMidnight,
   calendarDateInLocalTime,
   calendarDateInShopTime,
   calendarDateToUtcMidnight,
+  dayOfWeek,
   isCalendarDate,
   localDateFromCalendarDate,
   shopClock,
+  shopMidnight,
 } from "./calendar-date";
 
 describe("calendar dates", () => {
@@ -38,5 +41,22 @@ describe("calendar dates", () => {
     expect(shopClock(new Date("2026-10-01T19:00:00Z"))).toEqual({ date: "2026-10-01", minutes: 15 * 60 }); // EDT
     expect(shopClock(new Date("2026-12-01T20:00:00Z"))).toEqual({ date: "2026-12-01", minutes: 15 * 60 }); // EST
     expect(shopClock(new Date("2026-10-02T04:00:00Z"))).toEqual({ date: "2026-10-02", minutes: 0 });
+  });
+
+  it("adds days across month and year ends, and names the weekday", () => {
+    expect(addDays("2026-09-29", 3)).toBe("2026-10-02");
+    expect(addDays("2027-01-01", -1)).toBe("2026-12-31");
+    expect(dayOfWeek("2026-09-28")).toBe(1); // a Monday
+    expect(dayOfWeek("2026-10-04")).toBe(0); // a Sunday
+  });
+
+  it("finds the instant a New York day starts, on both sides of daylight saving", () => {
+    expect(shopMidnight("2026-10-01").toISOString()).toBe("2026-10-01T04:00:00.000Z"); // EDT
+    expect(shopMidnight("2026-12-01").toISOString()).toBe("2026-12-01T05:00:00.000Z"); // EST
+    // Clocks fall back at 2 AM Nov 1 and spring forward at 2 AM Mar 8.
+    expect(shopMidnight("2026-11-01").toISOString()).toBe("2026-11-01T04:00:00.000Z");
+    expect(shopMidnight("2026-11-02").toISOString()).toBe("2026-11-02T05:00:00.000Z");
+    expect(shopMidnight("2026-03-08").toISOString()).toBe("2026-03-08T05:00:00.000Z");
+    expect(shopMidnight("2026-03-09").toISOString()).toBe("2026-03-09T04:00:00.000Z");
   });
 });

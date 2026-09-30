@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import type { Order, Item, AuditEntry, Fulfillment, TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type CalendarDate, type Fulfillment, type Item, type ItemStatus, type Order, type TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -244,5 +244,70 @@ export class PrismaOrderRepository implements OrderRepository {
 
       return toDomainItem(updated);
     });
+  }
+
+  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { createdAt: { gte: from, lt: to } },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  // liveEstimate (domain.ts) in two aggregates: Orders with a live pair,
+  // their estimates summed, minus their cancelled pairs' estimates.
+  async summarizeBookedBetween(from: Date, to: Date): Promise<{ orders: number; value: Money }> {
+    const liveOrder = { createdAt: { gte: from, lt: to }, items: { some: { status: { not: "CANCELLED" as const } } } };
+    const [orders, cancelledPairs] = await Promise.all([
+      this.prisma.order.aggregate({ where: liveOrder, _count: { _all: true }, _sum: { estimateCents: true } }),
+      this.prisma.item.aggregate({ where: { status: "CANCELLED", order: liveOrder }, _sum: { estimateCents: true } }),
+    ]);
+    return {
+      orders: orders._count._all,
+      value: Money.fromCents((orders._sum.estimateCents ?? 0) - (cancelledPairs._sum.estimateCents ?? 0)),
+    };
+  }
+
+  async listRecent(limit: number): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({ include: ORDER_INCLUDE, orderBy: { createdAt: "desc" }, take: limit });
+    return rows.map(toDomainOrder);
+  }
+
+  async listCollectionsOn(date: CalendarDate): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { fulfillmentMethod: "PICKUP", pickupDate: calendarDateToUtcMidnight(date) },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  async findPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
+    const rows = await this.prisma.item.findMany({
+      where: { orderId: { in: orderIds }, auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } },
+      select: { orderId: true },
+      distinct: ["orderId"],
+    });
+    return new Set(rows.map((row) => row.orderId));
+  }
+
+  async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
+    const groups = await this.prisma.item.groupBy({ by: ["status"], _count: { _all: true } });
+    return Object.fromEntries(groups.map((group) => [group.status, group._count._all]));
+  }
+
+  async summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }> {
+    const { _count, _sum } = await this.prisma.order.aggregate({
+      where: {
+        AND: [
+          { items: { some: { status: { not: "CANCELLED" } } } },
+          { items: { none: { auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } } } },
+        ],
+      },
+      _count: { _all: true },
+      _sum: { depositCents: true },
+    });
+    return { orders: _count._all, deposits: Money.fromCents(_sum.depositCents ?? 0) };
   }
 }

@@ -78,9 +78,17 @@ prove it against.
 - **Customer Accounts (ADR-0014).** Every booking creates or uses a Customer Account (`orders.accountId` is required). With `FEATURE_CUSTOMER_SIGN_IN_ENABLED` on, a signed-out booking whose email already has an Account gets the booking flow's email-code login screen (`POST /api/v1/auth/code/request` and `/verify`). With it off (the default), that booking attaches to the existing Account.
 - **Photo viewing**: `GET /api/v1/orders/:orderId/photos` issues 5-minute presigned GET links to the Order's Account owner or an admin only. A photo key can belong to only one Order.
 - Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
+- **Admin Overview** (`/admin`, from the admin design `scratch/overview-dashboard.jpeg`): live figures from real Orders, all admin-only through `getAdminOverview`.
+  - One range picker (this week / last week / last 30 days, New York days, Monday-Sunday weeks) scopes Total Orders, Booked Revenue, the Revenue Trend bars and Orders by Service. Each is compared with the same stretch of the period before.
+  - "Booked revenue" is the Orders' estimates (Rush included), not payments received.
+  - One rule for cancelled pairs across every figure (Total Orders, revenue, the trend, Orders by Service, Recent Orders): they drop out. An Order counts at its estimate less its cancelled pairs' share (`liveEstimate`), and a fully cancelled Order not at all.
+  - The work queues are always "right now": pairs needing a quote, Orders awaiting their Deposit (no `MANUAL_PAYMENT_CONFIRMED` on any Item), and pairs Ready for Drop-Off/Shipping.
+  - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
+  - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
+  - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
 - Not built yet:
   - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
-  - Any admin working screen. `/admin` is a dashboard listing the planned screens, with placeholder stats.
+  - The other admin working screens (Orders, Calendar, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
 
 **Customer site (marketing + booking UI).**
 - Pages: `/`, `/services`, `/about`, `/booking`.

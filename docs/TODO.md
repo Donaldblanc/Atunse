@@ -4,7 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
-- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin dashboard's Orders queue is still "Next up" (`src/app/admin/page.tsx`), so today a new booking is only visible in the database. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up as a count on the admin Overview. Add an owner notification email for new bookings and/or build the Orders queue before launch.
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 
 ### Legal & policies
@@ -138,6 +138,26 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] Test admin actions on the booking.
 - [ ] Test the cancellation and refund path.
 - [ ] Repeat the critical flow on mobile.
+
+## Admin Overview: replace sample data and placeholders with real data
+
+The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample data where nothing records the real thing yet. Sample figures live in `src/features/admin-overview/sample-data.ts`, are marked `TODO(sample-data)`, and carry a dashed "Sample" tag on the page. Delete each one as its real source lands.
+
+**Sample data (shown now, not real):**
+- [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
+- [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
+- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): decide where reviews come from (customers after Completed, or imported from Google/Instagram), add a Review model, then show the latest.
+
+**Placeholders (real data exists, but the design shows more):**
+- [ ] **Pending Payments: Zelle/Cash split.** On #119's branch it's live (Payment rows); lands when #119 merges.
+- [ ] **Order #: ATU-1008 numbers** instead of the 8-character reference. On #119's branch; lands when #119 merges.
+- [ ] **Today's Schedule: return drop-offs.** Only collections show today; show RETURN Appointments too (#119), once Order detail or the Calendar can book one.
+- [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
+- [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
+- [ ] **Notification bell** in the top bar: needs something to notify about (new bookings, customer messages).
+- [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
+- [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
+- [ ] **Search** in the top bar: enable with the Orders screen, which it searches.
 
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).
