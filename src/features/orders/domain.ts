@@ -129,19 +129,20 @@ export interface TermsAcceptance {
 export const PAYMENT_KINDS = ["DEPOSIT", "BALANCE", "FULL"] as const;
 export type PaymentKind = (typeof PAYMENT_KINDS)[number];
 
-/** Zelle and Cash are confirmed by hand (ADR-0002); Card is Stripe, behind its toggle. */
-export const PAYMENT_METHODS = ["ZELLE", "CASH", "CARD"] as const;
+/** Zelle and Cash are confirmed by hand (ADR-0002); Card and Apple Pay are Stripe, behind its toggle. */
+export const PAYMENT_METHODS = ["ZELLE", "CASH", "CARD", "APPLE_PAY"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
-export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { ZELLE: "Zelle", CASH: "Cash", CARD: "Card" };
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { ZELLE: "Zelle", CASH: "Cash", CARD: "Card", APPLE_PAY: "Apple Pay" };
 
 export interface Payment {
   id: string;
   kind: PaymentKind;
   method: PaymentMethod;
   amount: Money;
-  status: "PENDING" | "RECEIVED";
-  /** Set exactly when status is RECEIVED. */
+  /** FAILED: a charge that didn't go through; REFUNDED: received, then given back. */
+  status: "PENDING" | "RECEIVED" | "FAILED" | "REFUNDED";
+  /** Set exactly when status is RECEIVED or REFUNDED. */
   receivedAt: Date | null;
   createdAt: Date;
 }

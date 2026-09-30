@@ -146,7 +146,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 **Sample data (shown now, not real):**
 - [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
 - [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
-- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): decide where reviews come from (customers after Completed, or imported from Google/Instagram), add a Review model, then show the latest.
+- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): the Review table exists (#119); decide how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram), then show the latest PUBLISHED ones.
 
 **Placeholders (real data exists, but the design shows more):**
 - [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
@@ -154,10 +154,12 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **Today's Schedule: return drop-offs.** Only collections show today; show RETURN Appointments too (#119), once Order detail or the Calendar can book one.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
-- [ ] **Notification bell** in the top bar: needs something to notify about (new bookings, customer messages).
+- [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
 - [ ] **Search** in the top bar: enable with the Orders screen, which it searches.
+- [ ] **Booking reads Settings** (ADR-0016): the booking flow and `submitOrder` use `operating_hours` and `business_settings.allowLocalDropOff`/`allowMailIn` instead of `pickup-window.ts`, then drop `pickup-window.integration.test.ts`.
+- [ ] **Settings tabs not modeled yet:** Notifications, Payments, Shipping & Pickup, Email & Templates, Team (multi-admin, see "Still to grill") and Billing. Design each when its tab is designed.
 
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).

@@ -1,7 +1,9 @@
-// The data model mirrors the admin screens (scratch/01-09 design images):
-// Orders and Order detail, Calendar (Appointment), Customers (Account),
-// Services & Pricing (Service, Bundle), Inventory (InventoryItem,
-// Supplier), Payments (Payment) and Messages (Conversation, Message).
+// The data model mirrors the admin screens (scratch/*.jpeg design images):
+// Orders and Order detail, Calendar (Appointment), Customers (Account,
+// Note), Services & Pricing (Service, Bundle), Inventory (InventoryItem,
+// Supplier, StockMovement), Payments (Payment), Messages (Conversation,
+// Message), Reviews (Review), Settings (BusinessSettings, OperatingHours)
+// and the top bar's bell (Notification).
 // An Order still has no status of its own: screens derive it from its
 // Items (CONTEXT.md: Order Status). Stripe and the notification outbox
 // come later (docs/SPEC.md Build sequence).
@@ -54,11 +56,16 @@ enum PaymentMethod {
   ZELLE
   CASH
   CARD
+  APPLE_PAY
 }
 
+// FAILED: a card/Apple Pay charge that didn't go through. REFUNDED: money
+// that was received and has been given back (receivedAt stays set).
 enum PaymentStatus {
   PENDING
   RECEIVED
+  FAILED
+  REFUNDED
 }
 
 // CONTEXT.md: Appointment. COLLECTION is DJ collecting a Local Drop-Off
@@ -66,6 +73,49 @@ enum PaymentStatus {
 enum AppointmentKind {
   COLLECTION
   RETURN
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+// Services & Pricing's categories (Categories tab). Add-ons are ADDITIONAL.
+enum ServiceCategory {
+  CLEANING
+  RESTORATION
+  CUSTOM_WORK
+  ADDITIONAL
+}
+
+// Why an Inventory Item's stock changed (Stock History).
+enum StockMovementReason {
+  RESTOCK
+  USED
+  ADJUSTMENT
+}
+
+enum MessageChannel {
+  IN_APP
+  EMAIL
+  SMS
+}
+
+// Reviews screen: new reviews wait for moderation; HIDDEN is unpublished.
+enum ReviewStatus {
+  PENDING
+  PUBLISHED
+  HIDDEN
+}
+
+// What the top bar's bell announces.
+enum NotificationKind {
+  NEW_BOOKING
+  CUSTOMER_MESSAGE
+  PAYMENT_RECEIVED
+  LOW_STOCK
+  NEW_REVIEW
 }
 
 enum MessageAuthor {
@@ -95,8 +145,12 @@ model Account {
 
   createdAt DateTime @default(now())
 
-  orders      Order[]
-  signInCodes SignInCode[]
+  orders        Order[]
+  signInCodes   SignInCode[]
+  conversations Conversation[]
+  // Notes the shop keeps about this customer (Customers, Order detail).
+  notes         Note[]
+  reviews       Review[]
 
   @@unique([email, role])
   @@map("accounts")
@@ -178,10 +232,17 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items        Item[]
-  payments     Payment[]
-  appointments Appointment[]
-  conversation Conversation?
+  // When the shop last asked the customer for a Review (Request Review).
+  reviewRequestedAt DateTime?
+
+  items         Item[]
+  payments      Payment[]
+  appointments  Appointment[]
+  conversations Conversation[]
+  notes         Note[]
+  review        Review?
+  notifications Notification[]
+  stockUsed     StockMovement[]
 
   @@index([createdAt])
   @@map("orders")
@@ -200,6 +261,7 @@ model Item {
   material    String?
   size        String? // e.g. "10", "W 8.5": entered by the owner on Order detail
   colorway    String? // e.g. "Black / White"
+  condition   String? // the owner's assessment on Order detail, e.g. "Good"
 
   // The pair's place in its Order (0 for a single pair; 0-2 in a Bundle),
   // so pairs always read back in the order the customer entered them.
@@ -308,9 +370,14 @@ model Payment {
   amountCents Int // Money as integer cents (ADR-0012); always > 0
   status      PaymentStatus @default(PENDING)
 
-  receivedAt           DateTime?
-  confirmedByAccountId String? // the admin who marked it received; null for automatic (CARD)
+  receivedAt           DateTime? // set for RECEIVED and REFUNDED
+  confirmedByAccountId String? // the admin who marked it received; null for automatic (CARD, APPLE_PAY)
   idempotencyKey       String?
+  // The processor's charge id (e.g. "ch_3N8f...") or a Zelle confirmation
+  // number; null for Cash or when none was noted ("Manual").
+  reference            String?
+  failureReason        String? // FAILED only
+  refundedAt           DateTime? // REFUNDED only
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -329,10 +396,13 @@ model Appointment {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id])
 
-  kind     AppointmentKind
-  startsAt DateTime
-  endsAt   DateTime
-  notes    String?
+  kind                AppointmentKind
+  status              AppointmentStatus @default(SCHEDULED)
+  startsAt            DateTime
+  endsAt              DateTime
+  notes               String?
+  // The Admin Account doing it (Calendar's staff filter); null = unassigned.
+  assignedToAccountId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -347,19 +417,22 @@ model Appointment {
 // cents; a "from $25+" Service has isMinimum. Deactivating hides a Service
 // from new bookings; it is never deleted, since past Items name it.
 model Service {
-  id             String  @id
+  id             String          @id
   name           String
   description    String
+  category       ServiceCategory
   isCleaningTier Boolean // Standard and Premium Clean: at most one per Item
   isAddOn        Boolean // CONTEXT.md: Add-on
   baseCents      Int
   isMinimum      Boolean
-  suedeFee       Boolean // carries the Suede Fee on suede pairs
+  suedeFeeCents  Int             @default(0) // the Suede Fee on suede pairs; 0 = none
   minimumLabel   String? // what a minimum price covers, e.g. "Midsole"
   alsoFrom       Json? // other published "from" prices: [{ label, cents }]
-  imageKey       String? // FileStorage key (ADR-0004)
-  active         Boolean @default(true)
+  internalNotes  String? // admin only, never shown to customers
+  active         Boolean         @default(true)
   position       Int // display order
+
+  images ServiceImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -369,15 +442,16 @@ model Service {
 
 // CONTEXT.md: Bundle (Services & Pricing, Bundles tab).
 model Bundle {
-  id         String   @id // stable slug, e.g. "revival"
-  name       String
-  priceCents Int
-  perks      String[]
-  imageKey   String?
-  active     Boolean  @default(true)
-  position   Int
+  id            String   @id // stable slug, e.g. "revival"
+  name          String
+  priceCents    Int
+  perks         String[]
+  internalNotes String?
+  active        Boolean  @default(true)
+  position      Int
 
   orders Order[]
+  images BundleImage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -405,15 +479,22 @@ model Supplier {
 // A supply, material or care product the shop keeps on hand (Inventory).
 // "Low Stock" is stock <= lowStockAt, derived, never stored.
 model InventoryItem {
-  id         String    @id @default(cuid())
-  name       String
-  category   String // e.g. "Cleaning", "Laces", "Restoration", "Tools"
-  stock      Int       @default(0) // never negative
-  lowStockAt Int       @default(0)
-  imageKey   String?
-  supplierId String?
-  supplier   Supplier? @relation(fields: [supplierId], references: [id])
-  active     Boolean   @default(true)
+  id                String    @id @default(cuid())
+  name              String
+  description       String?
+  sku               String?   @unique // e.g. "ATU-CP-001"
+  brand             String?
+  category          String // e.g. "Cleaning", "Laces", "Restoration", "Supplies"
+  stock             Int       @default(0) // never negative; every change is a StockMovement
+  lowStockAt        Int       @default(0)
+  unitCostCents     Int?
+  sellingPriceCents Int? // only for items the shop also sells
+  supplierId        String?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
+  active            Boolean   @default(true)
+
+  images    InventoryImage[]
+  movements StockMovement[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -425,9 +506,14 @@ model InventoryItem {
 // The message thread between the shop and a customer about one Order
 // (Messages). Archiving hides it from the inbox without deleting it.
 model Conversation {
-  id      String @id @default(cuid())
-  orderId String @unique
-  order   Order  @relation(fields: [orderId], references: [id])
+  id        String  @id @default(cuid())
+  // The customer it's with. A Conversation can start before any booking
+  // ("Do you offer pickup in Queens?"), so the Order is optional.
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id])
+  orderId   String?
+  order     Order?  @relation(fields: [orderId], references: [id])
+  subject   String? // e.g. "Pickup time confirmation"
 
   archivedAt    DateTime?
   lastMessageAt DateTime? // for sorting the inbox
@@ -436,6 +522,8 @@ model Conversation {
 
   createdAt DateTime @default(now())
 
+  @@index([accountId])
+  @@index([orderId])
   @@index([lastMessageAt])
   @@map("conversations")
 }
@@ -449,11 +537,194 @@ model Message {
 
   author          MessageAuthor
   authorAccountId String? // the Account that wrote it
+  channel         MessageChannel @default(IN_APP)
   body            String
   readAt          DateTime? // when the other side read it
+
+  attachments MessageAttachment[]
 
   createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
   @@map("messages")
+}
+
+// Photos and files, each a FileStorage key (ADR-0004), in display order.
+model ServiceImage {
+  id        String  @id @default(cuid())
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+  key       String  @unique
+  position  Int
+
+  @@index([serviceId])
+  @@map("service_images")
+}
+
+model BundleImage {
+  id       String @id @default(cuid())
+  bundleId String
+  bundle   Bundle @relation(fields: [bundleId], references: [id])
+  key      String @unique
+  position Int
+
+  @@index([bundleId])
+  @@map("bundle_images")
+}
+
+model InventoryImage {
+  id       String        @id @default(cuid())
+  itemId   String
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+  key      String        @unique
+  position Int
+
+  @@index([itemId])
+  @@map("inventory_images")
+}
+
+// One change to an Inventory Item's stock (Stock History). The item's
+// stock column is kept equal to the sum of its movements by the use-case
+// that writes both in one transaction.
+model StockMovement {
+  id             String              @id @default(cuid())
+  itemId         String
+  item           InventoryItem       @relation(fields: [itemId], references: [id])
+  change         Int // + restocked, - used; never 0
+  reason         StockMovementReason
+  note           String?
+  orderId        String? // the Order it was used on, if any
+  order          Order?              @relation(fields: [orderId], references: [id])
+  actorAccountId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([itemId, createdAt])
+  @@map("stock_movements")
+}
+
+model MessageAttachment {
+  id          String  @id @default(cuid())
+  messageId   String
+  message     Message @relation(fields: [messageId], references: [id])
+  key         String  @unique // FileStorage key (ADR-0004)
+  filename    String
+  contentType String
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+// A note the shop keeps about a customer, optionally about one of their
+// Orders (Customers' Notes tab, Order detail's Notes). Admin only.
+model Note {
+  id              String  @id @default(cuid())
+  accountId       String
+  account         Account @relation(fields: [accountId], references: [id])
+  orderId         String?
+  order           Order?  @relation(fields: [orderId], references: [id])
+  authorAccountId String?
+  body            String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId, createdAt])
+  @@index([orderId])
+  @@map("notes")
+}
+
+// A customer's review (Reviews). At most one per Order; "Verified
+// Customer" means it's tied to one of their Orders. New reviews wait in
+// PENDING until the owner publishes them on the website.
+model Review {
+  id        String       @id @default(cuid())
+  accountId String
+  account   Account      @relation(fields: [accountId], references: [id])
+  orderId   String?      @unique
+  order     Order?       @relation(fields: [orderId], references: [id])
+  rating    Int // 1-5
+  body      String
+  status    ReviewStatus @default(PENDING)
+
+  publishedAt        DateTime?
+  reply              String? // the shop's public reply
+  repliedAt          DateTime?
+  repliedByAccountId String?
+
+  photos ReviewPhoto[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@map("reviews")
+}
+
+model ReviewPhoto {
+  id       String @id @default(cuid())
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id])
+  key      String @unique // FileStorage key (ADR-0004)
+  position Int
+
+  @@index([reviewId])
+  @@map("review_photos")
+}
+
+// The top bar's bell. recipientAccountId null = every admin.
+model Notification {
+  id                 String           @id @default(cuid())
+  recipientAccountId String?
+  kind               NotificationKind
+  title              String
+  body               String?
+  orderId            String?
+  order              Order?           @relation(fields: [orderId], references: [id])
+  readAt             DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([recipientAccountId, readAt, createdAt])
+  @@map("notifications")
+}
+
+// Settings > Business Profile: the one row of business details the site,
+// booking flow and emails use. id is always 1.
+model BusinessSettings {
+  id           Int     @id @default(1)
+  businessName String
+  tagline      String?
+  ownerName    String?
+  email        String?
+  phone        String?
+  websiteUrl   String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  zip          String?
+  timeZone     String // IANA, e.g. "America/New_York"
+  currency     String // ISO 4217, e.g. "USD"
+  logoKey      String? // FileStorage key (ADR-0004)
+
+  // Booking Settings: which Fulfillment Methods customers can book.
+  allowLocalDropOff Boolean @default(true)
+  allowMailIn       Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("business_settings")
+}
+
+// Settings > Operating Hours: when Local Drop-Off collections can be
+// booked, per weekday (0 = Sunday ... 6 = Saturday), in minutes past
+// midnight, shop time.
+model OperatingHours {
+  weekday  Int     @id
+  isOpen   Boolean
+  opensAt  Int // e.g. 480 = 8:00 AM
+  closesAt Int // e.g. 1320 = 10:00 PM
+
+  @@map("operating_hours")
 }

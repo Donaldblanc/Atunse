@@ -9,9 +9,14 @@ import { shopClock, shopTime, type CalendarDate } from "./calendar-date";
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;
 
-// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots.
+// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots, every day. The
+// operating_hours table (Settings) is seeded to match; a parity test
+// keeps them in step until booking reads the table.
 const WINDOW_START_MINUTES = 8 * 60;
 const WINDOW_END_MINUTES = 22 * 60;
+
+/** The daily collection window in minutes past midnight, shop time. */
+export const PICKUP_WINDOW_MINUTES = { opensAt: WINDOW_START_MINUTES, closesAt: WINDOW_END_MINUTES } as const;
 
 function formatClock(minutes: number) {
   const h = Math.floor(minutes / 60);

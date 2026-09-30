@@ -87,7 +87,14 @@ prove it against.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
   - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
-- **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)): Payments, Appointments, Services and Bundles (seeded from `service-catalog.ts`, parity-tested), Inventory Items and Suppliers, Conversations and Messages, order numbers (ATU-1001 on), customer names, item size and colorway. Booking creates each Order's PENDING Deposit Payment and, for Local Drop-Off, its COLLECTION Appointment.
+- **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)):
+  - Payments (incl. Apple Pay, failed and refunded) and Appointments (with status and assignee).
+  - Services and Bundles (seeded from `service-catalog.ts`, parity-tested; with categories, suede fees and image galleries).
+  - Inventory Items with stock history and Suppliers.
+  - Conversations, Messages and attachments.
+  - Reviews, Notes, Notifications.
+  - Business settings and operating hours (seeded to match the booking flow, parity-tested).
+  - Order numbers (ATU-1001 on), customer names, item size, colorway and condition. Booking creates each Order's PENDING Deposit Payment and, for Local Drop-Off, its COLLECTION Appointment.
 - Not built yet:
   - Booking still prices from `service-catalog.ts`; switching it (and the Services page) to the `services`/`bundles` tables is step 2 of ADR-0016.
   - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
@@ -152,9 +159,9 @@ The admin follows the approved design images (`scratch/01-09`); the data model a
 6. **Services & Pricing** — Services and Bundles: prices, descriptions, active or not.
 7. **Inventory** — supplies with stock and low-stock alerts, and their Suppliers.
 8. **Payments** — every Deposit, Balance and Full payment, by method and status.
-9. **Messages** — an inbox with one Conversation per Order (unread, archived, link to the Order).
-
-Reviews and Settings are in the sidebar with no design yet. Feature toggles (Stripe, SMS) stay **env-var/config-only**, not an admin UI control.
+9. **Messages** — an inbox of Conversations with customers, usually about an Order (unread, archived, channels, attachments).
+10. **Reviews** — ratings and reviews per Order, moderation (publish/hide), replies, Request Review.
+11. **Settings** — business profile and logo, operating hours, which Fulfillment Methods are bookable, the admin's own account; integrations shown from environment configuration. Feature toggles (Stripe, SMS) stay **env-var/config-only**, not an admin UI control.
 
 ## Open TODOs (full list in docs/TODO.md)
 - [ ] Stripe integration (card/Apple Pay) — behind a feature toggle, off by default

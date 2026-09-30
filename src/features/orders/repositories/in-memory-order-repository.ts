@@ -183,7 +183,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       .filter((order) => order.items.some((item) => item.status !== "CANCELLED"))
       .flatMap((order) => order.payments)
       .filter((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING");
-    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0 };
+    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0, APPLE_PAY: 0 };
     for (const payment of pending) byMethod[payment.method] += 1;
     return {
       orders: pending.length,

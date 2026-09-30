@@ -328,7 +328,7 @@ export class PrismaOrderRepository implements OrderRepository {
       _count: { _all: true },
       _sum: { amountCents: true },
     });
-    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0 };
+    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0, APPLE_PAY: 0 };
     let cents = 0;
     for (const group of groups) {
       byMethod[group.method] = group._count._all;

@@ -423,7 +423,7 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
 
     expect(summary.orders).toBe(2);
     expect(summary.deposits.cents).toBe(4000);
-    expect(summary.byMethod).toEqual({ ZELLE: 1, CASH: 1, CARD: 0 });
+    expect(summary.byMethod).toEqual({ ZELLE: 1, CASH: 1, CARD: 0, APPLE_PAY: 0 });
   });
 });
 
@@ -480,14 +480,72 @@ describe("PrismaOrderRepository admin-screen data (integration)", () => {
     }
   });
 
-  it("keeps one Conversation per Order, holding its Messages in order", async () => {
+  it("keeps Conversations per customer, with or without an Order, and counts unread messages", async () => {
     const { order } = await repo.create(newOrder());
-    const conversation = await prisma.conversation.create({ data: { orderId: order.id } });
-    await prisma.message.create({ data: { conversationId: conversation.id, author: "CUSTOMER", body: "Can you add sole restoration?" } });
-    await prisma.message.create({ data: { conversationId: conversation.id, author: "ADMIN", body: "Yes, that's $25 more." } });
+    const aboutOrder = await prisma.conversation.create({ data: { accountId: order.accountId, orderId: order.id, subject: "Pickup time confirmation" } });
+    const inquiry = await prisma.conversation.create({ data: { accountId: order.accountId, subject: "Do you offer pickup in Queens?" } });
+    const question = await prisma.message.create({ data: { conversationId: aboutOrder.id, author: "CUSTOMER", body: "Can you add sole restoration?" } });
+    await prisma.messageAttachment.create({ data: { messageId: question.id, key: "messages/a/1.jpg", filename: "sole.jpg", contentType: "image/jpeg" } });
+    await prisma.message.create({ data: { conversationId: aboutOrder.id, author: "ADMIN", body: "Yes, that's $25 more.", channel: "SMS" } });
+    await prisma.message.create({ data: { conversationId: inquiry.id, author: "CUSTOMER", body: "Queens?" } });
 
-    await expect(prisma.conversation.create({ data: { orderId: order.id } })).rejects.toThrow();
-    const unread = await prisma.message.count({ where: { conversationId: conversation.id, author: "CUSTOMER", readAt: null } });
-    expect(unread).toBe(1);
+    const unread = await prisma.message.count({ where: { author: "CUSTOMER", readAt: null, conversation: { archivedAt: null } } });
+    expect(unread).toBe(2);
+  });
+});
+
+describe("admin-screen data: reviews, notes, stock, payments (integration)", () => {
+  it("allows one Review per Order, rated 1 to 5, with photos", async () => {
+    const { order } = await repo.create(newOrder());
+    const review = await prisma.review.create({
+      data: { accountId: order.accountId, orderId: order.id, rating: 5, body: "Brand new again!", photos: { create: [{ key: "reviews/r/1.jpg", position: 0 }] } },
+      include: { photos: true },
+    });
+    expect(review).toMatchObject({ status: "PENDING", photos: [expect.objectContaining({ key: "reviews/r/1.jpg" })] });
+
+    await expect(prisma.review.create({ data: { accountId: order.accountId, orderId: order.id, rating: 4, body: "Again" } })).rejects.toThrow();
+    await expect(prisma.review.create({ data: { accountId: order.accountId, rating: 6, body: "Too good" } })).rejects.toThrow();
+    await expect(prisma.review.create({ data: { accountId: order.accountId, rating: 0, body: "Nope" } })).rejects.toThrow();
+  });
+
+  it("records refunds and failures consistently", async () => {
+    const { order } = await repo.create(newOrder());
+    const now = new Date();
+    await expect(
+      prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "APPLE_PAY", amountCents: 1500, status: "REFUNDED", receivedAt: now, refundedAt: now, reference: "ch_3N8f" } }),
+    ).resolves.toBeTruthy();
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "CARD", amountCents: 1500, status: "FAILED", failureReason: "card_declined" } })).resolves.toBeTruthy();
+    // A refund must have been received first, and has its own date.
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "CARD", amountCents: 1500, status: "REFUNDED", refundedAt: now } })).rejects.toThrow();
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "CARD", amountCents: 1500, status: "RECEIVED", receivedAt: now, refundedAt: now } })).rejects.toThrow();
+  });
+
+  it("keeps notes on a customer, optionally about an Order, and a notification for the bell", async () => {
+    const { order } = await repo.create(newOrder());
+    await prisma.note.create({ data: { accountId: order.accountId, orderId: order.id, body: "Extra care on the midsole." } });
+    await prisma.note.create({ data: { accountId: order.accountId, body: "Always on time for collections." } });
+    await prisma.notification.create({ data: { kind: "NEW_BOOKING", title: "New booking", orderId: order.id } });
+
+    expect(await prisma.note.count({ where: { accountId: order.accountId } })).toBe(2);
+    expect(await prisma.notification.count({ where: { readAt: null } })).toBe(1);
+  });
+
+  it("tracks stock changes, never a zero change, with unique SKUs", async () => {
+    const item = await prisma.inventoryItem.create({ data: { name: "Crep Protect Spray", sku: "ATU-CP-IT", category: "Cleaning", stock: 12, lowStockAt: 5, unitCostCents: 850 } });
+    try {
+      await prisma.stockMovement.create({ data: { itemId: item.id, change: -2, reason: "USED" } });
+      await expect(prisma.stockMovement.create({ data: { itemId: item.id, change: 0, reason: "ADJUSTMENT" } })).rejects.toThrow();
+      await expect(prisma.inventoryItem.create({ data: { name: "Duplicate", sku: "ATU-CP-IT", category: "Cleaning" } })).rejects.toThrow();
+      await expect(prisma.inventoryItem.update({ where: { id: item.id }, data: { unitCostCents: -1 } })).rejects.toThrow();
+    } finally {
+      await prisma.stockMovement.deleteMany({ where: { itemId: item.id } });
+      await prisma.inventoryItem.delete({ where: { id: item.id } });
+    }
+  });
+
+  it("gives Appointments a status and an optional assignee", async () => {
+    const { order } = await repo.create(newOrder());
+    const collection = await prisma.appointment.findFirstOrThrow({ where: { orderId: order.id } });
+    expect(collection).toMatchObject({ status: "SCHEDULED", assignedToAccountId: null });
   });
 });
