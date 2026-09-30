@@ -158,6 +158,19 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     ).rejects.toThrow(/deposit/);
   });
 
+  it("lets the payment confirmation itself move a pair past Approved, settling the Deposit", async () => {
+    const { deps, orders, order, item } = await seedAt("APPROVED");
+    const moved = await transitionItemStatus(deps, admin, {
+      itemId: item.id,
+      fromStatus: "APPROVED",
+      toStatus: "AWAITING_SNEAKERS",
+      action: "MANUAL_PAYMENT_CONFIRMED",
+      idempotencyKey: "confirm-1",
+    });
+    expect(moved?.status).toBe("AWAITING_SNEAKERS");
+    expect(orders.orders.get(order.id)!.payments.find((payment) => payment.kind === "DEPOSIT")!.status).toBe("RECEIVED");
+  });
+
   it("emails the customer when a pair is ready, once, and stays silent on an idempotent replay", async () => {
     const { deps, notifications, item } = await seedAt("QUALITY_CHECK");
     const move = () =>

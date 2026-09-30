@@ -1,6 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
+import { redactForLog } from "@/shared/logging/redact";
 import { Money } from "@/shared/money/money";
 import { MAX_QUOTE_CENTS } from "../domain";
 import type { OrderRepository } from "../repositories/order-repository";
@@ -63,7 +64,7 @@ export async function sendQuote(
     if (!order || !item) throw new Error("Order not found after quoting");
     await deps.notifications.sendEmail({ to: order.contactEmail, ...quoteSentEmail(order, item) });
   } catch (err) {
-    console.error("[orders] quote saved, but the customer email failed", err);
+    console.error(`[orders] quote saved, but the customer email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
     return { status: "sent", emailFailed: true };
   }
   return { status: "sent", emailFailed: false };

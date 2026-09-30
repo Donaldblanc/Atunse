@@ -3,6 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { adminStatusMoves, canTransition, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
 import { ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
+import { redactForLog } from "@/shared/logging/redact";
 import { statusChangeEmail } from "../status-emails";
 
 export class InvalidTransitionError extends Error {
@@ -57,8 +58,11 @@ export async function transitionItemStatus(
   const current = before?.items.find((item) => item.id === input.itemId);
   if (!before || !current) throw new ItemNotFoundError(input.itemId);
   // A stale fromStatus is left to the repository (ItemStatusChangedError); only judge the move the caller actually saw.
+  const receivesDeposit = input.action === MANUAL_PAYMENT_CONFIRMED;
   if (current.status === input.fromStatus) {
-    const { moves, held } = adminStatusMoves(current, before);
+    // Confirming the payment settles the Deposit in the same write, so it can't be what holds the move (ADR-0002).
+    const payments = receivesDeposit ? before.payments.map((payment) => (payment.kind === "DEPOSIT" ? { ...payment, status: "RECEIVED" as const } : payment)) : before.payments;
+    const { moves, held } = adminStatusMoves(current, { payments });
     if (!moves.includes(input.toStatus)) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, held);
   }
 
@@ -73,7 +77,7 @@ export async function transitionItemStatus(
       idempotencyKey: input.idempotencyKey ?? null,
     },
     // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
-    receivesDeposit: input.action === MANUAL_PAYMENT_CONFIRMED,
+    receivesDeposit,
   });
 
   // updated === null means this idempotency key was already applied
@@ -89,6 +93,6 @@ async function emailCustomer(deps: { orders: OrderRepository; notifications: Not
     const email = order && item ? statusChangeEmail(order, item) : null;
     if (order && email) await deps.notifications.sendEmail({ to: order.contactEmail, ...email });
   } catch (err) {
-    console.error("[orders] status change saved, but the customer email failed", err);
+    console.error(`[orders] status change saved, but the customer email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
   }
 }
