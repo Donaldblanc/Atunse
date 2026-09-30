@@ -244,7 +244,8 @@ model Order {
   notifications Notification[]
   stockUsed     StockMovement[]
 
-  @@index([createdAt])
+  @@index([createdAt]) // the admin Overview's date ranges and Recent Orders
+  @@index([pickupDate]) // the Overview's Today's Schedule (listCollectionsOn)
   @@map("orders")
 }
 
