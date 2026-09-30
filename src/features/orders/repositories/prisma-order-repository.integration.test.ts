@@ -1,6 +1,6 @@
 // Proves the repository seam against a REAL Postgres — not mocked — per
 // Phase 0's "repository and migration integration tests" requirement.
-// Requires DATABASE_URL (see .env.example); run with `npm run test:integration`.
+// Requires TEST_DATABASE_URL (see .env.example); run with `npm run test:integration`.
 
 import { Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";

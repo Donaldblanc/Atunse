@@ -1,9 +1,13 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
+import { OFFLINE_SERVICES_ENV, loadEnv, testDatabaseUrl } from "./src/shared/testing/test-env";
 
 // Repository/migration integration tests against a real Postgres (ADR-0012's
-// build-strategy revision) — run via `npm run test:integration`, needs
-// DATABASE_URL pointed at a real (local Docker or CI service-container) Postgres.
+// build-strategy revision) — run via `npm run test:integration`. They delete
+// data, so they run only against TEST_DATABASE_URL (a database named *_test),
+// never DATABASE_URL: this throws before any test runs if it isn't one.
+const databaseUrl = testDatabaseUrl(loadEnv());
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -14,6 +18,8 @@ export default defineConfig({
     include: ["**/*.integration.test.ts"],
     exclude: ["**/node_modules/**", "demo_mock/**"],
     testTimeout: 20_000,
+    env: { ...OFFLINE_SERVICES_ENV, DATABASE_URL: databaseUrl },
+    globalSetup: ["./src/shared/testing/migrate-test-database.ts"],
     // Every integration file resets the same tables in beforeEach, so files
     // must not run concurrently against the shared database.
     fileParallelism: false,
