@@ -18,6 +18,7 @@ import {
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
 import { BUNDLE_CATALOG, RUSH_FEE_CENTS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
+import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 // The Overview's Order detail dialog (design: View Recent Order Details).
@@ -85,6 +86,23 @@ export interface OrderDetail {
     rush: Money | null;
   };
   notes: OrderNote[];
+  /** What Edit Order's form starts from: the stored values, and the Order's updatedAt for its optimistic check. */
+  edit: OrderEditValues;
+}
+
+export interface OrderEditValues {
+  /** ISO string of Order.updatedAt when this was read (round-trips to the millisecond, as the column stores). */
+  updatedAt: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  line1: string;
+  line2: string;
+  city: string;
+  state: string;
+  zip: string;
+  /** Every pair, cancelled ones too (their details are still the customer's). */
+  pairs: ({ itemId: string; label: string } & Record<PairDetailField, string>)[];
 }
 
 /**
@@ -144,6 +162,22 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       rush: order.rush ? Money.fromCents(RUSH_FEE_CENTS) : null,
     },
     notes,
+    edit: {
+      updatedAt: order.updatedAt.toISOString(),
+      contactName: order.contactName,
+      contactEmail: order.contactEmail,
+      contactPhone: order.contactPhone,
+      line1: address.line1,
+      line2: address.line2 ?? "",
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+      pairs: order.items.map((item, index) => ({
+        itemId: item.id,
+        label: order.items.length > 1 ? `Pair ${index + 1}` : "Pair",
+        ...(Object.fromEntries(PAIR_DETAIL_FIELDS.map((field) => [field, item[field] ?? ""])) as Record<PairDetailField, string>),
+      })),
+    },
   };
 }
 

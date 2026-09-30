@@ -2704,3 +2704,139 @@ a.visit-line:hover,
     flex: 1;
   }
 }
+
+/* ---------- Edit Order & Add note ---------- */
+
+.admin-dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.oe-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.oe-set {
+  min-width: 0;
+  margin: 0;
+}
+
+.oe-set legend {
+  padding: 0;
+  float: left;
+  width: 100%;
+}
+
+.oe-hint {
+  clear: both;
+  margin-bottom: 12px;
+}
+
+.oe-grid {
+  clear: both;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.oe-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.oe-field[data-span="2"] {
+  grid-column: 1 / -1;
+}
+
+.oe-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.oe-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 16px; /* prevents iOS zoom-on-focus */
+}
+
+textarea.oe-input {
+  resize: vertical;
+}
+
+.oe-input:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(41, 85, 255, 0.2);
+}
+
+.oe-input[aria-invalid="true"] {
+  border-color: var(--delta-down-ink);
+}
+
+.oe-error {
+  margin-top: 0;
+}
+
+.oe-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.oe-note-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+  .oe-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oe-actions .admin-btn {
+    flex: 1;
+  }
+
+  .oe-note-form .admin-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Title and close on one line; header buttons drop under the title at full width. */
+  .admin-dialog-head {
+    flex-wrap: wrap;
+  }
+
+  .admin-dialog-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .admin-dialog-actions {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .admin-dialog-actions .admin-btn {
+    flex: 1;
+  }
+}

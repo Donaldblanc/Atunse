@@ -7,6 +7,7 @@
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
 import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
   BundleNotFoundError,
@@ -14,6 +15,8 @@ import {
   ItemNotFoundError,
   ItemStatusChangedError,
   NoPendingDepositError,
+  OrderChangedError,
+  OrderNotFoundError,
   PhotoKeyInUseError,
   AppointmentCancelledError,
   AppointmentNotFoundError,
@@ -85,6 +88,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
       createdAt: new Date(),
+      updatedAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,
       termsAcceptance: { ...input.terms, acknowledgments: { ...input.terms.acknowledgments }, acceptedAt: input.policyAcceptedAt },
       fulfillment: input.fulfillment,
@@ -106,6 +110,7 @@ export class InMemoryOrderRepository implements OrderRepository {
         material: item.material,
         size: null,
         colorway: null,
+        condition: null,
         serviceIds: item.serviceIds,
         estimate: item.estimate,
         status: "REQUEST_SUBMITTED",
@@ -294,5 +299,48 @@ export class InMemoryOrderRepository implements OrderRepository {
       });
     }
     return true;
+  }
+
+  async updateOrderDetails(params: {
+    orderId: string;
+    expectedUpdatedAt: Date;
+    details: OrderDetailsInput;
+    actorAccountId: string | null;
+    idempotencyKey: string;
+  }): Promise<"updated" | "unchanged" | "already-applied"> {
+    const order = this.orders.get(params.orderId);
+    if (!order) throw new OrderNotFoundError(params.orderId);
+    const keys = [params.idempotencyKey, `${params.idempotencyKey}:contact`];
+    if (order.items.some((item) => keys.some((key) => this.appliedIdempotencyKeys.has(`${item.id}:${key}`)))) return "already-applied";
+    if (order.updatedAt.getTime() !== params.expectedUpdatedAt.getTime()) throw new OrderChangedError();
+    const stranger = params.details.pairs.find((pair) => !order.items.some((item) => item.id === pair.itemId));
+    if (stranger) throw new ItemNotFoundError(stranger.itemId);
+
+    const diff = diffOrderDetails(order, params.details);
+    if (isNoop(diff)) return "unchanged";
+
+    const { contact, address, pairs } = params.details;
+    order.contactName = contact.name;
+    order.contactEmail = contact.email;
+    order.contactPhone = contact.phone;
+    order.fulfillment = { ...order.fulfillment, address: { ...address } };
+    // A later edit must see a later stamp even inside the same millisecond.
+    order.updatedAt = new Date(Math.max(Date.now(), order.updatedAt.getTime() + 1));
+    for (const { itemId, ...fields } of pairs) Object.assign(order.items.find((item) => item.id === itemId)!, fields);
+
+    const record = (itemId: string, action: string, key: string, metadata: Record<string, unknown>) => {
+      this.appliedIdempotencyKeys.add(`${itemId}:${key}`);
+      this.auditEntries.push({ itemId, action, fromStatus: null, toStatus: null, actorAccountId: params.actorAccountId, idempotencyKey: key, metadata, at: new Date() });
+    };
+    for (const change of diff.pairs) record(change.itemId, DETAILS_EDITED, params.idempotencyKey, { changes: change.changes });
+    if (diff.contact.length > 0) record(order.items[0]!.id, ORDER_CONTACT_EDITED, `${params.idempotencyKey}:contact`, { fields: diff.contact });
+    return "updated";
+  }
+
+  async addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote> {
+    if (!this.orders.has(params.orderId)) throw new OrderNotFoundError(params.orderId);
+    const note = { id: fakeId("note"), orderId: params.orderId, body: params.body, createdAt: new Date() };
+    this.notes.push(note);
+    return { id: note.id, body: note.body, createdAt: note.createdAt };
   }
 }

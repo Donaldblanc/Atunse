@@ -1,10 +1,12 @@
-import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PencilSimpleIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type Payment } from "@/features/orders/domain";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import type { OrderDetail, OrderDetailPair } from "./order-detail";
+import { OrderEditForm } from "./order-edit-form";
+import { OrderNoteForm } from "./order-note-form";
 import { PairThumb } from "./pair-thumb";
 import { STATUS_TONE } from "./status-tone";
 import { UpdateStatusForm } from "./update-status-form";
@@ -59,10 +61,25 @@ export function OrderNotFoundDialog({ closeHref }: { closeHref: string }) {
  * Order detail (design: View Recent Order Details): who the customer is,
  * each pair with its Services, where the Order is in the pipeline and how
  * it's being paid. Opened by `?order=<id>` from any Overview list. It's
- * read-only apart from Update Status; Edit Order and the "…" menu have no
- * feature behind them yet (docs/TODO.md), so they aren't drawn.
+ * read-only apart from Update Status, Add note, and Edit Order, which swaps
+ * the body for a form (`editing`, from `?edit=order`); the "…" menu has no
+ * feature behind it yet (docs/TODO.md), so it isn't drawn.
  */
-export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; closeHref: string }) {
+export function OrderDetailDialog({
+  detail,
+  closeHref,
+  viewHref,
+  editHref,
+  editing = false,
+}: {
+  detail: OrderDetail;
+  closeHref: string;
+  /** This Order's plain dialog: where Cancel and a saved edit return to. */
+  viewHref: string;
+  /** This Order's edit view. */
+  editHref: string;
+  editing?: boolean;
+}) {
   const { customer, payment } = detail;
   const multiple = detail.pairs.length > 1;
   const initials = customer.name
@@ -76,6 +93,13 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
     <AdminDialog
       size="lg"
       closeHref={closeHref}
+      actions={
+        editing ? null : (
+          <Link href={editHref} replace scroll={false} className="admin-btn" data-variant="secondary">
+            <PencilSimpleIcon size={16} aria-hidden="true" /> Edit Order
+          </Link>
+        )
+      }
       title={
         <span className="od-title">
           <span className="od-title-icon" aria-hidden="true">
@@ -94,6 +118,10 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
         </span>
       }
     >
+      {editing ? (
+        // Keyed by the Order's stamp, so a reload after a stale-edit refusal starts a fresh form (and a fresh key).
+        <OrderEditForm key={detail.edit.updatedAt} orderId={detail.orderId} values={detail.edit} viewHref={viewHref} idempotencyKey={randomUUID()} />
+      ) : (
       <div className="od-grid">
         <div className="od-column">
           <section className="ov-card od-card" aria-labelledby="od-customer-title">
@@ -241,7 +269,7 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
               <p className="od-muted">No notes on this order.</p>
             ) : (
               <ul className="od-notes">
-                {detail.notes.map((note) => (
+                {[...detail.notes].reverse().map((note) => (
                   <li key={note.id}>
                     <p>{note.body}</p>
                     <span className="od-muted">{shopDay.format(note.createdAt)}</span>
@@ -249,9 +277,11 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
                 ))}
               </ul>
             )}
+            <OrderNoteForm orderId={detail.orderId} />
           </section>
         </div>
       </div>
+      )}
     </AdminDialog>
   );
 }

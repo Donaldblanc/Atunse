@@ -182,6 +182,14 @@ describe("getOrderDetail", () => {
     expect((await getOrderDetail(deps, ADMIN, order.id))!.notes.map((note) => note.body)).toEqual(["First", "Second"]);
   });
 
+  it("carries what Edit Order starts from: stored values, blanks as empty text, and the Order's stamp", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    const { edit } = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(edit).toMatchObject({ updatedAt: order.updatedAt.toISOString(), contactName: order.contactName, line1: "12 Elm St", line2: "Apt 4", state: "NY", zip: "11201" });
+    expect(edit.pairs).toEqual([expect.objectContaining({ itemId: order.items[0]!.id, label: "Pair", size: "", condition: "" })]);
+  });
+
   it("doesn't read a confirmed deposit as a status change", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder());

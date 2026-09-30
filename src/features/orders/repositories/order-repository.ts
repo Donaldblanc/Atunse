@@ -3,6 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
+import type { OrderDetailsInput } from "../order-details";
 import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
@@ -61,6 +62,22 @@ export class PhotoKeyInUseError extends Error {
   constructor() {
     super("A photo is already attached to another booking.");
     this.name = "PhotoKeyInUseError";
+  }
+}
+
+/** No Order has this id. Nothing was written. */
+export class OrderNotFoundError extends Error {
+  constructor(readonly orderId: string) {
+    super("Order not found.");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+/** The Order was edited after the admin's form was rendered (a second tab, another admin). Nothing was written. */
+export class OrderChangedError extends Error {
+  constructor() {
+    super("This order changed since you opened it. Reload and try again.");
+    this.name = "OrderChangedError";
   }
 }
 
@@ -280,4 +297,30 @@ export interface OrderRepository {
    * (same rule as listAwaitingDeposit), having written nothing.
    */
   confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
+
+  /**
+   * Edit Order: writes the contact, address and pair details in one
+   * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
+   * (else OrderChangedError, nothing written). Records what changed
+   * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
+   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
+   * address changes (there is no Order-level audit table). Returns
+   * "unchanged" when nothing differs (nothing written), "already-applied"
+   * when `idempotencyKey` was recorded by an earlier call (a retry).
+   * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
+   */
+  updateOrderDetails(params: {
+    orderId: string;
+    expectedUpdatedAt: Date;
+    details: OrderDetailsInput;
+    actorAccountId: string | null;
+    idempotencyKey: string;
+  }): Promise<"updated" | "unchanged" | "already-applied">;
+
+  /**
+   * Adds an admin's note to the Order (filed under the Order's customer
+   * Account; customers never see Notes). Append-only: nothing edits or
+   * removes one yet. Throws OrderNotFoundError.
+   */
+  addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
 }

@@ -131,6 +131,8 @@ export interface Item {
   size: string | null;
   /** e.g. "Black / White"; null until the owner enters it. */
   colorway: string | null;
+  /** The owner's assessment on Order detail, e.g. "Good"; null until entered. */
+  condition: string | null;
   serviceIds: string[];
   /** This pair's estimate from the service catalog, before Rush. */
   estimate: Money;
@@ -198,6 +200,8 @@ export interface Order {
   contactEmail: string;
   contactPhone: string;
   createdAt: Date;
+  /** Bumped by every write to the Order row itself; Edit Order's optimistic check reads it. */
+  updatedAt: Date;
   policyAcceptedAt: Date;
   /** Null only for Orders from before the agreement existed. */
   termsAcceptance: TermsAcceptance | null;
