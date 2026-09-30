@@ -222,7 +222,7 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     // A Collection called off, and John's pair going back this afternoon.
     const calledOff = await book(d.orders, "2026-09-24T15:00:00Z", collection("2026-09-29", "11:00 AM – 11:30 AM", "Lauren S."));
     calledOff.appointments[0]!.status = "CANCELLED";
-    john.appointments.push({ id: "apt_return", kind: "RETURN", status: "SCHEDULED", ...collectionTimes("2026-09-29", "4:00 PM – 4:30 PM") });
+    john.appointments.push({ id: "apt_return", kind: "RETURN", status: "SCHEDULED", notes: null, ...collectionTimes("2026-09-29", "4:00 PM – 4:30 PM") });
 
     const { todaysSchedule } = await getAdminOverview(d, ADMIN, "this-week");
 
@@ -232,6 +232,7 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
       ["6:30 PM", "Sarah Kim", "COLLECTION"],
     ]);
     expect(todaysSchedule[0]!.reference).toBe(`ATU-${john.number}`);
+    expect(todaysSchedule[0]!.appointmentId).toBe(john.appointments[0]!.id);
   });
 });
 

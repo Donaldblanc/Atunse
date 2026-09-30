@@ -2362,3 +2362,150 @@ a.admin-nav-item:hover {
     font-size: 20px;
   }
 }
+
+/* ---------- Schedule Item dialog ---------- */
+
+/* Today's Schedule rows: the customer's name is the link, stretched over the row. */
+.ov-schedule-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.ov-schedule li:hover .ov-schedule-link {
+  color: var(--color-accent-deep);
+}
+
+.visit-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visit-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.visit-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 999px;
+  background: #e4ebff;
+  color: var(--color-accent-deep);
+}
+
+.visit-summary-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.visit-summary-name .ov-tag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.visit-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.visit-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.visit-heading {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.visit-customer,
+.visit-order {
+  display: flex;
+  gap: 14px;
+}
+
+.visit-customer-lines,
+.visit-order-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.visit-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.visit-line svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+a.visit-line:hover,
+.visit-order-link:hover {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+}
+
+.visit-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+}
+
+.visit-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.visit-facts dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+.visit-facts dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .visit-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .visit-actions > *,
+  .visit-actions form .admin-btn {
+    width: 100%;
+  }
+}

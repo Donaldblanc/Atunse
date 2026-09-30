@@ -56,6 +56,8 @@ export interface RecentOrder {
 
 /** A Local Drop-Off visit scheduled for today: DJ collecting a pair, or dropping it back off. */
 export interface ScheduledVisit {
+  /** The Appointment, for the `?visit=` link to its Schedule Item dialog. */
+  appointmentId: string;
   orderId: string;
   reference: string;
   customerName: string;
@@ -157,6 +159,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     todaysSchedule: appointments
       .filter((appointment) => appointment.order.itemStatuses.some((status) => status !== "CANCELLED"))
       .map((appointment) => ({
+        appointmentId: appointment.id,
         orderId: appointment.order.id,
         reference: orderNumber(appointment.order.number),
         customerName: appointment.order.contactName,

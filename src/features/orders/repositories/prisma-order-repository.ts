@@ -8,6 +8,9 @@ import {
   ItemStatusChangedError,
   PhotoKeyInUseError,
   BundleNotFoundError,
+  AppointmentCancelledError,
+  AppointmentNotFoundError,
+  type AppointmentWithOrder,
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
@@ -92,7 +95,7 @@ function toDomainPayment(row: OrderRow["payments"][number]): Payment {
 }
 
 function toDomainAppointment(row: OrderRow["appointments"][number]): Appointment {
-  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt };
+  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt, notes: row.notes };
 }
 
 function toDomainOrder(row: OrderRow): Order {
@@ -392,5 +395,19 @@ export class PrismaOrderRepository implements OrderRepository {
       orderBy: { createdAt: "asc" },
     });
     return rows.map((row) => ({ itemId: row.itemId, toStatus: row.toStatus!, at: row.createdAt }));
+  }
+
+  async findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null> {
+    const row = await this.prisma.appointment.findUnique({ where: { id: appointmentId }, include: { order: { include: ORDER_INCLUDE } } });
+    return row ? { appointment: toDomainAppointment(row), order: toDomainOrder(row.order) } : null;
+  }
+
+  async completeAppointment(appointmentId: string): Promise<Appointment> {
+    // The status is part of the WHERE, so a concurrent cancel can't be overwritten.
+    await this.prisma.appointment.updateMany({ where: { id: appointmentId, status: "SCHEDULED" }, data: { status: "COMPLETED" } });
+    const row = await this.prisma.appointment.findUnique({ where: { id: appointmentId } });
+    if (!row) throw new AppointmentNotFoundError(appointmentId);
+    if (row.status === "CANCELLED") throw new AppointmentCancelledError();
+    return toDomainAppointment(row);
   }
 }

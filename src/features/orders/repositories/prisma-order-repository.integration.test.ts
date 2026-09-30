@@ -6,6 +6,8 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import {
+  AppointmentCancelledError,
+  AppointmentNotFoundError,
   BundleNotFoundError,
   EmailTakenError,
   ItemNotFoundError,
@@ -607,6 +609,35 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
 
     await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "FAILED", failureReason: "card_declined" } });
     await expect(prisma.payment.create({ data: { orderId: order.id, kind: "DEPOSIT", method: "CARD", amountCents: 1500 } })).resolves.toBeTruthy();
+  });
+
+  it("finds an Appointment of any status with its whole Order and notes, or null", async () => {
+    const { order } = await repo.create(newOrder({ contactName: "John Doe" }));
+    const appointmentId = order.appointments[0]!.id;
+    await prisma.appointment.update({ where: { id: appointmentId }, data: { status: "CANCELLED", notes: "Gate code 4411" } });
+
+    const found = await repo.findAppointment(appointmentId);
+
+    expect(found?.appointment).toMatchObject({ id: appointmentId, kind: "COLLECTION", status: "CANCELLED", notes: "Gate code 4411" });
+    expect(found?.order).toMatchObject({ id: order.id, contactName: "John Doe" });
+    expect(found?.order.items).toHaveLength(1);
+    expect(await repo.findAppointment("no-such-appointment")).toBeNull();
+  });
+
+  it("completes a SCHEDULED Appointment, idempotently, and never a cancelled or missing one", async () => {
+    const { order } = await repo.create(newOrder());
+    const appointmentId = order.appointments[0]!.id;
+
+    expect((await repo.completeAppointment(appointmentId)).status).toBe("COMPLETED");
+    expect((await repo.completeAppointment(appointmentId)).status).toBe("COMPLETED");
+    // Only the Appointment moves: the pair's status is transitionItemStatus's business.
+    expect((await repo.findById(order.id))!.items[0]!.status).toBe("REQUEST_SUBMITTED");
+
+    const calledOff = (await repo.create(newOrder())).order.appointments[0]!.id;
+    await prisma.appointment.update({ where: { id: calledOff }, data: { status: "CANCELLED" } });
+    await expect(repo.completeAppointment(calledOff)).rejects.toThrow(AppointmentCancelledError);
+    expect((await repo.findAppointment(calledOff))!.appointment.status).toBe("CANCELLED");
+    await expect(repo.completeAppointment("no-such-appointment")).rejects.toThrow(AppointmentNotFoundError);
   });
 });
 

@@ -116,6 +116,28 @@ export interface ScheduledAppointment extends Appointment {
   order: { id: string; number: number; contactName: string; itemStatuses: ItemStatus[] };
 }
 
+/** One Appointment with the whole Order it belongs to (the Overview's Schedule Item dialog). */
+export interface AppointmentWithOrder {
+  appointment: Appointment;
+  order: Order;
+}
+
+/** No Appointment has this id. Nothing was written. */
+export class AppointmentNotFoundError extends Error {
+  constructor(readonly appointmentId: string) {
+    super("Appointment not found.");
+    this.name = "AppointmentNotFoundError";
+  }
+}
+
+/** A cancelled Appointment can't be completed. Nothing was written. */
+export class AppointmentCancelledError extends Error {
+  constructor() {
+    super("This visit was cancelled, so it can't be completed.");
+    this.name = "AppointmentCancelledError";
+  }
+}
+
 export interface AwaitingDeposits {
   orders: number;
   deposits: Money;
@@ -203,4 +225,17 @@ export interface OrderRepository {
 
   /** Every status change recorded on the Order's Items, oldest first. Booking isn't one: an Item starts in its first status. */
   listStatusChanges(orderId: string): Promise<StatusChange[]>;
+
+  /** One Appointment (any status) with its Order, or null if no Appointment has this id. */
+  findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null>;
+
+  /**
+   * Marks an Appointment COMPLETED, only from SCHEDULED. Already COMPLETED
+   * is success (a double-click or retry changes nothing), so this is
+   * idempotent without a key. It changes the Appointment only: the pairs'
+   * statuses move through transitionItemStatus, never as a side effect.
+   * Throws AppointmentNotFoundError or AppointmentCancelledError, having
+   * written nothing.
+   */
+  completeAppointment(appointmentId: string): Promise<Appointment>;
 }

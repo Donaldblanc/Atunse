@@ -154,6 +154,8 @@ export interface Appointment {
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   startsAt: Date;
   endsAt: Date;
+  /** What the owner wrote for this visit (gate code, "call on arrival"); null when there is none. */
+  notes: string | null;
 }
 
 export interface Order {
