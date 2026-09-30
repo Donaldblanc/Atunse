@@ -130,6 +130,38 @@ export class AppointmentNotFoundError extends Error {
   }
 }
 
+/** Rescheduling only moves a SCHEDULED Appointment; this one is COMPLETED or CANCELLED. Nothing was written. */
+export class AppointmentNotScheduledError extends Error {
+  constructor(readonly status: Appointment["status"]) {
+    super("Only a scheduled visit can be moved.");
+    this.name = "AppointmentNotScheduledError";
+  }
+}
+
+/** The Appointment is at neither the time the caller saw nor the time it asked for: someone moved it meanwhile. */
+export class AppointmentMovedError extends Error {
+  constructor() {
+    super("This visit was moved by someone else. Reload to see its current time.");
+    this.name = "AppointmentMovedError";
+  }
+}
+
+/** No Order has this id. Nothing was written. */
+export class OrderNotFoundError extends Error {
+  constructor(readonly orderId: string) {
+    super("Order not found.");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+/** The Order's Return is already booked (SCHEDULED at another time, or COMPLETED). Nothing was written. */
+export class ReturnAlreadyBookedError extends Error {
+  constructor() {
+    super("This order already has a return visit booked.");
+    this.name = "ReturnAlreadyBookedError";
+  }
+}
+
 /** A cancelled Appointment can't be completed. Nothing was written. */
 export class AppointmentCancelledError extends Error {
   constructor() {
@@ -280,4 +312,34 @@ export interface OrderRepository {
    * (same rule as listAwaitingDeposit), having written nothing.
    */
   confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
+
+  /**
+   * Moves a SCHEDULED Appointment to a new time, changing startsAt/endsAt
+   * only (the Order keeps the collection time the customer booked, CONTEXT.md).
+   * `expectedStartsAt` is the time the caller saw: the move applies only if the
+   * Appointment is still there, which makes it idempotent without a stored key
+   * (ADR-0012; there is no column for one). Already at the requested time
+   * returns `changed: false` (a replay); at some third time throws
+   * AppointmentMovedError. Throws AppointmentNotFoundError, or
+   * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
+   * written nothing.
+   */
+  rescheduleAppointment(params: {
+    appointmentId: string;
+    expectedStartsAt: Date;
+    startsAt: Date;
+    endsAt: Date;
+  }): Promise<{ appointment: Appointment; changed: boolean }>;
+
+  /**
+   * Books the Order's RETURN Appointment (SCHEDULED). There is one RETURN per
+   * Order (unique on orderId + kind), so: none yet creates it; a CANCELLED one
+   * is reused (set back to SCHEDULED at the new time) because a second row
+   * would violate the constraint; one already SCHEDULED at exactly this time
+   * is a replay (`created: false`); anything else (SCHEDULED elsewhere, or
+   * COMPLETED) throws ReturnAlreadyBookedError. Whether the Order may have a
+   * Return at all (Local Drop-Off, a pair ready) is the use-case's rule.
+   * Throws OrderNotFoundError, having written nothing.
+   */
+  bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
 }

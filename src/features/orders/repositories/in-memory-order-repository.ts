@@ -16,7 +16,11 @@ import {
   NoPendingDepositError,
   PhotoKeyInUseError,
   AppointmentCancelledError,
+  AppointmentMovedError,
   AppointmentNotFoundError,
+  AppointmentNotScheduledError,
+  OrderNotFoundError,
+  ReturnAlreadyBookedError,
   type AppointmentWithOrder,
   type AwaitingDepositOrder,
   type AwaitingDeposits,
@@ -294,5 +298,34 @@ export class InMemoryOrderRepository implements OrderRepository {
       });
     }
     return true;
+  }
+
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+    const found = await this.findAppointment(params.appointmentId);
+    if (!found) throw new AppointmentNotFoundError(params.appointmentId);
+    const { appointment } = found;
+    if (appointment.status !== "SCHEDULED") throw new AppointmentNotScheduledError(appointment.status);
+    if (appointment.startsAt.getTime() === params.startsAt.getTime()) return { appointment, changed: false };
+    if (appointment.startsAt.getTime() !== params.expectedStartsAt.getTime()) throw new AppointmentMovedError();
+    appointment.startsAt = params.startsAt;
+    appointment.endsAt = params.endsAt;
+    return { appointment, changed: true };
+  }
+
+  async bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }) {
+    const order = this.orders.get(params.orderId);
+    if (!order) throw new OrderNotFoundError(params.orderId);
+    const existing = order.appointments.find((appointment) => appointment.kind === "RETURN");
+    if (existing?.status === "CANCELLED") {
+      Object.assign(existing, { status: "SCHEDULED", startsAt: params.startsAt, endsAt: params.endsAt, notes: null });
+      return { appointment: existing, created: true };
+    }
+    if (existing) {
+      if (existing.status === "SCHEDULED" && existing.startsAt.getTime() === params.startsAt.getTime()) return { appointment: existing, created: false };
+      throw new ReturnAlreadyBookedError();
+    }
+    const appointment: Appointment = { id: fakeId("appointment"), kind: "RETURN", status: "SCHEDULED", notes: null, startsAt: params.startsAt, endsAt: params.endsAt };
+    order.appointments.push(appointment);
+    return { appointment, created: true };
   }
 }

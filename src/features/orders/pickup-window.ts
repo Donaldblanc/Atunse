@@ -76,6 +76,21 @@ export function availablePickupSlots(date: CalendarDate, now: Date): string[] {
 }
 
 /**
+ * The slots the owner can book a visit into on `date`, at instant `now`
+ * (rescheduling a Collection, booking a Return). The same window and slot
+ * grid as customers get, but WITHOUT the customer lead time: the lead time
+ * exists so the owner can plan a route around a booking, and here the owner
+ * is the one planning. A slot that has already started is still refused,
+ * so today offers the slots from now on.
+ */
+export function adminVisitSlots(date: CalendarDate, now: Date): string[] {
+  const clock = shopClock(now);
+  if (date < clock.date) return [];
+  if (date > clock.date) return SLOTS.map((slot) => slot.label);
+  return SLOTS.filter((slot) => slot.startMinutes >= clock.minutes).map((slot) => slot.label);
+}
+
+/**
  * Whether a calendar day can be picked: from the shop's today onward, and
  * for Pickup only while that day still has a bookable slot.
  */

@@ -98,8 +98,23 @@ describe("getReadyToReturn", () => {
     const rows = await getReadyToReturn({ orders }, ADMIN);
 
     expect(rows).toEqual([
-      { orderId: ready.id, reference: `ATU-${ready.number}`, customerName: "Jordan Smith", pairsReady: 2, fulfillment: "Mail-In", bookedOn: "Sep 28, 2026" },
+      { orderId: ready.id, reference: `ATU-${ready.number}`, customerName: "Jordan Smith", pairsReady: 2, fulfillment: "Mail-In", bookedOn: "Sep 28, 2026", returnVisit: { kind: "none" } },
     ]);
+  });
+
+  it("offers a return visit for Local Drop-Off, and shows it once booked", async () => {
+    const orders = new InMemoryOrderRepository();
+    const local = await book(
+      orders,
+      "2026-09-28T14:00:00Z",
+      order({ fulfillment: { method: "PICKUP", address: { line1: "1 A St", line2: null, city: "New York", state: "NY", zip: "10001" }, date: "2026-10-03", slot: "4:30 PM – 5:00 PM" } }),
+    );
+    local.items[0]!.status = "READY_FOR_PICKUP_SHIPPING";
+
+    expect((await getReadyToReturn({ orders }, ADMIN))[0]!.returnVisit).toEqual({ kind: "bookable" });
+
+    const { appointment } = await orders.bookReturnAppointment({ orderId: local.id, startsAt: new Date("2026-10-08T14:00:00Z"), endsAt: new Date("2026-10-08T14:30:00Z") });
+    expect((await getReadyToReturn({ orders }, ADMIN))[0]!.returnVisit).toEqual({ kind: "booked", appointmentId: appointment.id, when: "Thu, Oct 8, 10:00 AM" });
   });
 });
 

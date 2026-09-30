@@ -155,9 +155,11 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
         <a className="admin-btn" data-variant="secondary" href={`tel:${visit.customer.phone.replace(/[^\d+]/g, "")}`}>
           <PhoneIcon size={18} aria-hidden="true" /> Contact Customer
         </a>
-        <button type="button" className="admin-btn" data-variant="secondary" disabled title="Rescheduling arrives with the Calendar (docs/TODO.md)">
-          Reschedule
-        </button>
+        {visit.status === "SCHEDULED" && (
+          <Link className="admin-btn" data-variant="secondary" href={overviewHref(selection, { visit: visit.appointmentId, reschedule: "1" })} scroll={false}>
+            Reschedule
+          </Link>
+        )}
       </div>
     </AdminDialog>
   );

@@ -45,6 +45,7 @@ import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { TodaysSchedule } from "@/features/admin-overview/todays-schedule";
 import { buildVisitDeps } from "@/features/admin-overview/visit-deps";
 import { VisitDialog } from "@/features/admin-overview/visit-dialog";
+import { BookReturnAction, RescheduleDialog, ReturnBookingDialog } from "@/features/admin-overview/visit-schedule-dialogs";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
@@ -202,8 +203,15 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
 
       {/* A modal <dialog> sits in the top layer, so it doesn't take part in this grid. */}
       {metric && <MetricDetailDialog metric={metric} overview={overview} through={highlight} closeHref={closeHref} />}
-      {visitId && <VisitDialog visit={visit} selection={selection} />}
-      {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
+      {visitId && (params.reschedule === "1" && visit ? <RescheduleDialog visit={visit} selection={selection} now={deps.now()} /> : <VisitDialog visit={visit} selection={selection} />)}
+      {orderId && params.book === "return" && <ReturnBookingDialog orderId={orderId} selection={selection} actingUser={actingUser} now={deps.now()} />}
+      {orderId &&
+        params.book !== "return" &&
+        (orderDetail ? (
+          <OrderDetailDialog detail={orderDetail} closeHref={closeHref} returnAction={<BookReturnAction orderId={orderId} selection={selection} actingUser={actingUser} />} />
+        ) : (
+          <OrderNotFoundDialog closeHref={closeHref} />
+        ))}
       {attentionPanel && <AttentionPanel panel={attentionPanel} selection={selection} actingUser={actingUser} />}
     </div>
   );

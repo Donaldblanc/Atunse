@@ -62,7 +62,7 @@ export function OrderNotFoundDialog({ closeHref }: { closeHref: string }) {
  * read-only apart from Update Status; Edit Order and the "…" menu have no
  * feature behind them yet (docs/TODO.md), so they aren't drawn.
  */
-export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; closeHref: string }) {
+export function OrderDetailDialog({ detail, closeHref, returnAction }: { detail: OrderDetail; closeHref: string; returnAction?: React.ReactNode }) {
   const { customer, payment } = detail;
   const multiple = detail.pairs.length > 1;
   const initials = customer.name
@@ -178,6 +178,7 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
               ))}
             </ol>
             <UpdateStatuses detail={detail} />
+            {returnAction}
           </section>
 
           <section className="ov-card od-card" aria-labelledby="od-payment-title">

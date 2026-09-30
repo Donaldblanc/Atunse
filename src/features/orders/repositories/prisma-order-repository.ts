@@ -10,7 +10,11 @@ import {
   PhotoKeyInUseError,
   BundleNotFoundError,
   AppointmentCancelledError,
+  AppointmentMovedError,
   AppointmentNotFoundError,
+  AppointmentNotScheduledError,
+  OrderNotFoundError,
+  ReturnAlreadyBookedError,
   type AppointmentWithOrder,
   type AwaitingDepositOrder,
   type AwaitingDeposits,
@@ -474,5 +478,51 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       return true;
     });
+  }
+
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+    // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
+    const moved = await this.prisma.appointment.updateMany({
+      where: { id: params.appointmentId, status: "SCHEDULED", startsAt: params.expectedStartsAt },
+      data: { startsAt: params.startsAt, endsAt: params.endsAt },
+    });
+    const row = await this.prisma.appointment.findUnique({ where: { id: params.appointmentId } });
+    if (!row) throw new AppointmentNotFoundError(params.appointmentId);
+    if (moved.count === 1) return { appointment: toDomainAppointment(row), changed: true };
+    if (row.status !== "SCHEDULED") throw new AppointmentNotScheduledError(row.status);
+    if (row.startsAt.getTime() === params.startsAt.getTime()) return { appointment: toDomainAppointment(row), changed: false };
+    throw new AppointmentMovedError();
+  }
+
+  async bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }) {
+    if (!(await this.prisma.order.findUnique({ where: { id: params.orderId }, select: { id: true } }))) throw new OrderNotFoundError(params.orderId);
+    // A concurrent booking can insert between the read and the create; the unique index catches it and the loop re-reads.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const existing = await this.prisma.appointment.findUnique({ where: { orderId_kind: { orderId: params.orderId, kind: "RETURN" } } });
+      if (existing?.status === "CANCELLED") {
+        const revived = await this.prisma.appointment.updateMany({
+          where: { id: existing.id, status: "CANCELLED" },
+          data: { status: "SCHEDULED", startsAt: params.startsAt, endsAt: params.endsAt, notes: null },
+        });
+        if (revived.count === 1) {
+          const row = await this.prisma.appointment.findUniqueOrThrow({ where: { id: existing.id } });
+          return { appointment: toDomainAppointment(row), created: true };
+        }
+        continue;
+      }
+      if (existing) {
+        if (existing.status === "SCHEDULED" && existing.startsAt.getTime() === params.startsAt.getTime()) {
+          return { appointment: toDomainAppointment(existing), created: false };
+        }
+        throw new ReturnAlreadyBookedError();
+      }
+      try {
+        const row = await this.prisma.appointment.create({ data: { orderId: params.orderId, kind: "RETURN", startsAt: params.startsAt, endsAt: params.endsAt } });
+        return { appointment: toDomainAppointment(row), created: true };
+      } catch (err) {
+        if (!uniqueViolationFields(err)) throw err;
+      }
+    }
+    throw new ReturnAlreadyBookedError();
   }
 }

@@ -17,6 +17,8 @@ export interface ScheduledVisitDetail {
   appointmentId: string;
   kind: Appointment["kind"];
   status: Appointment["status"];
+  /** The start instant: what Reschedule sends back so a stale dialog can't overwrite a newer move. */
+  startsAt: Date;
   /** "6:00 PM – 6:30 PM", shop time. */
   window: string;
   /** "Fri, Sep 26, 2026", shop time. */
@@ -80,6 +82,7 @@ export async function getScheduledVisit(
     appointmentId: appointment.id,
     kind: appointment.kind,
     status: appointment.status,
+    startsAt: appointment.startsAt,
     window: `${visitTime.format(appointment.startsAt)} – ${visitTime.format(appointment.endsAt)}`,
     // Formatted from the shop-time day, so an evening visit never shows the next UTC day.
     date: visitDate.format(calendarDateToUtcMidnight(calendarDateInShopTime(appointment.startsAt))),
