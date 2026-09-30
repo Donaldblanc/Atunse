@@ -6,7 +6,7 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { liveEstimate, livePairs, type AuditEntry, type Item, type ItemStatus, type Order, type PaymentMethod } from "../domain";
+import { liveEstimate, livePairs, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type PaymentMethod } from "../domain";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
   BundleNotFoundError,
@@ -14,6 +14,9 @@ import {
   ItemNotFoundError,
   ItemStatusChangedError,
   PhotoKeyInUseError,
+  AppointmentCancelledError,
+  AppointmentNotFoundError,
+  type AppointmentWithOrder,
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
@@ -116,7 +119,7 @@ export class InMemoryOrderRepository implements OrderRepository {
             },
           ]
         : [],
-      appointments: input.collection ? [{ id: fakeId("appointment"), kind: "COLLECTION", status: "SCHEDULED", ...input.collection }] : [],
+      appointments: input.collection ? [{ id: fakeId("appointment"), kind: "COLLECTION", status: "SCHEDULED", notes: null, ...input.collection }] : [],
     };
     for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
@@ -209,5 +212,21 @@ export class InMemoryOrderRepository implements OrderRepository {
       deposits: pending.reduce((sum, payment) => sum.add(payment.amount), Money.zero()),
       byMethod,
     };
+  }
+
+  async findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null> {
+    for (const order of this.orders.values()) {
+      const appointment = order.appointments.find((candidate) => candidate.id === appointmentId);
+      if (appointment) return { appointment, order };
+    }
+    return null;
+  }
+
+  async completeAppointment(appointmentId: string): Promise<Appointment> {
+    const found = await this.findAppointment(appointmentId);
+    if (!found) throw new AppointmentNotFoundError(appointmentId);
+    if (found.appointment.status === "CANCELLED") throw new AppointmentCancelledError();
+    found.appointment.status = "COMPLETED";
+    return found.appointment;
   }
 }

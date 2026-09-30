@@ -24,14 +24,18 @@ import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
-import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
+import { getAdminOverview } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
 import { SAMPLE_LOW_STOCK_ITEMS, SAMPLE_REVIEWS, SAMPLE_UNREAD_MESSAGES, type SampleReview } from "@/features/admin-overview/sample-data";
+import { getScheduledVisit } from "@/features/admin-overview/scheduled-visit";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
+import { TodaysSchedule } from "@/features/admin-overview/todays-schedule";
+import { buildVisitDeps } from "@/features/admin-overview/visit-deps";
+import { VisitDialog } from "@/features/admin-overview/visit-dialog";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
@@ -42,10 +46,14 @@ export const metadata = { title: "Overview · Atunṣe Admin" };
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: SearchParams }) {
-  const rangeId = parseOverviewRangeId((await searchParams).range);
+  const params = await searchParams;
+  const rangeId = parseOverviewRangeId(params.range);
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildAdminOverviewDeps();
   const overview = await getAdminOverview(deps, actingUser, rangeId);
+  // The Schedule Item dialog is open while `?visit=` names an Appointment.
+  const visitId = typeof params.visit === "string" ? params.visit : null;
+  const visit = visitId ? await getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null;
   const { range } = overview;
 
   const today = calendarDateInShopTime(deps.now());
@@ -55,6 +63,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
 
   return (
     <div className="ov">
+      {visitId && <VisitDialog visit={visit} searchParams={params} />}
       <div className="ov-primary">
         <div className="ov-header">
           <div>
@@ -149,7 +158,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h2>
             {calendarHref && <CardLink href={calendarHref}>View calendar</CardLink>}
           </div>
-          <TodaysSchedule visits={overview.todaysSchedule} />
+          <TodaysSchedule visits={overview.todaysSchedule} searchParams={params} />
         </section>
 
         <section className="ov-card" aria-labelledby="ov-attention-title">
@@ -227,30 +236,6 @@ function BrandCard() {
       {/* eslint-disable-next-line @next/next/no-img-element -- a small decorative crop, not worth next/image's loader */}
       <img src="/images/admin/brand-sneaker.jpg" alt="" className="ov-brand-photo" />
     </div>
-  );
-}
-
-const VISIT_LABELS: Record<ScheduledVisit["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
-
-/** Today's Local Drop-Off visits as a timeline: collections and returns, from the Calendar's Appointments. */
-function TodaysSchedule({ visits }: { visits: ScheduledVisit[] }) {
-  if (visits.length === 0) return <p className="ov-empty">Nothing scheduled for today.</p>;
-  return (
-    <ol className="ov-schedule">
-      {visits.map((visit) => (
-        <li key={`${visit.orderId}-${visit.kind}`}>
-          <span className="ov-schedule-time">{visit.time}</span>
-          <span className="ov-schedule-dot" aria-hidden="true" />
-          <span className="ov-schedule-what">
-            <span className="ov-cell-main">{visit.customerName}</span>
-            <span className="ov-cell-sub">{visit.reference}</span>
-          </span>
-          <span className="ov-tag" data-kind={visit.kind}>
-            {VISIT_LABELS[visit.kind]}
-          </span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
