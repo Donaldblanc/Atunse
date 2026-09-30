@@ -17,8 +17,10 @@ import {
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
+  type OrderNote,
   type OrderRepository,
   type ScheduledAppointment,
+  type StatusChange,
 } from "./order-repository";
 
 let nextId = 0;
@@ -30,7 +32,9 @@ function fakeId(prefix: string): string {
 export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
-  readonly auditEntries: (AuditEntry & { itemId: string })[] = [];
+  readonly auditEntries: (AuditEntry & { itemId: string; at?: Date })[] = [];
+  /** Notes about Orders; nothing writes them yet, so tests seed this directly. */
+  readonly notes: (OrderNote & { orderId: string })[] = [];
   private lastNumber = 1000;
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
   private readonly uploadKeysInUse = new Set<string>();
@@ -153,7 +157,7 @@ export class InMemoryOrderRepository implements OrderRepository {
 
     item.status = params.toStatus;
     if (key) this.appliedIdempotencyKeys.add(key);
-    this.auditEntries.push({ ...params.entry, itemId: params.itemId });
+    this.auditEntries.push({ ...params.entry, itemId: params.itemId, at: new Date() });
     if (params.receivesDeposit) {
       const deposit = this.orders.get(item.orderId)?.payments.find((p) => p.kind === "DEPOSIT" && p.status === "PENDING");
       if (deposit) Object.assign(deposit, { status: "RECEIVED", receivedAt: new Date() });
@@ -209,5 +213,20 @@ export class InMemoryOrderRepository implements OrderRepository {
       deposits: pending.reduce((sum, payment) => sum.add(payment.amount), Money.zero()),
       byMethod,
     };
+  }
+
+  async listOrderNotes(orderId: string): Promise<OrderNote[]> {
+    return this.notes
+      .filter((note) => note.orderId === orderId)
+      .map(({ id, body, createdAt }) => ({ id, body, createdAt }))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async listStatusChanges(orderId: string): Promise<StatusChange[]> {
+    const itemIds = new Set(this.orders.get(orderId)?.items.map((item) => item.id));
+    return this.auditEntries
+      .filter((entry) => itemIds.has(entry.itemId) && entry.toStatus !== null)
+      .map((entry) => ({ itemId: entry.itemId, toStatus: entry.toStatus!, at: entry.at ?? new Date(0) }))
+      .sort((a, b) => a.at.getTime() - b.at.getTime());
   }
 }

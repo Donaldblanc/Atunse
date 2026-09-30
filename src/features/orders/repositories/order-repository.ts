@@ -122,6 +122,20 @@ export interface AwaitingDeposits {
   byMethod: Record<PaymentMethod, number>;
 }
 
+/** An owner's note about an Order (Order detail's Notes). */
+export interface OrderNote {
+  id: string;
+  body: string;
+  createdAt: Date;
+}
+
+/** When an Item moved to a status, from its audit log (Order detail's timeline). */
+export interface StatusChange {
+  itemId: string;
+  toStatus: ItemStatus;
+  at: Date;
+}
+
 export interface OrderRepository {
   /**
    * Creates the Order with its Items and their photos, its PENDING Deposit
@@ -183,4 +197,10 @@ export interface OrderRepository {
    * how many, their amounts added up, and how many by method.
    */
   summarizeAwaitingDeposit(): Promise<AwaitingDeposits>;
+
+  /** The notes kept about an Order, oldest first. */
+  listOrderNotes(orderId: string): Promise<OrderNote[]>;
+
+  /** Every status change recorded on the Order's Items, oldest first. Booking isn't one: an Item starts in its first status. */
+  listStatusChanges(orderId: string): Promise<StatusChange[]>;
 }

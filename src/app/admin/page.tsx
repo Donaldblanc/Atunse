@@ -28,6 +28,10 @@ import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview
 import { greeting } from "@/features/admin-overview/greeting";
 import { parseOverviewMetric } from "@/features/admin-overview/metric-detail";
 import { MetricDetailDialog } from "@/features/admin-overview/metric-detail-dialog";
+import { getOrderDetail } from "@/features/admin-overview/order-detail";
+import { buildOrderDetailDeps } from "@/features/admin-overview/order-detail-deps";
+import { OrderDetailDialog, OrderNotFoundDialog } from "@/features/admin-overview/order-detail-dialog";
+import { orderIdFromSearchParams } from "@/features/admin-overview/order-links";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, overviewHref, parseOverviewSelection } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
@@ -54,7 +58,12 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   const overview = await getAdminOverview(deps, actingUser, selection);
   const { range } = overview;
   const rangeId = range.id;
+  // At most one dialog is open over the Overview, named by its param
+  // (?metric=, ?order=, ...); closing it goes back to the bare range.
+  const closeHref = overviewHref(selection);
   const metric = parseOverviewMetric(params.metric);
+  const orderId = orderIdFromSearchParams(params);
+  const orderDetail = orderId ? await getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null;
 
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
@@ -142,7 +151,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h2>
             {ordersHref && <CardLink href={ordersHref}>View all orders</CardLink>}
           </div>
-          <RecentOrders orders={overview.recentOrders} />
+          <RecentOrders orders={overview.recentOrders} selection={selection} />
         </section>
       </div>
 
@@ -187,7 +196,9 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         </section>
       </aside>
 
-      {metric && <MetricDetailDialog metric={metric} overview={overview} closeHref={overviewHref(selection)} />}
+      {/* A modal <dialog> sits in the top layer, so it doesn't take part in this grid. */}
+      {metric && <MetricDetailDialog metric={metric} overview={overview} closeHref={closeHref} />}
+      {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
     </div>
   );
 }

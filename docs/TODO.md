@@ -155,6 +155,12 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
 - [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
+- [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
+  - [ ] **Edit Order** and the dialog's "…" menu: no feature behind them yet, so they aren't drawn (order fields such as size, colorway, quoted price, drop-off fee and tax are editable only in the database).
+  - [ ] **Add a note**: Order detail shows an Order's notes but nothing writes them yet.
+  - [ ] **Quote a pair**: Update Status moves QUOTE_SENT without a price; the owner's quote (`Item.price`, the Approval Gate) needs its own step.
+  - [ ] **Customer email on status change**: Update Status doesn't email the customer (the use-case sends only when given an address and message); decide which steps notify.
+  - [ ] **Per-Service prices** on a pair are the catalog's base prices; the Suede Fee and a quoted minimum aren't broken out, and Bundle pairs show none.
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
 - [ ] **Search** in the top bar: enable with the Orders screen, which it searches.

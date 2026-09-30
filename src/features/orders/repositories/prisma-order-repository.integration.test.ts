@@ -609,3 +609,34 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
     await expect(prisma.payment.create({ data: { orderId: order.id, kind: "DEPOSIT", method: "CARD", amountCents: 1500 } })).resolves.toBeTruthy();
   });
 });
+
+describe("PrismaOrderRepository Order detail reads (integration)", () => {
+  it("lists an Order's notes, and only its own, oldest first", async () => {
+    const { order } = await repo.create(newOrder());
+    const { order: other } = await repo.create(newOrder());
+    await prisma.note.create({ data: { accountId: order.accountId, orderId: order.id, body: "Second", createdAt: new Date("2026-10-02T12:00:00Z") } });
+    await prisma.note.create({ data: { accountId: order.accountId, orderId: order.id, body: "First", createdAt: new Date("2026-10-01T12:00:00Z") } });
+    await prisma.note.create({ data: { accountId: other.accountId, orderId: other.id, body: "Someone else's" } });
+    await prisma.note.create({ data: { accountId: order.accountId, body: "About the customer, not the Order" } });
+
+    expect((await repo.listOrderNotes(order.id)).map((note) => note.body)).toEqual(["First", "Second"]);
+  });
+
+  it("lists the status changes on an Order's Items, oldest first", async () => {
+    const { order } = await repo.create(newOrder());
+    const itemId = order.items[0]!.id;
+    await repo.transitionItemStatus({
+      itemId,
+      toStatus: "UNDER_REVIEW",
+      entry: { action: "STATUS_TRANSITION", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", actorAccountId: null, idempotencyKey: null },
+    });
+    const { order: other } = await repo.create(newOrder());
+    await repo.transitionItemStatus({
+      itemId: other.items[0]!.id,
+      toStatus: "CANCELLED",
+      entry: { action: "STATUS_TRANSITION", fromStatus: "REQUEST_SUBMITTED", toStatus: "CANCELLED", actorAccountId: null, idempotencyKey: null },
+    });
+
+    expect(await repo.listStatusChanges(order.id)).toEqual([{ itemId, toStatus: "UNDER_REVIEW", at: expect.any(Date) }]);
+  });
+});

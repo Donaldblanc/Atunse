@@ -1,5 +1,5 @@
 import { ChartBarIcon, PackageIcon } from "@phosphor-icons/react/dist/ssr";
-import { ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
+import { ITEM_STATUS_LABELS } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { countTicks, dollarTicks, sharesOf100 } from "./chart-scale";
@@ -7,20 +7,7 @@ import { Delta } from "./delta";
 import type { AdminOverview } from "./get-admin-overview";
 import { MetricChart } from "./metric-chart";
 import type { OverviewMetric } from "./metric-detail";
-
-/** Dot colours follow the status pill tones in recent-orders.tsx (STATUS_TONE), so a status reads the same on both. */
-const STATUS_TONE: Record<ItemStatus, string> = {
-  REQUEST_SUBMITTED: "neutral",
-  UNDER_REVIEW: "neutral",
-  QUOTE_SENT: "amber",
-  APPROVED: "amber",
-  AWAITING_SNEAKERS: "amber",
-  IN_PROGRESS: "blue",
-  QUALITY_CHECK: "blue",
-  READY_FOR_PICKUP_SHIPPING: "violet",
-  COMPLETED: "green",
-  CANCELLED: "muted",
-};
+import { STATUS_TONE } from "./status-tone";
 
 const ordersLabel = (count: number) => `${count} ${count === 1 ? "order" : "orders"}`;
 
