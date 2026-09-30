@@ -15,7 +15,7 @@ import {
 import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
-import { overviewRange, type OverviewRange, type OverviewRangeId } from "./overview-range";
+import { overviewRange, type OverviewRange, type OverviewSelection } from "./overview-range";
 
 export interface AdminOverviewDeps {
   orders: Pick<
@@ -105,11 +105,11 @@ function isLive(order: { items: { status: ItemStatus }[] }): boolean {
 }
 
 /** The admin Overview (the first admin screen): admin-only (ADR-0012). */
-export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: ActingUser, rangeId: OverviewRangeId): Promise<AdminOverview> {
+export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: ActingUser, selection: OverviewSelection): Promise<AdminOverview> {
   requireRole(actingUser, "ADMIN");
 
   const now = deps.now();
-  const range = overviewRange(rangeId, now);
+  const range = overviewRange(selection, now);
   const today = calendarDateInShopTime(now);
   const [booked, previous, statusCounts, awaitingDeposit, recent, appointments] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),

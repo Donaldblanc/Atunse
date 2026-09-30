@@ -642,20 +642,6 @@ a.admin-nav-item:hover {
   font-weight: 500;
 }
 
-.ov-range-panel {
-  min-width: 100%;
-}
-
-.ov-range-panel .admin-menu-item[aria-current="true"] {
-  font-weight: 700;
-}
-
-.ov-range-check {
-  width: 16px;
-  display: grid;
-  place-items: center;
-}
-
 .ov-card {
   background: var(--color-card);
   border: 1px solid var(--color-border);
@@ -1588,4 +1574,180 @@ a.admin-nav-item:hover {
   margin-bottom: 16px;
   font-weight: 500;
   line-height: 1.5;
+}
+
+/* ---------- Select Date Range ---------- */
+
+.ov-range-panel {
+  width: min(560px, calc(100vw - 32px));
+  padding: 16px;
+}
+
+.ov-range-body {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.ov-range-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ov-range-preset {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ov-range-preset:hover {
+  background: var(--color-muted);
+}
+
+.ov-range-preset[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+
+.ov-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ov-cal-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ov-cal-nav {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+}
+
+.ov-cal-nav:hover:not(:disabled) {
+  background: var(--color-muted);
+}
+
+.ov-cal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ov-cal-weekdays,
+.ov-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ov-cal-weekdays span {
+  padding: 6px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.ov-cal-day {
+  height: 36px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-cal-day:hover:not(:disabled) {
+  background: var(--color-muted);
+  border-radius: 999px;
+}
+
+.ov-cal-day:disabled {
+  color: var(--color-muted-foreground);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ov-cal-day[data-today="true"] {
+  font-weight: 700;
+}
+
+/* The range reads as a band: tinted between, filled at both ends. */
+.ov-cal-day[data-state="between"] {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-deep);
+}
+
+.ov-cal-day[data-state="start"],
+.ov-cal-day[data-state="end"] {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.ov-cal-hint {
+  min-height: 20px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.ov-range-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Very long ranges: a bar per day is a sliver, so the gaps close up. */
+.ov-bars[data-dense="very"] .ov-bars-plot {
+  gap: 1px;
+}
+
+@media (max-width: 720px) {
+  /* The panel spans the header rather than hanging off the (narrow) button. */
+  .ov-header {
+    position: relative;
+  }
+
+  .ov-range {
+    position: static;
+  }
+
+  .ov-range-panel {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  .ov-range-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .ov-range-presets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .ov-range-preset {
+    min-height: 40px;
+    border: 1px solid var(--color-border);
+  }
 }
