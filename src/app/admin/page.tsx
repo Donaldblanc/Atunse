@@ -27,6 +27,10 @@ import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
+import { getOrderDetail } from "@/features/admin-overview/order-detail";
+import { buildOrderDetailDeps } from "@/features/admin-overview/order-detail-deps";
+import { OrderDetailDialog, OrderNotFoundDialog } from "@/features/admin-overview/order-detail-dialog";
+import { orderIdFromSearchParams, overviewHref } from "@/features/admin-overview/order-links";
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
@@ -42,11 +46,17 @@ export const metadata = { title: "Overview · Atunṣe Admin" };
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: SearchParams }) {
-  const rangeId = parseOverviewRangeId((await searchParams).range);
+  const params = await searchParams;
+  const rangeId = parseOverviewRangeId(params.range);
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildAdminOverviewDeps();
   const overview = await getAdminOverview(deps, actingUser, rangeId);
   const { range } = overview;
+
+  // ?order=<id> opens that Order's detail over the Overview; closing drops the param and keeps the rest.
+  const orderId = orderIdFromSearchParams(params);
+  const closeHref = overviewHref(params, null);
+  const orderDetail = orderId ? await getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null;
 
   const today = calendarDateInShopTime(deps.now());
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
@@ -135,7 +145,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h2>
             {ordersHref && <CardLink href={ordersHref}>View all orders</CardLink>}
           </div>
-          <RecentOrders orders={overview.recentOrders} />
+          <RecentOrders orders={overview.recentOrders} searchParams={params} />
         </section>
       </div>
 
@@ -179,6 +189,9 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
           </ul>
         </section>
       </aside>
+
+      {/* A modal <dialog> sits in the top layer, so it doesn't take part in this grid. */}
+      {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
     </div>
   );
 }

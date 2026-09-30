@@ -1,28 +1,24 @@
 import { SneakerIcon } from "@phosphor-icons/react/dist/ssr";
-import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type ItemStatus } from "@/features/orders/domain";
+import Link from "next/link";
+import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { RecentOrder } from "./get-admin-overview";
+import { overviewHref, type SearchParams } from "./order-links";
+import { STATUS_TONE } from "./status-tone";
 
-const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
-
-/** Status pill colours: where the pair is in the pipeline, always with its label. */
-const STATUS_TONE: Record<ItemStatus, string> = {
-  REQUEST_SUBMITTED: "neutral",
-  UNDER_REVIEW: "neutral",
-  QUOTE_SENT: "amber",
-  APPROVED: "amber",
-  AWAITING_SNEAKERS: "amber",
-  IN_PROGRESS: "blue",
-  QUALITY_CHECK: "blue",
-  READY_FOR_PICKUP_SHIPPING: "violet",
-  COMPLETED: "green",
-  CANCELLED: "muted",
-};
+const bookedDay = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "America/New_York",
+});
 
 /**
- * The latest bookings (design: Recent Orders). The design's per-row
- * actions menu arrives with Order detail, which it would open.
+ * The latest bookings (design: Recent Orders). Each row opens its Order's
+ * detail dialog through the reference, a real link stretched over the row
+ * (so it works without JavaScript and can be opened in a new tab). The
+ * design's per-row actions menu has no actions to offer yet (docs/TODO.md).
  */
-export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
+export function RecentOrders({ orders, searchParams }: { orders: RecentOrder[]; searchParams: SearchParams }) {
   if (orders.length === 0) return <p className="ov-empty">No bookings yet.</p>;
 
   return (
@@ -43,8 +39,12 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
         </thead>
         <tbody>
           {orders.map((order) => (
-            <tr key={order.orderId}>
-              <td className="ov-ref">{order.reference}</td>
+            <tr key={order.orderId} className="ov-row-link">
+              <td className="ov-ref">
+                <Link href={overviewHref(searchParams, order.orderId)} scroll={false} aria-label={`Order ${order.reference}, ${order.customerName}`}>
+                  {order.reference}
+                </Link>
+              </td>
               <td>
                 <span className="ov-cell-main">{order.customerName}</span>
                 <span className="ov-cell-sub">{bookedDay.format(order.bookedAt)}</span>

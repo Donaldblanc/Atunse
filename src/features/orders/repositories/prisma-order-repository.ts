@@ -11,6 +11,8 @@ import {
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
+  type OrderNote,
+  type StatusChange,
   type ScheduledAppointment,
   type OrderRepository,
 } from "./order-repository";
@@ -377,5 +379,18 @@ export class PrismaOrderRepository implements OrderRepository {
     }
     // One Deposit per Order, so counting Deposits counts Orders.
     return { orders: groups.reduce((sum, g) => sum + g._count._all, 0), deposits: Money.fromCents(cents), byMethod };
+  }
+
+  async listOrderNotes(orderId: string): Promise<OrderNote[]> {
+    const rows = await this.prisma.note.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+    return rows.map((row) => ({ id: row.id, body: row.body, createdAt: row.createdAt }));
+  }
+
+  async listStatusChanges(orderId: string): Promise<StatusChange[]> {
+    const rows = await this.prisma.itemAuditEntry.findMany({
+      where: { item: { orderId }, toStatus: { not: null } },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map((row) => ({ itemId: row.itemId, toStatus: row.toStatus!, at: row.createdAt }));
   }
 }
