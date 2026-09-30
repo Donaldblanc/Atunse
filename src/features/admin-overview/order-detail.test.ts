@@ -182,6 +182,14 @@ describe("getOrderDetail", () => {
     expect((await getOrderDetail(deps, ADMIN, order.id))!.notes.map((note) => note.body)).toEqual(["First", "Second"]);
   });
 
+  it("doesn't read a confirmed deposit as a status change", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    await deps.orders.confirmDeposit({ orderId: order.id, actorAccountId: "acc_admin", idempotencyKey: "k1" });
+
+    expect(await deps.orders.listStatusChanges(order.id)).toEqual([]);
+  });
+
   it("times the timeline from the audit log", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder());

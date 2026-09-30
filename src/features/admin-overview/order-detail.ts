@@ -2,6 +2,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { CalendarDate } from "@/features/orders/calendar-date";
 import {
+  adminStatusMoves,
   canTransition,
   FULFILLMENT_LABELS,
   ITEM_STATUSES,
@@ -11,6 +12,7 @@ import {
   orderRollupStatus,
   type Item,
   type ItemStatus,
+  type Order,
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
@@ -41,8 +43,10 @@ export interface OrderDetailPair {
   status: ItemStatus;
   /** The Services booked; a price is left off inside a Bundle, whose fixed price covers them. */
   services: { name: string; price: string | null }[];
-  /** Where Update Status can take this pair: the next step and Cancel, per canTransition. */
+  /** Where Update Status can take this pair (adminStatusMoves in domain.ts). */
   nextStatuses: ItemStatus[];
+  /** Why the next step isn't offered yet (awaiting the quote or the deposit), or null. */
+  held: string | null;
 }
 
 export interface TimelineStep {
@@ -122,7 +126,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
     },
     bundleName: BUNDLE_CATALOG.find((bundle) => bundle.id === order.bundleId)?.name ?? null,
-    pairs: await Promise.all(order.items.map((item) => toPair(item, deps.photoUrl, order.bundleId !== null))),
+    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl))),
     timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
     payment: {
       deposit: deposit
@@ -142,7 +146,9 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   };
 }
 
-async function toPair(item: Item, photoUrl: OrderDetailDeps["photoUrl"], inBundle: boolean): Promise<OrderDetailPair> {
+async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"]): Promise<OrderDetailPair> {
+  const inBundle = order.bundleId !== null;
+  const { moves, held } = adminStatusMoves(item, order);
   const photoKey = item.photoKeys[0];
   return {
     itemId: item.id,
@@ -155,7 +161,8 @@ async function toPair(item: Item, photoUrl: OrderDetailDeps["photoUrl"], inBundl
       name: service.name,
       price: inBundle ? null : `${Money.fromCents(service.baseCents).format()}${service.isMinimum ? "+" : ""}`,
     })),
-    nextStatuses: ITEM_STATUSES.filter((next) => canTransition(item.status, next)),
+    nextStatuses: moves,
+    held,
   };
 }
 

@@ -161,7 +161,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
   - [ ] **Edit Order** and the dialog's "…" menu: no feature behind them yet, so they aren't drawn (order fields such as size, colorway, quoted price, drop-off fee and tax are editable only in the database).
   - [ ] **Add a note**: Order detail shows an Order's notes but nothing writes them yet.
-  - [ ] **Quote a pair**: Update Status moves QUOTE_SENT without a price; the owner's quote (`Item.price`, the Approval Gate) needs its own step.
+  - [ ] **Quote a pair**: Update Status holds a pair at Under Review (adminStatusMoves in domain.ts) because Quote Sent means the owner's quote (`Item.price`, the Approval Gate) reached the customer; that needs its own step. It also holds a pair at Approved until its Deposit is marked paid (ADR-0002). The admin API route (`/api/v1/admin/items/[itemId]/transitions`) doesn't apply that rule yet.
   - [ ] **Customer email on status change**: Update Status doesn't email the customer (the use-case sends only when given an address and message); decide which steps notify.
   - [ ] **Per-Service prices** on a pair are the catalog's base prices; the Suede Fee and a quoted minimum aren't broken out, and Bundle pairs show none.
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.

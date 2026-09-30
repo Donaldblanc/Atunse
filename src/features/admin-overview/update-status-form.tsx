@@ -5,20 +5,25 @@ import { ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
 import { updateItemStatusAction, type UpdateStatusState } from "./order-actions";
 
 /**
- * Update Status for one pair: offers only where the pipeline can go (the
- * next step, and Cancel, per canTransition), submitted to a server action.
+ * Update Status for one pair: offers only where the owner may move it (the
+ * next step and Cancel, per adminStatusMoves), submitted to a server action.
+ * A step that's held (on the quote or the deposit) says why instead.
  * Cancelling can't be undone, so it takes a second, explicit click.
  */
 export function UpdateStatusForm({
+  orderId,
   itemId,
   fromStatus,
   nextStatuses,
+  held,
   idempotencyKey,
   pairLabel,
 }: {
+  orderId: string;
   itemId: string;
   fromStatus: ItemStatus;
   nextStatuses: ItemStatus[];
+  held: string | null;
   /** Made when the dialog rendered, so a double submit applies once (ADR-0012). */
   idempotencyKey: string;
   /** Names the pair when the Order has several; null for a single pair. */
@@ -28,10 +33,11 @@ export function UpdateStatusForm({
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const forward = nextStatuses.find((status) => status !== "CANCELLED");
   const canCancel = nextStatuses.includes("CANCELLED");
-  if (!forward && !canCancel) return null;
+  if (!forward && !canCancel && !held) return null;
 
   return (
     <form action={formAction} className="od-status-form">
+      <input type="hidden" name="orderId" value={orderId} />
       <input type="hidden" name="itemId" value={itemId} />
       <input type="hidden" name="fromStatus" value={fromStatus} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
@@ -58,6 +64,7 @@ export function UpdateStatusForm({
             </button>
           ))}
       </div>
+      {held && <p className="od-status-held">{held}</p>}
       {state.error && (
         <p role="alert" className="od-status-error">
           {state.error}

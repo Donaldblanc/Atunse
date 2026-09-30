@@ -234,7 +234,7 @@ export class InMemoryOrderRepository implements OrderRepository {
   async listStatusChanges(orderId: string): Promise<StatusChange[]> {
     const itemIds = new Set(this.orders.get(orderId)?.items.map((item) => item.id));
     return this.auditEntries
-      .filter((entry) => itemIds.has(entry.itemId) && entry.toStatus !== null)
+      .filter((entry) => itemIds.has(entry.itemId) && entry.toStatus !== null && entry.toStatus !== entry.fromStatus)
       .map((entry) => ({ itemId: entry.itemId, toStatus: entry.toStatus!, at: entry.at ?? new Date(0) }))
       .sort((a, b) => a.at.getTime() - b.at.getTime());
   }

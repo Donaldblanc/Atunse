@@ -2332,6 +2332,12 @@ a.admin-nav-item:hover {
   gap: 8px;
 }
 
+.od-status-held {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
 .od-status-error {
   margin-top: 8px;
   font-size: 13px;

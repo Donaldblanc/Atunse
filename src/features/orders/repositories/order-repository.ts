@@ -240,7 +240,11 @@ export interface OrderRepository {
   /** The notes kept about an Order, oldest first. */
   listOrderNotes(orderId: string): Promise<OrderNote[]>;
 
-  /** Every status change recorded on the Order's Items, oldest first. Booking isn't one: an Item starts in its first status. */
+  /**
+   * Every status change recorded on the Order's Items, oldest first. Booking
+   * isn't one (an Item starts in its first status), nor is an entry that
+   * leaves the status as it was, such as a confirmed deposit.
+   */
   listStatusChanges(orderId: string): Promise<StatusChange[]>;
 
   /** One Appointment (any status) with its Order, or null if no Appointment has this id. */

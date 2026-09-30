@@ -296,7 +296,7 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
 /** One Update Status form per pair that can still move, each with its own idempotency key. */
 function UpdateStatuses({ detail }: { detail: OrderDetail }) {
   const multiple = detail.pairs.length > 1;
-  const movable = detail.pairs.map((pair, index) => ({ pair, index })).filter(({ pair }) => pair.nextStatuses.length > 0);
+  const movable = detail.pairs.map((pair, index) => ({ pair, index })).filter(({ pair }) => pair.nextStatuses.length > 0 || pair.held);
   if (movable.length === 0) return null;
   return (
     <div className="od-status-forms">
@@ -305,9 +305,11 @@ function UpdateStatuses({ detail }: { detail: OrderDetail }) {
         // Keyed by status so a pair that just moved starts a fresh form (and a fresh key).
         <UpdateStatusForm
           key={`${pair.itemId}:${pair.status}`}
+          orderId={detail.orderId}
           itemId={pair.itemId}
           fromStatus={pair.status}
           nextStatuses={pair.nextStatuses}
+          held={pair.held}
           idempotencyKey={randomUUID()}
           pairLabel={multiple ? `Pair ${index + 1}${pair.title ? `: ${pair.title}` : ""}` : null}
         />

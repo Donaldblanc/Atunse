@@ -729,6 +729,8 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
       "CANCELLED",
     ]);
     expect(await repo.listAwaitingDeposit()).toEqual([]);
+    // The Order detail timeline reads status changes: the confirmation isn't one.
+    expect((await repo.listStatusChanges(order.id)).map((change) => change.toStatus)).toEqual(["CANCELLED"]);
   });
 
   it("refuses a second confirmation with a new key, and a fully cancelled Order, having written nothing", async () => {

@@ -403,7 +403,8 @@ export class PrismaOrderRepository implements OrderRepository {
       where: { item: { orderId }, toStatus: { not: null } },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map((row) => ({ itemId: row.itemId, toStatus: row.toStatus!, at: row.createdAt }));
+    // Prisma can't compare two columns in a where, so same-status entries (a confirmed deposit) are dropped here.
+    return rows.filter((row) => row.toStatus !== row.fromStatus).map((row) => ({ itemId: row.itemId, toStatus: row.toStatus!, at: row.createdAt }));
   }
 
   async findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null> {
