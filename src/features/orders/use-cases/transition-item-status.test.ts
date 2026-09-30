@@ -107,6 +107,23 @@ describe("transitionItemStatus", () => {
     expect(deposit()).toMatchObject({ status: "RECEIVED", receivedAt: expect.any(Date) });
   });
 
+  it("returns an Item from Under Review to Request Submitted, recorded like any transition", async () => {
+    const orders = new InMemoryOrderRepository();
+    const { item } = await seedOrder(orders);
+    const deps = { orders, notifications: new ConsoleNotificationService() };
+    await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" });
+
+    const reverted = await transitionItemStatus(deps, admin, {
+      itemId: item.id,
+      fromStatus: "UNDER_REVIEW",
+      toStatus: "REQUEST_SUBMITTED",
+      action: "REVIEW_REVERTED",
+    });
+
+    expect(reverted?.status).toBe("REQUEST_SUBMITTED");
+    expect(orders.auditEntries.at(-1)).toMatchObject({ action: "REVIEW_REVERTED", fromStatus: "UNDER_REVIEW", toStatus: "REQUEST_SUBMITTED", actorAccountId: "acc_admin" });
+  });
+
   it("refuses an item that doesn't exist, instead of reporting it as already applied", async () => {
     const orders = new InMemoryOrderRepository();
     await expect(

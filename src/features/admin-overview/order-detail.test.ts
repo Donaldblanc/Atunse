@@ -142,12 +142,13 @@ describe("getOrderDetail", () => {
     expect(detail.payment.quoted!.total.cents).toBe(14000);
   });
 
-  it("offers Cancel only at Under Review and Quote Sent: the quote and approval have their own controls", async () => {
+  it("offers no plain move forward at Under Review and Quote Sent: the quote and approval have their own controls", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder());
+    const expected = { UNDER_REVIEW: ["REQUEST_SUBMITTED", "CANCELLED"], QUOTE_SENT: ["CANCELLED"] } as const;
     for (const status of ["UNDER_REVIEW", "QUOTE_SENT"] as const) {
       deps.orders.orders.get(order.id)!.items[0]!.status = status;
-      expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual(["CANCELLED"]);
+      expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual(expected[status]);
     }
   });
 
