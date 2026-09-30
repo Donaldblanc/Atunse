@@ -4,7 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
-- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin dashboard's Orders queue is still "Next up" (`src/app/admin/page.tsx`), so today a new booking is only visible in the database. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up as a count on the admin Overview. Add an owner notification email for new bookings and/or build the Orders queue before launch.
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 
 ### Legal & policies

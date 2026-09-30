@@ -13,10 +13,8 @@ export function SignOutButton() {
   }
 
   return (
-    <button type="button" onClick={handleSignOut} className="admin-nav-item" data-active="false">
-      <span className="admin-nav-icon" aria-hidden="true">
-        <SignOutIcon size={18} weight="regular" />
-      </span>
+    <button type="button" onClick={handleSignOut} className="admin-menu-item">
+      <SignOutIcon size={18} aria-hidden="true" />
       Sign out
     </button>
   );

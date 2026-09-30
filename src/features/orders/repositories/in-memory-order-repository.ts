@@ -5,7 +5,8 @@
 // same one the sign-in use-cases read, so tests can book → sign in → rebook.
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
-import type { AuditEntry, Item, Order } from "../domain";
+import { Money } from "@/shared/money/money";
+import { MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type Item, type ItemStatus, type Order } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -24,6 +25,7 @@ function fakeId(prefix: string): string {
 export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
+  readonly auditEntries: (AuditEntry & { itemId: string })[] = [];
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
   private readonly uploadKeysInUse = new Set<string>();
 
@@ -120,6 +122,29 @@ export class InMemoryOrderRepository implements OrderRepository {
 
     item.status = params.toStatus;
     if (key) this.appliedIdempotencyKeys.add(key);
+    this.auditEntries.push({ ...params.entry, itemId: params.itemId });
     return item;
+  }
+
+  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+    return [...this.orders.values()]
+      .filter((order) => order.createdAt >= from && order.createdAt < to)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
+    const counts: Partial<Record<ItemStatus, number>> = {};
+    for (const item of [...this.orders.values()].flatMap((order) => order.items)) {
+      counts[item.status] = (counts[item.status] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  async summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }> {
+    const paidItemIds = new Set(this.auditEntries.filter((e) => e.action === MANUAL_PAYMENT_CONFIRMED).map((e) => e.itemId));
+    const waiting = [...this.orders.values()].filter(
+      (order) => order.items.some((item) => item.status !== "CANCELLED") && !order.items.some((item) => paidItemIds.has(item.id)),
+    );
+    return { orders: waiting.length, deposits: waiting.reduce((sum, order) => sum.add(order.deposit), Money.zero()) };
   }
 }

@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import type { Order, Item, AuditEntry, Fulfillment, TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, type Order, type Item, type AuditEntry, type Fulfillment, type ItemStatus, type TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -244,5 +244,33 @@ export class PrismaOrderRepository implements OrderRepository {
 
       return toDomainItem(updated);
     });
+  }
+
+  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { createdAt: { gte: from, lt: to } },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
+    const groups = await this.prisma.item.groupBy({ by: ["status"], _count: { _all: true } });
+    return Object.fromEntries(groups.map((group) => [group.status, group._count._all]));
+  }
+
+  async summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }> {
+    const { _count, _sum } = await this.prisma.order.aggregate({
+      where: {
+        AND: [
+          { items: { some: { status: { not: "CANCELLED" } } } },
+          { items: { none: { auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } } } },
+        ],
+      },
+      _count: { _all: true },
+      _sum: { depositCents: true },
+    });
+    return { orders: _count._all, deposits: Money.fromCents(_sum.depositCents ?? 0) };
   }
 }

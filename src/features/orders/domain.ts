@@ -128,6 +128,13 @@ export function orderReference(orderId: string): string {
   return orderId.slice(-8).toUpperCase();
 }
 
+/**
+ * The audit action recorded when the owner marks a Zelle/Cash payment
+ * received (ADR-0002). An Order with none on any of its Items is still
+ * waiting on its Deposit, which is always the first payment.
+ */
+export const MANUAL_PAYMENT_CONFIRMED = "MANUAL_PAYMENT_CONFIRMED";
+
 export interface AuditEntry {
   action: string;
   fromStatus: ItemStatus | null;

@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, Fulfillment, Order, TermsAcceptance } from "../domain";
+import type { AuditEntry, Fulfillment, ItemStatus, Order, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -114,4 +114,17 @@ export interface OrderRepository {
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
   }): Promise<Order["items"][number] | null>;
+
+  /** Orders booked (created) in [from, to), oldest first. */
+  listBookedBetween(from: Date, to: Date): Promise<Order[]>;
+
+  /** How many Items are in each status right now; statuses with none are left out. */
+  countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;
+
+  /**
+   * Orders still waiting on their Deposit: no payment confirmed on any of
+   * their Items (MANUAL_PAYMENT_CONFIRMED) and at least one Item not
+   * cancelled. Returns how many, and their Deposits added up.
+   */
+  summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }>;
 }

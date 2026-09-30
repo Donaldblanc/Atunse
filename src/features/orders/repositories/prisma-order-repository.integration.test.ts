@@ -343,3 +343,43 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(entries).toHaveLength(1);
   });
 });
+
+describe("PrismaOrderRepository admin Overview reads (integration)", () => {
+  const transition = (itemId: string, action: string, fromStatus: "REQUEST_SUBMITTED" | "UNDER_REVIEW", toStatus: "UNDER_REVIEW" | "CANCELLED") =>
+    repo.transitionItemStatus({ itemId, toStatus, entry: { action, fromStatus, toStatus, actorAccountId: null, idempotencyKey: null } });
+
+  it("lists the Orders booked in [from, to), oldest first", async () => {
+    const early = (await repo.create(newOrder())).order;
+    const late = (await repo.create(newOrder())).order;
+    const outside = (await repo.create(newOrder())).order;
+    await prisma.order.update({ where: { id: early.id }, data: { createdAt: new Date("2026-09-28T05:00:00Z") } });
+    await prisma.order.update({ where: { id: late.id }, data: { createdAt: new Date("2026-09-29T05:00:00Z") } });
+    await prisma.order.update({ where: { id: outside.id }, data: { createdAt: new Date("2026-09-30T04:00:00Z") } });
+
+    const booked = await repo.listBookedBetween(new Date("2026-09-28T04:00:00Z"), new Date("2026-09-30T04:00:00Z"));
+
+    expect(booked.map((order) => order.id)).toEqual([early.id, late.id]);
+    expect(booked[0]?.items).toHaveLength(1);
+  });
+
+  it("counts Items by status", async () => {
+    const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
+    await transition(order.items[0]!.id, "REVIEW_STARTED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
+
+    expect(await repo.countItemsByStatus()).toEqual({ REQUEST_SUBMITTED: 2, UNDER_REVIEW: 1 });
+  });
+
+  it("sums the Deposits of Orders with no payment confirmed, skipping fully cancelled Orders", async () => {
+    await repo.create(newOrder({ deposit: Money.fromCents(1500) }));
+    await repo.create(newOrder({ deposit: Money.fromCents(2500) }));
+    const paid = (await repo.create(newOrder({ deposit: Money.fromCents(4000) }))).order;
+    await transition(paid.items[0]!.id, "MANUAL_PAYMENT_CONFIRMED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
+    const cancelled = (await repo.create(newOrder({ deposit: Money.fromCents(8000) }))).order;
+    await transition(cancelled.items[0]!.id, "CANCELLED", "REQUEST_SUBMITTED", "CANCELLED");
+
+    const summary = await repo.summarizeAwaitingDeposit();
+
+    expect(summary.orders).toBe(2);
+    expect(summary.deposits.cents).toBe(4000);
+  });
+});
