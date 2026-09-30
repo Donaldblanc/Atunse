@@ -1,9 +1,9 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { calendarDateInShopTime, type CalendarDate } from "@/features/orders/calendar-date";
-import { liveEstimate, livePairs, orderReference, orderRollupStatus, type ItemStatus, type Order } from "@/features/orders/domain";
+import { liveEstimate, livePairs, orderNumber, orderRollupStatus, type ItemStatus, type Order, type PaymentMethod } from "@/features/orders/domain";
 import { PICKUP_TIME_SLOTS } from "@/features/orders/pickup-window";
-import type { OrderRepository } from "@/features/orders/repositories/order-repository";
+import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { overviewRange, type OverviewRange, type OverviewRangeId } from "./overview-range";
@@ -17,7 +17,6 @@ export interface AdminOverviewDeps {
     | "summarizeAwaitingDeposit"
     | "listRecent"
     | "listCollectionsOn"
-    | "findPaidOrderIds"
   >;
   /** A short-lived view link for a stored photo (ADR-0014), or null when photos can't be shown. */
   photoUrl: (key: string) => Promise<string | null>;
@@ -39,7 +38,8 @@ export interface RecentOrder {
   /** e.g. "Premium Clean + Lace Replacement" (servicesSummary). */
   services: string;
   status: ItemStatus;
-  depositPaid: boolean;
+  /** The Order's Deposit Payment, or null if it has none (e.g. a $0 estimate). */
+  deposit: { method: PaymentMethod; paid: boolean } | null;
   total: Money;
   totalIsMinimum: boolean;
 }
@@ -71,8 +71,8 @@ export interface AdminOverview {
   servicesBooked: { serviceId: string; name: string; count: number }[];
   /** Right now, whatever the range: pairs waiting on the owner's quote (ADR-0001). */
   needsQuote: number;
-  /** Right now: Orders whose Deposit isn't confirmed yet (ADR-0002). */
-  awaitingDeposit: { orders: number; deposits: Money };
+  /** Right now: Orders whose Deposit Payment is still PENDING (ADR-0002), and how they're paying. */
+  awaitingDeposit: AwaitingDeposits;
   /** Right now: pairs finished and waiting to go back (Ready for Drop-Off/Shipping). */
   readyForReturn: number;
   /** The latest bookings, whatever the range. */
@@ -103,7 +103,6 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     deps.orders.listRecent(RECENT_ORDERS),
     deps.orders.listCollectionsOn(calendarDateInShopTime(now)),
   ]);
-  const paidOrderIds = await deps.orders.findPaidOrderIds(recent.map((order) => order.id));
   const current = booked.filter(isLive);
 
   // One pass: each Order's day is worked out once, not once per day of the range.
@@ -133,12 +132,12 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
     awaitingDeposit,
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
-    recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, paidOrderIds.has(order.id), deps.photoUrl))),
+    recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
     todaysCollections: collections
       .filter(isLive)
       .flatMap((order) =>
         order.fulfillment.method === "PICKUP"
-          ? [{ orderId: order.id, reference: orderReference(order.id), customerName: order.contactName, slot: order.fulfillment.slot }]
+          ? [{ orderId: order.id, reference: orderNumber(order.number), customerName: order.contactName, slot: order.fulfillment.slot }]
           : [],
       )
       .sort((a, b) => PICKUP_TIME_SLOTS.indexOf(a.slot) - PICKUP_TIME_SLOTS.indexOf(b.slot))
@@ -146,16 +145,17 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   };
 }
 
-async function toRecentOrder(order: Order, depositPaid: boolean, photoUrl: AdminOverviewDeps["photoUrl"]): Promise<RecentOrder> {
+async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl"]): Promise<RecentOrder> {
   // The whole row describes the same pairs: the live ones, or, for a fully
   // cancelled Order, every pair, so it still shows what was booked.
   const live = livePairs(order);
   const pairs = live.length > 0 ? live : order.items;
   const first = pairs[0];
   const photoKey = first?.photoKeys[0];
+  const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
   return {
     orderId: order.id,
-    reference: orderReference(order.id),
+    reference: orderNumber(order.number),
     customerName: order.contactName,
     bookedAt: order.createdAt,
     photoUrl: photoKey ? await photoUrl(photoKey) : null,
@@ -163,7 +163,7 @@ async function toRecentOrder(order: Order, depositPaid: boolean, photoUrl: Admin
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
     status: orderRollupStatus(order.items),
-    depositPaid,
+    deposit: deposit ? { method: deposit.method, paid: deposit.status === "RECEIVED" } : null,
     total: live.length > 0 ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };

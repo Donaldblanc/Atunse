@@ -6,12 +6,13 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type Item, type ItemStatus, type Order } from "../domain";
+import { liveEstimate, livePairs, type AuditEntry, type Item, type ItemStatus, type Order, type PaymentMethod } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
   PhotoKeyInUseError,
+  type AwaitingDeposits,
   type NewOrderInput,
   type OrderRepository,
 } from "./order-repository";
@@ -26,6 +27,7 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   readonly auditEntries: (AuditEntry & { itemId: string })[] = [];
+  private lastNumber = 1000;
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
   private readonly uploadKeysInUse = new Set<string>();
 
@@ -57,8 +59,10 @@ export class InMemoryOrderRepository implements OrderRepository {
     }
 
     const orderId = fakeId("order");
+    this.lastNumber += 1;
     const order: Order = {
       id: orderId,
+      number: this.lastNumber,
       accountId,
       contactName: input.contactName,
       contactEmail: input.contactEmail,
@@ -71,6 +75,8 @@ export class InMemoryOrderRepository implements OrderRepository {
       estimate: input.estimate,
       estimateIsMinimum: input.estimateIsMinimum,
       deposit: input.deposit,
+      dropOffFee: Money.zero(),
+      tax: Money.zero(),
       confirmationEmailSentAt: null,
       submissionFingerprint: input.submissionFingerprint,
       bundleId: input.bundleId,
@@ -81,12 +87,29 @@ export class InMemoryOrderRepository implements OrderRepository {
         model: item.model,
         description: item.description,
         material: item.material,
+        size: null,
+        colorway: null,
         serviceIds: item.serviceIds,
         estimate: item.estimate,
         status: "REQUEST_SUBMITTED",
         price: null,
         photoKeys: item.photos.map((photo) => photo.key),
       })),
+      payments:
+        input.deposit.cents > 0
+          ? [
+              {
+                id: fakeId("payment"),
+                kind: "DEPOSIT",
+                method: input.depositMethod,
+                amount: input.deposit,
+                status: "PENDING",
+                receivedAt: null,
+                createdAt: new Date(),
+              },
+            ]
+          : [],
+      appointments: input.collection ? [{ id: fakeId("appointment"), kind: "COLLECTION", ...input.collection }] : [],
     };
     for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
@@ -147,13 +170,6 @@ export class InMemoryOrderRepository implements OrderRepository {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
-  async findPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
-    const paidItemIds = new Set(this.auditEntries.filter((e) => e.action === MANUAL_PAYMENT_CONFIRMED).map((e) => e.itemId));
-    return new Set(
-      orderIds.filter((id) => this.orders.get(id)?.items.some((item) => paidItemIds.has(item.id))),
-    );
-  }
-
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
     const counts: Partial<Record<ItemStatus, number>> = {};
     for (const item of [...this.orders.values()].flatMap((order) => order.items)) {
@@ -162,11 +178,17 @@ export class InMemoryOrderRepository implements OrderRepository {
     return counts;
   }
 
-  async summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }> {
-    const paidItemIds = new Set(this.auditEntries.filter((e) => e.action === MANUAL_PAYMENT_CONFIRMED).map((e) => e.itemId));
-    const waiting = [...this.orders.values()].filter(
-      (order) => order.items.some((item) => item.status !== "CANCELLED") && !order.items.some((item) => paidItemIds.has(item.id)),
-    );
-    return { orders: waiting.length, deposits: waiting.reduce((sum, order) => sum.add(order.deposit), Money.zero()) };
+  async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
+    const pending = [...this.orders.values()]
+      .filter((order) => order.items.some((item) => item.status !== "CANCELLED"))
+      .flatMap((order) => order.payments)
+      .filter((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING");
+    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0 };
+    for (const payment of pending) byMethod[payment.method] += 1;
+    return {
+      orders: pending.length,
+      deposits: pending.reduce((sum, payment) => sum.add(payment.amount), Money.zero()),
+      byMethod,
+    };
   }
 }

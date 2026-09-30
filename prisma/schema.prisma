@@ -1,8 +1,10 @@
-// Deliberately narrow (ADR-0012's build-strategy revision). Only what the
-// first vertical slice needs: a guest books one pair through /booking ->
-// owner quotes -> manual deposit confirmed -> Item completes. Multi-item
-// (Bundles), Balance Delta, Stripe, and the outbox table are added in
-// Phase 2/3 (see docs/SPEC.md Build sequence).
+// The data model mirrors the admin screens (scratch/01-09 design images):
+// Orders and Order detail, Calendar (Appointment), Customers (Account),
+// Services & Pricing (Service, Bundle), Inventory (InventoryItem,
+// Supplier), Payments (Payment) and Messages (Conversation, Message).
+// An Order still has no status of its own: screens derive it from its
+// Items (CONTEXT.md: Order Status). Stripe and the notification outbox
+// come later (docs/SPEC.md Build sequence).
 
 generator client {
   provider = "prisma-client-js"
@@ -37,17 +39,55 @@ enum FulfillmentMethod {
   MAIL_IN
 }
 
+// CONTEXT.md: Payment. The Deposit comes first; the Balance is the rest.
+// FULL is one payment covering the whole Order, which the owner can record
+// instead (e.g. a customer who pays everything in cash at collection).
+enum PaymentKind {
+  DEPOSIT
+  BALANCE
+  FULL
+}
+
+// Zelle and Cash are confirmed by hand (ADR-0002); CARD is Stripe, behind
+// its feature toggle, and confirms itself.
+enum PaymentMethod {
+  ZELLE
+  CASH
+  CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+}
+
+// CONTEXT.md: Appointment. COLLECTION is DJ collecting a Local Drop-Off
+// pair from the customer; RETURN is dropping it back off.
+enum AppointmentKind {
+  COLLECTION
+  RETURN
+}
+
+enum MessageAuthor {
+  CUSTOMER
+  ADMIN
+}
+
 // A Customer or Admin (ADR-0014). The two are separate identities: an
 // admin who books gets a Customer Account under the same email, and Orders
 // only ever belong to Customer Accounts. A Customer Account is created
 // automatically by their first booking; there are no guest orders.
 model Account {
-  id        String   @id @default(cuid())
-  role      Role     @default(CUSTOMER)
-  email     String   // always stored lowercased; unique per role, below
+  id    String  @id @default(cuid())
+  role  Role    @default(CUSTOMER)
+  email String // always stored lowercased; unique per role, below
+  // What the admin screens call the customer (Customers, Order detail).
+  // Set from the first booking's contact name; each Order keeps its own
+  // contactName as entered.
+  name  String?
   // Required for Customer Accounts (the booking that creates one requires
   // it); null only for Admin Accounts seeded without one.
-  phone     String?
+  phone String?
 
   // Interim admin password login (ADR-0005 addendum). Customers sign in
   // with an emailed code instead (SignInCode), so this stays null for them.
@@ -65,7 +105,11 @@ model Account {
 // The billing/shipping container (CONTEXT.md: Order). No status of its own —
 // display is always a per-Item breakdown.
 model Order {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
+  // The number the admin screens show, "ATU-1008" (orderNumber() in
+  // domain.ts). Sequential from 1001. Customers still quote
+  // orderReference() in their Zelle memo.
+  number    Int     @unique @default(autoincrement())
   accountId String
   account   Account @relation(fields: [accountId], references: [id])
 
@@ -94,9 +138,9 @@ model Order {
   city              String
   state             String
   zip               String
-  pickupDate        DateTime? @db.Date // Pickup only
+  pickupDate        DateTime?         @db.Date // Pickup only
   pickupSlot        String? // Pickup only, e.g. "4:30 PM – 5:00 PM"
-  mailInDate        DateTime? @db.Date // Mail-In only, optional preferred date
+  mailInDate        DateTime?         @db.Date // Mail-In only, optional preferred date
 
   rush Boolean @default(false)
 
@@ -106,14 +150,21 @@ model Order {
   estimateIsMinimum Boolean // true when a "from $X+" Service is included
   depositCents      Int // 50% of estimateCents, rounded down (CONTEXT.md: Deposit)
 
-  // The Bundle bought (BUNDLE_CATALOG id), or null for a single pair. Its
-  // perks that cover only some pairs are assigned by the shop after
-  // inspection, so the Order has to say which Bundle it was.
+  // Order detail's totals, set by the owner (Money as integer cents). Not
+  // computed at booking yet: whether and when tax and a Local Drop-Off fee
+  // apply is an open question (CONTEXT.md).
+  dropOffFeeCents Int @default(0)
+  taxCents        Int @default(0)
+
+  // The Bundle bought, or null for a single pair. Its perks that cover
+  // only some pairs are assigned by the shop after inspection, so the
+  // Order has to say which Bundle it was.
   bundleId String?
+  bundle   Bundle? @relation(fields: [bundleId], references: [id])
 
   // Client-generated key for retry-safe submission (ADR-0012): a resubmit
   // with the same key returns the existing Order instead of a duplicate.
-  submissionKey String? @unique
+  submissionKey         String? @unique
   // Hash of what was submitted with that key (#76): a retry with the same
   // key but different details is refused instead of returning this Order
   // as if nothing changed. Null for Orders from before it existed.
@@ -127,8 +178,12 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items Item[]
+  items        Item[]
+  payments     Payment[]
+  appointments Appointment[]
+  conversation Conversation?
 
+  @@index([createdAt])
   @@map("orders")
 }
 
@@ -143,12 +198,14 @@ model Item {
   model       String?
   description String?
   material    String?
+  size        String? // e.g. "10", "W 8.5": entered by the owner on Order detail
+  colorway    String? // e.g. "Black / White"
 
   // The pair's place in its Order (0 for a single pair; 0-2 in a Bundle),
   // so pairs always read back in the order the customer entered them.
   position Int @default(0)
 
-  serviceIds    String[] // catalog ids (src/features/orders/service-catalog.ts)
+  serviceIds    String[] // Service ids (services table)
   estimateCents Int // this pair's share of the Order estimate, before Rush
 
   status ItemStatus @default(REQUEST_SUBMITTED)
@@ -194,12 +251,12 @@ model ItemAuditEntry {
   itemId String
   item   Item   @relation(fields: [itemId], references: [id])
 
-  action        String // e.g. "STATUS_TRANSITION", "QUOTE_SENT", "MANUAL_PAYMENT_CONFIRMED"
-  fromStatus    ItemStatus?
-  toStatus      ItemStatus?
+  action         String // e.g. "STATUS_TRANSITION", "QUOTE_SENT", "MANUAL_PAYMENT_CONFIRMED"
+  fromStatus     ItemStatus?
+  toStatus       ItemStatus?
   actorAccountId String? // who did it; null for system actions
   idempotencyKey String? // set on actions that must be retry-safe (e.g. payment confirmation)
-  metadata      Json?
+  metadata       Json?
 
   createdAt DateTime @default(now())
 
@@ -235,4 +292,168 @@ model RateLimitBucket {
   @@id([key, windowStart])
   @@index([windowStart])
   @@map("rate_limit_buckets")
+}
+
+// One payment an Order is owed or has received (Payments screen, Order
+// detail). Booking creates the Deposit as PENDING; the owner marks Zelle
+// and Cash payments RECEIVED by hand (ADR-0002), retry-safe on
+// idempotencyKey (ADR-0012).
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  kind        PaymentKind
+  method      PaymentMethod
+  amountCents Int // Money as integer cents (ADR-0012); always > 0
+  status      PaymentStatus @default(PENDING)
+
+  receivedAt           DateTime?
+  confirmedByAccountId String? // the admin who marked it received; null for automatic (CARD)
+  idempotencyKey       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, idempotencyKey])
+  @@index([orderId])
+  @@index([status, kind])
+  @@map("payments")
+}
+
+// A booked time on the Calendar: DJ collecting a Local Drop-Off pair, or
+// dropping it back off. At most one of each per Order; rescheduling moves
+// it. The Order's pickupDate/pickupSlot stay as the customer booked them.
+model Appointment {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  kind     AppointmentKind
+  startsAt DateTime
+  endsAt   DateTime
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orderId, kind])
+  @@index([startsAt])
+  @@map("appointments")
+}
+
+// CONTEXT.md: Service (Services & Pricing). The id is the stable slug
+// Items store in serviceIds, e.g. "premium". Prices are Money as integer
+// cents; a "from $25+" Service has isMinimum. Deactivating hides a Service
+// from new bookings; it is never deleted, since past Items name it.
+model Service {
+  id             String  @id
+  name           String
+  description    String
+  isCleaningTier Boolean // Standard and Premium Clean: at most one per Item
+  isAddOn        Boolean // CONTEXT.md: Add-on
+  baseCents      Int
+  isMinimum      Boolean
+  suedeFee       Boolean // carries the Suede Fee on suede pairs
+  minimumLabel   String? // what a minimum price covers, e.g. "Midsole"
+  alsoFrom       Json? // other published "from" prices: [{ label, cents }]
+  imageKey       String? // FileStorage key (ADR-0004)
+  active         Boolean @default(true)
+  position       Int // display order
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("services")
+}
+
+// CONTEXT.md: Bundle (Services & Pricing, Bundles tab).
+model Bundle {
+  id         String   @id // stable slug, e.g. "revival"
+  name       String
+  priceCents Int
+  perks      String[]
+  imageKey   String?
+  active     Boolean  @default(true)
+  position   Int
+
+  orders Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bundles")
+}
+
+// Where the shop restocks supplies (Inventory, Suppliers tab).
+model Supplier {
+  id      String  @id @default(cuid())
+  name    String
+  email   String?
+  phone   String?
+  website String?
+  notes   String?
+
+  items InventoryItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("suppliers")
+}
+
+// A supply, material or care product the shop keeps on hand (Inventory).
+// "Low Stock" is stock <= lowStockAt, derived, never stored.
+model InventoryItem {
+  id         String    @id @default(cuid())
+  name       String
+  category   String // e.g. "Cleaning", "Laces", "Restoration", "Tools"
+  stock      Int       @default(0) // never negative
+  lowStockAt Int       @default(0)
+  imageKey   String?
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+  active     Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@map("inventory_items")
+}
+
+// The message thread between the shop and a customer about one Order
+// (Messages). Archiving hides it from the inbox without deleting it.
+model Conversation {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  archivedAt    DateTime?
+  lastMessageAt DateTime? // for sorting the inbox
+
+  messages Message[]
+
+  createdAt DateTime @default(now())
+
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+// One message in a Conversation. "Unread" in the admin inbox is a
+// CUSTOMER message with readAt null.
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  author          MessageAuthor
+  authorAccountId String? // the Account that wrote it
+  body            String
+  readAt          DateTime? // when the other side read it
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
 }

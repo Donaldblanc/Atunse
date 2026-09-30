@@ -149,8 +149,8 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): decide where reviews come from (customers after Completed, or imported from Google/Instagram), add a Review model, then show the latest.
 
 **Placeholders (real data exists, but the design shows more):**
-- [ ] **Pending Payments: Zelle/Cash split.** On #119's branch it's live (Payment rows); lands when #119 merges.
-- [ ] **Order #: ATU-1008 numbers** instead of the 8-character reference. On #119's branch; lands when #119 merges.
+- [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
+- [x] **Order #: ATU-1008 numbers** in Recent Orders and Today's Schedule (#119).
 - [ ] **Today's Schedule: return drop-offs.** Only collections show today; show RETURN Appointments too (#119), once Order detail or the Calendar can book one.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
@@ -221,4 +221,6 @@ tracked elsewhere are marked; everything else is new.
 - [ ] SMS notifications (Twilio or equivalent) — build the adapter now, gate actual sending behind a feature toggle (off by default) until there's budget to pay for real sending. See ADR-0009. Email (Resend) covers all required notification events in the meantime.
 - [ ] Customer data import — a dedicated admin-only screen/flow to import existing customer records, format TBD. Not an MVP-launch blocker; build once the source format is confirmed.
 - [ ] Mail-in label generation via a third-party carrier API (e.g. Shippo/EasyPost) — behind the same adapter pattern as address validation. Not in MVP; MVP only captures/validates the shipping address (ADR-0010).
-- [ ] Standalone cross-order messages inbox screen — behind a feature toggle. MVP messaging lives inside Item detail only; the inbox is a post-MVP admin screen.
+- [ ] **Messages inbox screen** (design `09-messages.png`): now MVP, one Conversation per Order (ADR-0016). The data model exists; the screen, sending, and customer-side replies don't yet.
+- [ ] **Booking reads the catalog from the database** (ADR-0016 step 2): `submitOrder`, the booking flow and the Services page read the `services`/`bundles` tables instead of `service-catalog.ts`, then drop the parity test.
+- [ ] **Decide tax and a Local Drop-Off fee** (Order detail design shows 8.875% tax): Orders can store both; nothing computes them yet (CONTEXT.md open question).

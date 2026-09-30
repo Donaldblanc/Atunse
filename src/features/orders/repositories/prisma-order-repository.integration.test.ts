@@ -13,16 +13,14 @@ import {
   type NewItemInput,
   type NewOrderInput,
 } from "./order-repository";
+import { deleteAllOrders } from "@/shared/testing/delete-all-orders";
 import { PrismaOrderRepository } from "./prisma-order-repository";
 
 const prisma = new PrismaClient();
 const repo = new PrismaOrderRepository(prisma);
 
 beforeEach(async () => {
-  await prisma.itemAuditEntry.deleteMany();
-  await prisma.itemPhoto.deleteMany();
-  await prisma.item.deleteMany();
-  await prisma.order.deleteMany();
+  await deleteAllOrders(prisma);
   await prisma.signInCode.deleteMany();
   await prisma.account.deleteMany({ where: { role: "CUSTOMER" } });
 });
@@ -70,6 +68,8 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     estimate: Money.fromCents(3000),
     estimateIsMinimum: false,
     deposit: Money.fromCents(1500),
+    depositMethod: "ZELLE",
+    collection: { startsAt: new Date("2026-10-03T20:30:00Z"), endsAt: new Date("2026-10-03T21:00:00Z") },
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
@@ -192,9 +192,7 @@ describe("PrismaOrderRepository (integration)", () => {
       expect(order.accountId).not.toBe(admin.id);
       expect(await prisma.account.count({ where: { email: "owner-it@example.com" } })).toBe(2);
     } finally {
-      await prisma.itemPhoto.deleteMany();
-      await prisma.item.deleteMany();
-      await prisma.order.deleteMany();
+      await deleteAllOrders(prisma);
       await prisma.account.delete({ where: { id: admin.id } });
     }
   });
@@ -406,14 +404,6 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect((await repo.listCollectionsOn("2026-10-03")).map((order) => order.id)).toEqual([today.id]);
   });
 
-  it("finds which Orders have a payment confirmed", async () => {
-    const paid = (await repo.create(newOrder({ items: [newItem(), newItem()] }))).order;
-    const unpaid = (await repo.create(newOrder())).order;
-    await transition(paid.items[1]!.id, "MANUAL_PAYMENT_CONFIRMED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
-
-    expect(await repo.findPaidOrderIds([paid.id, unpaid.id])).toEqual(new Set([paid.id]));
-  });
-
   it("counts Items by status", async () => {
     const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
     await transition(order.items[0]!.id, "REVIEW_STARTED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
@@ -421,11 +411,11 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect(await repo.countItemsByStatus()).toEqual({ REQUEST_SUBMITTED: 2, UNDER_REVIEW: 1 });
   });
 
-  it("sums the Deposits of Orders with no payment confirmed, skipping fully cancelled Orders", async () => {
+  it("sums the PENDING Deposits by method, skipping received ones and fully cancelled Orders", async () => {
     await repo.create(newOrder({ deposit: Money.fromCents(1500) }));
-    await repo.create(newOrder({ deposit: Money.fromCents(2500) }));
+    await repo.create(newOrder({ deposit: Money.fromCents(2500), depositMethod: "CASH" }));
     const paid = (await repo.create(newOrder({ deposit: Money.fromCents(4000) }))).order;
-    await transition(paid.items[0]!.id, "MANUAL_PAYMENT_CONFIRMED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
+    await prisma.payment.updateMany({ where: { orderId: paid.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
     const cancelled = (await repo.create(newOrder({ deposit: Money.fromCents(8000) }))).order;
     await transition(cancelled.items[0]!.id, "CANCELLED", "REQUEST_SUBMITTED", "CANCELLED");
 
@@ -433,5 +423,71 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
 
     expect(summary.orders).toBe(2);
     expect(summary.deposits.cents).toBe(4000);
+    expect(summary.byMethod).toEqual({ ZELLE: 1, CASH: 1, CARD: 0 });
+  });
+});
+
+describe("PrismaOrderRepository admin-screen data (integration)", () => {
+  it("numbers Orders in sequence and creates the PENDING Deposit and collection Appointment with them", async () => {
+    const first = (await repo.create(newOrder({ contactName: "John Doe" }))).order;
+    const second = (await repo.create(newOrder())).order;
+
+    expect(second.number).toBe(first.number + 1);
+    expect(first.payments).toEqual([
+      expect.objectContaining({ kind: "DEPOSIT", method: "ZELLE", amount: Money.fromCents(1500), status: "PENDING", receivedAt: null }),
+    ]);
+    expect(first.appointments).toEqual([
+      expect.objectContaining({ kind: "COLLECTION", startsAt: new Date("2026-10-03T20:30:00Z"), endsAt: new Date("2026-10-03T21:00:00Z") }),
+    ]);
+    expect((await prisma.account.findUniqueOrThrow({ where: { id: first.accountId } })).name).toBe("John Doe");
+    expect(first.items[0]).toMatchObject({ size: null, colorway: null });
+    expect(first.dropOffFee.cents).toBe(0);
+  });
+
+  it("gives a Mail-In Order no collection Appointment", async () => {
+    const { order } = await repo.create(
+      newOrder({
+        fulfillment: { method: "MAIL_IN", address: { line1: "1 Main St", line2: null, city: "Austin", state: "TX", zip: "73301" }, preferredDate: null },
+        collection: null,
+      }),
+    );
+    expect(order.appointments).toEqual([]);
+  });
+
+  it("links an Order to its Bundle, and refuses a Bundle that doesn't exist", async () => {
+    const { order } = await repo.create(newOrder({ bundleId: "revival" }));
+    expect(order.bundleId).toBe("revival");
+    await expect(repo.create(newOrder({ bundleId: "no-such-bundle" }))).rejects.toThrow();
+  });
+
+  it("enforces the money, time and stock rules in the database itself", async () => {
+    const { order } = await repo.create(newOrder());
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "CASH", amountCents: 0 } })).rejects.toThrow();
+    // RECEIVED exactly when there's a receivedAt.
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "CASH", amountCents: 100, status: "RECEIVED" } })).rejects.toThrow();
+    await expect(
+      prisma.appointment.create({ data: { orderId: order.id, kind: "RETURN", startsAt: new Date("2026-10-05T15:00:00Z"), endsAt: new Date("2026-10-05T15:00:00Z") } }),
+    ).rejects.toThrow();
+    // One COLLECTION per Order: rescheduling moves it rather than adding another.
+    await expect(
+      prisma.appointment.create({ data: { orderId: order.id, kind: "COLLECTION", startsAt: new Date("2026-10-05T15:00:00Z"), endsAt: new Date("2026-10-05T15:30:00Z") } }),
+    ).rejects.toThrow();
+    const item = await prisma.inventoryItem.create({ data: { name: "Crep Protect Spray", category: "Cleaning", stock: 1 } });
+    try {
+      await expect(prisma.inventoryItem.update({ where: { id: item.id }, data: { stock: { decrement: 2 } } })).rejects.toThrow();
+    } finally {
+      await prisma.inventoryItem.delete({ where: { id: item.id } });
+    }
+  });
+
+  it("keeps one Conversation per Order, holding its Messages in order", async () => {
+    const { order } = await repo.create(newOrder());
+    const conversation = await prisma.conversation.create({ data: { orderId: order.id } });
+    await prisma.message.create({ data: { conversationId: conversation.id, author: "CUSTOMER", body: "Can you add sole restoration?" } });
+    await prisma.message.create({ data: { conversationId: conversation.id, author: "ADMIN", body: "Yes, that's $25 more." } });
+
+    await expect(prisma.conversation.create({ data: { orderId: order.id } })).rejects.toThrow();
+    const unread = await prisma.message.count({ where: { conversationId: conversation.id, author: "CUSTOMER", readAt: null } });
+    expect(unread).toBe(1);
   });
 });

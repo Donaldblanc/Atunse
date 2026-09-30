@@ -48,6 +48,7 @@ basis for this build.
 | 0012 | Money (integer-cents value type), idempotency keys, per-use-case authorization, and audit records are explicit domain concerns designed in from the first vertical slice — not infrastructure retrofitted later |
 | 0013 | Prisma for the ORM/migrations; Vitest for both unit and integration tests. `PrismaClient` is only imported inside repositories |
 | 0014 | Every booking belongs to a Customer Account (created at first booking; no guest orders), separate from Admin Accounts even for the same email, with separate logins. Customers sign in with emailed codes, only when a booking's email already has an Account; photos are viewable only by their Account's owner or an admin, through 5-minute presigned links. Customer login is behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED` |
+| 0016 | The data model mirrors the admin screens (Payments, Appointments, Services/Bundles, Inventory, Conversations); Order status stays derived; the service catalog moves into the database in two steps, parity-tested until booking reads it |
 
 ## Guiding build principle
 **Establish architectural boundaries early; implement the domain
@@ -86,7 +87,9 @@ prove it against.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
   - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
+- **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)): Payments, Appointments, Services and Bundles (seeded from `service-catalog.ts`, parity-tested), Inventory Items and Suppliers, Conversations and Messages, order numbers (ATU-1001 on), customer names, item size and colorway. Booking creates each Order's PENDING Deposit Payment and, for Local Drop-Off, its COLLECTION Appointment.
 - Not built yet:
+  - Booking still prices from `service-catalog.ts`; switching it (and the Services page) to the `services`/`bundles` tables is step 2 of ADR-0016.
   - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
   - The other admin working screens (Orders, Calendar, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
 
@@ -137,19 +140,21 @@ This slice is the thing that proves the architecture, not a diagram.
 - Stripe behind its feature toggle (TODO)
 - Mail-in address validation adapter (ADR-0010)
 
-**Deferred past this list** (tracked in `docs/TODO.md`): SMS, customer data import, mail-in label generation, standalone messages inbox, multi-admin/staff invite flow.
+**Deferred past this list** (tracked in `docs/TODO.md`): SMS, customer data import, mail-in label generation, multi-admin/staff invite flow.
 
 ## Admin panel screen inventory (MVP)
-1. **Orders queue** — all orders/items, filterable by status; main working view
-2. **Item detail** — photos, condition notes, service selection, price/quote entry, status transitions, payment status (incl. manual Zelle/Cash confirmation per ADR-0002), and messages scoped to this item (see below)
-3. **Under-Review / needs-action queue** — items awaiting a quote (every item requires manual review, ADR-0001) — where the owner's daily work starts
-4. **Awaiting payment confirmation queue** — Zelle/Cash items with a deposit/balance not yet marked received
-5. **Customers** — list + detail (contact info, order history)
-6. **Settings** — service/pricing reference list, policy documents. Feature toggles (Stripe, SMS) are **env-var/config-only**, not an admin UI control.
+The admin follows the approved design images (`scratch/01-09`); the data model already holds what each needs (ADR-0016).
+1. **Overview** (built) — booked orders and revenue for a date range, and the work queues right now.
+2. **Orders** — every Order, with status tabs derived from its Items and Payments, filters by Service, payment method and date.
+3. **Order detail** — progress, customer, Items and Services (photos, size, colorway, quote), Payments (manual Zelle/Cash confirmation per ADR-0002), totals.
+4. **Calendar** — Local Drop-Off collection and return Appointments, plus pairs in progress and ready.
+5. **Customers** — list and detail: contact info, bookings, last booking.
+6. **Services & Pricing** — Services and Bundles: prices, descriptions, active or not.
+7. **Inventory** — supplies with stock and low-stock alerts, and their Suppliers.
+8. **Payments** — every Deposit, Balance and Full payment, by method and status.
+9. **Messages** — an inbox with one Conversation per Order (unread, archived, link to the Order).
 
-Messaging in MVP lives inside Item detail only — no cross-order inbox yet
-(that's a post-MVP toggle, see TODO). Customer data import (TODO) and the
-future standalone messages inbox (TODO) are both post-MVP admin screens.
+Reviews and Settings are in the sidebar with no design yet. Feature toggles (Stripe, SMS) stay **env-var/config-only**, not an admin UI control.
 
 ## Open TODOs (full list in docs/TODO.md)
 - [ ] Stripe integration (card/Apple Pay) — behind a feature toggle, off by default

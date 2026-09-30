@@ -33,6 +33,8 @@ import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
 import { SAMPLE_LOW_STOCK_ITEMS, SAMPLE_REVIEWS, SAMPLE_UNREAD_MESSAGES, type SampleReview } from "@/features/admin-overview/sample-data";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
+import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
 import { builtScreenHref, OWNER_DISPLAY_NAME } from "./admin-screens";
 
 export const metadata = { title: "Overview · Atunṣe Admin" };
@@ -81,9 +83,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
           </StatCard>
           <StatCard label="Pending Payments" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
             <p className="ov-stat-note">
-              {overview.awaitingDeposit.orders === 0
-                ? "Every deposit confirmed"
-                : `${overview.awaitingDeposit.deposits.format()} in deposits due`}
+              {overview.awaitingDeposit.orders === 0 ? "Every deposit confirmed" : depositSplit(overview.awaitingDeposit)}
             </p>
           </StatCard>
           <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)}>
@@ -181,6 +181,12 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
       </aside>
     </div>
   );
+}
+
+/** "3 Zelle · 3 Cash · $280 due": each method that has a Deposit waiting, then the total. */
+function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
+  const methods = PAYMENT_METHODS.filter((method) => byMethod[method] > 0).map((method) => `${byMethod[method]} ${PAYMENT_METHOD_LABELS[method]}`);
+  return [...methods, `${deposits.format()} due`].join(" · ");
 }
 
 function StatCard({ label, icon: Icon, value, children }: { label: string; icon: Icon; value: string; children: React.ReactNode }) {

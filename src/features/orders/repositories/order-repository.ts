@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, CalendarDate, Fulfillment, ItemStatus, Order, TermsAcceptance } from "../domain";
+import type { AuditEntry, CalendarDate, Fulfillment, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -65,6 +65,10 @@ export interface NewOrderInput {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /** How the Deposit is expected: created as a PENDING Payment with the Order. */
+  depositMethod: PaymentMethod;
+  /** Local Drop-Off's COLLECTION Appointment, from its booked slot; null for Mail-In. */
+  collection: { startsAt: Date; endsAt: Date } | null;
   submissionKey: string | null;
   submissionFingerprint: string | null;
   /** The Bundle bought, or null for a single pair. */
@@ -84,10 +88,18 @@ export interface NewItemInput {
   photos: { key: string; uploadKey: string }[];
 }
 
+export interface AwaitingDeposits {
+  orders: number;
+  deposits: Money;
+  byMethod: Record<PaymentMethod, number>;
+}
+
 export interface OrderRepository {
   /**
-   * Creates the Order with its Items and their photos, and the owner's Account when
-   * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
+   * Creates the Order with its Items and their photos, its PENDING Deposit
+   * Payment, its COLLECTION Appointment (Local Drop-Off), and the owner's
+   * Account when it's a new customer (named after contactName), all in one
+   * transaction. Retry-safe (ADR-0012): if
    * an Order with the same `submissionKey` already exists, returns that
    * Order with `created: false` instead of inserting a duplicate. Throws
    * EmailTakenError or PhotoKeyInUseError, having written nothing.
@@ -130,16 +142,12 @@ export interface OrderRepository {
   /** Local Drop-Off Orders whose collection is booked on `date`, in booking order. */
   listCollectionsOn(date: CalendarDate): Promise<Order[]>;
 
-  /** Which of these Orders have a payment confirmed on any of their Items (MANUAL_PAYMENT_CONFIRMED). */
-  findPaidOrderIds(orderIds: string[]): Promise<Set<string>>;
-
   /** How many Items are in each status right now; statuses with none are left out. */
   countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;
 
   /**
-   * Orders still waiting on their Deposit: no payment confirmed on any of
-   * their Items (MANUAL_PAYMENT_CONFIRMED) and at least one Item not
-   * cancelled. Returns how many, and their Deposits added up.
+   * Deposits still PENDING on Orders with at least one Item not cancelled:
+   * how many, their amounts added up, and how many by method.
    */
-  summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }>;
+  summarizeAwaitingDeposit(): Promise<AwaitingDeposits>;
 }

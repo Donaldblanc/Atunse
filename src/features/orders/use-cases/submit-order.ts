@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
+import { availablePickupSlots, collectionTimes, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
@@ -213,6 +213,9 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       estimate: orderEstimate.estimate,
       estimateIsMinimum: orderEstimate.isMinimum,
       deposit: orderEstimate.deposit,
+      // The booking confirmation asks for the Deposit by Zelle, the only way offered at booking today.
+      depositMethod: "ZELLE",
+      collection: fulfillment.method === "PICKUP" ? collectionTimes(fulfillment.date, fulfillment.slot) : null,
       submissionKey: input.submissionKey,
       submissionFingerprint: fingerprint,
       bundleId: input.bundleId,

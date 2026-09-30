@@ -85,14 +85,20 @@ function shopOffsetMs(instant: Date): number {
 }
 
 /**
- * The instant a day starts in the shop's (New York's) time, e.g. to count
- * the Orders booked on it. DST-safe: New York never changes clocks at
- * midnight, so every day has exactly one midnight.
+ * The instant New York's wall clock reads `minutesPastMidnight` on `date`,
+ * e.g. a booked collection slot. DST-safe: New York changes clocks at
+ * 2 AM, and the shop's times (midnight, 8 AM-10 PM) never fall in the
+ * skipped or repeated hour.
  */
-export function shopMidnight(date: CalendarDate): Date {
-  const utcMidnight = calendarDateToUtcMidnight(date).getTime();
-  const firstGuess = utcMidnight - shopOffsetMs(new Date(utcMidnight));
-  // The offset at the real midnight can differ from the first guess's when
+export function shopTime(date: CalendarDate, minutesPastMidnight: number): Date {
+  const wallClockAsUtc = calendarDateToUtcMidnight(date).getTime() + minutesPastMidnight * 60_000;
+  const firstGuess = wallClockAsUtc - shopOffsetMs(new Date(wallClockAsUtc));
+  // The offset at the real instant can differ from the first guess's when
   // a DST change falls between them; re-reading it there settles it.
-  return new Date(utcMidnight - shopOffsetMs(new Date(firstGuess)));
+  return new Date(wallClockAsUtc - shopOffsetMs(new Date(firstGuess)));
+}
+
+/** The instant a day starts in the shop's (New York's) time, e.g. to count the Orders booked on it. */
+export function shopMidnight(date: CalendarDate): Date {
+  return shopTime(date, 0);
 }

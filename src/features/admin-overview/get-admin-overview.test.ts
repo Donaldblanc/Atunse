@@ -37,6 +37,8 @@ function order(estimateCents: number, items: NewItemInput[] = [item(["standard"]
     estimate: Money.fromCents(estimateCents),
     estimateIsMinimum: false,
     deposit: Money.fromCents(estimateCents / 2),
+    depositMethod: "ZELLE",
+    collection: null,
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
@@ -138,18 +140,15 @@ describe("getAdminOverview", () => {
     old.items[1]!.status = "UNDER_REVIEW";
     old.items[2]!.status = "READY_FOR_PICKUP_SHIPPING";
     const paid = await book(d.orders, "2026-06-02T13:00:00Z", order(4000));
-    await d.orders.transitionItemStatus({
-      itemId: paid.items[0]!.id,
-      toStatus: "UNDER_REVIEW",
-      entry: { action: "MANUAL_PAYMENT_CONFIRMED", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", actorAccountId: "acc_admin", idempotencyKey: "k" },
-    });
+    paid.items[0]!.status = "UNDER_REVIEW";
+    Object.assign(paid.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
 
     const overview = await getAdminOverview(d, ADMIN, "this-week");
 
     expect(overview.orders.current).toBe(0);
     expect(overview.needsQuote).toBe(3); // old: submitted + under review; paid: under review
     expect(overview.readyForReturn).toBe(1);
-    expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000) });
+    expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0 } });
   });
 });
 
@@ -164,12 +163,8 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     );
     latest.items[0]!.brand = "Air Jordan 1";
     latest.items[0]!.status = "IN_PROGRESS";
-    latest.items[1]!.status = "APPROVED";
-    await d.orders.transitionItemStatus({
-      itemId: latest.items[1]!.id,
-      toStatus: "AWAITING_SNEAKERS",
-      entry: { action: "MANUAL_PAYMENT_CONFIRMED", fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", actorAccountId: "acc_admin", idempotencyKey: "k" },
-    });
+    latest.items[1]!.status = "AWAITING_SNEAKERS";
+    Object.assign(latest.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
 
     const { recentOrders } = await getAdminOverview(d, ADMIN, "this-week");
 
@@ -181,12 +176,13 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
       firstPair: "Air Jordan 1",
       services: "Standard Clean + 2 more",
       status: "AWAITING_SNEAKERS", // the least-advanced pair
-      depositPaid: true,
+      reference: `ATU-${latest.number}`,
+      deposit: { method: "ZELLE", paid: true },
       total: Money.fromCents(12000),
       totalIsMinimum: true,
     });
     expect(recentOrders[0]!.photoUrl).toMatch(/^https:\/\/photos\.test\/photos\//);
-    expect(recentOrders[1]!.depositPaid).toBe(false);
+    expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", paid: false });
   });
 
   it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {

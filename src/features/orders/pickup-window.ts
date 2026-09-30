@@ -4,7 +4,7 @@
 // features/orders, next to service-catalog.ts, so a UI refactor can't
 // silently change server validation. Pure: no React.
 
-import { shopClock, type CalendarDate } from "./calendar-date";
+import { shopClock, shopTime, type CalendarDate } from "./calendar-date";
 
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;
@@ -45,6 +45,17 @@ export const PICKUP_WINDOW_LABEL = `${formatClock(WINDOW_START_MINUTES)} – ${f
 
 /** Every slot in the daily window, bookable or not. */
 export const PICKUP_TIME_SLOTS: readonly string[] = SLOTS.map((slot) => slot.label);
+
+/**
+ * When a booked collection slot starts and ends, as instants: the
+ * Calendar's COLLECTION Appointment. Throws for a slot that isn't one of
+ * PICKUP_TIME_SLOTS (submitOrder has already validated it).
+ */
+export function collectionTimes(date: CalendarDate, slot: string): { startsAt: Date; endsAt: Date } {
+  const match = SLOTS.find((s) => s.label === slot);
+  if (!match) throw new Error(`Unknown collection slot: ${slot}`);
+  return { startsAt: shopTime(date, match.startMinutes), endsAt: shopTime(date, match.startMinutes + 30) };
+}
 
 /**
  * The slots a customer can still book on `date`, at instant `now`. The
