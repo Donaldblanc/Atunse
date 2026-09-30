@@ -16,6 +16,7 @@ import {
   type PickupAddress,
   type ScheduleMethod,
   type Step,
+  type TermsSelection,
 } from "./booking-types";
 import { ServiceStep } from "./service-step";
 import { DetailsStep } from "./details-step";
@@ -23,7 +24,8 @@ import { ScheduleStep } from "./schedule-step";
 import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
-import { computeMultiServicePricing, pricedLineForService } from "./pricing";
+import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
+import { formatPrice } from "@/features/orders/service-catalog";
 import { CustomerSignIn } from "./customer-sign-in";
 import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
@@ -41,7 +43,7 @@ const STEPS: { key: Step; label: string }[] = [
 // "details" pluralizes in the bundle flow, matching DetailsStep's heading.
 const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => string> = {
   details: (isBundle) => `Tell us about your pair${isBundle ? "s" : ""}`,
-  schedule: () => "Pickup or mail in",
+  schedule: () => "Local Drop-Off or mail in",
   contact: () => "Contact details",
   review: () => "Confirm booking",
 };
@@ -59,13 +61,13 @@ export function BookingFlow() {
   const [flow, setFlow] = useState<FlowType>(requestedService ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   // Cleaning is single-select (Standard vs Premium — never both on one
-  // pair); restoration/custom-work services are additive add-ons, so
-  // they're tracked separately and can combine freely with each other
-  // and with the chosen cleaning tier.
+  // pair); restoration/custom-work services stack, so they're tracked
+  // separately and combine freely with each other and with the chosen
+  // cleaning tier. Add-ons live on each pair (PairDetails.addOnIds).
   const [selectedCleaningId, setSelectedCleaningId] = useState<string | null>(() =>
     requestedService?.category === "cleaning" ? requestedService.id : null,
   );
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(() =>
+  const [selectedStackableIds, setSelectedStackableIds] = useState<string[]>(() =>
     requestedService && requestedService.category !== "cleaning" ? [requestedService.id] : [],
   );
   const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
@@ -90,16 +92,17 @@ export function BookingFlow() {
   // Set when this booking's submission key already created an Order with
   // other details (#76): the customer keeps that booking or books anew.
   const [conflict, setConflict] = useState<{ message: string; existing: SubmitOrderResponse } | null>(null);
-  const policyAcceptedRef = useRef(false);
+  const termsRef = useRef<TermsSelection>({ policyAccepted: false, acknowledgedTerms: [], termsVersion: "" });
 
-  const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedAddonIds];
+  const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedStackableIds];
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
   const isBundle = flow === "bundle";
   const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
+  const selectedAddOns = addOnLines((isBundle ? pairs : [singlePair]).map((pair) => pair.addOnIds));
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
-    ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush)
-    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush);
+    ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush, selectedAddOns)
+    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush, selectedAddOns);
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
@@ -116,18 +119,18 @@ export function BookingFlow() {
     if (service.category === "cleaning") {
       setSelectedCleaningId((prev) => (prev === id ? null : id));
     } else {
-      setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
+      setSelectedStackableIds((prev) => (prev.includes(id) ? prev.filter((existing) => existing !== id) : [...prev, id]));
     }
   }
 
-  async function confirmBooking(policyAccepted: boolean) {
-    policyAcceptedRef.current = policyAccepted;
+  async function confirmBooking(terms: TermsSelection) {
+    termsRef.current = terms;
     submissionKey.current ??= crypto.randomUUID();
     let result: SubmitOrderResponse;
     try {
       result = await submitBooking({
         submissionKey: submissionKey.current,
-        policyAccepted,
+        ...terms,
         bundleId: isBundle ? selectedBundle.id : null,
         serviceIds: isBundle ? [] : selectedServiceIds,
         pairs: isBundle ? pairs : [singlePair],
@@ -165,7 +168,7 @@ export function BookingFlow() {
     <div className="booking-page-layout">
       <div className="booking-page-main">
         {step !== "service" && !confirmation && (
-          <button type="button" className="booking-page-back-link" onClick={goBack}>
+          <button type="button" className="booking-page-back-link" onClick={goBack} aria-label="Back">
             <ArrowLeft size={14} aria-hidden="true" />
             <span className="booking-page-back-text">Back</span>
           </button>
@@ -188,9 +191,9 @@ export function BookingFlow() {
             const isActive = index === stepIndex;
             const subtext = s.key === "service" ? selectedName : STEP_SUBTEXT[s.key](isBundle);
             return (
-              <div key={s.key} className="booking-page-step-group">
+              <div key={s.key} className="booking-page-step-group" data-reached={isDone || isActive}>
                 {index > 0 && <div className="booking-page-step-rule" />}
-                <div className="booking-page-step" data-active={isActive} data-done={isDone}>
+                <div className="booking-page-step" data-active={isActive} data-done={isDone} aria-current={isActive ? "step" : undefined}>
                   <span className="booking-page-step-num" aria-hidden="true">
                     {isDone ? <Check size={14} /> : index + 1}
                   </span>
@@ -259,7 +262,7 @@ export function BookingFlow() {
         {step === "review" && !confirmation && signInEmail && (
           <CustomerSignIn
             email={signInEmail}
-            onSignedIn={() => confirmBooking(policyAcceptedRef.current)}
+            onSignedIn={() => confirmBooking(termsRef.current)}
             onUseDifferentEmail={() => {
               setSignInEmail(null);
               setStep("contact");
@@ -281,7 +284,7 @@ export function BookingFlow() {
               // uploads, since the remembered ones belong to the first Order.
               submissionKey.current = null;
               uploadedPhotoKeys.current = new WeakMap();
-              await confirmBooking(policyAcceptedRef.current);
+              await confirmBooking(termsRef.current);
             }}
           />
         )}
@@ -329,6 +332,14 @@ export function BookingFlow() {
           <span className="booking-page-summary-line-price">{selectedPrice}</span>
         </div>
         {selectedPriceNote && <span className="booking-page-summary-price-note">{selectedPriceNote}</span>}
+        {selectedAddOns.map((addOn) => (
+          <div className="booking-page-summary-line booking-page-summary-addon" key={addOn.key}>
+            <span className="booking-page-summary-line-body">
+              <span>{addOn.name}</span>
+            </span>
+            <span className="booking-page-summary-line-price">+{formatPrice(addOn.baseCents, addOn.isMinimum)}</span>
+          </div>
+        ))}
 
         <div className="booking-page-summary-rule" />
 
@@ -342,15 +353,15 @@ export function BookingFlow() {
         <div className="booking-page-summary-note">
           <Info size={16} aria-hidden="true" />
           <span>
-            <strong>No surprises.</strong>
-            We&rsquo;ll inspect your sneakers and confirm final pricing before any work begins.
+            <strong>Pricing confirmed first.</strong>
+            We&rsquo;ll inspect your sneakers and confirm final pricing with you before any work begins.
           </span>
         </div>
 
         <div className="booking-page-summary-feature">
           <Truck size={18} aria-hidden="true" />
           <span>
-            <strong>Pickup or mail in</strong>
+            <strong>Local Drop-Off or mail in</strong>
             Convenient options at scheduling.
           </span>
         </div>
@@ -373,7 +384,7 @@ export function BookingFlow() {
         <p className="booking-page-summary-contact">
           Questions? We&rsquo;re here to help.
           <br />
-          <Link href="/coming-soon" className="landing-link-arrow">
+          <Link href="/contact" className="landing-link-arrow">
             Contact us
             <ArrowRight size={12} aria-hidden="true" />
           </Link>

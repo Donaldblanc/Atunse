@@ -36,9 +36,18 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return FORWARD_TRANSITIONS[from].includes(to);
 }
 
-/** CONTEXT.md: exactly two Fulfillment Methods. There is no drop-off. */
+/**
+ * CONTEXT.md: exactly two Fulfillment Methods. PICKUP is the code name for
+ * **Local Drop-Off**: DJ collects the pair from the customer's address
+ * (NY/NJ/CT) at a booked time and drops it back off when it's done. The
+ * code name predates the customer-facing one and is kept so stored Orders
+ * and the API stay unchanged; customers never see the word "pickup".
+ */
 export const FULFILLMENT_METHODS = ["PICKUP", "MAIL_IN"] as const;
 export type FulfillmentMethod = (typeof FULFILLMENT_METHODS)[number];
+
+/** What customers see for each Fulfillment Method, everywhere (site and emails). */
+export const FULFILLMENT_LABELS: Record<FulfillmentMethod, string> = { PICKUP: "Local Drop-Off", MAIL_IN: "Mail-In" };
 
 export interface Address {
   line1: string;
@@ -71,6 +80,21 @@ export interface Item {
   photoKeys: string[];
 }
 
+/**
+ * ADR-0015: the evidence that a customer affirmatively accepted a specific
+ * Terms of Service & Restoration Agreement. Recorded once, at submission.
+ */
+export interface TermsAcceptance {
+  version: string;
+  /** The PDF's permanent URL for that version. */
+  url: string;
+  /** SHA-256 of that PDF's bytes, hex. */
+  sha256: string;
+  acceptedAt: Date;
+  /** Each risk acknowledgment's id (booking-terms.ts) -> whether it was ticked. */
+  acknowledgments: Record<string, boolean>;
+}
+
 export interface Order {
   id: string;
   /** Every Order belongs to an Account (ADR-0014); there are no guest orders. */
@@ -80,6 +104,8 @@ export interface Order {
   contactPhone: string;
   createdAt: Date;
   policyAcceptedAt: Date;
+  /** Null only for Orders from before the agreement existed. */
+  termsAcceptance: TermsAcceptance | null;
   fulfillment: Fulfillment;
   rush: boolean;
   estimate: Money;

@@ -26,20 +26,21 @@ const FAQS = [
   {
     question: "How does the process work?",
     answer:
-      "Schedule a pickup or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+      "Book a Local Drop-Off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
   },
   {
     question: "How long does restoration take?",
-    answer: "Most restorations take 5-10 business days depending on the service and current order volume.",
+    answer: "Restorations usually take 5–10 business days, depending on the service and current order volume. Timelines are estimates.",
   },
   {
     question: "How do I get my sneakers to you?",
     answer:
-      "We'll schedule a pickup from your address in the NY/NJ/CT area, or you can ship them to us from anywhere in the country using a prepaid mail-in label.",
+      "In the NY/NJ/CT area, book a Local Drop-Off: DJ collects them from your address and drops them back off when they're done. Anywhere else in the US, choose Mail-In: we'll email you where to send them, and ship them back when they're done.",
   },
   {
     question: "What if I'm not happy with the results?",
-    answer: "Let us know within 7 days of pickup or delivery and we'll make it right at no extra cost.",
+    answer:
+      "Contact us as soon as your pair is back, with your order reference and photos, and we'll look into it. Results vary with each pair's age and condition; our Terms of Service & Restoration Agreement explains how we handle concerns.",
   },
 ];
 
@@ -60,7 +61,7 @@ const REVIEWS = [
   },
   {
     stars: 5,
-    quote: "Dropped off a pair I thought were done for. Got them back like they just came out of the box.",
+    quote: "Sent in a pair I thought were done for. Got them back like they just came out of the box.",
     name: "Priya R.",
     loc: "Jersey City, NJ",
     initials: "PR",
@@ -92,6 +93,7 @@ export default function HomePage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="landing-hero">
         <div>
@@ -102,8 +104,8 @@ export default function HomePage() {
             MOVES YOU.
           </h1>
           <p className="landing-lede">
-            NYC&rsquo;s sneaker studio for cleaning, restoration and protection. Keep your
-            favorite pairs in rotation &mdash; longer.
+            NYC-based sneaker cleaning, restoration and protection, with Local Drop-Off across NY / NJ / CT and
+            mail-in nationwide. Keep your favorite pairs in rotation &mdash; longer.
           </p>
           <div className="landing-cta-row">
             <BookRestorationCta topCta />
@@ -130,9 +132,9 @@ export default function HomePage() {
         <div className="landing-trust-item">
           <Clock className="landing-trust-icon" size={18} aria-hidden="true" />
           <span>
-            <strong>72-HOUR</strong>
+            <strong>~72-HOUR</strong>
             <br />
-            Turnaround
+            Typical turnaround
           </span>
         </div>
         <div className="landing-trust-item">
@@ -140,7 +142,7 @@ export default function HomePage() {
           <span>
             <strong>NY / NJ / CT</strong>
             <br />
-            Local pickup
+            Local Drop-Off
           </span>
         </div>
         <div className="landing-trust-item">
@@ -198,7 +200,7 @@ export default function HomePage() {
       <div className="landing-lower">
         <ReviewsCarousel reviews={REVIEWS} />
 
-        <FaqAccordion faqs={FAQS} />
+        <FaqAccordion faqs={FAQS} id="faq" />
 
         <BookingPanel />
       </div>
@@ -214,6 +216,8 @@ export default function HomePage() {
           LONGER MILES.
         </div>
       </div>
+
+      </main>
 
       <SiteFooter />
       <MobileBookBar />

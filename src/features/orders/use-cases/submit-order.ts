@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, US_STATES } from "../pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
@@ -11,6 +11,8 @@ import type { FileStorage } from "@/shared/storage";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
+import { acknowledgesAll, acknowledgmentRecord } from "../booking-terms";
+import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
   EmailTakenError,
@@ -35,6 +37,14 @@ export interface SubmitOrderInput {
   /** Client-generated once per booking; a retry with the same key is a no-op (ADR-0012). */
   submissionKey: string | null;
   policyAccepted: boolean; // captured at submission itself, not deferred
+  /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked: all of them, or the booking is refused. */
+  acknowledgedTerms: string[];
+  /**
+   * The TERMS_AGREEMENT version the booking page showed. Must be the
+   * current one, so the recorded acceptance is of the agreement the
+   * customer actually saw (ADR-0015).
+   */
+  termsVersion: string;
   contact: { name: string; email: string; phone: string };
   fulfillment: Fulfillment;
   rush: boolean;
@@ -48,7 +58,10 @@ export interface PairInput {
   brand: string | null;
   material: string | null;
   notes: string | null;
-  /** The pair's Services. Empty in a Bundle: its Services come from the catalog. */
+  /**
+   * The pair's Services, Add-ons included. In a Bundle, only the pair's
+   * Add-ons (often none): its other Services come with the Bundle.
+   */
   serviceIds: string[];
   photoKeys: string[]; // from presigned uploads (ADR-0004) — never raw file bytes
 }
@@ -69,7 +82,13 @@ export interface SubmitOrderDeps {
 
 export class PolicyNotAcceptedError extends Error {
   constructor() {
-    super("Order cannot be submitted without accepting the required policies.");
+    // A booking tab opened before the acknowledgments shipped, or before
+    // the agreement's current version, doesn't show them: hence the
+    // reload hint.
+    super(
+      "Tick each acknowledgment and agree to the Terms of Service & Restoration Agreement to confirm your booking. " +
+        "Don't see them? Reload the page.",
+    );
   }
 }
 
@@ -154,7 +173,8 @@ export class PhotosInUseError extends BookingValidationError {
 export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser, input: SubmitOrderInput): Promise<Order> {
   requireRole(actingUser, "GUEST", "CUSTOMER");
 
-  if (!input.policyAccepted) {
+  // Affirmative acceptance of the agreement the customer saw (ADR-0015).
+  if (!input.policyAccepted || !acknowledgesAll(input.acknowledgedTerms) || input.termsVersion !== TERMS_AGREEMENT.version) {
     throw new PolicyNotAcceptedError();
   }
 
@@ -182,6 +202,12 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       contactEmail: contact.email,
       contactPhone: contact.phone,
       policyAcceptedAt: now,
+      terms: {
+        version: TERMS_AGREEMENT.version,
+        url: TERMS_AGREEMENT.href,
+        sha256: TERMS_AGREEMENT.sha256,
+        acknowledgments: acknowledgmentRecord(input.acknowledgedTerms),
+      },
       fulfillment,
       rush: input.rush,
       estimate: orderEstimate.estimate,
@@ -311,17 +337,17 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
 
   if (fulfillment.method === "PICKUP") {
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
-      throw new BookingValidationError("Pickup is only available in NY, NJ and CT. Choose Mail-In instead.");
+      throw new BookingValidationError("Local Drop-Off is only available in NY, NJ and CT. Choose Mail-In instead.");
     }
     if (!isCalendarDate(fulfillment.date) || fulfillment.date < today) {
-      throw new BookingValidationError("Choose a pickup date from today onward.");
+      throw new BookingValidationError("Choose a collection date from today onward.");
     }
     if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
-      throw new BookingValidationError("Choose a pickup time between 4:30 PM and 10:00 PM.");
+      throw new BookingValidationError(`Choose a collection time from ${PICKUP_WINDOW_LABEL}.`);
     }
     if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
       throw new BookingValidationError(
-        `That pickup time is no longer available. Same-day pickups need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
+        `That collection time is no longer available. Same-day collections need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
       );
     }
     return { method: "PICKUP", address, date: fulfillment.date, slot: fulfillment.slot };
@@ -388,7 +414,7 @@ function validateMaterial(material: string | null): Material | null {
  * Each pair's material, Services and estimate, from the server's own
  * catalog. A single pair is priced from its Services; a Bundle's three pairs
  * each get the Bundle's Services and an even share of its fixed price, with
- * the Suede Fee waived (CONTEXT.md: Bundle).
+ * the Suede Fee waived (CONTEXT.md: Bundle), plus their own Add-ons.
  */
 function pricePairs(input: SubmitOrderInput): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
   const pairLabel = (i: number) => (input.bundleId === null ? "your pair" : `pair ${i + 1}`);
@@ -406,12 +432,11 @@ function pricePairs(input: SubmitOrderInput): { material: Material | null; servi
     if (input.items.length !== BUNDLE_PAIRS) {
       throw new BookingValidationError(`A Bundle covers exactly ${BUNDLE_PAIRS} pairs.`);
     }
-    if (input.items.some((item) => item.serviceIds.length > 0)) {
-      throw new BookingValidationError("A Bundle's Services come with it: don't choose Services per pair.");
-    }
-    return estimateBundleItems(input.bundleId).map((estimate, i) => ({
+    // Add-ons only: estimateBundleItems refuses any other Service per pair.
+    const addOnIdsByPair = input.items.map((item) => item.serviceIds);
+    return estimateBundleItems(input.bundleId, addOnIdsByPair).map((estimate, i) => ({
       material: materials[i]!,
-      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS], // each Item its own array, never the catalog's
+      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS, ...addOnIdsByPair[i]!], // each Item its own array, never the catalog's
       estimate,
     }));
   } catch (err) {
@@ -442,8 +467,8 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
   const pairs = pairsPhrase(order.items.length);
   const nextStep =
     order.fulfillment.method === "PICKUP"
-      ? `We'll pick up ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}.`
-      : `We'll email you where to ship ${pairs}.`;
+      ? `Local Drop-Off: DJ will collect ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}, and drop them back off when they're done.`
+      : `Mail-In: we'll email you where to ship ${pairs}, and ship them back when they're done.`;
   const bundle = findBundle(order.bundleId);
   return [
     `Thanks, ${order.contactName}. Your booking ${reference} was received.`,
@@ -454,5 +479,9 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
     howToPay,
     nextStep,
     "We'll inspect your sneakers and confirm final pricing before any work begins.",
+    // The customer's own copy of what they accepted (ADR-0015).
+    ...(order.termsAcceptance
+      ? [`You agreed to our ${TERMS_AGREEMENT.title} (version ${order.termsAcceptance.version}) when you booked.`]
+      : []),
   ].join("\n\n");
 }

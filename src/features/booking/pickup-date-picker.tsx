@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useId } from "react";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
-import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES } from "@/features/orders/pickup-window";
+import { useDialog } from "@/features/landing/use-dialog";
+import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES, PICKUP_WINDOW_LABEL } from "@/features/orders/pickup-window";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";
@@ -59,7 +60,7 @@ export function PickupDatePicker({
   selection,
   onConfirm,
   mode = "datetime",
-  label = "pickup",
+  label = "collection",
 }: {
   selection: PickupSelection | null;
   onConfirm: (selection: PickupSelection) => void;
@@ -67,6 +68,8 @@ export function PickupDatePicker({
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const dialogRef = useDialog<HTMLDivElement>(open, () => setOpen(false));
+  const headingId = useId();
   const [view, setView] = useState<"calendar" | "time">("calendar");
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -115,14 +118,14 @@ export function PickupDatePicker({
       {open && (
         <>
           <div className="booking-page-modal-backdrop" onClick={() => setOpen(false)} />
-          <div className="booking-page-modal">
+          <div className="booking-page-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={headingId}>
             <div className="booking-page-modal-sheet-handle" />
 
             {view === "calendar" ? (
               <>
                 <div className="booking-page-modal-head">
                   <div>
-                    <h3>Select a {label} date</h3>
+                    <h3 id={headingId}>Select a {label} date</h3>
                     <p>Choose a date that works best for you. We only show available dates.</p>
                   </div>
                   <button type="button" className="booking-page-modal-close" onClick={() => setOpen(false)} aria-label="Close">
@@ -134,7 +137,7 @@ export function PickupDatePicker({
                   <button type="button" className="booking-page-calendar-nav-btn" onClick={() => stepMonth(-1)} aria-label="Previous month">
                     <ChevronLeft size={14} aria-hidden="true" />
                   </button>
-                  <strong>
+                  <strong aria-live="polite">
                     {MONTH_NAMES[viewMonth]} {viewYear}
                   </strong>
                   <button type="button" className="booking-page-calendar-nav-btn" onClick={() => stepMonth(1)} aria-label="Next month">
@@ -156,6 +159,10 @@ export function PickupDatePicker({
                       data-disabled={cell.disabled}
                       data-active={!!(pendingDate && cell.date && cell.date.getTime() === pendingDate.getTime())}
                       disabled={cell.disabled}
+                      // Days from the neighbouring months are filler: hidden from screen readers.
+                      aria-hidden={cell.outside || undefined}
+                      aria-label={cell.date ? cell.date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : undefined}
+                      aria-pressed={cell.date ? !!(pendingDate && cell.date.getTime() === pendingDate.getTime()) : undefined}
                       onClick={() => cell.date && setPendingDate(cell.date)}
                     >
                       {cell.day}
@@ -167,9 +174,9 @@ export function PickupDatePicker({
                   <div className="booking-page-info-box">
                     <Clock size={16} aria-hidden="true" />
                     <span>
-                      Pickup times are available from
+                      Collection times are available from
                       <br />
-                      <strong>4:30 PM &ndash; 10:00 PM.</strong>
+                      <strong>{PICKUP_WINDOW_LABEL}.</strong>
                     </span>
                   </div>
                 )}
@@ -195,7 +202,7 @@ export function PickupDatePicker({
             ) : (
               <>
                 <div className="booking-page-modal-head">
-                  <h3>Select a pickup time</h3>
+                  <h3 id={headingId}>Select a collection time</h3>
                   <button type="button" className="booking-page-modal-close" onClick={() => setOpen(false)} aria-label="Close">
                     <X size={16} aria-hidden="true" />
                   </button>
@@ -209,13 +216,13 @@ export function PickupDatePicker({
                   </button>
                 </div>
                 <p className="booking-page-time-caption">
-                  Available pickup times are between 4:30 PM &ndash; 10:00 PM (New York time). Same-day pickups need at
+                  Collection times are between {PICKUP_WINDOW_LABEL} (New York time). Same-day collections need at
                   least {PICKUP_LEAD_MINUTES / 60} hours&rsquo; notice.
                 </p>
 
                 <div className="booking-page-time-list">
                   {timeSlots.length === 0 && (
-                    <p className="booking-page-time-caption">No pickup times left on this day. Choose another date.</p>
+                    <p className="booking-page-time-caption">No collection times left on this day. Choose another date.</p>
                   )}
                   {timeSlots.map((slot) => (
                     <button
@@ -223,6 +230,7 @@ export function PickupDatePicker({
                       key={slot}
                       className="booking-page-time-slot"
                       data-active={pendingTime === slot}
+                      aria-pressed={pendingTime === slot}
                       onClick={() => setPendingTime(slot)}
                     >
                       <span className="booking-page-time-radio" aria-hidden="true" />
@@ -241,7 +249,7 @@ export function PickupDatePicker({
                     setOpen(false);
                   }}
                 >
-                  Confirm Pickup Time
+                  Confirm Collection Time
                   <ArrowRight size={14} aria-hidden="true" />
                 </button>
               </>

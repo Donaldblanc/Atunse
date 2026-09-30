@@ -17,8 +17,8 @@ const HOW_IT_WORKS = [
     icon: Calendar,
   },
   {
-    title: "Schedule a pickup or mail it in",
-    description: "We collect it from your address in NY/NJ/CT, or you ship it to us with the provided instructions.",
+    title: "Book a Local Drop-Off or mail it in",
+    description: "DJ collects it from your address in NY/NJ/CT, or you ship it to us with the instructions we email you.",
     icon: Package,
   },
   {
@@ -28,7 +28,7 @@ const HOW_IT_WORKS = [
   },
   {
     title: "Get them back fresh",
-    description: "Your sneakers are returned clean, restored, and ready for what's next.",
+    description: "DJ drops your pair back off, or we ship it back to you.",
     icon: SportShoe,
   },
 ];
@@ -37,6 +37,7 @@ export default function BookingPage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="booking" />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="landing-about-hero booking-page-hero">
         <div>
@@ -47,7 +48,7 @@ export default function BookingPage() {
           </h1>
           <p className="landing-lede">
             A simple booking process to get your sneakers cleaned, restored, and back in rotation.
-            Tell us what you need, schedule a pickup or ship us your pair, and we&rsquo;ll take care of the rest.
+            Tell us what you need, book a Local Drop-Off or ship us your pair, and we&rsquo;ll take care of the rest.
           </p>
         </div>
         <div className="landing-about-cta-tagline">
@@ -91,6 +92,8 @@ export default function BookingPage() {
           );
         })}
       </div>
+
+      </main>
 
       <SiteFooter active="booking" />
       <MobileTabBar />

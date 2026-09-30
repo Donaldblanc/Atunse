@@ -13,6 +13,7 @@ export default function AboutPage() {
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="about" />
+      <main id="main-content" tabIndex={-1}>
 
       <div className="landing-about-hero">
         <div>
@@ -214,6 +215,8 @@ export default function AboutPage() {
           </div>
         </div>
       </div>
+
+      </main>
 
       <SiteFooter active="about" />
       <MobileBookBar />

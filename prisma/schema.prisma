@@ -77,6 +77,15 @@ model Order {
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
 
+  // ADR-0015: which Terms of Service & Restoration Agreement the customer
+  // accepted at policyAcceptedAt: its version, permanent URL and the
+  // SHA-256 of the PDF, plus each risk acknowledgment's id -> ticked. Null
+  // for Orders from before the agreement existed.
+  termsVersion         String?
+  termsUrl             String?
+  termsSha256          String?
+  termsAcknowledgments Json?
+
   // Where the sneakers come from: the Pickup address (NY/NJ/CT) or the
   // Mail-In customer's shipping address (ADR-0010: captured, not labelled).
   fulfillmentMethod FulfillmentMethod

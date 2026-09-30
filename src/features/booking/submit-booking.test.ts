@@ -8,9 +8,11 @@ function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmissi
   return {
     submissionKey: "3c1f0e2a-7d4b-4a8e-9f6c-1b2d3e4f5a6b",
     policyAccepted: true,
+    acknowledgedTerms: ["pricing", "restorationResults", "materialRisks", "structuralLimitations"],
+    termsVersion: "2026-09-27-v1",
     bundleId: null,
     serviceIds: ["standard"],
-    pairs: [{ brand: "Nike AF1", material: "Suede", notes: "", photos: [photo] }],
+    pairs: [{ brand: "Nike AF1", material: "Suede", notes: "", photos: [photo], addOnIds: [] }],
     scheduleMethod: "pickup",
     address: { ...EMPTY_ADDRESS, address: "123 Main St", city: "New York", state: "NY", zip: "10001" },
     pickupSelection: { date: new Date(2026, 9, 3), time: "4:30 PM – 5:00 PM" },
@@ -31,11 +33,13 @@ describe("buildOrderRequestBody", () => {
       slot: "4:30 PM – 5:00 PM",
     });
     expect(body.bundleId).toBeNull();
+    expect(body.acknowledgedTerms).toEqual(["pricing", "restorationResults", "materialRisks", "structuralLimitations"]);
+    expect(body.termsVersion).toBe("2026-09-27-v1");
     expect(body.items).toEqual([{ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] }]);
   });
 
   it("sends a Bundle as its three pairs, each with its own photo keys and no Services of its own", () => {
-    const pair = (brand: string) => ({ brand, material: "", notes: "", photos: [photo] });
+    const pair = (brand: string) => ({ brand, material: "", notes: "", photos: [photo], addOnIds: [] });
     const body = buildOrderRequestBody(
       submission({ bundleId: "revival", serviceIds: [], pairs: [pair("A"), pair("B"), pair("C")] }),
       [["a"], ["b"], ["c"]],
@@ -46,6 +50,21 @@ describe("buildOrderRequestBody", () => {
       ["B", [], ["b"]],
       ["C", [], ["c"]],
     ]);
+  });
+
+  it("sends each pair's Add-ons with its Services: after a single pair's, alone for a Bundle pair", () => {
+    const single = buildOrderRequestBody(
+      submission({ serviceIds: ["premium"], pairs: [{ ...submission().pairs[0]!, addOnIds: ["laces", "waterproofing"] }] }),
+      [["k"]],
+    );
+    expect(single.items[0]!.serviceIds).toEqual(["premium", "laces", "waterproofing"]);
+
+    const pair = (addOnIds: string[]) => ({ brand: "", material: "", notes: "", photos: [photo], addOnIds });
+    const bundle = buildOrderRequestBody(
+      submission({ bundleId: "revival", serviceIds: [], pairs: [pair([]), pair(["deodorizing"]), pair(["laces"])] }),
+      [["a"], ["b"], ["c"]],
+    );
+    expect(bundle.items.map((item) => item.serviceIds)).toEqual([[], ["deodorizing"], ["laces"]]);
   });
 
   it("sends Mail-In with an optional preferred date", () => {
@@ -186,7 +205,7 @@ describe("retries reuse uploaded photos (#78)", () => {
       "https://bucket.test": () => new Response(null, { status: 204 }),
       "/api/v1/orders": () => Response.json({ order: {}, paymentInstructions: { zelle: null } }, { status: 201 }),
     });
-    const pair = () => ({ brand: "", material: "", notes: "", photos: [new File([new Uint8Array(4)], "p.jpg", { type: "image/jpeg" })] });
+    const pair = () => ({ brand: "", material: "", notes: "", photos: [new File([new Uint8Array(4)], "p.jpg", { type: "image/jpeg" })], addOnIds: [] });
 
     await submitBooking(submission({ bundleId: "revival", serviceIds: [], pairs: [pair(), pair(), pair()] }), new WeakMap(), impl);
 
@@ -294,7 +313,7 @@ describe("Bundle photo uploads (#85)", () => {
       if (url === "https://bucket.test") return new Response(null, { status: 204 });
       return Response.json({ order: { reference: "B" }, paymentInstructions: { zelle: null } }, { status: 201 });
     }) as unknown as typeof fetch;
-    const pair = (name: string) => ({ brand: name, material: "", notes: "", photos: [new File([new Uint8Array(4)], `${name}.jpg`, { type: "image/jpeg" })] });
+    const pair = (name: string) => ({ brand: name, material: "", notes: "", photos: [new File([new Uint8Array(4)], `${name}.jpg`, { type: "image/jpeg" })], addOnIds: [] });
 
     await submitBooking(submission({ bundleId: "revival", serviceIds: [], pairs: [pair("A"), pair("B"), pair("C")] }), new WeakMap(), impl);
 

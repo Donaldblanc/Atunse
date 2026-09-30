@@ -4,9 +4,10 @@ import { useState } from "react";
 import { ArrowRight, Info, Package, Truck, TriangleAlert } from "lucide-react";
 import { PickupDatePicker, type PickupSelection } from "./pickup-date-picker";
 import type { PickupAddress, ScheduleMethod } from "./booking-types";
+import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { isValidZip } from "@/features/orders/contact-rules";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, US_STATES } from "@/features/orders/pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_WINDOW_LABEL, US_STATES } from "@/features/orders/pickup-window";
 
 export function ScheduleStep({
   method,
@@ -37,36 +38,36 @@ export function ScheduleStep({
     <>
       <div className="booking-page-section-head">
         <p className="booking-page-step-eyebrow">STEP 3 OF 5</p>
-        <h2>Pickup or mail in?</h2>
-        <p>Choose how you&rsquo;d like to get your sneakers to us.</p>
+        <h2>Local Drop-Off or mail in?</h2>
+        <p>Choose how you&rsquo;d like to get your sneakers to us, and back.</p>
       </div>
 
       <div className="booking-page-shipping-grid">
         <button type="button" className="booking-page-shipping-card" data-active={method === "pickup"} onClick={() => onSelectMethod("pickup")}>
           <Truck size={20} aria-hidden="true" />
           <span>
-            <strong>Pickup</strong>
-            <span>We&rsquo;ll collect your sneakers from your address.</span>
+            <strong>{FULFILLMENT_LABELS.PICKUP}</strong>
+            <span>DJ collects your sneakers from your address (NY / NJ / CT) and drops them back off when they&rsquo;re done.</span>
           </span>
         </button>
         <button type="button" className="booking-page-shipping-card" data-active={method === "mail-in"} onClick={() => onSelectMethod("mail-in")}>
           <Package size={20} aria-hidden="true" />
           <span>
-            <strong>Mail in</strong>
-            <span>We&rsquo;ll email you where to ship after checkout.</span>
+            <strong>{FULFILLMENT_LABELS.MAIL_IN}</strong>
+            <span>We&rsquo;ll email you where to ship after checkout, and ship them back when they&rsquo;re done.</span>
           </span>
         </button>
       </div>
 
       <div className="booking-page-section-head booking-page-section-head-tight">
         <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
-          {method === "pickup" ? "PICKUP ADDRESS" : "SHIPPING ADDRESS"}
+          {method === "pickup" ? "COLLECTION ADDRESS" : "SHIPPING ADDRESS"}
         </p>
       </div>
       <div className="booking-page-form-grid">
         <label className="booking-page-field">
           <span>Address</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. 123 Main St"
             value={pickupAddress.address}
@@ -86,7 +87,7 @@ export function ScheduleStep({
       <div className="booking-page-form-grid booking-page-form-grid-thirds">
         <label className="booking-page-field">
           <span>City</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. New York"
             value={pickupAddress.city}
@@ -95,7 +96,7 @@ export function ScheduleStep({
         </label>
         <label className="booking-page-field">
           <span>State / Province</span>
-          <select
+          <select required
             value={pickupAddress.state}
             onChange={(e) => onChangePickupAddress({ ...pickupAddress, state: e.target.value })}
           >
@@ -109,7 +110,7 @@ export function ScheduleStep({
         </label>
         <label className="booking-page-field">
           <span>Zip / Postal code</span>
-          <input
+          <input required
             type="text"
             placeholder="e.g. 10001"
             value={pickupAddress.zip}
@@ -122,7 +123,7 @@ export function ScheduleStep({
         <>
           <div className="booking-page-section-head booking-page-section-head-tight">
             <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
-              PICKUP DATE
+              COLLECTION DATE &amp; TIME
             </p>
           </div>
           <PickupDatePicker selection={pickupSelection} onConfirm={onConfirmPickup} />
@@ -130,9 +131,9 @@ export function ScheduleStep({
           <div className="booking-page-info-box">
             <Info size={16} aria-hidden="true" />
             <span>
-              Available pickup times are between
+              DJ collects between
               <br />
-              <strong>4:30 PM &ndash; 10:00 PM.</strong>
+              <strong>{PICKUP_WINDOW_LABEL}.</strong>
             </span>
           </div>
         </>
@@ -162,12 +163,15 @@ export function ScheduleStep({
         Continue to your info
         <ArrowRight size={14} aria-hidden="true" />
       </button>
-      {showWarning && (
-        <p className="booking-page-form-warning" id="schedule-step-warning" role="status" aria-live="polite">
-          <TriangleAlert size={14} aria-hidden="true" />
-          {problem}
-        </p>
-      )}
+      {/* Always in the page, so screen readers announce the warning when it appears. */}
+      <p className="booking-page-form-warning" id="schedule-step-warning" role="status" aria-live="polite">
+        {showWarning && (
+          <>
+            <TriangleAlert size={14} aria-hidden="true" />
+            {problem}
+          </>
+        )}
+      </p>
     </>
   );
 }
@@ -185,13 +189,13 @@ function scheduleProblem(
   if (!isValidZip(address.zip)) return "Enter a valid 5-digit zip code to continue.";
   if (method === "pickup") {
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
-      return "Pickup is only available in NY, NJ and CT. Choose Mail in instead.";
+      return "Local Drop-Off is only available in NY, NJ and CT. Choose Mail-In instead.";
     }
-    if (!pickupSelection) return "Choose a pickup date and time to continue.";
+    if (!pickupSelection) return "Choose a collection date and time to continue.";
     // The picker only offers bookable slots, but one can lapse while the
     // customer fills in the form (same-day notice, #75).
     if (!availablePickupSlots(calendarDateInLocalTime(pickupSelection.date), new Date()).includes(pickupSelection.time)) {
-      return `That pickup time is no longer available (same-day pickups need ${PICKUP_LEAD_MINUTES / 60} hours' notice). Choose another.`;
+      return `That collection time is no longer available (same-day collections need ${PICKUP_LEAD_MINUTES / 60} hours' notice). Choose another.`;
     }
   }
   return null;

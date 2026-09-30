@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import type { Order, Item, AuditEntry, Fulfillment } from "../domain";
+import type { Order, Item, AuditEntry, Fulfillment, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -55,6 +55,18 @@ function toDomainFulfillment(row: OrderRow): Fulfillment {
   return { method: "MAIL_IN", address, preferredDate: row.mailInDate ? calendarDateFromUtcMidnight(row.mailInDate) : null };
 }
 
+/** Null for Orders from before the agreement existed (ADR-0015). */
+function toDomainTermsAcceptance(row: OrderRow): TermsAcceptance | null {
+  if (row.termsVersion === null || row.termsUrl === null || row.termsSha256 === null) return null;
+  return {
+    version: row.termsVersion,
+    url: row.termsUrl,
+    sha256: row.termsSha256,
+    acceptedAt: row.policyAcceptedAt,
+    acknowledgments: (row.termsAcknowledgments ?? {}) as Record<string, boolean>,
+  };
+}
+
 function toDomainOrder(row: OrderRow): Order {
   return {
     id: row.id,
@@ -64,6 +76,7 @@ function toDomainOrder(row: OrderRow): Order {
     contactPhone: row.contactPhone,
     createdAt: row.createdAt,
     policyAcceptedAt: row.policyAcceptedAt,
+    termsAcceptance: toDomainTermsAcceptance(row),
     fulfillment: toDomainFulfillment(row),
     rush: row.rush,
     estimate: Money.fromCents(row.estimateCents),
@@ -123,6 +136,10 @@ export class PrismaOrderRepository implements OrderRepository {
         contactEmail: input.contactEmail,
         contactPhone: input.contactPhone,
         policyAcceptedAt: input.policyAcceptedAt,
+        termsVersion: input.terms.version,
+        termsUrl: input.terms.url,
+        termsSha256: input.terms.sha256,
+        termsAcknowledgments: input.terms.acknowledgments,
         fulfillmentMethod: fulfillment.method,
         addressLine1: fulfillment.address.line1,
         addressLine2: fulfillment.address.line2,

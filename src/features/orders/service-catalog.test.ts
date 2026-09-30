@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { RATE_LIMITS } from "@/shared/rate-limit/rate-limiter";
 import { Money } from "@/shared/money/money";
-import { BOOKING_SERVICES } from "@/features/booking/services-data";
+import { BOOKING_ADD_ONS, BOOKING_SERVICES } from "@/features/booking/services-data";
 import {
   BUNDLE_CATALOG,
   BUNDLE_PAIRS,
+  catalogService,
   estimateBundleItems,
   formatServicePrice,
   serviceNotes,
@@ -45,6 +46,27 @@ describe("estimateItem", () => {
   });
 });
 
+describe("Add-ons (CONTEXT.md: Add-on)", () => {
+  it("adds each Add-on's flat price to the pair, with no Suede Fee and no minimum", () => {
+    const result = estimateItem({ serviceIds: ["standard", "laces", "deodorizing", "waterproofing"], material: "Suede" });
+    expect(result.estimate.cents).toBe(3000 + SUEDE_FEE_CENTS + 1500 + 1000 + 500);
+    expect(result.isMinimum).toBe(false);
+  });
+
+  it("goes with any main Service, restoration included", () => {
+    expect(estimateItem({ serviceIds: ["reglue", "laces"], material: null }).estimate.cents).toBe(5000 + 1500);
+  });
+
+  it("is never booked on its own", () => {
+    expect(() => estimateItem({ serviceIds: ["laces"], material: null })).toThrow(/Add-ons go with a cleaning or restoration service/);
+    expect(() => estimateItem({ serviceIds: ["laces", "waterproofing"], material: null })).toThrow(InvalidServiceSelectionError);
+  });
+
+  it("can't be chosen twice on one pair", () => {
+    expect(() => estimateItem({ serviceIds: ["standard", "laces", "laces"], material: null })).toThrow(InvalidServiceSelectionError);
+  });
+});
+
 describe("estimateBundleItems", () => {
   it("splits every Bundle into three flat shares that sum to exactly its price", () => {
     for (const bundle of BUNDLE_CATALOG) {
@@ -58,6 +80,17 @@ describe("estimateBundleItems", () => {
 
   it("rejects an unknown Bundle", () => {
     expect(() => estimateBundleItems("mystery")).toThrow(InvalidServiceSelectionError);
+  });
+
+  it("adds each pair's own Add-ons on top of its share", () => {
+    const shares = estimateBundleItems("revival", [[], ["laces", "deodorizing"], ["waterproofing"]]);
+    expect(shares.map((s) => s.estimate.cents)).toEqual([5000, 5000 + 1500 + 1000, 5000 + 500]);
+    expect(shares.reduce((sum, s) => sum + s.estimate.cents, 0)).toBe(15000 + 1500 + 1000 + 500);
+  });
+
+  it("allows only Add-ons per pair: the Bundle's other Services come with it", () => {
+    expect(() => estimateBundleItems("revival", [["premium"], [], []])).toThrow(/only add-ons/);
+    expect(() => estimateBundleItems("revival", [["laces", "laces"], [], []])).toThrow(InvalidServiceSelectionError);
   });
 });
 
@@ -89,11 +122,20 @@ describe("catalog display prices", () => {
       oxidation: { price: "Midsole from $25+", notes: ["Sole from $40+"] },
       painting: { price: "Starting at $40+", notes: [] },
       reglue: { price: "Starting at $50+", notes: [] },
+      laces: { price: "$15", notes: [] },
+      deodorizing: { price: "$10", notes: [] },
+      waterproofing: { price: "$5", notes: [] },
     });
   });
 
   it("has a catalog entry for every Service the booking flow offers, and no others", () => {
-    expect(SERVICE_CATALOG.map((s) => s.id).sort()).toEqual(BOOKING_SERVICES.map((s) => s.id).sort());
+    expect(SERVICE_CATALOG.map((s) => s.id).sort()).toEqual([...BOOKING_SERVICES, ...BOOKING_ADD_ONS].map((s) => s.id).sort());
+    expect(BOOKING_SERVICES.every((s) => !catalogService(s.id).isAddOn)).toBe(true);
+    expect(BOOKING_ADD_ONS.map((a) => [a.name, a.description !== ""])).toEqual([
+      ["Lace Replacement", true],
+      ["Premium Deodorizing Treatment", true],
+      ["Waterproof Seal", true],
+    ]);
   });
 });
 

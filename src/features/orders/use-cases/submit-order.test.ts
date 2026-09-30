@@ -10,6 +10,7 @@ import {
   submitOrder,
 } from "./submit-order";
 import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
+import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 import { bookingDeps, FIXED_NOW, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
@@ -29,6 +30,41 @@ describe("submitOrder", () => {
     await expect(submitOrder(bookingDeps(), guest, validBookingInput({ policyAccepted: false }))).rejects.toThrow(
       PolicyNotAcceptedError,
     );
+  });
+
+  it.each([
+    ["none", []],
+    ["only some", ["pricing", "restorationResults"]],
+    ["unknown ids", ["pricing", "restorationResults", "materialRisks", "something-else"]],
+  ])("rejects a booking that acknowledged %s of the risks, even with the Terms Agreement ticked", async (_label, acknowledgedTerms) => {
+    const deps = bookingDeps();
+    await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow(PolicyNotAcceptedError);
+    await expect(submitOrder(deps, guest, validBookingInput({ acknowledgedTerms }))).rejects.toThrow("Reload the page");
+  });
+
+  it.each([
+    ["an older agreement version", "2026-01-01-v0"],
+    ["no version (a tab from before versions were sent)", ""],
+  ])("rejects a booking that accepted %s", async (_label, termsVersion) => {
+    await expect(submitOrder(bookingDeps(), guest, validBookingInput({ termsVersion }))).rejects.toThrow(PolicyNotAcceptedError);
+  });
+
+  it("records exactly which agreement was accepted, when, and each acknowledgment (ADR-0015)", async () => {
+    const order = await submitOrder(bookingDeps(), guest, validBookingInput());
+    expect(order.termsAcceptance).toEqual({
+      version: TERMS_AGREEMENT.version,
+      url: TERMS_AGREEMENT.href,
+      sha256: TERMS_AGREEMENT.sha256,
+      acceptedAt: FIXED_NOW,
+      acknowledgments: { pricing: true, restorationResults: true, materialRisks: true, structuralLimitations: true },
+    });
+    expect(order.policyAcceptedAt).toEqual(FIXED_NOW);
+  });
+
+  it("tells the customer in the confirmation email which agreement version they accepted", async () => {
+    const deps = bookingDeps();
+    await submitOrder(deps, guest, validBookingInput());
+    expect(deps.notifications.sent[0]!.body).toContain(`${TERMS_AGREEMENT.title} (version ${TERMS_AGREEMENT.version})`);
   });
 
   it("rejects an admin trying to submit an order as themselves", async () => {
@@ -159,6 +195,21 @@ describe("submitOrder", () => {
       await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
 
+    it("adds a pair's Add-ons to its estimate and keeps them on the Item", async () => {
+      const input = validBookingInput();
+      input.items = [{ ...input.items[0]!, serviceIds: ["premium", "laces", "waterproofing"] }];
+      const order = await submitOrder(bookingDeps(), guest, input);
+      expect(order.items[0]!.serviceIds).toEqual(["premium", "laces", "waterproofing"]);
+      expect(order.estimate.cents).toBe(5000 + 1500 + 500);
+      expect(order.deposit.cents).toBe(3500);
+    });
+
+    it("refuses Add-ons booked on their own", async () => {
+      const input = validBookingInput();
+      input.items = [{ ...input.items[0]!, serviceIds: ["laces"] }];
+      await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow("Add-ons go with a cleaning or restoration service");
+    });
+
     it("rejects an unknown material", async () => {
       const input = validBookingInput();
       input.items = [{ ...input.items[0]!, material: "Velvet" }];
@@ -246,7 +297,7 @@ describe("submitOrder", () => {
         submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, date: "2026-02-30" } })),
       ).rejects.toThrow(BookingValidationError);
       await expect(
-        submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, slot: "9:00 AM – 9:30 AM" } })),
+        submitOrder(bookingDeps(), guest, validBookingInput({ fulfillment: { ...base, slot: "7:30 AM – 8:00 AM" } })),
       ).rejects.toThrow(BookingValidationError);
     });
 
@@ -444,6 +495,20 @@ describe("submitOrder", () => {
       expect(order.estimate.cents).toBe(20000 + 2000);
     });
 
+    it("gives each pair its own Add-ons on top of its share of the Bundle", async () => {
+      const input = validBundleInput("revival");
+      input.items = input.items.map((pair, i) => ({ ...pair, serviceIds: [[], ["laces"], ["deodorizing", "waterproofing"]][i]! }));
+      const order = await submitOrder(bookingDeps(), guest, input);
+      expect(order.items.map((item) => item.serviceIds)).toEqual([
+        ["premium"],
+        ["premium", "laces"],
+        ["premium", "deodorizing", "waterproofing"],
+      ]);
+      expect(order.items.map((item) => item.estimate.cents)).toEqual([5000, 6500, 6500]);
+      expect(order.estimate.cents).toBe(15000 + 1500 + 1000 + 500);
+      expect(order.deposit.cents).toBe(9000);
+    });
+
     it("keeps each pair's photos with that pair, each as its own verified copy", async () => {
       const order = await submitOrder(bookingDeps(), guest, validBundleInput());
       const keys = order.items.map((item) => item.photoKeys);
@@ -461,7 +526,7 @@ describe("submitOrder", () => {
     it.each([
       ["two pairs", () => validBundleInput("revival", { items: [validPair({ serviceIds: [] }, 0), validPair({ serviceIds: [] }, 1)] })],
       ["an unknown Bundle", () => validBundleInput("mystery")],
-      ["Services chosen per pair", () => validBundleInput("revival", { items: [0, 1, 2].map((i) => validPair({}, i)) })],
+      ["Services other than Add-ons chosen per pair", () => validBundleInput("revival", { items: [0, 1, 2].map((i) => validPair({}, i)) })],
       ["the same photo on two pairs", () => validBundleInput("revival", { items: [0, 0, 1].map((i) => validPair({ serviceIds: [] }, i)) })],
       ["three pairs without a Bundle", () => validBookingInput({ items: [0, 1, 2].map((i) => validPair({}, i)) })],
     ])("rejects %s", async (_label, input) => {

@@ -12,11 +12,15 @@ export type { SubmitOrderResponse };
 export interface BookingSubmission {
   submissionKey: string;
   policyAccepted: boolean;
+  /** The BOOKING_ACKNOWLEDGMENTS ids the customer ticked on the Review step. */
+  acknowledgedTerms: string[];
+  /** The TERMS_AGREEMENT version the Review step showed (ADR-0015). */
+  termsVersion: string;
   /** The Bundle chosen, or null for a single pair. */
   bundleId: string | null;
   /** The single pair's Services; empty for a Bundle, whose Services come with it. */
   serviceIds: string[];
-  /** One pair, or a Bundle's three. */
+  /** One pair, or a Bundle's three, each with its own Add-ons. */
   pairs: PairDetails[];
   scheduleMethod: ScheduleMethod;
   address: PickupAddress;
@@ -60,7 +64,7 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
 
   let fulfillment;
   if (submission.scheduleMethod === "pickup") {
-    if (!submission.pickupSelection) throw new BookingSubmitError("Choose a pickup date and time.");
+    if (!submission.pickupSelection) throw new BookingSubmitError("Choose a collection date and time.");
     fulfillment = {
       method: "PICKUP" as const,
       address: orderAddress,
@@ -77,6 +81,8 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
 
   return {
     policyAccepted: submission.policyAccepted,
+    acknowledgedTerms: submission.acknowledgedTerms,
+    termsVersion: submission.termsVersion,
     contact: submission.contact,
     fulfillment,
     rush: submission.rush,
@@ -85,7 +91,8 @@ export function buildOrderRequestBody(submission: BookingSubmission, photoKeysBy
       brand: pair.brand || null,
       material: pair.material || null,
       notes: pair.notes || null,
-      serviceIds: submission.serviceIds,
+      // Each pair's Add-ons ride along with its Services (a Bundle pair's alone).
+      serviceIds: [...submission.serviceIds, ...pair.addOnIds],
       photoKeys: photoKeysByPair[i] ?? [],
     })),
   };

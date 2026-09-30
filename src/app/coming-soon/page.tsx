@@ -7,10 +7,8 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 
 // Generic placeholder for any page/section that isn't built yet (order
-// flow, a standalone Process page, pricing/booking). Linked from SiteNav's
-// "Book a restoration"/"Process" and from the home page's other
-// not-yet-real CTAs (View pricing & book now, View all services, View
-// more) — see docs/TODO.md.
+// flow, pricing/booking). Linked from any not-yet-real CTA — see
+// docs/TODO.md.
 export const metadata = {
   title: "Coming Soon — Atunṣe",
 };
@@ -20,7 +18,7 @@ export default function ComingSoonPage() {
     <div className="landing" id="landing-root">
       <SiteNav />
 
-      <main className="coming-soon-main">
+      <main id="main-content" tabIndex={-1} className="coming-soon-main">
         <div className="coming-soon-bg" aria-hidden="true" />
         <section className="coming-soon-hero">
           <div className="coming-soon-copy">

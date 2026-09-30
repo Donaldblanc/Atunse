@@ -1,20 +1,22 @@
 // Shared fixtures for use-case unit tests: a booking that passes every
 // submitOrder rule, and in-memory deps pinned to a fixed "now".
 
-import type { NotificationService } from "@/features/notifications/notification-service";
+import type { EmailMessage, NotificationService } from "@/features/notifications/notification-service";
 import type { PaymentInstructions } from "../payment-instructions";
 import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
 import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import type { PairInput, SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
+import { BOOKING_ACKNOWLEDGMENTS } from "../booking-terms";
+import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export const FIXED_NOW = new Date("2026-10-01T15:00:00Z"); // Oct 1, 11 AM in New York
 
 export class RecordingNotificationService implements NotificationService {
-  readonly sent: { to: string; subject: string; body: string }[] = [];
+  readonly sent: EmailMessage[] = [];
   /** Set to make the next sends throw, like a provider outage. */
   failing = false;
-  async sendEmail(params: { to: string; subject: string; body: string }): Promise<void> {
+  async sendEmail(params: EmailMessage): Promise<void> {
     if (this.failing) throw new Error("email provider unavailable");
     this.sent.push(params);
   }
@@ -44,6 +46,8 @@ export function validBookingInput(overrides: Partial<SubmitOrderInput> = {}): Su
   return {
     submissionKey: null,
     policyAccepted: true,
+    acknowledgedTerms: BOOKING_ACKNOWLEDGMENTS.map((ack) => ack.id),
+    termsVersion: TERMS_AGREEMENT.version,
     contact: { name: "Jordan Smith", email: "customer@example.com", phone: "(212) 555-0142" },
     fulfillment: {
       method: "PICKUP",

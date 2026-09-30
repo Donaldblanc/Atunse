@@ -19,16 +19,16 @@ basis for this build.
 
 ## Domain model (see CONTEXT.md for full detail)
 - **Order** = billing/shipping container, holds one or more **Items**, no single status field of its own — customer-facing view always shows a **per-Item breakdown**, never a collapsed order-level status.
-- **Item** = one sneaker **pair** (not an individual shoe), carries its own Services, price, and moves independently through the **Status Pipeline**: Request Submitted → Under Review → Quote Sent → Approved → Awaiting Sneakers → In Progress → Quality Check → Ready for Pickup/Shipping → Completed (Cancelled reachable from any state).
+- **Item** = one sneaker **pair** (not an individual shoe), carries its own Services, price, and moves independently through the **Status Pipeline**: Request Submitted → Under Review → Quote Sent → Approved → Awaiting Sneakers → In Progress → Quality Check → Ready for Drop-Off/Shipping → Completed (Cancelled reachable from any state).
 - **Approval Gate**: every Item, no exceptions, is manually priced/reviewed by the owner before the customer can pay on it (ADR-0001) — no auto-priced "standard" tier in MVP.
 - **Deposit**: one 50% payment per Order at submission, based on published/estimated prices.
-- **Balance Delta**: if a custom-quoted Item's final price exceeds its deposit estimate, the delta is folded into the Balance due at completion (deposit never re-charged/refunded) and the customer is notified as soon as the Quote is sent — no surprise at pickup.
+- **Balance Delta**: if a custom-quoted Item's final price exceeds its deposit estimate, the delta is folded into the Balance due at completion (deposit never re-charged/refunded) and the customer is notified as soon as the Quote is sent — no surprise when the pair comes back.
 - **Customer Account** (ADR-0014): every booking belongs to an Account, created automatically by the first booking from its email and phone. There are no guest orders and no Account Linking. A signed-out booking whose email already has an Account must sign in with an emailed **Sign-in Code** (the booking flow's own login screen), behind the `FEATURE_CUSTOMER_SIGN_IN_ENABLED` toggle. Customers can only ever see their own photos, through short-lived links.
 - **Manual Payment Confirmation**: Zelle/Cash payments only advance an Order once the owner marks them received in admin (ADR-0002); Apple Pay/card (Stripe, once toggled on) confirms automatically.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
 - **Photo retention**: sneaker condition photos are retained indefinitely; accessible only to the owner/admin and the Account that owns the Order.
-- **Fulfillment Method**: exactly two, **Pickup** (the shop collects from the customer's address, NY/NJ/CT only) and **Mail-In** (nationwide). **There is no in-person drop-off** (resolved 2026-09-26). The original `docs/notes.txt` answers mention drop-off; that is superseded. Open: how finished sneakers return to Pickup customers, and renaming the "Ready for Pickup/Shipping" status to match (see `CONTEXT.md` open questions).
+- **Fulfillment Method**: exactly two, **Local Drop-Off** (DJ collects from the customer's address at a booked time and drops the finished pair back off, NY/NJ/CT only; code name `PICKUP`) and **Mail-In** (nationwide; shipped back). Customers never come in person (resolved 2026-09-26; renamed from "Pickup" and return leg decided 2026-09-28). The original `docs/notes.txt` answers mention drop-off; that is superseded. Open: how finished sneakers return to Pickup customers, and renaming the "Ready for Pickup/Shipping" status to match (see `CONTEXT.md` open questions).
 - **Loyalty rewards**: dropped from MVP entirely (was ambiguous between must-have and deferred in the original notes — resolved to "not in MVP"). Accounts still track order history without any points system at launch.
 
 ## Architecture decisions (full text in docs/adr/)
@@ -68,9 +68,9 @@ prove it against.
 - Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
 
 **Phase 1 — booking submission connected end to end (single pair).**
-- `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, pickup slot or preferred mail-in date, Rush and contact name.
+- `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, Local Drop-Off collection slot or preferred mail-in date, Rush and contact name.
 - The estimate and 50% Deposit are computed server-side from `src/features/orders/service-catalog.ts`. The browser's display prices in `services-data.ts` are kept in step by a parity test; client-sent prices are ignored.
-- Server-side rules: Policy Acceptance, Pickup only in NY/NJ/CT within the 4:30–10:00 PM window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
+- Server-side rules: Policy Acceptance, Local Drop-Off only in NY/NJ/CT within the 8:00 AM–10:00 PM collection window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
 - Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
 - `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).
@@ -88,7 +88,7 @@ prove it against.
 - `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review, then a confirmation.
   - **Service:** one pair with additive Services (one cleaning tier plus any restoration add-ons), or a three-pair Bundle.
   - **Details:** at least one photo per pair.
-  - **Schedule:** Pickup (NY/NJ/CT address plus date and time) or Mail-In (any US address, optional date).
+  - **Schedule:** Local Drop-Off (NY/NJ/CT address plus collection date and time) or Mail-In (any US address, optional date).
   - **Your Info:** name, email, phone, and optional Rush.
   - **Review:** Policy Acceptance checkbox, then Confirm Booking submits.
 - **Bundles** book three Items in one Order. The Bundle flow is the default for a bare `/booking`.
@@ -152,7 +152,7 @@ future standalone messages inbox (TODO) are both post-MVP admin screens.
 - [x] Bundles: three Items in one Order, priced from `BUNDLE_CATALOG`
 - [ ] Create the S3 bucket and set its env vars; `/booking` can't be submitted on a deploy until then
 - [ ] Real Terms of Service, Refund Policy, Restoration Disclaimer, Payment Policy and Privacy pages (the Policy Acceptance checkbox links to `/coming-soon`)
-- [ ] Return leg for Pickup orders, and renaming the `READY_FOR_PICKUP_SHIPPING` status
+- [x] Return leg (2026-09-28): DJ drops Local Drop-Off pairs back off; Mail-In pairs are shipped back. The status reads "Ready for Drop-Off/Shipping"; its code name `READY_FOR_PICKUP_SHIPPING` is unchanged
 
 ## Open questions — still not resolved
 - **Launch date** — explicitly left undecided by the owner (neither "before summer over" nor Sept 26 is realistic against current scope + architecture; revisit once more of the build is scoped)

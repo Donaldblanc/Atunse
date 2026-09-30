@@ -63,6 +63,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       contactPhone: input.contactPhone,
       createdAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,
+      termsAcceptance: { ...input.terms, acknowledgments: { ...input.terms.acknowledgments }, acceptedAt: input.policyAcceptedAt },
       fulfillment: input.fulfillment,
       rush: input.rush,
       estimate: input.estimate,
