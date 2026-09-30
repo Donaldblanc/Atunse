@@ -5,14 +5,18 @@ import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { ITEM_STATUSES, type ItemStatus } from "@/features/orders/domain";
 import {
   InvalidTransitionError,
+  MoveNotAllowedError,
   transitionItemStatus,
 } from "@/features/orders/use-cases/transition-item-status";
 import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/repositories/order-repository";
 
 // POST /api/v1/admin/items/:itemId/transitions — every admin action on the
-// item pipeline (review started, quote sent, manual payment confirmed,
-// approved, ...) goes through this one endpoint (ADR-0001: every Item is
-// reviewed; the generalized transitionItemStatus use-case backs every step).
+// item pipeline's plain status moves goes through this one endpoint (ADR-0001:
+// every Item is reviewed). It applies the same rule as Order detail's Update
+// Status (adminStatusMoves): Quote Sent and Approved are refused here with
+// 409, since they have their own steps (sendQuote, recordApproval) that set
+// the price / record who approved. The customer is emailed at the key
+// moments by the use-case, not by the caller.
 //
 // Reachable only past src/proxy.ts's admin guard (matcher includes
 // /api/v1/admin/:path*) — but the authz check here is a second, independent
@@ -52,7 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ite
     }
     return NextResponse.json({ item }, { status: 200 });
   } catch (err) {
-    if (err instanceof InvalidTransitionError || err instanceof ItemStatusChangedError) {
+    if (err instanceof InvalidTransitionError || err instanceof MoveNotAllowedError || err instanceof ItemStatusChangedError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof ItemNotFoundError) {
@@ -96,8 +100,6 @@ function parseTransitionBody(
       toStatus: b.toStatus,
       action: b.action,
       idempotencyKey: typeof b.idempotencyKey === "string" ? b.idempotencyKey : undefined,
-      notifyEmail: typeof b.notifyEmail === "string" ? b.notifyEmail : undefined,
-      notifySubject: typeof b.notifySubject === "string" ? b.notifySubject : undefined,
     },
   };
 }

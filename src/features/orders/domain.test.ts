@@ -33,10 +33,9 @@ describe("adminStatusMoves", () => {
     expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({ moves: ["QUALITY_CHECK", "CANCELLED"], held: null });
   });
 
-  it("holds Quote Sent for the quote step (ADR-0001)", () => {
-    const { moves, held } = adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"));
-    expect(moves).toEqual(["CANCELLED"]);
-    expect(held).toMatch(/quote/);
+  it("never offers Quote Sent or Approved as a plain move: each has its own step (ADR-0001)", () => {
+    expect(adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"))).toEqual({ moves: ["CANCELLED"], held: null });
+    expect(adminStatusMoves({ status: "QUOTE_SENT" }, deposit("RECEIVED"))).toEqual({ moves: ["CANCELLED"], held: null });
   });
 
   it("holds a pair at Approved while the Deposit is pending (ADR-0002)", () => {

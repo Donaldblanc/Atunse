@@ -5,9 +5,9 @@ import { revalidatePath } from "next/cache";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { requireRole, UnauthorizedError } from "@/features/accounts/authz";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
-import { adminStatusMoves, ITEM_STATUSES, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
+import { ITEM_STATUSES, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
 import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/repositories/order-repository";
-import { InvalidTransitionError, transitionItemStatus } from "@/features/orders/use-cases/transition-item-status";
+import { InvalidTransitionError, MoveNotAllowedError, transitionItemStatus } from "@/features/orders/use-cases/transition-item-status";
 
 export type UpdateStatusState = { error: string | null };
 
@@ -21,10 +21,10 @@ function statusField(formData: FormData, name: string): ItemStatus | null {
  * it, through the same use-case the admin API route uses. `fromStatus` is
  * the status the screen showed, so a stale dialog is refused instead of
  * skipping a step; the idempotency key (made when the form rendered) makes
- * a double submit apply once (ADR-0012). The move is checked against
- * adminStatusMoves again here, not just in the form, so a step held on the
- * quote or the deposit can't be forced. Failures come back as a message
- * for the form to show.
+ * a double submit apply once (ADR-0012). The use-case checks the move
+ * against adminStatusMoves again, not just the form, so a step with its own
+ * control (the quote, the approval) or held on the deposit can't be forced.
+ * Failures come back as a message for the form to show.
  */
 export async function updateItemStatusAction(_previous: UpdateStatusState, formData: FormData): Promise<UpdateStatusState> {
   const orderId = formData.get("orderId");
@@ -40,15 +40,10 @@ export async function updateItemStatusAction(_previous: UpdateStatusState, formD
     const actingUser = await actingUserFromCookies(await cookies());
     // Before reading the Order, so a non-admin learns nothing about it (ADR-0012).
     requireRole(actingUser, "ADMIN");
-    const deps = buildOrderUseCaseDeps();
-    const order = await deps.orders.findById(orderId);
-    const item = order?.items.find((candidate) => candidate.id === itemId);
-    if (!order || !item) return { error: "This pair no longer exists." };
-    const { moves, held } = adminStatusMoves(item, order);
-    if (item.status === fromStatus && !moves.includes(toStatus)) {
-      return { error: held ?? `A pair can't move from ${ITEM_STATUS_LABELS[fromStatus]} to ${ITEM_STATUS_LABELS[toStatus]}.` };
-    }
-    await transitionItemStatus(deps, actingUser, {
+    // The use-case applies adminStatusMoves (a step held on the quote, the
+    // approval or the deposit can't be forced) and emails the customer at the
+    // moments that matter (status-emails.ts).
+    await transitionItemStatus(buildOrderUseCaseDeps(), actingUser, {
       itemId,
       fromStatus,
       toStatus,
@@ -56,7 +51,7 @@ export async function updateItemStatusAction(_previous: UpdateStatusState, formD
       idempotencyKey,
     });
   } catch (err) {
-    if (err instanceof ItemStatusChangedError) return { error: err.message };
+    if (err instanceof ItemStatusChangedError || err instanceof MoveNotAllowedError) return { error: err.message };
     if (err instanceof InvalidTransitionError)
       return {
         error: `A pair can't move from ${ITEM_STATUS_LABELS[fromStatus]} to ${ITEM_STATUS_LABELS[toStatus]}.`,

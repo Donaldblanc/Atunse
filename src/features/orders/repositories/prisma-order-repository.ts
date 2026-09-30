@@ -260,6 +260,7 @@ export class PrismaOrderRepository implements OrderRepository {
     toStatus: Item["status"];
     entry: AuditEntry;
     receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Item | null> {
     return this.prisma.$transaction(async (tx) => {
       // Idempotency (ADR-0012): a repeat call with the same idempotencyKey
@@ -280,7 +281,7 @@ export class PrismaOrderRepository implements OrderRepository {
       // request can't skip a step in the pipeline.
       const { count } = await tx.item.updateMany({
         where: { id: params.itemId, ...(params.entry.fromStatus ? { status: params.entry.fromStatus } : {}) },
-        data: { status: params.toStatus },
+        data: { status: params.toStatus, ...(params.price ? { priceCents: params.price.cents } : {}) },
       });
       if (count === 0) {
         const current = await tx.item.findUnique({ where: { id: params.itemId }, select: { status: true } });
@@ -474,5 +475,10 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       return true;
     });
+  }
+
+  async findByItemId(itemId: string): Promise<Order | null> {
+    const row = await this.prisma.order.findFirst({ where: { items: { some: { id: itemId } } }, include: ORDER_INCLUDE });
+    return row ? toDomainOrder(row) : null;
   }
 }
