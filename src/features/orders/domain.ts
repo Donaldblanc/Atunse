@@ -97,6 +97,10 @@ export interface Item {
   model: string | null;
   description: string | null;
   material: string | null;
+  /** Entered by the owner on Order detail, e.g. "10"; null until then. */
+  size: string | null;
+  /** e.g. "Black / White"; null until the owner enters it. */
+  colorway: string | null;
   serviceIds: string[];
   /** This pair's estimate from the service catalog, before Rush. */
   estimate: Money;
@@ -121,8 +125,41 @@ export interface TermsAcceptance {
   acknowledgments: Record<string, boolean>;
 }
 
+/** CONTEXT.md: Payment. The Deposit is first; the Balance is the rest; FULL covers the whole Order at once. */
+export const PAYMENT_KINDS = ["DEPOSIT", "BALANCE", "FULL"] as const;
+export type PaymentKind = (typeof PAYMENT_KINDS)[number];
+
+/** Zelle and Cash are confirmed by hand (ADR-0002); Card and Apple Pay are Stripe, behind its toggle. */
+export const PAYMENT_METHODS = ["ZELLE", "CASH", "CARD", "APPLE_PAY"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = { ZELLE: "Zelle", CASH: "Cash", CARD: "Card", APPLE_PAY: "Apple Pay" };
+
+export interface Payment {
+  id: string;
+  kind: PaymentKind;
+  method: PaymentMethod;
+  amount: Money;
+  /** FAILED: a charge that didn't go through; REFUNDED: received, then given back. */
+  status: "PENDING" | "RECEIVED" | "FAILED" | "REFUNDED";
+  /** Set exactly when status is RECEIVED or REFUNDED. */
+  receivedAt: Date | null;
+  createdAt: Date;
+}
+
+/** CONTEXT.md: Appointment. DJ collecting a Local Drop-Off pair, or dropping it back off. */
+export interface Appointment {
+  id: string;
+  kind: "COLLECTION" | "RETURN";
+  status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
+  startsAt: Date;
+  endsAt: Date;
+}
+
 export interface Order {
   id: string;
+  /** Sequential from 1001; shown as orderNumber(number), "ATU-1008". */
+  number: number;
   /** Every Order belongs to an Account (ADR-0014); there are no guest orders. */
   accountId: string;
   contactName: string;
@@ -137,16 +174,30 @@ export interface Order {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /** Order detail's totals, set by the owner; zero until then. */
+  dropOffFee: Money;
+  tax: Money;
   /** The Bundle bought (service-catalog.ts BUNDLE_CATALOG), or null for a single pair. */
   bundleId: string | null;
   confirmationEmailSentAt: Date | null;
   /** What was submitted with its submission key (#76); null for older Orders. */
   submissionFingerprint: string | null;
   items: Item[];
+  payments: Payment[];
+  appointments: Appointment[];
+}
+
+/**
+ * An Order's reference everywhere, "ATU-1008": admin screens, the
+ * booking confirmation and emails, and the customer's Zelle memo, so a
+ * payment can be matched to its Order at a glance.
+ */
+export function orderNumber(number: number): string {
+  return `ATU-${number}`;
 }
 
 /** An Order's pairs that aren't cancelled. */
-export function livePairs(order: Pick<Order, "items">): Item[] {
+export function livePairs<T extends { status: ItemStatus }>(order: { items: T[] }): T[] {
   return order.items.filter((item) => item.status !== "CANCELLED");
 }
 
@@ -155,7 +206,7 @@ export function livePairs(order: Pick<Order, "items">): Item[] {
  * cancelled pairs' share. Order-level charges (Rush) stay while any pair
  * is live; a fully cancelled Order is worth nothing.
  */
-export function liveEstimate(order: Pick<Order, "items" | "estimate">): Money {
+export function liveEstimate(order: { estimate: Money; items: { status: ItemStatus; estimate: Money }[] }): Money {
   if (livePairs(order).length === 0) return Money.zero();
   return order.items
     .filter((item) => item.status === "CANCELLED")
@@ -163,18 +214,9 @@ export function liveEstimate(order: Pick<Order, "items" | "estimate">): Money {
 }
 
 /**
- * Short code the customer quotes in their Zelle memo and emails. The tail
- * of a cuid is its random block, so this is effectively unique at this
- * business's volume, and the owner can always fall back to the full id.
- */
-export function orderReference(orderId: string): string {
-  return orderId.slice(-8).toUpperCase();
-}
-
-/**
- * The audit action recorded when the owner marks a Zelle/Cash payment
- * received (ADR-0002). An Order with none on any of its Items is still
- * waiting on its Deposit, which is always the first payment.
+ * The audit action for the owner marking a Zelle/Cash payment received
+ * (ADR-0002). Recorded on an Item, it also marks the Order's PENDING
+ * Deposit Payment RECEIVED in the same transaction.
  */
 export const MANUAL_PAYMENT_CONFIRMED = "MANUAL_PAYMENT_CONFIRMED";
 

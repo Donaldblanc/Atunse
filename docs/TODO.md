@@ -146,18 +146,20 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 **Sample data (shown now, not real):**
 - [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
 - [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
-- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): decide where reviews come from (customers after Completed, or imported from Google/Instagram), add a Review model, then show the latest.
+- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): the Review table exists (#119); decide how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram), then show the latest PUBLISHED ones.
 
 **Placeholders (real data exists, but the design shows more):**
-- [ ] **Pending Payments: Zelle/Cash split.** On #119's branch it's live (Payment rows); lands when #119 merges.
-- [ ] **Order #: ATU-1008 numbers** instead of the 8-character reference. On #119's branch; lands when #119 merges.
-- [ ] **Today's Schedule: return drop-offs.** Only collections show today; show RETURN Appointments too (#119), once Order detail or the Calendar can book one.
+- [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
+- [x] **Order #: ATU-1008 numbers** in Recent Orders and Today's Schedule (#119).
+- [x] **Today's Schedule: return drop-offs.** It reads SCHEDULED Appointments of both kinds (#119); returns appear once Order detail or the Calendar can book one.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
-- [ ] **Notification bell** in the top bar: needs something to notify about (new bookings, customer messages).
+- [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
 - [ ] **Search** in the top bar: enable with the Orders screen, which it searches.
+- [ ] **Booking reads Settings** (ADR-0016): the booking flow and `submitOrder` use `operating_hours` and `business_settings.allowLocalDropOff`/`allowMailIn` instead of `pickup-window.ts`, then drop `pickup-window.integration.test.ts`.
+- [ ] **Settings tabs not modeled yet:** Notifications, Payments, Shipping & Pickup, Email & Templates, Team (multi-admin, see "Still to grill") and Billing. Design each when its tab is designed.
 
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).
@@ -221,4 +223,6 @@ tracked elsewhere are marked; everything else is new.
 - [ ] SMS notifications (Twilio or equivalent) — build the adapter now, gate actual sending behind a feature toggle (off by default) until there's budget to pay for real sending. See ADR-0009. Email (Resend) covers all required notification events in the meantime.
 - [ ] Customer data import — a dedicated admin-only screen/flow to import existing customer records, format TBD. Not an MVP-launch blocker; build once the source format is confirmed.
 - [ ] Mail-in label generation via a third-party carrier API (e.g. Shippo/EasyPost) — behind the same adapter pattern as address validation. Not in MVP; MVP only captures/validates the shipping address (ADR-0010).
-- [ ] Standalone cross-order messages inbox screen — behind a feature toggle. MVP messaging lives inside Item detail only; the inbox is a post-MVP admin screen.
+- [ ] **Messages inbox screen** (design `09-messages.png`): now MVP, one Conversation per Order (ADR-0016). The data model exists; the screen, sending, and customer-side replies don't yet.
+- [ ] **Booking reads the catalog from the database** (ADR-0016 step 2): `submitOrder`, the booking flow and the Services page read the `services`/`bundles` tables instead of `service-catalog.ts`, then drop the parity test.
+- [ ] **Decide tax and a Local Drop-Off fee** (Order detail design shows 8.875% tax): Orders can store both; nothing computes them yet (CONTEXT.md open question).

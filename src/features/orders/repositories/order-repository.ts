@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, CalendarDate, Fulfillment, ItemStatus, Order, TermsAcceptance } from "../domain";
+import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -44,6 +44,18 @@ export class ItemStatusChangedError extends Error {
   }
 }
 
+/**
+ * The Order names a Bundle the bundles table doesn't have (e.g. one taken
+ * out of the catalog while the booking page still offered it). Nothing
+ * was written.
+ */
+export class BundleNotFoundError extends Error {
+  constructor(readonly bundleId: string) {
+    super("That bundle is no longer offered.");
+    this.name = "BundleNotFoundError";
+  }
+}
+
 /** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
 export class PhotoKeyInUseError extends Error {
   constructor() {
@@ -65,6 +77,13 @@ export interface NewOrderInput {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /**
+   * The Deposit Payment to create PENDING with the Order, or null when
+   * none is due. submitOrder decides; repositories just store it.
+   */
+  depositPayment: { method: PaymentMethod; amount: Money } | null;
+  /** Local Drop-Off's COLLECTION Appointment, from its booked slot; null for Mail-In. */
+  collection: { startsAt: Date; endsAt: Date } | null;
   submissionKey: string | null;
   submissionFingerprint: string | null;
   /** The Bundle bought, or null for a single pair. */
@@ -84,10 +103,31 @@ export interface NewItemInput {
   photos: { key: string; uploadKey: string }[];
 }
 
+/** An Order as the Overview's range figures read it, without photos, payments or appointments. */
+export interface BookedOrder {
+  id: string;
+  createdAt: Date;
+  estimate: Money;
+  items: Pick<Item, "status" | "serviceIds" | "estimate">[];
+}
+
+/** A Calendar Appointment with what Today's Schedule shows about its Order. */
+export interface ScheduledAppointment extends Appointment {
+  order: { id: string; number: number; contactName: string; itemStatuses: ItemStatus[] };
+}
+
+export interface AwaitingDeposits {
+  orders: number;
+  deposits: Money;
+  byMethod: Record<PaymentMethod, number>;
+}
+
 export interface OrderRepository {
   /**
-   * Creates the Order with its Items and their photos, and the owner's Account when
-   * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
+   * Creates the Order with its Items and their photos, its PENDING Deposit
+   * Payment, its COLLECTION Appointment (Local Drop-Off), and the owner's
+   * Account when it's a new customer (named after contactName), all in one
+   * transaction. Retry-safe (ADR-0012): if
    * an Order with the same `submissionKey` already exists, returns that
    * Order with `created: false` instead of inserting a duplicate. Throws
    * EmailTakenError or PhotoKeyInUseError, having written nothing.
@@ -108,15 +148,20 @@ export interface OrderRepository {
    * recorded for this item (ADR-0012: retry-safe); the caller should treat
    * that as "already applied", not an error. Throws ItemNotFoundError or
    * ItemStatusChangedError, having written nothing.
+   *
+   * With `receivesDeposit`, the same transaction also marks the Item's
+   * Order's PENDING Deposit Payment RECEIVED (ADR-0002), so a confirmed
+   * deposit leaves Pending Payments at once.
    */
   transitionItemStatus(params: {
     itemId: string;
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
   }): Promise<Order["items"][number] | null>;
 
-  /** Orders booked (created) in [from, to), oldest first. */
-  listBookedBetween(from: Date, to: Date): Promise<Order[]>;
+  /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
+  listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]>;
 
   /**
    * The Orders booked in [from, to) that still have a live pair, and what
@@ -127,19 +172,15 @@ export interface OrderRepository {
   /** The most recently booked Orders, newest first. */
   listRecent(limit: number): Promise<Order[]>;
 
-  /** Local Drop-Off Orders whose collection is booked on `date`, in booking order. */
-  listCollectionsOn(date: CalendarDate): Promise<Order[]>;
-
-  /** Which of these Orders have a payment confirmed on any of their Items (MANUAL_PAYMENT_CONFIRMED). */
-  findPaidOrderIds(orderIds: string[]): Promise<Set<string>>;
+  /** SCHEDULED Appointments starting in [from, to), earliest first, with their Order's summary. */
+  listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]>;
 
   /** How many Items are in each status right now; statuses with none are left out. */
   countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;
 
   /**
-   * Orders still waiting on their Deposit: no payment confirmed on any of
-   * their Items (MANUAL_PAYMENT_CONFIRMED) and at least one Item not
-   * cancelled. Returns how many, and their Deposits added up.
+   * Deposits still PENDING on Orders with at least one Item not cancelled:
+   * how many, their amounts added up, and how many by method.
    */
-  summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }>;
+  summarizeAwaitingDeposit(): Promise<AwaitingDeposits>;
 }

@@ -24,7 +24,7 @@ import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
-import { getAdminOverview, type ScheduledCollection } from "@/features/admin-overview/get-admin-overview";
+import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
@@ -33,6 +33,8 @@ import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
 import { SAMPLE_LOW_STOCK_ITEMS, SAMPLE_REVIEWS, SAMPLE_UNREAD_MESSAGES, type SampleReview } from "@/features/admin-overview/sample-data";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
+import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
 import { builtScreenHref, OWNER_DISPLAY_NAME } from "./admin-screens";
 
 export const metadata = { title: "Overview · Atunṣe Admin" };
@@ -81,9 +83,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
           </StatCard>
           <StatCard label="Pending Payments" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
             <p className="ov-stat-note">
-              {overview.awaitingDeposit.orders === 0
-                ? "Every deposit confirmed"
-                : `${overview.awaitingDeposit.deposits.format()} in deposits due`}
+              {overview.awaitingDeposit.orders === 0 ? "Every deposit confirmed" : depositSplit(overview.awaitingDeposit)}
             </p>
           </StatCard>
           <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)}>
@@ -149,7 +149,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h2>
             {calendarHref && <CardLink href={calendarHref}>View calendar</CardLink>}
           </div>
-          <TodaysSchedule collections={overview.todaysCollections} />
+          <TodaysSchedule visits={overview.todaysSchedule} />
         </section>
 
         <section className="ov-card" aria-labelledby="ov-attention-title">
@@ -181,6 +181,12 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
       </aside>
     </div>
   );
+}
+
+/** "3 Zelle · 3 Cash · $280 due": each method that has a Deposit waiting, then the total. */
+function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
+  const methods = PAYMENT_METHODS.filter((method) => byMethod[method] > 0).map((method) => `${byMethod[method]} ${PAYMENT_METHOD_LABELS[method]}`);
+  return [...methods, `${deposits.format()} due`].join(" · ");
 }
 
 function StatCard({ label, icon: Icon, value, children }: { label: string; icon: Icon; value: string; children: React.ReactNode }) {
@@ -224,20 +230,24 @@ function BrandCard() {
   );
 }
 
-/** Today's Local Drop-Off collections as a timeline. Return drop-offs aren't scheduled in the app yet. */
-function TodaysSchedule({ collections }: { collections: ScheduledCollection[] }) {
-  if (collections.length === 0) return <p className="ov-empty">No collections booked for today.</p>;
+const VISIT_LABELS: Record<ScheduledVisit["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
+
+/** Today's Local Drop-Off visits as a timeline: collections and returns, from the Calendar's Appointments. */
+function TodaysSchedule({ visits }: { visits: ScheduledVisit[] }) {
+  if (visits.length === 0) return <p className="ov-empty">Nothing scheduled for today.</p>;
   return (
     <ol className="ov-schedule">
-      {collections.map((collection) => (
-        <li key={collection.orderId}>
-          <span className="ov-schedule-time">{collection.time}</span>
+      {visits.map((visit) => (
+        <li key={`${visit.orderId}-${visit.kind}`}>
+          <span className="ov-schedule-time">{visit.time}</span>
           <span className="ov-schedule-dot" aria-hidden="true" />
           <span className="ov-schedule-what">
-            <span className="ov-cell-main">{collection.customerName}</span>
-            <span className="ov-cell-sub">{collection.reference}</span>
+            <span className="ov-cell-main">{visit.customerName}</span>
+            <span className="ov-cell-sub">{visit.reference}</span>
           </span>
-          <span className="ov-tag">Collection</span>
+          <span className="ov-tag" data-kind={visit.kind}>
+            {VISIT_LABELS[visit.kind]}
+          </span>
         </li>
       ))}
     </ol>

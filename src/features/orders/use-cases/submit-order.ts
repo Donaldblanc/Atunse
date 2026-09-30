@@ -1,10 +1,10 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
+import { availablePickupSlots, collectionTimes, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
-import { orderReference, pairsPhrase, type Fulfillment, type Order } from "../domain";
+import { orderNumber, pairsPhrase, type Fulfillment, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { mapWithConcurrency } from "@/shared/concurrency";
 import type { FileStorage } from "@/shared/storage";
@@ -15,6 +15,7 @@ import { acknowledgesAll, acknowledgmentRecord } from "../booking-terms";
 import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
 import {
+  BundleNotFoundError,
   EmailTakenError,
   PhotoKeyInUseError,
   type OrderOwner,
@@ -114,7 +115,7 @@ export class SubmissionConflictError extends Error {
 
   /** `existing` is the Order the key created, so the client can show it. */
   constructor(readonly existing: Order) {
-    const reference = orderReference(existing.id);
+    const reference = orderNumber(existing.number);
     super(
       `We already received this booking (reference ${reference}) before your changes. ` +
         "Check your email for its details, and reply there to change anything.",
@@ -213,6 +214,9 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       estimate: orderEstimate.estimate,
       estimateIsMinimum: orderEstimate.isMinimum,
       deposit: orderEstimate.deposit,
+      // The booking confirmation asks for the Deposit by Zelle, the only way offered at booking today.
+      depositPayment: orderEstimate.deposit.cents > 0 ? { method: "ZELLE", amount: orderEstimate.deposit } : null,
+      collection: fulfillment.method === "PICKUP" ? collectionTimes(fulfillment.date, fulfillment.slot) : null,
       submissionKey: input.submissionKey,
       submissionFingerprint: fingerprint,
       bundleId: input.bundleId,
@@ -241,6 +245,9 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     // The database's unique photo key: a photo belongs to exactly one
     // booking, so another Order can never gain view access to it.
     if (err instanceof PhotoKeyInUseError) throw new PhotosInUseError();
+    // The code catalog offered a Bundle the bundles table no longer has
+    // (until booking reads the table, ADR-0016): a clear 400, not a 500.
+    if (err instanceof BundleNotFoundError) throw new BookingValidationError(err.message);
     throw err;
   }
 
@@ -301,7 +308,7 @@ async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Da
   if (!order.confirmationEmailSentAt) {
     await deps.notifications.sendEmail({
       to: order.contactEmail,
-      subject: `We received your booking (${orderReference(order.id)})`,
+      subject: `We received your booking (${orderNumber(order.number)})`,
       body: confirmationEmailBody(order, deps.paymentInstructions),
     });
     await deps.orders.markConfirmationEmailSent(order.id, now);
@@ -459,7 +466,7 @@ function blankToNull(value: string | null): string | null {
 }
 
 function confirmationEmailBody(order: Order, payment: PaymentInstructions): string {
-  const reference = orderReference(order.id);
+  const reference = orderNumber(order.number);
   const estimate = `${order.estimateIsMinimum ? "from " : ""}${order.estimate.format()}`;
   const howToPay = payment.zelle
     ? `Pay the ${order.deposit.format()} deposit by Zelle to ${payment.zelle.recipient} (${payment.zelle.name}) with "${reference}" in the memo.`

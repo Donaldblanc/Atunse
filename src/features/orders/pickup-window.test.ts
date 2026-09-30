@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availablePickupSlots, isBookableDay, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL } from "./pickup-window";
+import { availablePickupSlots, collectionTimes, isBookableDay, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL } from "./pickup-window";
 
 describe("pickup window", () => {
   it("offers 30-minute slots from 8:00 AM to 10:00 PM", () => {
@@ -43,5 +43,21 @@ describe("bookable pickup slots and days (New York clock, 2h notice)", () => {
     const now = at("2026-10-01T15:00:00Z");
     expect(availablePickupSlots("2026-09-30", now)).toEqual([]);
     expect(isBookableDay("2026-09-30", "MAIL_IN", now)).toBe(false);
+  });
+});
+
+describe("collection times", () => {
+  it("turns a booked slot into New York instants, across daylight saving", () => {
+    expect(collectionTimes("2026-10-03", "4:30 PM – 5:00 PM")).toEqual({
+      startsAt: new Date("2026-10-03T20:30:00Z"), // EDT
+      endsAt: new Date("2026-10-03T21:00:00Z"),
+    });
+    // Nov 1: clocks fell back at 2 AM, so 8 AM is 9 real hours after midnight.
+    expect(collectionTimes("2026-11-01", "8:00 AM – 8:30 AM").startsAt).toEqual(new Date("2026-11-01T13:00:00Z"));
+    expect(collectionTimes("2026-03-08", "9:30 PM – 10:00 PM").endsAt).toEqual(new Date("2026-03-09T02:00:00Z"));
+  });
+
+  it("refuses a slot that isn't bookable", () => {
+    expect(() => collectionTimes("2026-10-03", "3:15 AM – 3:45 AM")).toThrow();
   });
 });

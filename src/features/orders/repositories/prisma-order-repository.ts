@@ -1,13 +1,17 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import { MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type CalendarDate, type Fulfillment, type Item, type ItemStatus, type Order, type TermsAcceptance } from "../domain";
+import type { Appointment, AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
   PhotoKeyInUseError,
+  BundleNotFoundError,
+  type AwaitingDeposits,
+  type BookedOrder,
   type NewOrderInput,
+  type ScheduledAppointment,
   type OrderRepository,
 } from "./order-repository";
 
@@ -15,7 +19,11 @@ import {
 // every method returns the domain's own Order/Item types.
 
 const ITEM_INCLUDE = { photos: { orderBy: { position: "asc" } } } satisfies Prisma.ItemInclude;
-const ORDER_INCLUDE = { items: { include: ITEM_INCLUDE, orderBy: { position: "asc" as const } } } satisfies Prisma.OrderInclude;
+const ORDER_INCLUDE = {
+  items: { include: ITEM_INCLUDE, orderBy: { position: "asc" as const } },
+  payments: { orderBy: { createdAt: "asc" as const } },
+  appointments: { orderBy: { startsAt: "asc" as const } },
+} satisfies Prisma.OrderInclude;
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -28,6 +36,8 @@ function toDomainItem(row: ItemRow): Item {
     model: row.model,
     description: row.description,
     material: row.material,
+    size: row.size,
+    colorway: row.colorway,
     serviceIds: row.serviceIds,
     estimate: Money.fromCents(row.estimateCents),
     status: row.status,
@@ -67,9 +77,26 @@ function toDomainTermsAcceptance(row: OrderRow): TermsAcceptance | null {
   };
 }
 
+function toDomainPayment(row: OrderRow["payments"][number]): Payment {
+  return {
+    id: row.id,
+    kind: row.kind,
+    method: row.method,
+    amount: Money.fromCents(row.amountCents),
+    status: row.status,
+    receivedAt: row.receivedAt,
+    createdAt: row.createdAt,
+  };
+}
+
+function toDomainAppointment(row: OrderRow["appointments"][number]): Appointment {
+  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt };
+}
+
 function toDomainOrder(row: OrderRow): Order {
   return {
     id: row.id,
+    number: row.number,
     accountId: row.accountId,
     contactName: row.contactName,
     contactEmail: row.contactEmail,
@@ -82,11 +109,23 @@ function toDomainOrder(row: OrderRow): Order {
     estimate: Money.fromCents(row.estimateCents),
     estimateIsMinimum: row.estimateIsMinimum,
     deposit: Money.fromCents(row.depositCents),
+    dropOffFee: Money.fromCents(row.dropOffFeeCents),
+    tax: Money.fromCents(row.taxCents),
     confirmationEmailSentAt: row.confirmationEmailSentAt,
     submissionFingerprint: row.submissionFingerprint,
     bundleId: row.bundleId,
     items: row.items.map(toDomainItem),
+    payments: row.payments.map(toDomainPayment),
+    appointments: row.appointments.map(toDomainAppointment),
   };
+}
+
+/**
+ * A nested `connect` found no Bundle row (P2025). The Account connect can
+ * fail the same way, so the message is checked for the Bundle relation.
+ */
+function isMissingBundle(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025" && /Bundle/.test(`${String(err.meta?.cause ?? "")} ${err.message}`);
 }
 
 /** The fields of the unique constraint a Prisma P2002 violated, or null. */
@@ -117,12 +156,13 @@ export class PrismaOrderRepository implements OrderRepository {
       }
       if (fields?.includes("email")) throw new EmailTakenError();
       if (fields?.includes("uploadKey") || fields?.includes("key")) throw new PhotoKeyInUseError();
+      if (input.bundleId && isMissingBundle(err)) throw new BundleNotFoundError(input.bundleId);
       throw err;
     }
   }
 
-  // One nested write: a new customer's Account, the Order, its Item and
-  // the Item's photos commit together, and the unique indexes (email per
+  // One nested write: a new customer's Account, the Order, its Items and
+  // their photos, its Deposit and its collection Appointment commit together, and the unique indexes (email per
   // role, photo key) settle races inside that single transaction.
   private async insert(input: NewOrderInput): Promise<Order> {
     const { fulfillment, owner } = input;
@@ -131,7 +171,7 @@ export class PrismaOrderRepository implements OrderRepository {
         account:
           "accountId" in owner
             ? { connect: { id: owner.accountId } }
-            : { create: { role: "CUSTOMER", email: owner.newCustomer.email, phone: owner.newCustomer.phone } },
+            : { create: { role: "CUSTOMER" as const, email: owner.newCustomer.email, phone: owner.newCustomer.phone, name: input.contactName } },
         contactName: input.contactName,
         contactEmail: input.contactEmail,
         contactPhone: input.contactPhone,
@@ -158,7 +198,7 @@ export class PrismaOrderRepository implements OrderRepository {
         depositCents: input.deposit.cents,
         submissionKey: input.submissionKey,
         submissionFingerprint: input.submissionFingerprint,
-        bundleId: input.bundleId,
+        bundle: input.bundleId ? { connect: { id: input.bundleId } } : undefined,
         items: {
           create: input.items.map((item, position) => ({
             position,
@@ -174,6 +214,10 @@ export class PrismaOrderRepository implements OrderRepository {
             status: "REQUEST_SUBMITTED" as const,
           })),
         },
+        payments: input.depositPayment
+          ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
+          : undefined,
+        appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
       },
       include: ORDER_INCLUDE,
     });
@@ -201,6 +245,7 @@ export class PrismaOrderRepository implements OrderRepository {
     itemId: string;
     toStatus: Item["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
   }): Promise<Item | null> {
     return this.prisma.$transaction(async (tx) => {
       // Idempotency (ADR-0012): a repeat call with the same idempotencyKey
@@ -242,17 +287,41 @@ export class PrismaOrderRepository implements OrderRepository {
         },
       });
 
+      // A confirmed payment settles the Order's PENDING Deposit in the same
+      // transaction, so the Payments view and the audit trail never disagree.
+      if (params.receivesDeposit) {
+        await tx.payment.updateMany({
+          where: { orderId: updated.orderId, kind: "DEPOSIT", status: "PENDING" },
+          data: {
+            status: "RECEIVED",
+            receivedAt: new Date(),
+            confirmedByAccountId: params.entry.actorAccountId,
+            idempotencyKey: params.entry.idempotencyKey,
+          },
+        });
+      }
+
       return toDomainItem(updated);
     });
   }
 
-  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+  async listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]> {
     const rows = await this.prisma.order.findMany({
       where: { createdAt: { gte: from, lt: to } },
-      include: ORDER_INCLUDE,
+      select: {
+        id: true,
+        createdAt: true,
+        estimateCents: true,
+        items: { select: { status: true, serviceIds: true, estimateCents: true }, orderBy: { position: "asc" } },
+      },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map(toDomainOrder);
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      estimate: Money.fromCents(row.estimateCents),
+      items: row.items.map((item) => ({ status: item.status, serviceIds: item.serviceIds, estimate: Money.fromCents(item.estimateCents) })),
+    }));
   }
 
   // liveEstimate (domain.ts) in two aggregates: Orders with a live pair,
@@ -274,22 +343,18 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
-  async listCollectionsOn(date: CalendarDate): Promise<Order[]> {
-    const rows = await this.prisma.order.findMany({
-      where: { fulfillmentMethod: "PICKUP", pickupDate: calendarDateToUtcMidnight(date) },
-      include: ORDER_INCLUDE,
-      orderBy: { createdAt: "asc" },
+  async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
+    const rows = await this.prisma.appointment.findMany({
+      where: { status: "SCHEDULED", startsAt: { gte: from, lt: to } },
+      include: {
+        order: { select: { id: true, number: true, contactName: true, items: { select: { status: true }, orderBy: { position: "asc" } } } },
+      },
+      orderBy: { startsAt: "asc" },
     });
-    return rows.map(toDomainOrder);
-  }
-
-  async findPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
-    const rows = await this.prisma.item.findMany({
-      where: { orderId: { in: orderIds }, auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } },
-      select: { orderId: true },
-      distinct: ["orderId"],
-    });
-    return new Set(rows.map((row) => row.orderId));
+    return rows.map((row) => ({
+      ...toDomainAppointment(row),
+      order: { id: row.order.id, number: row.order.number, contactName: row.order.contactName, itemStatuses: row.order.items.map((item) => item.status) },
+    }));
   }
 
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
@@ -297,17 +362,20 @@ export class PrismaOrderRepository implements OrderRepository {
     return Object.fromEntries(groups.map((group) => [group.status, group._count._all]));
   }
 
-  async summarizeAwaitingDeposit(): Promise<{ orders: number; deposits: Money }> {
-    const { _count, _sum } = await this.prisma.order.aggregate({
-      where: {
-        AND: [
-          { items: { some: { status: { not: "CANCELLED" } } } },
-          { items: { none: { auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } } } },
-        ],
-      },
+  async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
+    const groups = await this.prisma.payment.groupBy({
+      by: ["method"],
+      where: { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } },
       _count: { _all: true },
-      _sum: { depositCents: true },
+      _sum: { amountCents: true },
     });
-    return { orders: _count._all, deposits: Money.fromCents(_sum.depositCents ?? 0) };
+    const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0, APPLE_PAY: 0 };
+    let cents = 0;
+    for (const group of groups) {
+      byMethod[group.method] = group._count._all;
+      cents += group._sum.amountCents ?? 0;
+    }
+    // One Deposit per Order, so counting Deposits counts Orders.
+    return { orders: groups.reduce((sum, g) => sum + g._count._all, 0), deposits: Money.fromCents(cents), byMethod };
   }
 }
