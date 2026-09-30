@@ -7,14 +7,18 @@
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
 import { liveEstimate, livePairs, type AuditEntry, type Item, type ItemStatus, type Order, type PaymentMethod } from "../domain";
+import { BUNDLE_CATALOG } from "../service-catalog";
 import {
+  BundleNotFoundError,
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
   PhotoKeyInUseError,
   type AwaitingDeposits,
+  type BookedOrder,
   type NewOrderInput,
   type OrderRepository,
+  type ScheduledAppointment,
 } from "./order-repository";
 
 let nextId = 0;
@@ -44,6 +48,10 @@ export class InMemoryOrderRepository implements OrderRepository {
     const uploadKeys = input.items.flatMap((item) => item.photos.map((photo) => photo.uploadKey));
     if (new Set(uploadKeys).size !== uploadKeys.length || uploadKeys.some((key) => this.uploadKeysInUse.has(key))) {
       throw new PhotoKeyInUseError();
+    }
+    // The bundles table is seeded from BUNDLE_CATALOG; its foreign key refuses any other id.
+    if (input.bundleId && !BUNDLE_CATALOG.some((bundle) => bundle.id === input.bundleId)) {
+      throw new BundleNotFoundError(input.bundleId);
     }
 
     let accountId: string;
@@ -95,21 +103,20 @@ export class InMemoryOrderRepository implements OrderRepository {
         price: null,
         photoKeys: item.photos.map((photo) => photo.key),
       })),
-      payments:
-        input.deposit.cents > 0
-          ? [
-              {
-                id: fakeId("payment"),
-                kind: "DEPOSIT",
-                method: input.depositMethod,
-                amount: input.deposit,
-                status: "PENDING",
-                receivedAt: null,
-                createdAt: new Date(),
-              },
-            ]
-          : [],
-      appointments: input.collection ? [{ id: fakeId("appointment"), kind: "COLLECTION", ...input.collection }] : [],
+      payments: input.depositPayment
+        ? [
+            {
+              id: fakeId("payment"),
+              kind: "DEPOSIT",
+              method: input.depositPayment.method,
+              amount: input.depositPayment.amount,
+              status: "PENDING",
+              receivedAt: null,
+              createdAt: new Date(),
+            },
+          ]
+        : [],
+      appointments: input.collection ? [{ id: fakeId("appointment"), kind: "COLLECTION", status: "SCHEDULED", ...input.collection }] : [],
     };
     for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
@@ -135,6 +142,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     itemId: string;
     toStatus: Item["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
   }): Promise<Item | null> {
     const key = params.entry.idempotencyKey ? `${params.itemId}:${params.entry.idempotencyKey}` : null;
     if (key && this.appliedIdempotencyKeys.has(key)) return null;
@@ -146,10 +154,14 @@ export class InMemoryOrderRepository implements OrderRepository {
     item.status = params.toStatus;
     if (key) this.appliedIdempotencyKeys.add(key);
     this.auditEntries.push({ ...params.entry, itemId: params.itemId });
+    if (params.receivesDeposit) {
+      const deposit = this.orders.get(item.orderId)?.payments.find((p) => p.kind === "DEPOSIT" && p.status === "PENDING");
+      if (deposit) Object.assign(deposit, { status: "RECEIVED", receivedAt: new Date() });
+    }
     return item;
   }
 
-  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+  async listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]> {
     return [...this.orders.values()]
       .filter((order) => order.createdAt >= from && order.createdAt < to)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
@@ -164,10 +176,17 @@ export class InMemoryOrderRepository implements OrderRepository {
     return [...this.orders.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
   }
 
-  async listCollectionsOn(date: string): Promise<Order[]> {
+  async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
     return [...this.orders.values()]
-      .filter((order) => order.fulfillment.method === "PICKUP" && order.fulfillment.date === date)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .flatMap((order) =>
+        order.appointments
+          .filter((appointment) => appointment.status === "SCHEDULED" && appointment.startsAt >= from && appointment.startsAt < to)
+          .map((appointment) => ({
+            ...appointment,
+            order: { id: order.id, number: order.number, contactName: order.contactName, itemStatuses: order.items.map((item) => item.status) },
+          })),
+      )
+      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
   }
 
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {

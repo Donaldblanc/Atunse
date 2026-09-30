@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { canTransition, type Item, type ItemStatus } from "../domain";
+import { canTransition, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
 import type { OrderRepository } from "../repositories/order-repository";
 
 export class InvalidTransitionError extends Error {
@@ -50,6 +50,8 @@ export async function transitionItemStatus(
       actorAccountId: actingUser.accountId,
       idempotencyKey: input.idempotencyKey ?? null,
     },
+    // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
+    receivesDeposit: input.action === MANUAL_PAYMENT_CONFIRMED,
   });
 
   // updated === null means this idempotency key was already applied

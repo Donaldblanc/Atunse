@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
+import { collectionTimes } from "@/features/orders/pickup-window";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
@@ -37,7 +38,7 @@ function order(estimateCents: number, items: NewItemInput[] = [item(["standard"]
     estimate: Money.fromCents(estimateCents),
     estimateIsMinimum: false,
     deposit: Money.fromCents(estimateCents / 2),
-    depositMethod: "ZELLE",
+    depositPayment: { method: "ZELLE", amount: Money.fromCents(estimateCents / 2) },
     collection: null,
     submissionKey: null,
     submissionFingerprint: null,
@@ -64,6 +65,7 @@ function collection(date: string, slot: string, contactName: string): NewOrderIn
     ...order(3000),
     contactName,
     fulfillment: { method: "PICKUP", address: { line1: "1 Main St", line2: null, city: "Brooklyn", state: "NY", zip: "11201" }, date, slot },
+    collection: collectionTimes(date, slot),
   };
 }
 
@@ -177,12 +179,12 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
       services: "Standard Clean + 2 more",
       status: "AWAITING_SNEAKERS", // the least-advanced pair
       reference: `ATU-${latest.number}`,
-      deposit: { method: "ZELLE", paid: true },
+      deposit: { method: "ZELLE", status: "RECEIVED" },
       total: Money.fromCents(12000),
       totalIsMinimum: true,
     });
     expect(recentOrders[0]!.photoUrl).toMatch(/^https:\/\/photos\.test\/photos\//);
-    expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", paid: false });
+    expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", status: "PENDING" });
   });
 
   it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {
@@ -207,20 +209,29 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     expect((await getAdminOverview(d, ADMIN, "this-week")).recentOrders[0]!.photoUrl).toBeNull();
   });
 
-  it("lists today's Local Drop-Off collections in time order, skipping cancelled ones and other days", async () => {
+  it("lists today's scheduled collections and returns in time order, from the Appointments", async () => {
     const d = deps();
     await book(d.orders, "2026-09-20T15:00:00Z", collection("2026-09-29", "6:30 PM – 7:00 PM", "Sarah Kim"));
-    await book(d.orders, "2026-09-21T15:00:00Z", collection("2026-09-29", "10:00 AM – 10:30 AM", "John Doe"));
+    const john = await book(d.orders, "2026-09-21T15:00:00Z", collection("2026-09-29", "10:00 AM – 10:30 AM", "John Doe"));
     const cancelled = await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-29", "8:00 AM – 8:30 AM", "Mike R."));
     cancelled.items[0]!.status = "CANCELLED";
     await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-30", "9:00 AM – 9:30 AM", "Jessica L."));
+    // Booked for today, but the Calendar moved the collection to tomorrow.
+    const moved = await book(d.orders, "2026-09-23T15:00:00Z", collection("2026-09-29", "9:00 AM – 9:30 AM", "Chris P."));
+    Object.assign(moved.appointments[0]!, collectionTimes("2026-09-30", "9:00 AM – 9:30 AM"));
+    // A Collection called off, and John's pair going back this afternoon.
+    const calledOff = await book(d.orders, "2026-09-24T15:00:00Z", collection("2026-09-29", "11:00 AM – 11:30 AM", "Lauren S."));
+    calledOff.appointments[0]!.status = "CANCELLED";
+    john.appointments.push({ id: "apt_return", kind: "RETURN", status: "SCHEDULED", ...collectionTimes("2026-09-29", "4:00 PM – 4:30 PM") });
 
-    const { todaysCollections } = await getAdminOverview(d, ADMIN, "this-week");
+    const { todaysSchedule } = await getAdminOverview(d, ADMIN, "this-week");
 
-    expect(todaysCollections.map((c) => [c.time, c.customerName])).toEqual([
-      ["10:00 AM", "John Doe"],
-      ["6:30 PM", "Sarah Kim"],
+    expect(todaysSchedule.map((visit) => [visit.time, visit.customerName, visit.kind])).toEqual([
+      ["10:00 AM", "John Doe", "COLLECTION"],
+      ["4:00 PM", "John Doe", "RETURN"],
+      ["6:30 PM", "Sarah Kim", "COLLECTION"],
     ]);
+    expect(todaysSchedule[0]!.reference).toBe(`ATU-${john.number}`);
   });
 });
 

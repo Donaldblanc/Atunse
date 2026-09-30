@@ -86,6 +86,26 @@ describe("transitionItemStatus", () => {
     expect(retry).toBeNull(); // already applied — not an error, not a double-transition
   });
 
+  it("settles the Order's Deposit Payment when a payment is confirmed, and only then", async () => {
+    const orders = new InMemoryOrderRepository();
+    const { order, item } = await seedOrder(orders);
+    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deposit = () => orders.orders.get(order.id)!.payments.find((payment) => payment.kind === "DEPOSIT")!;
+    expect(deposit().status).toBe("PENDING");
+
+    await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" });
+    expect(deposit().status).toBe("PENDING");
+
+    await transitionItemStatus(deps, admin, {
+      itemId: item.id,
+      fromStatus: "UNDER_REVIEW",
+      toStatus: "QUOTE_SENT",
+      action: "MANUAL_PAYMENT_CONFIRMED",
+      idempotencyKey: "confirm-1",
+    });
+    expect(deposit()).toMatchObject({ status: "RECEIVED", receivedAt: expect.any(Date) });
+  });
+
   it("refuses an item that doesn't exist, instead of reporting it as already applied", async () => {
     const orders = new InMemoryOrderRepository();
     await expect(

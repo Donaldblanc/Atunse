@@ -72,10 +72,19 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
                 </span>
               </td>
               <td>
-                {order.deposit === null ? null : order.deposit.paid ? (
+                {order.deposit === null ? null : order.deposit.status === "RECEIVED" ? (
                   <span className="ov-pill" data-tone="green" data-nowrap="true">
                     Deposit paid
                   </span>
+                ) : order.deposit.status === "REFUNDED" ? (
+                  <span className="ov-pill" data-tone="muted" data-nowrap="true">
+                    Deposit refunded
+                  </span>
+                ) : order.deposit.status === "FAILED" ? (
+                  <>
+                    <span className="ov-cell-main">{PAYMENT_METHOD_LABELS[order.deposit.method]}</span>
+                    <span className="ov-failed">Failed</span>
+                  </>
                 ) : order.status === "CANCELLED" ? (
                   // A cancelled Order's unpaid deposit isn't owed, so it isn't chased (nor counted in Pending Payments).
                   <span className="ov-cell-sub">No deposit due</span>

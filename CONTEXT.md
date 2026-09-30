@@ -9,7 +9,7 @@ The billing and shipping envelope a customer submits. Every Order belongs to a *
 One **pair** of sneakers submitted within an Order (not one individual shoe — left/right are never priced or tracked separately). An Item carries its own brand/model, condition photos, requested Services, price, and **its own status** through the restoration Status Pipeline. Items in the same Order advance independently — one Item can be In Progress while a sibling Item in the same Order is still Under Review awaiting approval.
 
 ## Order Number
-The sequential number admin screens show for an Order, e.g. "ATU-1008" (first Order: ATU-1001). Customers still quote the Order's short **reference** (its id's last 8 characters) in their Zelle memo.
+An Order's sequential reference, e.g. "ATU-1008" (first Order: ATU-1001), used everywhere: admin screens, the booking confirmation and emails, and the customer's Zelle memo.
 
 ## Order Status (display)
 There is no single Order status field. The customer-facing order view always shows a per-Item breakdown (each Item's own place in the Status Pipeline) — never a single collapsed label for the whole Order. Admin screens that list Orders by status (Pending Payment, In Progress, Ready, Completed, Cancelled) derive it from the Items and the Payments; it is never stored.

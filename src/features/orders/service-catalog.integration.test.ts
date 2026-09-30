@@ -32,7 +32,7 @@ describe("service catalog parity (integration)", () => {
         minimumLabel: minimumLabel ?? undefined,
         alsoFrom: alsoFrom ?? undefined,
       })),
-    ).toEqual(SERVICE_CATALOG.map((service) => ({ ...service, minimumLabel: service.minimumLabel, alsoFrom: service.alsoFrom })));
+    ).toEqual(SERVICE_CATALOG);
     expect(rows.every((row) => row.active)).toBe(true);
   });
 

@@ -151,7 +151,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 **Placeholders (real data exists, but the design shows more):**
 - [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
 - [x] **Order #: ATU-1008 numbers** in Recent Orders and Today's Schedule (#119).
-- [ ] **Today's Schedule: return drop-offs.** Only collections show today; show RETURN Appointments too (#119), once Order detail or the Calendar can book one.
+- [x] **Today's Schedule: return drop-offs.** It reads SCHEDULED Appointments of both kinds (#119); returns appear once Order detail or the Calendar can book one.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
 - [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.

@@ -83,8 +83,8 @@ prove it against.
   - One range picker (this week / last week / last 30 days, New York days, Monday-Sunday weeks) scopes Total Orders, Booked Revenue, the Revenue Trend bars and Orders by Service. Each is compared with the same stretch of the period before.
   - "Booked revenue" is the Orders' estimates (Rush included), not payments received.
   - One rule for cancelled pairs across every figure (Total Orders, revenue, the trend, Orders by Service, Recent Orders): they drop out. An Order counts at its estimate less its cancelled pairs' share (`liveEstimate`), and a fully cancelled Order not at all.
-  - The work queues are always "right now": pairs needing a quote, Orders awaiting their Deposit (no `MANUAL_PAYMENT_CONFIRMED` on any Item), and pairs Ready for Drop-Off/Shipping.
-  - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
+  - The work queues are always "right now": pairs needing a quote, Orders whose Deposit Payment is still PENDING (confirming a payment marks it RECEIVED), and pairs Ready for Drop-Off/Shipping.
+  - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and the deposit's status) and Today's Schedule (today's scheduled collections and returns, read from the Calendar's Appointments, so a rescheduled visit shows on its new day).
   - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
 - **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)):

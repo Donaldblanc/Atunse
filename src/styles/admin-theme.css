@@ -1101,6 +1101,13 @@ a.admin-nav-item:hover {
   color: #b35300;
 }
 
+.ov-failed {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--delta-down-ink);
+}
+
 .ov-pending::before {
   content: "";
   width: 8px;
@@ -1204,6 +1211,11 @@ a.admin-nav-item:hover {
   border-radius: 8px;
   background: var(--delta-up-bg);
   color: var(--delta-up-ink);
+}
+
+.ov-tag[data-kind="RETURN"] {
+  background: #e4ebff;
+  color: #1c3fd6;
 }
 
 /* Needs Attention. */

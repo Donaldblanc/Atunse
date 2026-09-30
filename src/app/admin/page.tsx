@@ -24,7 +24,7 @@ import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
-import { getAdminOverview, type ScheduledCollection } from "@/features/admin-overview/get-admin-overview";
+import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
@@ -149,7 +149,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h2>
             {calendarHref && <CardLink href={calendarHref}>View calendar</CardLink>}
           </div>
-          <TodaysSchedule collections={overview.todaysCollections} />
+          <TodaysSchedule visits={overview.todaysSchedule} />
         </section>
 
         <section className="ov-card" aria-labelledby="ov-attention-title">
@@ -230,20 +230,24 @@ function BrandCard() {
   );
 }
 
-/** Today's Local Drop-Off collections as a timeline. Return drop-offs aren't scheduled in the app yet. */
-function TodaysSchedule({ collections }: { collections: ScheduledCollection[] }) {
-  if (collections.length === 0) return <p className="ov-empty">No collections booked for today.</p>;
+const VISIT_LABELS: Record<ScheduledVisit["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
+
+/** Today's Local Drop-Off visits as a timeline: collections and returns, from the Calendar's Appointments. */
+function TodaysSchedule({ visits }: { visits: ScheduledVisit[] }) {
+  if (visits.length === 0) return <p className="ov-empty">Nothing scheduled for today.</p>;
   return (
     <ol className="ov-schedule">
-      {collections.map((collection) => (
-        <li key={collection.orderId}>
-          <span className="ov-schedule-time">{collection.time}</span>
+      {visits.map((visit) => (
+        <li key={`${visit.orderId}-${visit.kind}`}>
+          <span className="ov-schedule-time">{visit.time}</span>
           <span className="ov-schedule-dot" aria-hidden="true" />
           <span className="ov-schedule-what">
-            <span className="ov-cell-main">{collection.customerName}</span>
-            <span className="ov-cell-sub">{collection.reference}</span>
+            <span className="ov-cell-main">{visit.customerName}</span>
+            <span className="ov-cell-sub">{visit.reference}</span>
           </span>
-          <span className="ov-tag">Collection</span>
+          <span className="ov-tag" data-kind={visit.kind}>
+            {VISIT_LABELS[visit.kind]}
+          </span>
         </li>
       ))}
     </ol>

@@ -5,7 +5,7 @@
 // submitOrder so they hold for every caller, not just this route.
 
 import { z } from "zod";
-import { orderReference, type Order } from "../domain";
+import { orderNumber, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
 import { BUNDLE_PAIRS, findBundle } from "../service-catalog";
 import type { SubmitOrderInput } from "../use-cases/submit-order";
@@ -85,7 +85,7 @@ export function toSubmitOrderResponse(order: Order, paymentInstructions: Payment
   return {
     order: {
       id: order.id,
-      reference: orderReference(order.id),
+      reference: orderNumber(order.number),
       fulfillmentMethod: order.fulfillment.method,
       estimateCents: order.estimate.cents,
       estimateIsMinimum: order.estimateIsMinimum,

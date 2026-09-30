@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, CalendarDate, Fulfillment, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
+import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -44,6 +44,18 @@ export class ItemStatusChangedError extends Error {
   }
 }
 
+/**
+ * The Order names a Bundle the bundles table doesn't have (e.g. one taken
+ * out of the catalog while the booking page still offered it). Nothing
+ * was written.
+ */
+export class BundleNotFoundError extends Error {
+  constructor(readonly bundleId: string) {
+    super("That bundle is no longer offered.");
+    this.name = "BundleNotFoundError";
+  }
+}
+
 /** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
 export class PhotoKeyInUseError extends Error {
   constructor() {
@@ -65,8 +77,11 @@ export interface NewOrderInput {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
-  /** How the Deposit is expected: created as a PENDING Payment with the Order. */
-  depositMethod: PaymentMethod;
+  /**
+   * The Deposit Payment to create PENDING with the Order, or null when
+   * none is due. submitOrder decides; repositories just store it.
+   */
+  depositPayment: { method: PaymentMethod; amount: Money } | null;
   /** Local Drop-Off's COLLECTION Appointment, from its booked slot; null for Mail-In. */
   collection: { startsAt: Date; endsAt: Date } | null;
   submissionKey: string | null;
@@ -86,6 +101,19 @@ export interface NewItemInput {
   estimate: Money;
   /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
   photos: { key: string; uploadKey: string }[];
+}
+
+/** An Order as the Overview's range figures read it, without photos, payments or appointments. */
+export interface BookedOrder {
+  id: string;
+  createdAt: Date;
+  estimate: Money;
+  items: Pick<Item, "status" | "serviceIds" | "estimate">[];
+}
+
+/** A Calendar Appointment with what Today's Schedule shows about its Order. */
+export interface ScheduledAppointment extends Appointment {
+  order: { id: string; number: number; contactName: string; itemStatuses: ItemStatus[] };
 }
 
 export interface AwaitingDeposits {
@@ -120,15 +148,20 @@ export interface OrderRepository {
    * recorded for this item (ADR-0012: retry-safe); the caller should treat
    * that as "already applied", not an error. Throws ItemNotFoundError or
    * ItemStatusChangedError, having written nothing.
+   *
+   * With `receivesDeposit`, the same transaction also marks the Item's
+   * Order's PENDING Deposit Payment RECEIVED (ADR-0002), so a confirmed
+   * deposit leaves Pending Payments at once.
    */
   transitionItemStatus(params: {
     itemId: string;
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
   }): Promise<Order["items"][number] | null>;
 
-  /** Orders booked (created) in [from, to), oldest first. */
-  listBookedBetween(from: Date, to: Date): Promise<Order[]>;
+  /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
+  listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]>;
 
   /**
    * The Orders booked in [from, to) that still have a live pair, and what
@@ -139,8 +172,8 @@ export interface OrderRepository {
   /** The most recently booked Orders, newest first. */
   listRecent(limit: number): Promise<Order[]>;
 
-  /** Local Drop-Off Orders whose collection is booked on `date`, in booking order. */
-  listCollectionsOn(date: CalendarDate): Promise<Order[]>;
+  /** SCHEDULED Appointments starting in [from, to), earliest first, with their Order's summary. */
+  listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]>;
 
   /** How many Items are in each status right now; statuses with none are left out. */
   countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;

@@ -52,7 +52,8 @@ The Service catalog was code (`src/features/orders/service-catalog.ts`), so the 
 ## Consequences
 - Screens 02–09 can be built one at a time with no further migrations for their core data. Each adds its own repository methods and use-cases when it's built, rather than designing them ahead of their screen.
 - Until step 2 lands, a price change has to be made in both `service-catalog.ts` and the `services` table (the parity test enforces it).
-- Customers still quote `orderReference()` (the last 8 characters of the Order id) in their Zelle memo; admin screens show the order number. Switching customer-facing references to "ATU-1008" is a separate decision.
+- **One reference everywhere.** "ATU-1008" (`orderNumber`) is what admin screens show and what customers see: the booking confirmation, the email subject and the Zelle memo. That way a payment can be matched to its Order at a glance. It replaces the id-based 8-character reference; Orders booked before this still have those in their past emails.
+- **Confirming a payment settles the Deposit.** The `MANUAL_PAYMENT_CONFIRMED` transition marks the Order's PENDING Deposit Payment RECEIVED in the same transaction. At most one Deposit per Order is PENDING or RECEIVED (a partial unique index); a retry after a FAILED one is allowed.
 - Tax and a Local Drop-Off fee are stored but never computed: whether, when and how they apply is an open question (CONTEXT.md).
 - Messaging moves into the MVP as an inbox (Conversations per customer, usually about an Order), replacing "messages inside Item detail only".
 - Not modeled yet (no design detail): Settings' Notifications, Payments, Shipping & Pickup, Email & Templates, Team and Billing tabs. Integrations (Stripe, email, SMS) stay environment configuration (ADR-0009, SPEC: feature toggles are env-only), shown as connected or not.

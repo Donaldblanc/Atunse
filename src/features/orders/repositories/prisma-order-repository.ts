@@ -7,8 +7,11 @@ import {
   ItemNotFoundError,
   ItemStatusChangedError,
   PhotoKeyInUseError,
+  BundleNotFoundError,
   type AwaitingDeposits,
+  type BookedOrder,
   type NewOrderInput,
+  type ScheduledAppointment,
   type OrderRepository,
 } from "./order-repository";
 
@@ -87,7 +90,7 @@ function toDomainPayment(row: OrderRow["payments"][number]): Payment {
 }
 
 function toDomainAppointment(row: OrderRow["appointments"][number]): Appointment {
-  return { id: row.id, kind: row.kind, startsAt: row.startsAt, endsAt: row.endsAt };
+  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt };
 }
 
 function toDomainOrder(row: OrderRow): Order {
@@ -115,6 +118,14 @@ function toDomainOrder(row: OrderRow): Order {
     payments: row.payments.map(toDomainPayment),
     appointments: row.appointments.map(toDomainAppointment),
   };
+}
+
+/**
+ * A nested `connect` found no Bundle row (P2025). The Account connect can
+ * fail the same way, so the message is checked for the Bundle relation.
+ */
+function isMissingBundle(err: unknown): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025" && /Bundle/.test(`${String(err.meta?.cause ?? "")} ${err.message}`);
 }
 
 /** The fields of the unique constraint a Prisma P2002 violated, or null. */
@@ -145,6 +156,7 @@ export class PrismaOrderRepository implements OrderRepository {
       }
       if (fields?.includes("email")) throw new EmailTakenError();
       if (fields?.includes("uploadKey") || fields?.includes("key")) throw new PhotoKeyInUseError();
+      if (input.bundleId && isMissingBundle(err)) throw new BundleNotFoundError(input.bundleId);
       throw err;
     }
   }
@@ -202,10 +214,9 @@ export class PrismaOrderRepository implements OrderRepository {
             status: "REQUEST_SUBMITTED" as const,
           })),
         },
-        payments:
-          input.deposit.cents > 0
-            ? { create: { kind: "DEPOSIT" as const, method: input.depositMethod, amountCents: input.deposit.cents } }
-            : undefined,
+        payments: input.depositPayment
+          ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
+          : undefined,
         appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
       },
       include: ORDER_INCLUDE,
@@ -234,6 +245,7 @@ export class PrismaOrderRepository implements OrderRepository {
     itemId: string;
     toStatus: Item["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
   }): Promise<Item | null> {
     return this.prisma.$transaction(async (tx) => {
       // Idempotency (ADR-0012): a repeat call with the same idempotencyKey
@@ -275,17 +287,41 @@ export class PrismaOrderRepository implements OrderRepository {
         },
       });
 
+      // A confirmed payment settles the Order's PENDING Deposit in the same
+      // transaction, so the Payments view and the audit trail never disagree.
+      if (params.receivesDeposit) {
+        await tx.payment.updateMany({
+          where: { orderId: updated.orderId, kind: "DEPOSIT", status: "PENDING" },
+          data: {
+            status: "RECEIVED",
+            receivedAt: new Date(),
+            confirmedByAccountId: params.entry.actorAccountId,
+            idempotencyKey: params.entry.idempotencyKey,
+          },
+        });
+      }
+
       return toDomainItem(updated);
     });
   }
 
-  async listBookedBetween(from: Date, to: Date): Promise<Order[]> {
+  async listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]> {
     const rows = await this.prisma.order.findMany({
       where: { createdAt: { gte: from, lt: to } },
-      include: ORDER_INCLUDE,
+      select: {
+        id: true,
+        createdAt: true,
+        estimateCents: true,
+        items: { select: { status: true, serviceIds: true, estimateCents: true }, orderBy: { position: "asc" } },
+      },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map(toDomainOrder);
+    return rows.map((row) => ({
+      id: row.id,
+      createdAt: row.createdAt,
+      estimate: Money.fromCents(row.estimateCents),
+      items: row.items.map((item) => ({ status: item.status, serviceIds: item.serviceIds, estimate: Money.fromCents(item.estimateCents) })),
+    }));
   }
 
   // liveEstimate (domain.ts) in two aggregates: Orders with a live pair,
@@ -307,13 +343,18 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
-  async listCollectionsOn(date: CalendarDate): Promise<Order[]> {
-    const rows = await this.prisma.order.findMany({
-      where: { fulfillmentMethod: "PICKUP", pickupDate: calendarDateToUtcMidnight(date) },
-      include: ORDER_INCLUDE,
-      orderBy: { createdAt: "asc" },
+  async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
+    const rows = await this.prisma.appointment.findMany({
+      where: { status: "SCHEDULED", startsAt: { gte: from, lt: to } },
+      include: {
+        order: { select: { id: true, number: true, contactName: true, items: { select: { status: true }, orderBy: { position: "asc" } } } },
+      },
+      orderBy: { startsAt: "asc" },
     });
-    return rows.map(toDomainOrder);
+    return rows.map((row) => ({
+      ...toDomainAppointment(row),
+      order: { id: row.order.id, number: row.order.number, contactName: row.order.contactName, itemStatuses: row.order.items.map((item) => item.status) },
+    }));
   }
 
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {

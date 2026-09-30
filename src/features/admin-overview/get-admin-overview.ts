@@ -1,8 +1,17 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
-import { calendarDateInShopTime, type CalendarDate } from "@/features/orders/calendar-date";
-import { liveEstimate, livePairs, orderNumber, orderRollupStatus, type ItemStatus, type Order, type PaymentMethod } from "@/features/orders/domain";
-import { PICKUP_TIME_SLOTS } from "@/features/orders/pickup-window";
+import { addDays, calendarDateInShopTime, SHOP_TIMEZONE, shopMidnight, type CalendarDate } from "@/features/orders/calendar-date";
+import {
+  liveEstimate,
+  livePairs,
+  orderNumber,
+  orderRollupStatus,
+  type Appointment,
+  type ItemStatus,
+  type Order,
+  type Payment,
+  type PaymentMethod,
+} from "@/features/orders/domain";
 import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
@@ -16,7 +25,7 @@ export interface AdminOverviewDeps {
     | "countItemsByStatus"
     | "summarizeAwaitingDeposit"
     | "listRecent"
-    | "listCollectionsOn"
+    | "listAppointmentsBetween"
   >;
   /** A short-lived view link for a stored photo (ADR-0014), or null when photos can't be shown. */
   photoUrl: (key: string) => Promise<string | null>;
@@ -39,19 +48,22 @@ export interface RecentOrder {
   services: string;
   status: ItemStatus;
   /** The Order's Deposit Payment, or null if it has none (e.g. a $0 estimate). */
-  deposit: { method: PaymentMethod; paid: boolean } | null;
+  deposit: { method: PaymentMethod; status: Payment["status"] } | null;
   total: Money;
   totalIsMinimum: boolean;
 }
 
-/** A Local Drop-Off collection booked for today, in time order. */
-export interface ScheduledCollection {
+/** A Local Drop-Off visit scheduled for today: DJ collecting a pair, or dropping it back off. */
+export interface ScheduledVisit {
   orderId: string;
   reference: string;
   customerName: string;
-  /** The slot's start as booked, e.g. "6:00 PM". */
+  kind: Appointment["kind"];
+  /** When it starts, shop time, e.g. "6:00 PM". */
   time: string;
 }
+
+const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
 
 const RECENT_ORDERS = 5;
 
@@ -77,14 +89,18 @@ export interface AdminOverview {
   readyForReturn: number;
   /** The latest bookings, whatever the range. */
   recentOrders: RecentOrder[];
-  /** Today's (New York) Local Drop-Off collections. */
-  todaysCollections: ScheduledCollection[];
+  /**
+   * Today's (New York) SCHEDULED Appointments, collections and returns, in
+   * time order: read from the Calendar's Appointments, so a rescheduled
+   * visit shows on its new day.
+   */
+  todaysSchedule: ScheduledVisit[];
 }
 
 const NEEDS_QUOTE: ItemStatus[] = ["REQUEST_SUBMITTED", "UNDER_REVIEW"];
 
 /** A fully cancelled Order was booked but isn't business: it's left out of every figure. */
-function isLive(order: Order): boolean {
+function isLive(order: { items: { status: ItemStatus }[] }): boolean {
   return livePairs(order).length > 0;
 }
 
@@ -94,14 +110,15 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
 
   const now = deps.now();
   const range = overviewRange(rangeId, now);
-  const [booked, previous, statusCounts, awaitingDeposit, recent, collections] = await Promise.all([
+  const today = calendarDateInShopTime(now);
+  const [booked, previous, statusCounts, awaitingDeposit, recent, appointments] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),
     // Only totals are needed for the stretch before, so it's aggregated, not loaded.
     deps.orders.summarizeBookedBetween(range.previous.start, range.previous.end),
     deps.orders.countItemsByStatus(),
     deps.orders.summarizeAwaitingDeposit(),
     deps.orders.listRecent(RECENT_ORDERS),
-    deps.orders.listCollectionsOn(calendarDateInShopTime(now)),
+    deps.orders.listAppointmentsBetween(shopMidnight(today), shopMidnight(addDays(today, 1))),
   ]);
   const current = booked.filter(isLive);
 
@@ -133,15 +150,15 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     awaitingDeposit,
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
     recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
-    todaysCollections: collections
-      .filter(isLive)
-      .flatMap((order) =>
-        order.fulfillment.method === "PICKUP"
-          ? [{ orderId: order.id, reference: orderNumber(order.number), customerName: order.contactName, slot: order.fulfillment.slot }]
-          : [],
-      )
-      .sort((a, b) => PICKUP_TIME_SLOTS.indexOf(a.slot) - PICKUP_TIME_SLOTS.indexOf(b.slot))
-      .map(({ slot, ...collection }) => ({ ...collection, time: slot.split(" – ")[0]! })),
+    todaysSchedule: appointments
+      .filter((appointment) => appointment.order.itemStatuses.some((status) => status !== "CANCELLED"))
+      .map((appointment) => ({
+        orderId: appointment.order.id,
+        reference: orderNumber(appointment.order.number),
+        customerName: appointment.order.contactName,
+        kind: appointment.kind,
+        time: visitTime.format(appointment.startsAt),
+      })),
   };
 }
 
@@ -163,7 +180,7 @@ async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
     status: orderRollupStatus(order.items),
-    deposit: deposit ? { method: deposit.method, paid: deposit.status === "RECEIVED" } : null,
+    deposit: deposit ? { method: deposit.method, status: deposit.status } : null,
     total: live.length > 0 ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };

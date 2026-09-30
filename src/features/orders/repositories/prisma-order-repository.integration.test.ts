@@ -6,6 +6,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import {
+  BundleNotFoundError,
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
@@ -68,7 +69,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     estimate: Money.fromCents(3000),
     estimateIsMinimum: false,
     deposit: Money.fromCents(1500),
-    depositMethod: "ZELLE",
+    depositPayment: { method: "ZELLE", amount: Money.fromCents(1500) },
     collection: { startsAt: new Date("2026-10-03T20:30:00Z"), endsAt: new Date("2026-10-03T21:00:00Z") },
     submissionKey: null,
     submissionFingerprint: null,
@@ -392,16 +393,23 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect(recent.map((order) => order.id)).toEqual([orders[1]!.id, orders[2]!.id]);
   });
 
-  it("finds the Local Drop-Off collections booked on a day", async () => {
-    const today = (await repo.create(newOrder())).order; // collected 2026-10-03
-    await repo.create(
-      newOrder({ fulfillment: { method: "PICKUP", address: { line1: "1 Main St", line2: null, city: "New York", state: "NY", zip: "10001" }, date: "2026-10-04", slot: "4:30 PM – 5:00 PM" } }),
-    );
-    await repo.create(
-      newOrder({ fulfillment: { method: "MAIL_IN", address: { line1: "1 Main St", line2: null, city: "Austin", state: "TX", zip: "73301" }, preferredDate: "2026-10-03" } }),
-    );
+  it("finds the SCHEDULED Appointments starting in [from, to), earliest first, with their Order", async () => {
+    const collected = (await repo.create(newOrder({ contactName: "John Doe" }))).order; // collection Oct 3, 4:30 PM EDT
+    const nextDay = (await repo.create(newOrder({ collection: { startsAt: new Date("2026-10-04T20:30:00Z"), endsAt: new Date("2026-10-04T21:00:00Z") } }))).order;
+    const calledOff = (await repo.create(newOrder())).order;
+    await prisma.appointment.updateMany({ where: { orderId: calledOff.id }, data: { status: "CANCELLED" } });
+    await prisma.appointment.create({
+      data: { orderId: collected.id, kind: "RETURN", startsAt: new Date("2026-10-03T14:00:00Z"), endsAt: new Date("2026-10-03T14:30:00Z") },
+    });
 
-    expect((await repo.listCollectionsOn("2026-10-03")).map((order) => order.id)).toEqual([today.id]);
+    const visits = await repo.listAppointmentsBetween(new Date("2026-10-03T04:00:00Z"), new Date("2026-10-04T04:00:00Z"));
+
+    expect(visits.map((visit) => [visit.kind, visit.order.id])).toEqual([
+      ["RETURN", collected.id],
+      ["COLLECTION", collected.id],
+    ]);
+    expect(visits[0]!.order).toMatchObject({ number: collected.number, contactName: "John Doe", itemStatuses: ["REQUEST_SUBMITTED"] });
+    expect(visits.some((visit) => visit.order.id === nextDay.id)).toBe(false);
   });
 
   it("counts Items by status", async () => {
@@ -413,7 +421,7 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
 
   it("sums the PENDING Deposits by method, skipping received ones and fully cancelled Orders", async () => {
     await repo.create(newOrder({ deposit: Money.fromCents(1500) }));
-    await repo.create(newOrder({ deposit: Money.fromCents(2500), depositMethod: "CASH" }));
+    await repo.create(newOrder({ deposit: Money.fromCents(2500), depositPayment: { method: "CASH", amount: Money.fromCents(2500) } }));
     const paid = (await repo.create(newOrder({ deposit: Money.fromCents(4000) }))).order;
     await prisma.payment.updateMany({ where: { orderId: paid.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
     const cancelled = (await repo.create(newOrder({ deposit: Money.fromCents(8000) }))).order;
@@ -547,5 +555,57 @@ describe("admin-screen data: reviews, notes, stock, payments (integration)", () 
     const { order } = await repo.create(newOrder());
     const collection = await prisma.appointment.findFirstOrThrow({ where: { orderId: order.id } });
     expect(collection).toMatchObject({ status: "SCHEDULED", assignedToAccountId: null });
+  });
+});
+
+describe("PrismaOrderRepository review fixes (integration)", () => {
+  it("settles the Order's PENDING Deposit in the same transaction as a payment confirmation, once", async () => {
+    const { order } = await repo.create(newOrder());
+    const itemId = order.items[0]!.id;
+    const confirm = () =>
+      repo.transitionItemStatus({
+        itemId,
+        toStatus: "UNDER_REVIEW",
+        entry: { action: "MANUAL_PAYMENT_CONFIRMED", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", actorAccountId: null, idempotencyKey: "confirm-1" },
+        receivesDeposit: true,
+      });
+
+    await confirm();
+    const retry = await confirm();
+
+    const deposit = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id, kind: "DEPOSIT" } });
+    expect(retry).toBeNull();
+    expect(deposit).toMatchObject({ status: "RECEIVED", idempotencyKey: "confirm-1" });
+    expect(deposit.receivedAt).toBeInstanceOf(Date);
+    expect((await repo.summarizeAwaitingDeposit()).orders).toBe(0);
+  });
+
+  it("leaves the Deposit alone on other transitions", async () => {
+    const { order } = await repo.create(newOrder());
+    await repo.transitionItemStatus({
+      itemId: order.items[0]!.id,
+      toStatus: "UNDER_REVIEW",
+      entry: { action: "REVIEW_STARTED", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", actorAccountId: null, idempotencyKey: null },
+    });
+    expect((await prisma.payment.findFirstOrThrow({ where: { orderId: order.id } })).status).toBe("PENDING");
+  });
+
+  it("refuses a Bundle the bundles table doesn't have, as BundleNotFoundError, having written nothing", async () => {
+    const before = await prisma.order.count();
+    await expect(repo.create(newOrder({ bundleId: "no-such-bundle" }))).rejects.toThrow(BundleNotFoundError);
+    expect(await prisma.order.count()).toBe(before);
+  });
+
+  it("won't let a Bundle that Orders name be deleted (deactivate it instead)", async () => {
+    await repo.create(newOrder({ bundleId: "revival" }));
+    await expect(prisma.bundle.delete({ where: { id: "revival" } })).rejects.toThrow();
+  });
+
+  it("allows one active Deposit per Order, but a retry after a failed one", async () => {
+    const { order } = await repo.create(newOrder()); // its PENDING Deposit
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "DEPOSIT", method: "CASH", amountCents: 1500 } })).rejects.toThrow();
+
+    await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "FAILED", failureReason: "card_declined" } });
+    await expect(prisma.payment.create({ data: { orderId: order.id, kind: "DEPOSIT", method: "CARD", amountCents: 1500 } })).resolves.toBeTruthy();
   });
 });

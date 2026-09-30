@@ -151,6 +151,7 @@ export interface Payment {
 export interface Appointment {
   id: string;
   kind: "COLLECTION" | "RETURN";
+  status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   startsAt: Date;
   endsAt: Date;
 }
@@ -186,13 +187,17 @@ export interface Order {
   appointments: Appointment[];
 }
 
-/** The number the admin screens show for an Order: "ATU-1008". */
+/**
+ * An Order's reference everywhere, "ATU-1008": admin screens, the
+ * booking confirmation and emails, and the customer's Zelle memo, so a
+ * payment can be matched to its Order at a glance.
+ */
 export function orderNumber(number: number): string {
   return `ATU-${number}`;
 }
 
 /** An Order's pairs that aren't cancelled. */
-export function livePairs(order: Pick<Order, "items">): Item[] {
+export function livePairs<T extends { status: ItemStatus }>(order: { items: T[] }): T[] {
   return order.items.filter((item) => item.status !== "CANCELLED");
 }
 
@@ -201,7 +206,7 @@ export function livePairs(order: Pick<Order, "items">): Item[] {
  * cancelled pairs' share. Order-level charges (Rush) stay while any pair
  * is live; a fully cancelled Order is worth nothing.
  */
-export function liveEstimate(order: Pick<Order, "items" | "estimate">): Money {
+export function liveEstimate(order: { estimate: Money; items: { status: ItemStatus; estimate: Money }[] }): Money {
   if (livePairs(order).length === 0) return Money.zero();
   return order.items
     .filter((item) => item.status === "CANCELLED")
@@ -209,13 +214,11 @@ export function liveEstimate(order: Pick<Order, "items" | "estimate">): Money {
 }
 
 /**
- * Short code the customer quotes in their Zelle memo and emails. The tail
- * of a cuid is its random block, so this is effectively unique at this
- * business's volume, and the owner can always fall back to the full id.
+ * The audit action for the owner marking a Zelle/Cash payment received
+ * (ADR-0002). Recorded on an Item, it also marks the Order's PENDING
+ * Deposit Payment RECEIVED in the same transaction.
  */
-export function orderReference(orderId: string): string {
-  return orderId.slice(-8).toUpperCase();
-}
+export const MANUAL_PAYMENT_CONFIRMED = "MANUAL_PAYMENT_CONFIRMED";
 
 export interface AuditEntry {
   action: string;
