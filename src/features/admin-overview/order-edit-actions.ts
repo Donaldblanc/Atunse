@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { buildOrderUseCaseDeps } from "@/features/orders/deps";
@@ -14,7 +15,6 @@ export type EditOrderState = {
   /** A problem with the save as a whole (stale form, signed out); field problems are in `errors`. */
   error: string | null;
   errors: OrderDetailsErrors;
-  saved: boolean;
 };
 
 export type AddNoteState = { error: string | null; /** Bumped on each success so the form can clear itself. */ added: number };
@@ -37,7 +37,7 @@ export async function updateOrderDetailsAction(_previous: EditOrderState, formDa
   const expectedUpdatedAt = new Date(text(formData, "updatedAt"));
   const itemIds = formData.getAll("itemId").filter((id): id is string => typeof id === "string");
   if (!orderId || !idempotencyKey || Number.isNaN(expectedUpdatedAt.getTime())) {
-    return { error: "That request wasn't valid. Reload and try again.", errors: {}, saved: false };
+    return { error: "That request wasn't valid. Reload and try again.", errors: {} };
   }
 
   const raw: RawOrderDetails = {
@@ -58,16 +58,19 @@ export async function updateOrderDetailsAction(_previous: EditOrderState, formDa
   try {
     const actingUser = await actingUserFromCookies(await cookies());
     const result = await updateOrderDetails(buildOrderUseCaseDeps(), actingUser, { orderId, expectedUpdatedAt, raw, idempotencyKey });
-    if (!result.ok) return { error: null, errors: result.errors, saved: false };
+    if (!result.ok) return { error: null, errors: result.errors };
   } catch (err) {
-    if (err instanceof OrderChangedError) return { error: "This order changed since you opened it. Reload the page to see the latest, then edit again.", errors: {}, saved: false };
-    if (err instanceof OrderNotFoundError || err instanceof ItemNotFoundError) return { error: "This order or one of its pairs no longer exists.", errors: {}, saved: false };
-    if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that.", errors: {}, saved: false };
+    if (err instanceof OrderChangedError) return { error: "This order changed since you opened it. Reload the page to see the latest, then edit again.", errors: {} };
+    if (err instanceof OrderNotFoundError || err instanceof ItemNotFoundError) return { error: "This order or one of its pairs no longer exists.", errors: {} };
+    if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that.", errors: {} };
     throw err;
   }
 
   revalidatePath("/admin");
-  return { error: null, errors: {}, saved: true };
+  // Back to the Order dialog. The save re-renders the edit form under a new key (the Order's updatedAt), which
+  // would drop client state, so the action navigates itself. Only an /admin URL is followed: it's a form field.
+  const returnTo = text(formData, "returnTo");
+  redirect(returnTo.startsWith("/admin") ? returnTo : "/admin");
 }
 
 /** Order detail's Add note: appends an admin-only Note to the Order. */

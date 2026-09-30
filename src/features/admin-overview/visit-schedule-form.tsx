@@ -94,7 +94,8 @@ export function VisitScheduleForm({
       <div className="vsf-actions">
         {confirming ? (
           <>
-            <button type="submit" className="admin-btn" disabled={pending}>
+            {/* Keyed apart from the review button: reused in place, the click that swaps them would also submit. */}
+            <button key="confirm" type="submit" className="admin-btn" disabled={pending}>
               {pending ? "Saving…" : "Confirm and email customer"}
             </button>
             <button type="button" className="admin-btn" data-variant="secondary" disabled={pending} onClick={() => setConfirming(false)}>
@@ -103,7 +104,7 @@ export function VisitScheduleForm({
           </>
         ) : (
           <>
-            <button type="button" className="admin-btn" disabled={!choice.slot} onClick={() => setConfirming(true)}>
+            <button key="review" type="button" className="admin-btn" disabled={!choice.slot} onClick={() => setConfirming(true)}>
               {verb}…
             </button>
             <Link className="admin-btn" data-variant="secondary" href={cancelHref} replace scroll={false}>

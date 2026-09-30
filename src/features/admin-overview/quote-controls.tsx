@@ -88,7 +88,7 @@ export function PairQuoteControls({
                 ?
               </p>
               <div className="od-status-actions">
-                <button type="submit" className="admin-btn" disabled={quoting}>
+                <button key="send-quote" type="submit" className="admin-btn" disabled={quoting}>
                   Send quote
                 </button>
                 <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingQuote(false)} disabled={quoting}>
@@ -99,6 +99,7 @@ export function PairQuoteControls({
           ) : (
             <div className="od-status-actions">
               <button
+                key="review-quote"
                 type="button"
                 className="admin-btn"
                 onClick={() => {
@@ -124,7 +125,7 @@ export function PairQuoteControls({
             <>
               <p className="od-quote-confirm">Record that the customer approved this quote? It can&apos;t be undone.</p>
               <div className="od-status-actions">
-                <button type="submit" className="admin-btn" disabled={approving}>
+                <button key="record-approval" type="submit" className="admin-btn" disabled={approving}>
                   Confirm approval
                 </button>
                 <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingApproval(false)} disabled={approving}>
@@ -134,7 +135,7 @@ export function PairQuoteControls({
             </>
           ) : (
             <div className="od-status-actions">
-              <button type="button" className="admin-btn" onClick={() => setConfirmingApproval(true)}>
+              <button key="ask-approval" type="button" className="admin-btn" onClick={() => setConfirmingApproval(true)}>
                 Customer approved
               </button>
             </div>

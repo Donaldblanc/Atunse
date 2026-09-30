@@ -51,7 +51,8 @@ export function UpdateStatusForm({
         {canCancel &&
           (confirmingCancel ? (
             <>
-              <button type="submit" name="toStatus" value="CANCELLED" className="admin-btn" data-variant="danger" disabled={pending}>
+              {/* Keyed apart from "Cancel order": reused in place, the click that swaps them would also submit. */}
+              <button key="confirm-cancel" type="submit" name="toStatus" value="CANCELLED" className="admin-btn" data-variant="danger" disabled={pending}>
                 Confirm cancel
               </button>
               <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(false)} disabled={pending}>
@@ -59,7 +60,7 @@ export function UpdateStatusForm({
               </button>
             </>
           ) : (
-            <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(true)} disabled={pending}>
+            <button key="ask-cancel" type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(true)} disabled={pending}>
               Cancel {pairLabel ? "pair" : "order"}
             </button>
           ))}

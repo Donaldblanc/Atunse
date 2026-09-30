@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { PAIR_DETAIL_FIELDS, PAIR_DETAIL_MAX, pairFieldKey, type PairDetailField } from "@/features/orders/order-details";
 import type { OrderEditValues } from "./order-detail";
 import { updateOrderDetailsAction, type EditOrderState } from "./order-edit-actions";
@@ -52,15 +51,11 @@ export function OrderEditForm({
   /** Made when the dialog rendered, so a double submit applies once (ADR-0012). */
   idempotencyKey: string;
 }) {
-  const [state, formAction, pending] = useActionState<EditOrderState, FormData>(updateOrderDetailsAction, { error: null, errors: {}, saved: false });
+  const [state, formAction, pending] = useActionState<EditOrderState, FormData>(updateOrderDetailsAction, { error: null, errors: {} });
   const [draft, setDraft] = useState<Record<string, string>>(() => ({
     ...Object.fromEntries(CONTACT_INPUTS.map(({ name }) => [name, values[name]])),
     ...Object.fromEntries(values.pairs.flatMap((pair) => PAIR_DETAIL_FIELDS.map((field) => [`${pair.itemId}:${field}`, pair[field]]))),
   }));
-  const router = useRouter();
-  useEffect(() => {
-    if (state.saved) router.replace(viewHref, { scroll: false });
-  }, [state.saved, viewHref, router]);
 
   const { errors } = state;
   const bind = (name: string, errorKey: string, maxLength: number) => ({
@@ -80,6 +75,8 @@ export function OrderEditForm({
       <input type="hidden" name="orderId" value={orderId} />
       <input type="hidden" name="updatedAt" value={values.updatedAt} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
+      {/* Where a successful save lands; the action redirects there itself, since the save re-renders (and remounts) this form. */}
+      <input type="hidden" name="returnTo" value={viewHref} />
 
       <fieldset className="ov-card od-card oe-set">
         <legend className="ov-card-title">Contact &amp; address</legend>
