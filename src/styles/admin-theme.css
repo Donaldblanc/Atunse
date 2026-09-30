@@ -494,6 +494,85 @@ a.admin-nav-item:hover {
   cursor: not-allowed;
 }
 
+/* A secondary action beside .admin-btn: the same pill, outlined. */
+.admin-btn[data-variant="secondary"] {
+  background: var(--color-card);
+  color: var(--color-foreground);
+  border-color: var(--color-border);
+}
+
+.admin-btn[data-variant="secondary"]:hover {
+  background: var(--color-muted);
+}
+
+/* ---------- Dialog (src/shared/ui/admin-dialog.tsx) ---------- */
+
+.admin-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  box-shadow: var(--shadow-popover);
+  font-family: "Inter", sans-serif;
+}
+
+.admin-dialog[data-size="sm"] {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.admin-dialog[data-size="lg"] {
+  width: min(880px, calc(100vw - 32px));
+}
+
+.admin-dialog::backdrop {
+  background: rgba(11, 15, 26, 0.45);
+}
+
+.admin-dialog-body {
+  padding: 24px;
+}
+
+.admin-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-dialog-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.admin-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px 0 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-muted-foreground);
+  flex: none;
+}
+
+.admin-dialog-close:hover {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+@media (max-width: 720px) {
+  .admin-dialog-body {
+    padding: 20px 16px;
+  }
+}
+
 /* ---------- Overview ---------- */
 
 .ov {
