@@ -26,7 +26,9 @@ import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
-import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewSelection } from "@/features/admin-overview/overview-range";
+import { parseOverviewMetric } from "@/features/admin-overview/metric-detail";
+import { MetricDetailDialog } from "@/features/admin-overview/metric-detail-dialog";
+import { formatRangeDates, OVERVIEW_RANGE_LABELS, overviewHref, parseOverviewSelection } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
@@ -42,15 +44,17 @@ export const metadata = { title: "Overview · Atunṣe Admin" };
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams;
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildAdminOverviewDeps();
   const today = calendarDateInShopTime(deps.now());
   // ?range= (a preset) or ?from=&to= (custom); links that add their own
   // params build on overviewHref(selection, {...}) to keep it.
-  const selection = parseOverviewSelection(await searchParams, deps.now());
+  const selection = parseOverviewSelection(params, deps.now());
   const overview = await getAdminOverview(deps, actingUser, selection);
   const { range } = overview;
   const rangeId = range.id;
+  const metric = parseOverviewMetric(params.metric);
 
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
@@ -74,10 +78,10 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         </div>
 
         <section className="ov-stats" aria-label="Key figures">
-          <StatCard label="Total Orders" icon={PackageIcon} value={String(overview.orders.current)}>
+          <StatCard label="Total Orders" icon={PackageIcon} href={overviewHref(selection, { metric: "orders" })} value={String(overview.orders.current)}>
             <Delta current={overview.orders.current} previous={overview.orders.previous} comparison={range.comparisonLabel} />
           </StatCard>
-          <StatCard label="Booked Revenue" icon={ChartBarIcon} value={overview.bookedRevenue.current.format()}>
+          <StatCard label="Booked Revenue" icon={ChartBarIcon} href={overviewHref(selection, { metric: "revenue" })} value={overview.bookedRevenue.current.format()}>
             <Delta
               current={overview.bookedRevenue.current.cents}
               previous={overview.bookedRevenue.previous.cents}
@@ -182,6 +186,8 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
           </ul>
         </section>
       </aside>
+
+      {metric && <MetricDetailDialog metric={metric} overview={overview} closeHref={overviewHref(selection)} />}
     </div>
   );
 }
@@ -192,16 +198,36 @@ function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
   return [...methods, `${deposits.format()} due`].join(" · ");
 }
 
-function StatCard({ label, icon: Icon, value, children }: { label: string; icon: Icon; value: string; children: React.ReactNode }) {
-  return (
-    <div className="ov-card ov-stat">
+/** With an `href`, the whole card is a link to it (a metric's detail dialog). */
+function StatCard({
+  label,
+  icon: Icon,
+  value,
+  href,
+  children,
+}: {
+  label: string;
+  icon: Icon;
+  value: string;
+  href?: string;
+  children: React.ReactNode;
+}) {
+  const content = (
+    <>
       <div className="ov-stat-head">
         <h2 className="ov-stat-label">{label}</h2>
         <Icon size={26} weight="light" className="ov-stat-icon" aria-hidden="true" />
       </div>
       <p className="ov-stat-value">{value}</p>
       {children}
-    </div>
+    </>
+  );
+  return href ? (
+    <Link className="ov-card ov-stat ov-stat-clickable" href={href} scroll={false}>
+      {content}
+    </Link>
+  ) : (
+    <div className="ov-card ov-stat">{content}</div>
   );
 }
 

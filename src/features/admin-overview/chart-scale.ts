@@ -42,3 +42,11 @@ export function sharesOf100(values: number[]): number[] {
   for (let k = 0; k < missing; k++) shares[byRemainder[k]!.i]! += 1;
   return shares;
 }
+
+/** Y-axis ticks for a count: four whole numbers from 0 up to at least `max` (never a fractional order). */
+export function countTicks(max: number): number[] {
+  const step = Math.max(1, Math.ceil(max / 3));
+  const magnitude = 10 ** Math.floor(Math.log10(step));
+  const rounded = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= step)!;
+  return [0, rounded, rounded * 2, rounded * 3];
+}
