@@ -16,8 +16,15 @@ describe("Item status pipeline", () => {
     expect(canTransition("REQUEST_SUBMITTED", "APPROVED")).toBe(false);
   });
 
-  it("rejects moving backward", () => {
+  it("allows returning an Item from Under Review to Request Submitted", () => {
+    expect(canTransition("UNDER_REVIEW", "REQUEST_SUBMITTED")).toBe(true);
+  });
+
+  it("rejects any other move backward", () => {
     expect(canTransition("QUOTE_SENT", "UNDER_REVIEW")).toBe(false);
+    expect(canTransition("QUOTE_SENT", "REQUEST_SUBMITTED")).toBe(false);
+    expect(canTransition("IN_PROGRESS", "QUALITY_CHECK")).toBe(true);
+    expect(canTransition("QUALITY_CHECK", "IN_PROGRESS")).toBe(false);
   });
 
   it("has no transitions out of terminal states", () => {

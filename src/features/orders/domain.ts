@@ -18,10 +18,15 @@ export const ITEM_STATUSES = [
 
 export type ItemStatus = (typeof ITEM_STATUSES)[number];
 
-/** CANCELLED is reachable from any state; otherwise the pipeline is linear. */
+/**
+ * CANCELLED is reachable from any state; otherwise the pipeline is linear,
+ * with one step back: the owner can return an Item from Under Review to
+ * Request Submitted (e.g. a review started by mistake). Nothing has been
+ * quoted yet, so nothing else needs undoing.
+ */
 const FORWARD_TRANSITIONS: Record<ItemStatus, ItemStatus[]> = {
   REQUEST_SUBMITTED: ["UNDER_REVIEW", "CANCELLED"],
-  UNDER_REVIEW: ["QUOTE_SENT", "CANCELLED"],
+  UNDER_REVIEW: ["QUOTE_SENT", "REQUEST_SUBMITTED", "CANCELLED"],
   QUOTE_SENT: ["APPROVED", "CANCELLED"],
   APPROVED: ["AWAITING_SNEAKERS", "CANCELLED"],
   AWAITING_SNEAKERS: ["IN_PROGRESS", "CANCELLED"],
