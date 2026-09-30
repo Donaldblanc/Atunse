@@ -114,7 +114,7 @@ describe("getOrderDetail", () => {
       expect.objectContaining({
         title: "Nike Air Max 90",
         details: ["Leather", "Yellowed midsole"],
-        photoUrl: expect.stringMatching(/^https:\/\/photos\.test\/photos\//),
+        photo: { kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) },
         services: [
           { name: "Premium Clean", price: "$50" },
           { name: "Lace Replacement", price: "$15" },

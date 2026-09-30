@@ -1,10 +1,11 @@
-import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PhoneIcon, SneakerIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type Payment } from "@/features/orders/domain";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import type { OrderDetail, OrderDetailPair } from "./order-detail";
+import { PairThumb } from "./pair-thumb";
 import { STATUS_TONE } from "./status-tone";
 import { UpdateStatusForm } from "./update-status-form";
 
@@ -258,14 +259,7 @@ export function OrderDetailDialog({ detail, closeHref }: { detail: OrderDetail; 
 function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) {
   return (
     <li className="od-pair">
-      {pair.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a short-lived storage link, not a static asset next/image can optimize
-        <img src={pair.photoUrl} alt="" className="ov-thumb od-pair-photo" />
-      ) : (
-        <span className="ov-thumb od-pair-photo" aria-hidden="true">
-          <SneakerIcon size={26} />
-        </span>
-      )}
+      <PairThumb photo={pair.photo} className="ov-thumb od-pair-photo" iconSize={26} />
       <div className="od-pair-body">
         <div className="od-pair-head">
           <p className="od-pair-title">

@@ -183,7 +183,7 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
       total: Money.fromCents(12000),
       totalIsMinimum: true,
     });
-    expect(recentOrders[0]!.photoUrl).toMatch(/^https:\/\/photos\.test\/photos\//);
+    expect(recentOrders[0]!.photo).toEqual({ kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) });
     expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", status: "PENDING" });
   });
 
@@ -198,15 +198,15 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     const [partlyRow, goneRow] = (await getAdminOverview(d, ADMIN, "this-week")).recentOrders;
 
     expect(partlyRow).toMatchObject({ pairCount: 1, firstPair: "Nike Air Max 90", services: "Premium Clean", total: Money.fromCents(6000) });
-    expect(partlyRow!.photoUrl).toBe(`https://photos.test/${partly.items[1]!.photoKeys[0]}`);
+    expect(partlyRow!.photo).toEqual({ kind: "stored", url: `https://photos.test/${partly.items[1]!.photoKeys[0]}` });
     expect(goneRow).toMatchObject({ pairCount: 1, services: "Standard Clean", status: "CANCELLED", total: Money.fromCents(3000) });
   });
 
-  it("shows no photo when the link can't be made", async () => {
+  it("tells a photo whose link can't be made apart from no photo", async () => {
     const d = { ...deps(), photoUrl: async () => null };
     await book(d.orders, "2026-09-28T15:00:00Z", order(3000));
 
-    expect((await getAdminOverview(d, ADMIN, "this-week")).recentOrders[0]!.photoUrl).toBeNull();
+    expect((await getAdminOverview(d, ADMIN, "this-week")).recentOrders[0]!.photo).toEqual({ kind: "stored", url: null });
   });
 
   it("lists today's scheduled collections and returns in time order, from the Appointments", async () => {

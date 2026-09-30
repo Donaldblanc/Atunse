@@ -18,6 +18,7 @@ import {
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
 import { BUNDLE_CATALOG, RUSH_FEE_CENTS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
+import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 // The Overview's Order detail dialog (design: View Recent Order Details).
 // Lives beside the Overview because Recent Orders, Today's Schedule and
@@ -32,8 +33,8 @@ export interface OrderDetailDeps {
 
 export interface OrderDetailPair {
   itemId: string;
-  /** The pair's first photo, or null. */
-  photoUrl: string | null;
+  /** The pair's first photo. */
+  photo: PairPhoto;
   /** e.g. "Nike Air Max 90"; null when the customer gave neither. */
   title: string | null;
   /** What's known beyond that: material, size, colorway, the customer's description. */
@@ -152,7 +153,7 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
   const photoKey = item.photoKeys[0];
   return {
     itemId: item.id,
-    photoUrl: photoKey ? await photoUrl(photoKey) : null,
+    photo: await pairPhoto(photoKey, photoUrl),
     title: [item.brand, item.model].filter(Boolean).join(" ") || null,
     details: [item.material, item.size && `Size ${item.size}`, item.colorway, item.description].filter((detail): detail is string => Boolean(detail)),
     estimate: item.estimate,

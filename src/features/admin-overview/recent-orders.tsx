@@ -1,8 +1,8 @@
-import { SneakerIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { RecentOrder } from "./get-admin-overview";
 import { overviewHref, type OverviewSelection } from "./overview-range";
+import { PairThumb } from "./pair-thumb";
 import { STATUS_TONE } from "./status-tone";
 
 const bookedDay = new Intl.DateTimeFormat("en-US", {
@@ -51,14 +51,7 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
               </td>
               <td>
                 <span className="ov-items">
-                  {order.photoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- a short-lived storage link, not a static asset next/image can optimize
-                    <img src={order.photoUrl} alt="" className="ov-thumb" />
-                  ) : (
-                    <span className="ov-thumb" aria-hidden="true">
-                      <SneakerIcon size={22} />
-                    </span>
-                  )}
+                  <PairThumb photo={order.photo} className="ov-thumb" iconSize={22} />
                   <span>
                     <span className="ov-cell-main">{order.pairCount === 1 ? "1 item" : `${order.pairCount} items`}</span>
                     {order.firstPair && <span className="ov-cell-sub">{order.firstPair}</span>}

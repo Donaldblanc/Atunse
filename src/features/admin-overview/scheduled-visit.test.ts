@@ -86,7 +86,7 @@ describe("getScheduledVisit", () => {
       customer: { name: "Sarah Kim", phone: "(212) 555-0142", email: "sarah@example.com", address: "1 Main St, Apt 4B, Brooklyn, NY 11201" },
       order: { id: order.id, reference: `ATU-${order.number}`, firstPair: "Nike Air Max 90", pairCount: 1, services: "Premium Clean", estimateIsMinimum: false },
     });
-    expect(visit!.order.photoUrl).toMatch(/^https:\/\/photos\.test\/photos\//);
+    expect(visit!.order.photo).toEqual({ kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) });
     expect(visit!.order.estimate.cents).toBe(4000);
   });
 

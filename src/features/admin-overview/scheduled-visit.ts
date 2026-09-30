@@ -5,6 +5,7 @@ import { liveEstimate, livePairs, orderNumber, type Address, type Appointment } 
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import type { Money } from "@/shared/money/money";
 import { servicesSummary, type AdminOverviewDeps } from "./get-admin-overview";
+import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 export interface ScheduledVisitDeps {
   orders: Pick<OrderRepository, "findAppointment">;
@@ -32,8 +33,8 @@ export interface ScheduledVisitDetail {
   order: {
     id: string;
     reference: string;
-    /** The first pair's first photo, or null. */
-    photoUrl: string | null;
+    /** The first pair's first photo. */
+    photo: PairPhoto;
     /** The first pair's brand and model, e.g. "Nike Air Max 90". */
     firstPair: string | null;
     /** Pairs not cancelled (every pair for a fully cancelled Order). */
@@ -87,7 +88,7 @@ export async function getScheduledVisit(
     order: {
       id: order.id,
       reference: orderNumber(order.number),
-      photoUrl: photoKey ? await deps.photoUrl(photoKey) : null,
+      photo: await pairPhoto(photoKey, deps.photoUrl),
       firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
       pairCount: pairs.length,
       estimate: live.length > 0 ? liveEstimate(order) : order.estimate,

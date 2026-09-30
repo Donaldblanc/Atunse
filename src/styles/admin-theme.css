@@ -1107,6 +1107,14 @@ a.admin-nav-item:hover {
   place-items: center;
 }
 
+/* A stored photo that couldn't be shown (pair-thumb.tsx): warning tone and a dashed edge, unlike the plain "no photo" placeholder. */
+.ov-thumb[data-state="broken"] {
+  background: var(--delta-down-bg);
+  color: var(--delta-down-ink);
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
 .ov-chip-service {
   display: inline-block;
   max-width: 170px;

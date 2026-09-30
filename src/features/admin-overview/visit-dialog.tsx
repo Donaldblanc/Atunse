@@ -1,8 +1,9 @@
-import { CheckCircleIcon, ClockIcon, EnvelopeSimpleIcon, MapPinIcon, PhoneIcon, SneakerIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon, ClockIcon, EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { completeVisitAction } from "./complete-visit-action";
 import { overviewHref, rangeSearchParams, type OverviewSelection } from "./overview-range";
+import { PairThumb } from "./pair-thumb";
 import type { ScheduledVisitDetail } from "./scheduled-visit";
 
 
@@ -93,14 +94,7 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
               Order Details
             </h3>
             <div className="visit-order">
-              {visit.order.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- a short-lived storage link, not a static asset next/image can optimize
-                <img src={visit.order.photoUrl} alt="" className="ov-thumb visit-thumb" />
-              ) : (
-                <span className="ov-thumb visit-thumb" aria-hidden="true">
-                  <SneakerIcon size={28} />
-                </span>
-              )}
+              <PairThumb photo={visit.order.photo} className="ov-thumb visit-thumb" iconSize={28} />
               <div className="visit-order-lines">
                 <Link className="ov-ref visit-order-link" href={orderHref} scroll={false}>
                   {visit.order.reference}

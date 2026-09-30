@@ -16,6 +16,7 @@ import type { AwaitingDeposits, OrderRepository } from "@/features/orders/reposi
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { metricDetail, type MetricDetail } from "./metric-detail";
+import { pairPhoto, type PairPhoto } from "./pair-photo";
 import { overviewRange, type OverviewRange, type OverviewSelection } from "./overview-range";
 
 export interface AdminOverviewDeps {
@@ -39,8 +40,8 @@ export interface RecentOrder {
   reference: string;
   customerName: string;
   bookedAt: Date;
-  /** The first pair's first photo, or null. */
-  photoUrl: string | null;
+  /** The first pair's first photo. */
+  photo: PairPhoto;
   /** Pairs not cancelled (every pair for a fully cancelled Order, which shows what was booked). */
   pairCount: number;
   /** The first of those pairs' brand and model, e.g. "Nike Air Max 90". */
@@ -182,7 +183,7 @@ async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl
     reference: orderNumber(order.number),
     customerName: order.contactName,
     bookedAt: order.createdAt,
-    photoUrl: photoKey ? await photoUrl(photoKey) : null,
+    photo: await pairPhoto(photoKey, photoUrl),
     pairCount: pairs.length,
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
