@@ -1,13 +1,15 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import type { Appointment, AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
+  NoPendingDepositError,
   PhotoKeyInUseError,
   BundleNotFoundError,
+  type AwaitingDepositOrder,
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
@@ -24,6 +26,13 @@ const ORDER_INCLUDE = {
   payments: { orderBy: { createdAt: "asc" as const } },
   appointments: { orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.OrderInclude;
+
+/**
+ * The Deposits Pending Payments is about: PENDING, on an Order with a live
+ * pair. One where-clause behind the summary, the list and confirmDeposit,
+ * so the count, the rows and what can be confirmed can't drift apart.
+ */
+const AWAITING_DEPOSIT = { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } } satisfies Prisma.PaymentWhereInput;
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -365,7 +374,7 @@ export class PrismaOrderRepository implements OrderRepository {
   async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
     const groups = await this.prisma.payment.groupBy({
       by: ["method"],
-      where: { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } },
+      where: AWAITING_DEPOSIT,
       _count: { _all: true },
       _sum: { amountCents: true },
     });
@@ -377,5 +386,60 @@ export class PrismaOrderRepository implements OrderRepository {
     }
     // One Deposit per Order, so counting Deposits counts Orders.
     return { orders: groups.reduce((sum, g) => sum + g._count._all, 0), deposits: Money.fromCents(cents), byMethod };
+  }
+
+  async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {
+    const rows = await this.prisma.payment.findMany({
+      where: AWAITING_DEPOSIT,
+      select: { method: true, amountCents: true, order: { select: { id: true, number: true, contactName: true, createdAt: true } } },
+      orderBy: { order: { createdAt: "asc" } },
+    });
+    return rows.map((row) => ({
+      orderId: row.order.id,
+      number: row.order.number,
+      contactName: row.order.contactName,
+      createdAt: row.order.createdAt,
+      deposit: { method: row.method, amount: Money.fromCents(row.amountCents) },
+    }));
+  }
+
+  async listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { items: { some: { status: { in: statuses } } } },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  async confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Idempotency (ADR-0012): the key is recorded on the Order's audit entries, so a retry finds it.
+      const applied = await tx.itemAuditEntry.findFirst({
+        where: { idempotencyKey: params.idempotencyKey, item: { orderId: params.orderId } },
+        select: { id: true },
+      });
+      if (applied) return false;
+
+      // Conditional on the Deposit still being PENDING, so two admins (or tabs) can't both settle it.
+      const { count } = await tx.payment.updateMany({
+        where: { ...AWAITING_DEPOSIT, orderId: params.orderId },
+        data: { status: "RECEIVED", receivedAt: new Date(), confirmedByAccountId: params.actorAccountId, idempotencyKey: params.idempotencyKey },
+      });
+      if (count === 0) throw new NoPendingDepositError(params.orderId);
+
+      const live = await tx.item.findMany({ where: { orderId: params.orderId, status: { not: "CANCELLED" } }, select: { id: true, status: true } });
+      await tx.itemAuditEntry.createMany({
+        data: live.map((item) => ({
+          itemId: item.id,
+          action: MANUAL_PAYMENT_CONFIRMED,
+          fromStatus: item.status,
+          toStatus: item.status,
+          actorAccountId: params.actorAccountId,
+          idempotencyKey: params.idempotencyKey,
+        })),
+      });
+      return true;
+    });
   }
 }

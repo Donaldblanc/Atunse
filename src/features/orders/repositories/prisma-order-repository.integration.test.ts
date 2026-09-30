@@ -10,6 +10,7 @@ import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
+  NoPendingDepositError,
   PhotoKeyInUseError,
   type NewItemInput,
   type NewOrderInput,
@@ -607,5 +608,76 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
 
     await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "FAILED", failureReason: "card_declined" } });
     await expect(prisma.payment.create({ data: { orderId: order.id, kind: "DEPOSIT", method: "CARD", amountCents: 1500 } })).resolves.toBeTruthy();
+  });
+});
+
+describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
+  const cancelItem = (itemId: string) =>
+    repo.transitionItemStatus({
+      itemId,
+      toStatus: "CANCELLED",
+      entry: { action: "CANCELLED", fromStatus: "REQUEST_SUBMITTED", toStatus: "CANCELLED", actorAccountId: null, idempotencyKey: null },
+    });
+
+  it("lists the PENDING Deposits oldest first: exactly the Orders the summary counts", async () => {
+    const newer = (await repo.create(newOrder({ contactName: "Newer", deposit: Money.fromCents(2500), depositPayment: { method: "CASH", amount: Money.fromCents(2500) } }))).order;
+    const older = (await repo.create(newOrder({ contactName: "Older" }))).order;
+    const paid = (await repo.create(newOrder())).order;
+    await prisma.payment.updateMany({ where: { orderId: paid.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
+    const cancelled = (await repo.create(newOrder())).order;
+    await cancelItem(cancelled.items[0]!.id);
+    await prisma.order.update({ where: { id: newer.id }, data: { createdAt: new Date("2026-09-29T12:00:00Z") } });
+    await prisma.order.update({ where: { id: older.id }, data: { createdAt: new Date("2026-09-28T12:00:00Z") } });
+
+    const rows = await repo.listAwaitingDeposit();
+
+    expect(rows.map((row) => row.orderId)).toEqual([older.id, newer.id]);
+    expect(rows[1]).toMatchObject({ number: newer.number, contactName: "Newer", deposit: { method: "CASH", amount: Money.fromCents(2500) } });
+    expect(rows.length).toBe((await repo.summarizeAwaitingDeposit()).orders);
+  });
+
+  it("lists Orders with an Item in the given statuses, oldest first", async () => {
+    const ready = (await repo.create(newOrder({ items: [newItem(), newItem()] }))).order;
+    await prisma.item.update({ where: { id: ready.items[0]!.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } });
+    await repo.create(newOrder());
+
+    const orders = await repo.listWithItemsIn(["READY_FOR_PICKUP_SHIPPING"]);
+
+    expect(orders.map((order) => order.id)).toEqual([ready.id]);
+    expect(orders[0]!.items).toHaveLength(2);
+  });
+
+  it("confirms a Deposit once: the Payment is RECEIVED and each live Item is audited, with no status change", async () => {
+    const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
+    await cancelItem(order.items[2]!.id);
+    const confirm = (key: string) => repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: key });
+
+    expect(await confirm("k1")).toBe(true);
+    expect(await confirm("k1")).toBe(false); // a retry, not an error
+
+    const deposit = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id, kind: "DEPOSIT" } });
+    expect(deposit).toMatchObject({ status: "RECEIVED", idempotencyKey: "k1" });
+    expect(deposit.receivedAt).toBeInstanceOf(Date);
+    const audits = await prisma.itemAuditEntry.findMany({ where: { action: "MANUAL_PAYMENT_CONFIRMED", item: { orderId: order.id } } });
+    expect(audits.map((entry) => entry.itemId).sort()).toEqual([order.items[0]!.id, order.items[1]!.id].sort());
+    expect(audits[0]).toMatchObject({ fromStatus: "REQUEST_SUBMITTED", toStatus: "REQUEST_SUBMITTED", idempotencyKey: "k1" });
+    expect((await prisma.item.findMany({ where: { orderId: order.id }, orderBy: { position: "asc" } })).map((item) => item.status)).toEqual([
+      "REQUEST_SUBMITTED",
+      "REQUEST_SUBMITTED",
+      "CANCELLED",
+    ]);
+    expect(await repo.listAwaitingDeposit()).toEqual([]);
+  });
+
+  it("refuses a second confirmation with a new key, and a fully cancelled Order, having written nothing", async () => {
+    const { order } = await repo.create(newOrder());
+    await repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: "k1" });
+    await expect(repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: "k2" })).rejects.toThrow(NoPendingDepositError);
+
+    const gone = (await repo.create(newOrder())).order;
+    await cancelItem(gone.items[0]!.id);
+    await expect(repo.confirmDeposit({ orderId: gone.id, actorAccountId: null, idempotencyKey: "k3" })).rejects.toThrow(NoPendingDepositError);
+    expect((await prisma.payment.findFirstOrThrow({ where: { orderId: gone.id } })).status).toBe("PENDING");
+    expect(await prisma.itemAuditEntry.count({ where: { idempotencyKey: { in: ["k2", "k3"] } } })).toBe(0);
   });
 });

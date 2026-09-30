@@ -22,6 +22,10 @@ import type { Icon } from "@phosphor-icons/react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
+import { AttentionItem } from "@/features/admin-overview/attention-item";
+import { attentionHref } from "@/features/admin-overview/attention-links";
+import { AttentionPanel } from "@/features/admin-overview/attention-panel";
+import { parseAttentionPanel } from "@/features/admin-overview/attention-panels";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
@@ -42,7 +46,9 @@ export const metadata = { title: "Overview · Atunṣe Admin" };
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: SearchParams }) {
-  const rangeId = parseOverviewRangeId((await searchParams).range);
+  const params = await searchParams;
+  const rangeId = parseOverviewRangeId(params.range);
+  const attentionPanel = parseAttentionPanel(params.attention);
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildAdminOverviewDeps();
   const overview = await getAdminOverview(deps, actingUser, rangeId);
@@ -81,19 +87,13 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
               comparison={range.comparisonLabel}
             />
           </StatCard>
-          <StatCard label="Pending Payments" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
+          <StatCard label="Pending Payments" icon={CreditCardIcon} href={attentionHref(params, "pending-payments")} value={String(overview.awaitingDeposit.orders)}>
             <p className="ov-stat-note">
               {overview.awaitingDeposit.orders === 0 ? "Every deposit confirmed" : depositSplit(overview.awaitingDeposit)}
             </p>
           </StatCard>
-          <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)}>
-            {ordersHref ? (
-              <Link className="ov-stat-link" href={`${ordersHref}?status=READY_FOR_PICKUP_SHIPPING`}>
-                View orders <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
-              </Link>
-            ) : (
-              <p className="ov-stat-note">Ready for Drop-Off/Shipping</p>
-            )}
+          <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)} href={attentionHref(params, "ready-to-return")}>
+            <p className="ov-stat-note">Ready for Drop-Off/Shipping</p>
           </StatCard>
         </section>
 
@@ -157,11 +157,11 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             Needs Attention
           </h2>
           <ul className="ov-attention">
-            <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} />
-            <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} />
-            <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} />
-            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sample />
-            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={SAMPLE_LOW_STOCK_ITEMS} sample />
+            <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} href={attentionHref(params, "pending-payments")} />
+            <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} href={attentionHref(params, "ready-to-return")} />
+            <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} href={attentionHref(params, "needs-quote")} />
+            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sampleTag={<SampleTag />} />
+            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={SAMPLE_LOW_STOCK_ITEMS} sampleTag={<SampleTag />} />
           </ul>
         </section>
 
@@ -179,6 +179,8 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
           </ul>
         </section>
       </aside>
+
+      {attentionPanel && <AttentionPanel panel={attentionPanel} searchParams={params} actingUser={actingUser} />}
     </div>
   );
 }
@@ -189,16 +191,23 @@ function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
   return [...methods, `${deposits.format()} due`].join(" · ");
 }
 
-function StatCard({ label, icon: Icon, value, children }: { label: string; icon: Icon; value: string; children: React.ReactNode }) {
-  return (
-    <div className="ov-card ov-stat">
+function StatCard({ label, icon: Icon, value, href, children }: { label: string; icon: Icon; value: string; href?: string; children: React.ReactNode }) {
+  const content = (
+    <>
       <div className="ov-stat-head">
         <h2 className="ov-stat-label">{label}</h2>
         <Icon size={26} weight="light" className="ov-stat-icon" aria-hidden="true" />
       </div>
       <p className="ov-stat-value">{value}</p>
       {children}
-    </div>
+    </>
+  );
+  return href ? (
+    <Link className="ov-card ov-stat" data-link="true" href={href} scroll={false}>
+      {content}
+    </Link>
+  ) : (
+    <div className="ov-card ov-stat">{content}</div>
   );
 }
 
@@ -260,39 +269,6 @@ function SampleTag() {
     <span className="ov-sample" title="Sample data: the real figure arrives with its screen (docs/TODO.md)">
       Sample
     </span>
-  );
-}
-
-function AttentionItem({
-  tone,
-  icon: Icon,
-  title,
-  detail,
-  count,
-  sample = false,
-}: {
-  tone: "red" | "orange" | "blue" | "violet" | "gray";
-  icon: Icon;
-  title: string;
-  detail: string;
-  count: number;
-  /** The count is sample data, not real. */
-  sample?: boolean;
-}) {
-  return (
-    <li className="ov-attention-item">
-      <span className="ov-attention-icon" data-tone={tone} aria-hidden="true">
-        <Icon size={22} />
-      </span>
-      <span className="ov-attention-text">
-        <strong>{title}</strong>
-        <span>{detail}</span>
-      </span>
-      {sample && <SampleTag />}
-      <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
-        {count}
-      </span>
-    </li>
   );
 }
 
