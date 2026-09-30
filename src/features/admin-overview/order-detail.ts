@@ -19,6 +19,7 @@ import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders
 import { BUNDLE_CATALOG, RUSH_FEE_CENTS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
+import { quotedTotal } from "@/features/orders/status-emails";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 // The Overview's Order detail dialog (design: View Recent Order Details).
@@ -42,6 +43,8 @@ export interface OrderDetailPair {
   details: string[];
   /** This pair's estimate, before Rush. */
   estimate: Money;
+  /** The owner's quote (Item.price); null until sent. */
+  price: Money | null;
   status: ItemStatus;
   /** The Services booked; a price is left off inside a Bundle, whose fixed price covers them. */
   services: { name: string; price: string | null }[];
@@ -84,6 +87,8 @@ export interface OrderDetail {
     estimateIsMinimum: boolean;
     depositDue: Money;
     rush: Money | null;
+    /** Once any live pair is quoted: the total when they all are (Rush included), else what's quoted so far. */
+    quoted: { total: Money; complete: boolean; pairs: number; of: number } | null;
   };
   notes: OrderNote[];
   /** What Edit Order's form starts from: the stored values, and the Order's updatedAt for its optimistic check. */
@@ -160,6 +165,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       estimateIsMinimum: order.estimateIsMinimum,
       depositDue: order.deposit,
       rush: order.rush ? Money.fromCents(RUSH_FEE_CENTS) : null,
+      quoted: quotedSummary(order),
     },
     notes,
     edit: {
@@ -181,6 +187,19 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   };
 }
 
+function quotedSummary(order: Order): OrderDetail["payment"]["quoted"] {
+  const live = livePairs(order);
+  const quoted = live.filter((item) => item.price !== null);
+  if (quoted.length === 0) return null;
+  const total = quotedTotal(order);
+  return {
+    total: total ?? quoted.reduce((sum, item) => sum.add(item.price!), Money.zero()),
+    complete: total !== null,
+    pairs: quoted.length,
+    of: live.length,
+  };
+}
+
 async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"]): Promise<OrderDetailPair> {
   const inBundle = order.bundleId !== null;
   const { moves, held } = adminStatusMoves(item, order);
@@ -191,6 +210,7 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     title: [item.brand, item.model].filter(Boolean).join(" ") || null,
     details: [item.material, item.size && `Size ${item.size}`, item.colorway, item.description].filter((detail): detail is string => Boolean(detail)),
     estimate: item.estimate,
+    price: item.price,
     status: item.status,
     services: SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id)).map((service) => ({
       name: service.name,

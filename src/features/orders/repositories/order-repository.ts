@@ -222,12 +222,16 @@ export interface OrderRepository {
    * With `receivesDeposit`, the same transaction also marks the Item's
    * Order's PENDING Deposit Payment RECEIVED (ADR-0002), so a confirmed
    * deposit leaves Pending Payments at once.
+   *
+   * With `price`, the same transaction also sets the Item's quoted price
+   * (Approval Gate), so a Quote Sent pair always has one.
    */
   transitionItemStatus(params: {
     itemId: string;
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
     receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Order["items"][number] | null>;
 
   /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
@@ -323,4 +327,7 @@ export interface OrderRepository {
    * removes one yet. Throws OrderNotFoundError.
    */
   addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
+
+  /** The Order that holds this Item, or null if no Item has this id. */
+  findByItemId(itemId: string): Promise<Order | null>;
 }

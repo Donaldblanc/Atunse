@@ -3,11 +3,13 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type Payment } from "@/features/orders/domain";
+import { Money } from "@/shared/money/money";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import type { OrderDetail, OrderDetailPair } from "./order-detail";
 import { OrderEditForm } from "./order-edit-form";
 import { OrderNoteForm } from "./order-note-form";
 import { PairThumb } from "./pair-thumb";
+import { PairQuoteControls } from "./quote-controls";
 import { STATUS_TONE } from "./status-tone";
 import { UpdateStatusForm } from "./update-status-form";
 
@@ -205,6 +207,7 @@ export function OrderDetailDialog({
                 </li>
               ))}
             </ol>
+            <QuoteSteps detail={detail} />
             <UpdateStatuses detail={detail} />
           </section>
 
@@ -248,6 +251,15 @@ export function OrderDetailDialog({
                   {payment.estimateIsMinimum ? "+" : ""}
                 </dd>
               </div>
+              {payment.quoted && (
+                <div>
+                  <dt>{payment.quoted.complete ? "Quoted total" : `Quoted so far (${payment.quoted.pairs} of ${payment.quoted.of} pairs)`}</dt>
+                  <dd>
+                    {payment.quoted.total.format()}
+                    {payment.quoted.complete && payment.rush ? <span className="od-muted"> with Rush</span> : ""}
+                  </dd>
+                </div>
+              )}
               {payment.rush && (
                 <div>
                   <dt>Rush (included)</dt>
@@ -298,6 +310,12 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
           </p>
           <span className="od-pair-price">{pair.estimate.format()}</span>
         </div>
+        {pair.price && (
+          <p className="od-pair-quote">
+            <strong>Quoted {pair.price.format()}</strong>
+            <span className="od-muted"> {quoteDifference(pair.price, pair.estimate)}</span>
+          </p>
+        )}
         {pair.details.length > 0 && <p className="od-muted">{pair.details.join(" · ")}</p>}
         <ul className="od-services">
           {pair.services.map((service) => (
@@ -314,6 +332,38 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
         )}
       </div>
     </li>
+  );
+}
+
+/** How a quote compares with the estimate it replaces: "(same as the estimate)" or "($15 above the estimate)". */
+function quoteDifference(price: Money, estimate: Money): string {
+  const difference = price.cents - estimate.cents;
+  if (difference === 0) return "(same as the estimate)";
+  return `(${Money.fromCents(Math.abs(difference)).format()} ${difference > 0 ? "above" : "below"} the estimate)`;
+}
+
+/** The Approval Gate steps: Send Quote for a pair Under Review, "Customer approved" once it's Quote Sent. */
+function QuoteSteps({ detail }: { detail: OrderDetail }) {
+  const multiple = detail.pairs.length > 1;
+  const steps = detail.pairs.flatMap((pair, index) => (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT" ? [{ pair, index, status: pair.status }] : []));
+  if (steps.length === 0) return null;
+  return (
+    <div className="od-status-forms">
+      <h4 className="od-subhead">Quote &amp; Approval</h4>
+      {steps.map(({ pair, index, status }) => (
+        <PairQuoteControls
+          key={pair.itemId}
+          itemId={pair.itemId}
+          status={status}
+          estimateCents={pair.estimate.cents}
+          quotedCents={pair.price?.cents ?? null}
+          customerEmail={detail.customer.email}
+          quoteKey={randomUUID()}
+          approvalKey={randomUUID()}
+          pairLabel={multiple ? `Pair ${index + 1}${pair.title ? `: ${pair.title}` : ""}` : null}
+        />
+      ))}
+    </div>
   );
 }
 

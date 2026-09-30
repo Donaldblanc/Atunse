@@ -735,6 +735,37 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
     expect((await repo.listStatusChanges(order.id)).map((change) => change.toStatus)).toEqual(["CANCELLED"]);
   });
 
+  it("sets the price with the Quote Sent transition in one step, audits it, and is idempotent", async () => {
+    const { order } = await repo.create(newOrder());
+    const itemId = order.items[0]!.id;
+    await prisma.item.update({ where: { id: itemId }, data: { status: "UNDER_REVIEW" } });
+    const send = (key: string, cents: number) =>
+      repo.transitionItemStatus({
+        itemId,
+        toStatus: "QUOTE_SENT",
+        price: Money.fromCents(cents),
+        entry: { action: "QUOTE_SENT", fromStatus: "UNDER_REVIEW", toStatus: "QUOTE_SENT", actorAccountId: null, idempotencyKey: key, metadata: { priceCents: cents } },
+      });
+
+    const sent = await send("q1", 9050);
+    expect(sent).toMatchObject({ status: "QUOTE_SENT", price: Money.fromCents(9050) });
+    expect(await send("q1", 1)).toBeNull(); // a replay changes nothing
+    const row = await prisma.item.findUniqueOrThrow({ where: { id: itemId } });
+    expect(row).toMatchObject({ status: "QUOTE_SENT", priceCents: 9050 });
+    const audit = await prisma.itemAuditEntry.findFirstOrThrow({ where: { itemId, action: "QUOTE_SENT" } });
+    expect(audit.metadata).toEqual({ priceCents: 9050 });
+
+    // No longer Under Review: refused, and the price stays.
+    await expect(send("q2", 5000)).rejects.toThrow(ItemStatusChangedError);
+    expect((await prisma.item.findUniqueOrThrow({ where: { id: itemId } })).priceCents).toBe(9050);
+  });
+
+  it("finds the Order that holds an Item", async () => {
+    const { order } = await repo.create(newOrder({ items: [newItem(), newItem()] }));
+    expect((await repo.findByItemId(order.items[1]!.id))?.id).toBe(order.id);
+    expect(await repo.findByItemId("nope")).toBeNull();
+  });
+
   it("refuses a second confirmation with a new key, and a fully cancelled Order, having written nothing", async () => {
     const { order } = await repo.create(newOrder());
     await repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: "k1" });

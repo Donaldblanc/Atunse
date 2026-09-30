@@ -157,6 +157,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     toStatus: Item["status"];
     entry: AuditEntry;
     receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Item | null> {
     const key = params.entry.idempotencyKey ? `${params.itemId}:${params.entry.idempotencyKey}` : null;
     if (key && this.appliedIdempotencyKeys.has(key)) return null;
@@ -166,6 +167,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (params.entry.fromStatus && item.status !== params.entry.fromStatus) throw new ItemStatusChangedError(item.status);
 
     item.status = params.toStatus;
+    if (params.price) item.price = params.price;
     if (key) this.appliedIdempotencyKeys.add(key);
     this.auditEntries.push({ ...params.entry, itemId: params.itemId, at: new Date() });
     if (params.receivesDeposit) {
@@ -342,5 +344,9 @@ export class InMemoryOrderRepository implements OrderRepository {
     const note = { id: fakeId("note"), orderId: params.orderId, body: params.body, createdAt: new Date() };
     this.notes.push(note);
     return { id: note.id, body: note.body, createdAt: note.createdAt };
+  }
+
+  async findByItemId(itemId: string): Promise<Order | null> {
+    return [...this.orders.values()].find((order) => order.items.some((item) => item.id === itemId)) ?? null;
   }
 }

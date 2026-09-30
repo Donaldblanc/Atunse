@@ -2840,3 +2840,69 @@ textarea.oe-input {
     flex: 1;
   }
 }
+
+/* ---------- Quote & Approval ---------- */
+
+.od-quote,
+.od-quote-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.od-quote-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.od-quote-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-background);
+}
+
+.od-quote-input input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
+.od-quote-input input:focus {
+  outline: none;
+}
+
+.od-quote-input:focus-within {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.od-quote-input:has(input[aria-invalid]) {
+  border-color: var(--delta-down-ink);
+}
+
+.od-quote-confirm {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.od-quote-notice {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.od-pair-quote {
+  font-size: 14px;
+}
