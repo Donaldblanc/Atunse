@@ -3,7 +3,7 @@ import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
-import { getAdminOverview, percentChange, servicesSummary } from "./get-admin-overview";
+import { changeBadge, getAdminOverview, percentChange, servicesSummary } from "./get-admin-overview";
 
 // Tuesday Sep 29, 2026, 10:00 AM in New York: "this week" is Sep 28 - Oct 4.
 const NOW = new Date("2026-09-29T14:00:00Z");
@@ -96,17 +96,22 @@ describe("getAdminOverview", () => {
     expect(overview.revenueByDay[0]).toEqual({ date: "2026-09-28", revenue: Money.fromCents(4000) });
   });
 
-  it("leaves fully cancelled Orders and cancelled pairs out", async () => {
+  it("leaves cancelled pairs out of every figure, and fully cancelled Orders altogether", async () => {
     const d = deps();
     const cancelled = await book(d.orders, "2026-09-28T13:00:00Z", order(3000));
     cancelled.items[0]!.status = "CANCELLED";
+    // $90 for two $30 pairs plus $30 of order-level charges; the second pair is cancelled.
     const partly = await book(d.orders, "2026-09-28T14:00:00Z", order(9000, [item(["premium", "laces"]), item(["standard"])]));
     partly.items[1]!.status = "CANCELLED";
+    const cancelledLastWeek = await book(d.orders, "2026-09-21T13:00:00Z", order(4000));
+    cancelledLastWeek.items[0]!.status = "CANCELLED";
 
     const overview = await getAdminOverview(d, ADMIN, "this-week");
 
-    expect(overview.orders.current).toBe(1);
-    expect(overview.bookedRevenue.current.cents).toBe(9000);
+    expect(overview.orders).toEqual({ current: 1, previous: 0 });
+    expect(overview.bookedRevenue.current.cents).toBe(6000); // $90 less the cancelled pair's $30
+    expect(overview.bookedRevenue.previous.cents).toBe(0);
+    expect(overview.revenueByDay[0]!.revenue.cents).toBe(6000);
     expect(overview.servicesBooked).toEqual([
       { serviceId: "premium", name: "Premium Clean", count: 1 },
       { serviceId: "laces", name: "Lace Replacement", count: 1 },
@@ -184,6 +189,21 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     expect(recentOrders[1]!.depositPaid).toBe(false);
   });
 
+  it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {
+    const d = deps();
+    const partly = await book(d.orders, "2026-09-27T15:00:00Z", order(9000, [item(["standard"]), item(["premium"])]));
+    Object.assign(partly.items[0]!, { status: "CANCELLED", brand: "Cancelled Pair" });
+    Object.assign(partly.items[1]!, { brand: "Nike", model: "Air Max 90" });
+    const gone = await book(d.orders, "2026-09-26T15:00:00Z", order(3000, [item(["standard"])]));
+    gone.items[0]!.status = "CANCELLED";
+
+    const [partlyRow, goneRow] = (await getAdminOverview(d, ADMIN, "this-week")).recentOrders;
+
+    expect(partlyRow).toMatchObject({ pairCount: 1, firstPair: "Nike Air Max 90", services: "Premium Clean", total: Money.fromCents(6000) });
+    expect(partlyRow!.photoUrl).toBe(`https://photos.test/${partly.items[1]!.photoKeys[0]}`);
+    expect(goneRow).toMatchObject({ pairCount: 1, services: "Standard Clean", status: "CANCELLED", total: Money.fromCents(3000) });
+  });
+
   it("shows no photo when the link can't be made", async () => {
     const d = { ...deps(), photoUrl: async () => null };
     await book(d.orders, "2026-09-28T15:00:00Z", order(3000));
@@ -214,6 +234,17 @@ describe("servicesSummary", () => {
     expect(servicesSummary([["laces", "premium"]])).toBe("Premium Clean + Lace Replacement");
     expect(servicesSummary([["premium"], ["premium", "oxidation"], ["reglue"]])).toBe("Premium Clean + 2 more");
     expect(servicesSummary([])).toBe("");
+  });
+});
+
+describe("changeBadge", () => {
+  it("takes its direction from the real difference, so a small change isn't flat", () => {
+    expect(changeBadge(12, 10)).toEqual({ tone: "up", label: "20%" });
+    expect(changeBadge(5, 10)).toEqual({ tone: "down", label: "50%" });
+    expect(changeBadge(100_400, 100_000)).toEqual({ tone: "up", label: "<1%" });
+    expect(changeBadge(199, 200)).toEqual({ tone: "down", label: "<1%" });
+    expect(changeBadge(200, 200)).toEqual({ tone: "flat", label: "0%" });
+    expect(changeBadge(3, 0)).toBeNull();
   });
 });
 

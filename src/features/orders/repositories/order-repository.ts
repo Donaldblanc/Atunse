@@ -118,6 +118,12 @@ export interface OrderRepository {
   /** Orders booked (created) in [from, to), oldest first. */
   listBookedBetween(from: Date, to: Date): Promise<Order[]>;
 
+  /**
+   * The Orders booked in [from, to) that still have a live pair, and what
+   * they're worth (liveEstimate in domain.ts), without loading them.
+   */
+  summarizeBookedBetween(from: Date, to: Date): Promise<{ orders: number; value: Money }>;
+
   /** The most recently booked Orders, newest first. */
   listRecent(limit: number): Promise<Order[]>;
 

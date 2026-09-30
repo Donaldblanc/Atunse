@@ -76,6 +76,9 @@ export function RecentOrders({ orders }: { orders: RecentOrder[] }) {
                   <span className="ov-pill" data-tone="green" data-nowrap="true">
                     Deposit paid
                   </span>
+                ) : order.status === "CANCELLED" ? (
+                  // A cancelled Order's unpaid deposit isn't owed, so it isn't chased (nor counted in Pending Payments).
+                  <span className="ov-cell-sub">No deposit due</span>
                 ) : (
                   <>
                     <span className="ov-cell-main">Deposit</span>

@@ -145,6 +145,23 @@ export interface Order {
   items: Item[];
 }
 
+/** An Order's pairs that aren't cancelled. */
+export function livePairs(order: Pick<Order, "items">): Item[] {
+  return order.items.filter((item) => item.status !== "CANCELLED");
+}
+
+/**
+ * What an Order is still worth (admin figures): its estimate without its
+ * cancelled pairs' share. Order-level charges (Rush) stay while any pair
+ * is live; a fully cancelled Order is worth nothing.
+ */
+export function liveEstimate(order: Pick<Order, "items" | "estimate">): Money {
+  if (livePairs(order).length === 0) return Money.zero();
+  return order.items
+    .filter((item) => item.status === "CANCELLED")
+    .reduce((sum, item) => sum.subtract(item.estimate), order.estimate);
+}
+
 /**
  * Short code the customer quotes in their Zelle memo and emails. The tail
  * of a cuid is its random block, so this is effectively unique at this

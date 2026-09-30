@@ -255,6 +255,20 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
+  // liveEstimate (domain.ts) in two aggregates: Orders with a live pair,
+  // their estimates summed, minus their cancelled pairs' estimates.
+  async summarizeBookedBetween(from: Date, to: Date): Promise<{ orders: number; value: Money }> {
+    const liveOrder = { createdAt: { gte: from, lt: to }, items: { some: { status: { not: "CANCELLED" as const } } } };
+    const [orders, cancelledPairs] = await Promise.all([
+      this.prisma.order.aggregate({ where: liveOrder, _count: { _all: true }, _sum: { estimateCents: true } }),
+      this.prisma.item.aggregate({ where: { status: "CANCELLED", order: liveOrder }, _sum: { estimateCents: true } }),
+    ]);
+    return {
+      orders: orders._count._all,
+      value: Money.fromCents((orders._sum.estimateCents ?? 0) - (cancelledPairs._sum.estimateCents ?? 0)),
+    };
+  }
+
   async listRecent(limit: number): Promise<Order[]> {
     const rows = await this.prisma.order.findMany({ include: ORDER_INCLUDE, orderBy: { createdAt: "desc" }, take: limit });
     return rows.map(toDomainOrder);

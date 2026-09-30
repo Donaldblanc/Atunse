@@ -1,7 +1,7 @@
 // The period the admin Overview reports on, in the shop's (New York's)
 // days. One range scopes every number on the page, so they always agree.
 
-import { addDays, calendarDateInShopTime, dayOfWeek, shopMidnight, type CalendarDate } from "@/features/orders/calendar-date";
+import { addDays, calendarDateInShopTime, calendarDateToUtcMidnight, dayOfWeek, shopMidnight, type CalendarDate } from "@/features/orders/calendar-date";
 
 export const OVERVIEW_RANGE_IDS = ["this-week", "last-week", "last-30-days"] as const;
 export type OverviewRangeId = (typeof OVERVIEW_RANGE_IDS)[number];
@@ -72,6 +72,6 @@ const dayFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numer
 export function formatRangeDates(range: OverviewRange): string {
   const first = range.days[0]!;
   const last = range.days[range.days.length - 1]!;
-  const format = (date: CalendarDate) => dayFormat.format(new Date(`${date}T00:00:00Z`));
+  const format = (date: CalendarDate) => dayFormat.format(calendarDateToUtcMidnight(date));
   return `${format(first)} – ${format(last)}, ${last.slice(0, 4)}`;
 }

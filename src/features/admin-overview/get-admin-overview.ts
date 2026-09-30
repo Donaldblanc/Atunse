@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { calendarDateInShopTime, type CalendarDate } from "@/features/orders/calendar-date";
-import { orderReference, orderRollupStatus, type ItemStatus, type Order } from "@/features/orders/domain";
+import { liveEstimate, livePairs, orderReference, orderRollupStatus, type ItemStatus, type Order } from "@/features/orders/domain";
 import { PICKUP_TIME_SLOTS } from "@/features/orders/pickup-window";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
@@ -11,7 +11,13 @@ import { overviewRange, type OverviewRange, type OverviewRangeId } from "./overv
 export interface AdminOverviewDeps {
   orders: Pick<
     OrderRepository,
-    "listBookedBetween" | "countItemsByStatus" | "summarizeAwaitingDeposit" | "listRecent" | "listCollectionsOn" | "findPaidOrderIds"
+    | "listBookedBetween"
+    | "summarizeBookedBetween"
+    | "countItemsByStatus"
+    | "summarizeAwaitingDeposit"
+    | "listRecent"
+    | "listCollectionsOn"
+    | "findPaidOrderIds"
   >;
   /** A short-lived view link for a stored photo (ADR-0014), or null when photos can't be shown. */
   photoUrl: (key: string) => Promise<string | null>;
@@ -26,8 +32,9 @@ export interface RecentOrder {
   bookedAt: Date;
   /** The first pair's first photo, or null. */
   photoUrl: string | null;
+  /** Pairs not cancelled (every pair for a fully cancelled Order, which shows what was booked). */
   pairCount: number;
-  /** The first pair's brand/model as the customer typed it. */
+  /** The first of those pairs' brand and model, e.g. "Nike Air Max 90". */
   firstPair: string | null;
   /** e.g. "Premium Clean + Lace Replacement" (servicesSummary). */
   services: string;
@@ -50,9 +57,13 @@ const RECENT_ORDERS = 5;
 
 export interface AdminOverview {
   range: OverviewRange;
-  /** Orders booked in the range and the stretch before it. */
+  /**
+   * Orders booked in the range and the stretch before it. One rule for
+   * cancelled pairs across every figure: they drop out, so a fully
+   * cancelled Order doesn't count at all (liveEstimate in domain.ts).
+   */
   orders: { current: number; previous: number };
-  /** The booked Orders' estimates added up (Rush included): what's been booked, not what's been paid. */
+  /** The booked Orders' live estimates added up (Rush included): what's been booked, not what's been paid. */
   bookedRevenue: { current: Money; previous: Money };
   /** bookedRevenue per day of the range, oldest first. */
   revenueByDay: { date: CalendarDate; revenue: Money }[];
@@ -74,11 +85,7 @@ const NEEDS_QUOTE: ItemStatus[] = ["REQUEST_SUBMITTED", "UNDER_REVIEW"];
 
 /** A fully cancelled Order was booked but isn't business: it's left out of every figure. */
 function isLive(order: Order): boolean {
-  return order.items.some((item) => item.status !== "CANCELLED");
-}
-
-function sumEstimates(orders: Order[]): Money {
-  return orders.reduce((sum, order) => sum.add(order.estimate), Money.zero());
+  return livePairs(order).length > 0;
 }
 
 /** The admin Overview (the first admin screen): admin-only (ADR-0012). */
@@ -87,9 +94,10 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
 
   const now = deps.now();
   const range = overviewRange(rangeId, now);
-  const [booked, bookedBefore, statusCounts, awaitingDeposit, recent, collections] = await Promise.all([
+  const [booked, previous, statusCounts, awaitingDeposit, recent, collections] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),
-    deps.orders.listBookedBetween(range.previous.start, range.previous.end),
+    // Only totals are needed for the stretch before, so it's aggregated, not loaded.
+    deps.orders.summarizeBookedBetween(range.previous.start, range.previous.end),
     deps.orders.countItemsByStatus(),
     deps.orders.summarizeAwaitingDeposit(),
     deps.orders.listRecent(RECENT_ORDERS),
@@ -97,16 +105,17 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   ]);
   const paidOrderIds = await deps.orders.findPaidOrderIds(recent.map((order) => order.id));
   const current = booked.filter(isLive);
-  const previous = bookedBefore.filter(isLive);
 
-  const revenueByDay = range.days.map((date) => ({
-    date,
-    revenue: sumEstimates(current.filter((order) => calendarDateInShopTime(order.createdAt) === date)),
-  }));
+  // One pass: each Order's day is worked out once, not once per day of the range.
+  const revenueByDate = new Map<CalendarDate, Money>();
+  for (const order of current) {
+    const date = calendarDateInShopTime(order.createdAt);
+    revenueByDate.set(date, (revenueByDate.get(date) ?? Money.zero()).add(liveEstimate(order)));
+  }
+  const revenueByDay = range.days.map((date) => ({ date, revenue: revenueByDate.get(date) ?? Money.zero() }));
 
   const serviceCounts = new Map<string, number>();
-  for (const item of current.flatMap((order) => order.items)) {
-    if (item.status === "CANCELLED") continue;
+  for (const item of current.flatMap(livePairs)) {
     for (const serviceId of item.serviceIds) serviceCounts.set(serviceId, (serviceCounts.get(serviceId) ?? 0) + 1);
   }
   const servicesBooked = SERVICE_CATALOG.filter((service) => serviceCounts.has(service.id)).map((service) => ({
@@ -117,8 +126,8 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
 
   return {
     range,
-    orders: { current: current.length, previous: previous.length },
-    bookedRevenue: { current: sumEstimates(current), previous: sumEstimates(previous) },
+    orders: { current: current.length, previous: previous.orders },
+    bookedRevenue: { current: current.reduce((sum, order) => sum.add(liveEstimate(order)), Money.zero()), previous: previous.value },
     revenueByDay,
     servicesBooked,
     needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
@@ -138,7 +147,11 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
 }
 
 async function toRecentOrder(order: Order, depositPaid: boolean, photoUrl: AdminOverviewDeps["photoUrl"]): Promise<RecentOrder> {
-  const first = order.items[0];
+  // The whole row describes the same pairs: the live ones, or, for a fully
+  // cancelled Order, every pair, so it still shows what was booked.
+  const live = livePairs(order);
+  const pairs = live.length > 0 ? live : order.items;
+  const first = pairs[0];
   const photoKey = first?.photoKeys[0];
   return {
     orderId: order.id,
@@ -146,12 +159,12 @@ async function toRecentOrder(order: Order, depositPaid: boolean, photoUrl: Admin
     customerName: order.contactName,
     bookedAt: order.createdAt,
     photoUrl: photoKey ? await photoUrl(photoKey) : null,
-    pairCount: order.items.length,
-    firstPair: first?.brand ?? first?.model ?? null,
-    services: servicesSummary(order.items.filter((item) => item.status !== "CANCELLED").map((item) => item.serviceIds)),
+    pairCount: pairs.length,
+    firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
+    services: servicesSummary(pairs.map((item) => item.serviceIds)),
     status: orderRollupStatus(order.items),
     depositPaid,
-    total: order.estimate,
+    total: live.length > 0 ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };
 }
@@ -174,4 +187,17 @@ export function servicesSummary(serviceIdsByPair: string[][]): string {
 export function percentChange(current: number, previous: number): number | null {
   if (previous === 0) return null;
   return Math.round(((current - previous) / previous) * 100);
+}
+
+/**
+ * The Overview's change badge: which way the figure moved (from the raw
+ * difference, so a small real change never reads as flat) and its label,
+ * "<1%" when it rounds to 0 without being equal. Null: nothing to compare.
+ */
+export function changeBadge(current: number, previous: number): { tone: "up" | "down" | "flat"; label: string } | null {
+  const change = percentChange(current, previous);
+  if (change === null) return null;
+  const difference = current - previous;
+  const tone = difference > 0 ? "up" : difference < 0 ? "down" : "flat";
+  return { tone, label: change === 0 && difference !== 0 ? "<1%" : `${Math.abs(change)}%` };
 }

@@ -1,11 +1,11 @@
-import type { CalendarDate } from "@/features/orders/calendar-date";
+import { calendarDateToUtcMidnight, type CalendarDate } from "@/features/orders/calendar-date";
 import type { Money } from "@/shared/money/money";
 import { dollarTicks } from "./chart-scale";
 
 const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const longDay = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 const shortDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const asDate = (date: CalendarDate) => new Date(`${date}T00:00:00Z`);
+const asDate = calendarDateToUtcMidnight;
 
 /**
  * Booked revenue per day as bars, one series, so no legend: the card

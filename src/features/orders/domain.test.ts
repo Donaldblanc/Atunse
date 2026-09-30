@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canTransition, orderRollupStatus } from "./domain";
+import { Money } from "@/shared/money/money";
+import { canTransition, liveEstimate, orderRollupStatus } from "./domain";
 
 describe("Item status pipeline", () => {
   it("allows the next linear step", () => {
@@ -33,5 +34,18 @@ describe("orderRollupStatus", () => {
 
   it("is Cancelled only when every pair is", () => {
     expect(orderRollupStatus([{ status: "CANCELLED" }, { status: "CANCELLED" }])).toBe("CANCELLED");
+  });
+});
+
+describe("liveEstimate", () => {
+  const pair = (status: "IN_PROGRESS" | "CANCELLED", cents: number) => ({ status, estimate: Money.fromCents(cents) }) as never;
+
+  it("drops cancelled pairs' share but keeps order-level charges like Rush", () => {
+    // Two $30 pairs plus a $20 Rush fee; one pair cancelled.
+    expect(liveEstimate({ estimate: Money.fromCents(8000), items: [pair("IN_PROGRESS", 3000), pair("CANCELLED", 3000)] }).cents).toBe(5000);
+  });
+
+  it("is nothing for a fully cancelled Order", () => {
+    expect(liveEstimate({ estimate: Money.fromCents(5000), items: [pair("CANCELLED", 3000)] }).cents).toBe(0);
   });
 });

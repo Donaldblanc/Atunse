@@ -6,7 +6,7 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type Item, type ItemStatus, type Order } from "../domain";
+import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type Item, type ItemStatus, type Order } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -130,6 +130,11 @@ export class InMemoryOrderRepository implements OrderRepository {
     return [...this.orders.values()]
       .filter((order) => order.createdAt >= from && order.createdAt < to)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async summarizeBookedBetween(from: Date, to: Date): Promise<{ orders: number; value: Money }> {
+    const live = (await this.listBookedBetween(from, to)).filter((order) => livePairs(order).length > 0);
+    return { orders: live.length, value: live.reduce((sum, order) => sum.add(liveEstimate(order)), Money.zero()) };
   }
 
   async listRecent(limit: number): Promise<Order[]> {

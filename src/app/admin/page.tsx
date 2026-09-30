@@ -32,7 +32,7 @@ import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
 import { SAMPLE_LOW_STOCK_ITEMS, SAMPLE_REVIEWS, SAMPLE_UNREAD_MESSAGES, type SampleReview } from "@/features/admin-overview/sample-data";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
-import { calendarDateInShopTime } from "@/features/orders/calendar-date";
+import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { builtScreenHref, OWNER_DISPLAY_NAME } from "./admin-screens";
 
 export const metadata = { title: "Overview · Atunṣe Admin" };
@@ -303,7 +303,7 @@ function Review({ review }: { review: SampleReview }) {
       <div className="ov-review-body">
         <div className="ov-review-head">
           <strong>{review.name}</strong>
-          <span className="ov-cell-sub">{reviewDay.format(new Date(`${review.date}T00:00:00Z`))}</span>
+          <span className="ov-cell-sub">{reviewDay.format(calendarDateToUtcMidnight(review.date))}</span>
         </div>
         <span className="ov-stars" role="img" aria-label={`${review.rating} out of 5 stars`}>
           {Array.from({ length: 5 }, (_, i) => (

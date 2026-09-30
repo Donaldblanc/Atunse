@@ -80,7 +80,8 @@ prove it against.
 - Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
 - **Admin Overview** (`/admin`, from the admin design `scratch/overview-dashboard.jpeg`): live figures from real Orders, all admin-only through `getAdminOverview`.
   - One range picker (this week / last week / last 30 days, New York days, Monday-Sunday weeks) scopes Total Orders, Booked Revenue, the Revenue Trend bars and Orders by Service. Each is compared with the same stretch of the period before.
-  - "Booked revenue" is the Orders' estimates (Rush included), not payments received. Fully cancelled Orders are left out.
+  - "Booked revenue" is the Orders' estimates (Rush included), not payments received.
+  - One rule for cancelled pairs across every figure (Total Orders, revenue, the trend, Orders by Service, Recent Orders): they drop out. An Order counts at its estimate less its cancelled pairs' share (`liveEstimate`), and a fully cancelled Order not at all.
   - The work queues are always "right now": pairs needing a quote, Orders awaiting their Deposit (no `MANUAL_PAYMENT_CONFIRMED` on any Item), and pairs Ready for Drop-Off/Shipping.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
   - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.

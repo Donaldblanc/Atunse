@@ -362,6 +362,25 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect(booked[0]?.items).toHaveLength(1);
   });
 
+  it("totals the Orders booked in [from, to) without loading them, leaving cancelled pairs out", async () => {
+    const at = (order: { id: string }, iso: string) => prisma.order.update({ where: { id: order.id }, data: { createdAt: new Date(iso) } });
+    const whole = (await repo.create(newOrder({ estimate: Money.fromCents(3000) }))).order;
+    const partly = (await repo.create(newOrder({ estimate: Money.fromCents(9000), items: [newItem(), newItem({ estimate: Money.fromCents(3000) })] }))).order;
+    const gone = (await repo.create(newOrder({ estimate: Money.fromCents(4000) }))).order;
+    const outside = (await repo.create(newOrder({ estimate: Money.fromCents(7000) }))).order;
+    await at(whole, "2026-09-28T15:00:00Z");
+    await at(partly, "2026-09-28T16:00:00Z");
+    await at(gone, "2026-09-28T17:00:00Z");
+    await at(outside, "2026-09-30T15:00:00Z");
+    await transition(partly.items[1]!.id, "CANCELLED", "REQUEST_SUBMITTED", "CANCELLED");
+    await transition(gone.items[0]!.id, "CANCELLED", "REQUEST_SUBMITTED", "CANCELLED");
+
+    const summary = await repo.summarizeBookedBetween(new Date("2026-09-28T04:00:00Z"), new Date("2026-09-30T04:00:00Z"));
+
+    expect(summary.orders).toBe(2);
+    expect(summary.value.cents).toBe(3000 + (9000 - 3000));
+  });
+
   it("lists the most recent Orders, newest first", async () => {
     const orders = [];
     for (const day of ["2026-09-20", "2026-09-22", "2026-09-21"]) {
