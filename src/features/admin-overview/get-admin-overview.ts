@@ -15,6 +15,7 @@ import {
 import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
+import { metricDetail, type MetricDetail } from "./metric-detail";
 import { overviewRange, type OverviewRange, type OverviewRangeId } from "./overview-range";
 
 export interface AdminOverviewDeps {
@@ -79,6 +80,8 @@ export interface AdminOverview {
   bookedRevenue: { current: Money; previous: Money };
   /** bookedRevenue per day of the range, oldest first. */
   revenueByDay: { date: CalendarDate; revenue: Money }[];
+  /** The range's Orders by day and by status, for the metric dialog (metric-detail.ts). */
+  metricDetail: MetricDetail;
   /** How many of the range's pairs included each Service, in catalog order; unbooked Services are left out. */
   servicesBooked: { serviceId: string; name: string; count: number }[];
   /** Right now, whatever the range: pairs waiting on the owner's quote (ADR-0001). */
@@ -145,6 +148,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     orders: { current: current.length, previous: previous.orders },
     bookedRevenue: { current: current.reduce((sum, order) => sum.add(liveEstimate(order)), Money.zero()), previous: previous.value },
     revenueByDay,
+    metricDetail: metricDetail(booked, range.days),
     servicesBooked,
     needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
     awaitingDeposit,
