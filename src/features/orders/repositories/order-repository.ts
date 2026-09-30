@@ -138,6 +138,23 @@ export class AppointmentCancelledError extends Error {
   }
 }
 
+/** Nothing to confirm: the Order has no PENDING Deposit on a live pair (already received, or fully cancelled). Nothing was written. */
+export class NoPendingDepositError extends Error {
+  constructor(readonly orderId: string) {
+    super("This order has no deposit waiting to be confirmed.");
+    this.name = "NoPendingDepositError";
+  }
+}
+
+/** One row of Pending Payments: an Order whose Deposit is still PENDING. */
+export interface AwaitingDepositOrder {
+  orderId: string;
+  number: number;
+  contactName: string;
+  createdAt: Date;
+  deposit: { method: PaymentMethod; amount: Money };
+}
+
 export interface AwaitingDeposits {
   orders: number;
   deposits: Money;
@@ -238,4 +255,25 @@ export interface OrderRepository {
    * written nothing.
    */
   completeAppointment(appointmentId: string): Promise<Appointment>;
+
+  /**
+   * The Orders summarizeAwaitingDeposit counts, oldest booking first: one
+   * row per PENDING Deposit on an Order with a live pair. Same rule as the
+   * summary, so the Pending Payments list and its count always agree.
+   */
+  listAwaitingDeposit(): Promise<AwaitingDepositOrder[]>;
+
+  /** Orders with at least one Item in one of `statuses`, oldest booking first. */
+  listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]>;
+
+  /**
+   * Marks the Order's PENDING Deposit Payment RECEIVED (receivedAt now) and
+   * appends a MANUAL_PAYMENT_CONFIRMED audit entry to each live Item, without
+   * changing any Item's status, all in one transaction (ADR-0002/0012).
+   * Returns false, having written nothing, if `idempotencyKey` was already
+   * applied to this Order (a retry); the caller treats that as success.
+   * Throws NoPendingDepositError when there is no PENDING Deposit to settle
+   * (same rule as listAwaitingDeposit), having written nothing.
+   */
+  confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
 }

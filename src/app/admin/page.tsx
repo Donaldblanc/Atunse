@@ -22,6 +22,9 @@ import type { Icon } from "@phosphor-icons/react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
+import { AttentionItem } from "@/features/admin-overview/attention-item";
+import { AttentionPanel } from "@/features/admin-overview/attention-panel";
+import { parseAttentionPanel } from "@/features/admin-overview/attention-panels";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview } from "@/features/admin-overview/get-admin-overview";
@@ -70,6 +73,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   const orderDetail = orderId ? await getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null;
   const visitId = typeof params.visit === "string" ? params.visit : null;
   const visit = visitId ? await getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null;
+  const attentionPanel = parseAttentionPanel(params.attention);
 
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
@@ -103,19 +107,13 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
               comparison={range.comparisonLabel}
             />
           </StatCard>
-          <StatCard label="Pending Payments" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
+          <StatCard label="Pending Payments" icon={CreditCardIcon} href={overviewHref(selection, { attention: "pending-payments" })} value={String(overview.awaitingDeposit.orders)}>
             <p className="ov-stat-note">
               {overview.awaitingDeposit.orders === 0 ? "Every deposit confirmed" : depositSplit(overview.awaitingDeposit)}
             </p>
           </StatCard>
-          <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)}>
-            {ordersHref ? (
-              <Link className="ov-stat-link" href={`${ordersHref}?status=READY_FOR_PICKUP_SHIPPING`}>
-                View orders <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
-              </Link>
-            ) : (
-              <p className="ov-stat-note">Ready for Drop-Off/Shipping</p>
-            )}
+          <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)} href={overviewHref(selection, { attention: "ready-to-return" })}>
+            <p className="ov-stat-note">Ready for Drop-Off/Shipping</p>
           </StatCard>
         </section>
 
@@ -179,11 +177,11 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             Needs Attention
           </h2>
           <ul className="ov-attention">
-            <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} />
-            <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} />
-            <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} />
-            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sample />
-            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={SAMPLE_LOW_STOCK_ITEMS} sample />
+            <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} href={overviewHref(selection, { attention: "pending-payments" })} />
+            <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} href={overviewHref(selection, { attention: "ready-to-return" })} />
+            <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} href={overviewHref(selection, { attention: "needs-quote" })} />
+            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sampleTag={<SampleTag />} />
+            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={SAMPLE_LOW_STOCK_ITEMS} sampleTag={<SampleTag />} />
           </ul>
         </section>
 
@@ -206,6 +204,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
       {metric && <MetricDetailDialog metric={metric} overview={overview} closeHref={closeHref} />}
       {visitId && <VisitDialog visit={visit} selection={selection} />}
       {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
+      {attentionPanel && <AttentionPanel panel={attentionPanel} selection={selection} actingUser={actingUser} />}
     </div>
   );
 }
@@ -216,7 +215,7 @@ function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
   return [...methods, `${deposits.format()} due`].join(" · ");
 }
 
-/** With an `href`, the whole card is a link to it (a metric's detail dialog). */
+/** With an `href`, the whole card is a link to it (a metric's detail dialog or a Needs Attention panel). */
 function StatCard({
   label,
   icon: Icon,
@@ -283,39 +282,6 @@ function SampleTag() {
     <span className="ov-sample" title="Sample data: the real figure arrives with its screen (docs/TODO.md)">
       Sample
     </span>
-  );
-}
-
-function AttentionItem({
-  tone,
-  icon: Icon,
-  title,
-  detail,
-  count,
-  sample = false,
-}: {
-  tone: "red" | "orange" | "blue" | "violet" | "gray";
-  icon: Icon;
-  title: string;
-  detail: string;
-  count: number;
-  /** The count is sample data, not real. */
-  sample?: boolean;
-}) {
-  return (
-    <li className="ov-attention-item">
-      <span className="ov-attention-icon" data-tone={tone} aria-hidden="true">
-        <Icon size={22} />
-      </span>
-      <span className="ov-attention-text">
-        <strong>{title}</strong>
-        <span>{detail}</span>
-      </span>
-      {sample && <SampleTag />}
-      <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
-        {count}
-      </span>
-    </li>
   );
 }
 

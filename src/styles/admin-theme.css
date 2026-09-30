@@ -1749,6 +1749,9 @@ a.admin-nav-item:hover {
   .ov-range-preset {
     min-height: 40px;
     border: 1px solid var(--color-border);
+  }
+}
+
 /* ---------- Metric details (src/features/admin-overview/metric-detail-dialog.tsx) ---------- */
 
 .ov-stat-clickable {
@@ -2508,4 +2511,122 @@ a.visit-line:hover,
   .visit-actions form .admin-btn {
     width: 100%;
   }
+}
+
+/* ---------- Take Action from Needs Attention ---------- */
+
+/* Needs Attention rows that open a panel (?attention=); stat cards use .ov-stat-clickable. */
+.ov-attention-item[data-link="true"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The row moved inside an <li>, so the divider is on the <li>s now. */
+.ov-attention > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.ov-attention-item[data-link="true"] {
+  color: inherit;
+  border-radius: 12px;
+}
+
+.ov-attention-item[data-link="true"]:hover {
+  background: var(--color-muted);
+}
+
+/* Panel dialogs: tabs and search above a table. */
+.att-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.att-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.att-tab {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.att-tab[aria-selected="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.att-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+.att-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.att-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+}
+
+.att-scroll {
+  overflow-x: auto;
+}
+
+.att-table {
+  min-width: 620px;
+}
+
+.att-link {
+  color: var(--color-accent);
+}
+
+.att-link:hover {
+  text-decoration: underline;
+}
+
+.att-action {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.att-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.att-error {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-destructive);
+  text-align: right;
 }

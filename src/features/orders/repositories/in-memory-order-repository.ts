@@ -6,17 +6,19 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { liveEstimate, livePairs, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type PaymentMethod } from "../domain";
+import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
   BundleNotFoundError,
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
+  NoPendingDepositError,
   PhotoKeyInUseError,
   AppointmentCancelledError,
   AppointmentNotFoundError,
   type AppointmentWithOrder,
+  type AwaitingDepositOrder,
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
@@ -204,11 +206,15 @@ export class InMemoryOrderRepository implements OrderRepository {
     return counts;
   }
 
+  /** The Orders whose Deposit is PENDING and that still have a live pair: the one rule behind the summary, the list and confirmDeposit. */
+  private awaitingDeposits(): { order: Order; payment: Payment }[] {
+    return [...this.orders.values()]
+      .filter((order) => livePairs(order).length > 0)
+      .flatMap((order) => order.payments.filter((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING").map((payment) => ({ order, payment })));
+  }
+
   async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
-    const pending = [...this.orders.values()]
-      .filter((order) => order.items.some((item) => item.status !== "CANCELLED"))
-      .flatMap((order) => order.payments)
-      .filter((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING");
+    const pending = this.awaitingDeposits().map(({ payment }) => payment);
     const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0, APPLE_PAY: 0 };
     for (const payment of pending) byMethod[payment.method] += 1;
     return {
@@ -247,5 +253,46 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (found.appointment.status === "CANCELLED") throw new AppointmentCancelledError();
     found.appointment.status = "COMPLETED";
     return found.appointment;
+  }
+
+  async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {
+    return this.awaitingDeposits()
+      .map(({ order, payment }) => ({
+        orderId: order.id,
+        number: order.number,
+        contactName: order.contactName,
+        createdAt: order.createdAt,
+        deposit: { method: payment.method, amount: payment.amount },
+      }))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]> {
+    return [...this.orders.values()]
+      .filter((order) => order.items.some((item) => statuses.includes(item.status)))
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
+    const order = this.orders.get(params.orderId);
+    const keyOf = (itemId: string) => `${itemId}:${params.idempotencyKey}`;
+    if (order?.items.some((item) => this.appliedIdempotencyKeys.has(keyOf(item.id)))) return false;
+
+    const awaiting = this.awaitingDeposits().find((entry) => entry.order.id === params.orderId);
+    if (!order || !awaiting) throw new NoPendingDepositError(params.orderId);
+
+    Object.assign(awaiting.payment, { status: "RECEIVED", receivedAt: new Date() });
+    for (const item of livePairs(order)) {
+      this.appliedIdempotencyKeys.add(keyOf(item.id));
+      this.auditEntries.push({
+        action: MANUAL_PAYMENT_CONFIRMED,
+        fromStatus: item.status,
+        toStatus: item.status,
+        actorAccountId: params.actorAccountId,
+        idempotencyKey: params.idempotencyKey,
+        itemId: item.id,
+      });
+    }
+    return true;
   }
 }
