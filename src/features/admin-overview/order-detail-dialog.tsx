@@ -73,6 +73,7 @@ export function OrderDetailDialog({
   viewHref,
   editHref,
   editing = false,
+  returnAction,
 }: {
   detail: OrderDetail;
   closeHref: string;
@@ -81,6 +82,8 @@ export function OrderDetailDialog({
   /** This Order's edit view. */
   editHref: string;
   editing?: boolean;
+  /** Book return visit, or the booked Return (return-booking.ts); left out where it doesn't apply. */
+  returnAction?: React.ReactNode;
 }) {
   const { customer, payment } = detail;
   const multiple = detail.pairs.length > 1;
@@ -209,6 +212,7 @@ export function OrderDetailDialog({
             </ol>
             <QuoteSteps detail={detail} />
             <UpdateStatuses detail={detail} />
+            {returnAction}
           </section>
 
           <section className="ov-card od-card" aria-labelledby="od-payment-title">

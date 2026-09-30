@@ -50,6 +50,7 @@ export async function AttentionPanel({
                   <th scope="col">Pairs Ready</th>
                   <th scope="col">Return</th>
                   <th scope="col">Booked</th>
+                  <th scope="col">Return visit</th>
                 </tr>
               </thead>
               <tbody>
@@ -66,6 +67,19 @@ export async function AttentionPanel({
                     <td>{row.pairsReady}</td>
                     <td>{row.fulfillment}</td>
                     <td>{row.bookedOn}</td>
+                    <td>
+                      {row.returnVisit.kind === "bookable" ? (
+                        <Link className="admin-btn att-book" data-variant="secondary" href={overviewHref(selection, { order: row.orderId, book: "return" })} scroll={false}>
+                          Book return visit
+                        </Link>
+                      ) : row.returnVisit.kind === "booked" ? (
+                        <Link className="att-link" href={overviewHref(selection, { visit: row.returnVisit.appointmentId })} scroll={false}>
+                          {row.returnVisit.when}
+                        </Link>
+                      ) : (
+                        <span className="ov-cell-sub">Ships back</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

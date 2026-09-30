@@ -7,14 +7,17 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
 import {
   AppointmentCancelledError,
+  AppointmentMovedError,
   AppointmentNotFoundError,
+  AppointmentNotScheduledError,
+  OrderNotFoundError,
+  ReturnAlreadyBookedError,
   BundleNotFoundError,
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
   NoPendingDepositError,
   OrderChangedError,
-  OrderNotFoundError,
   PhotoKeyInUseError,
   type NewItemInput,
   type NewOrderInput,
@@ -641,6 +644,58 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
     await expect(repo.completeAppointment(calledOff)).rejects.toThrow(AppointmentCancelledError);
     expect((await repo.findAppointment(calledOff))!.appointment.status).toBe("CANCELLED");
     await expect(repo.completeAppointment("no-such-appointment")).rejects.toThrow(AppointmentNotFoundError);
+  });
+});
+
+describe("PrismaOrderRepository reschedule and Return booking (integration)", () => {
+  const OLD = new Date("2026-10-03T20:30:00Z");
+  const NEW = { startsAt: new Date("2026-10-04T13:00:00Z"), endsAt: new Date("2026-10-04T13:30:00Z") };
+
+  it("moves only a SCHEDULED visit from the time the caller saw, and replays as unchanged", async () => {
+    const { order } = await repo.create(newOrder());
+    const appointmentId = order.appointments[0]!.id;
+
+    const moved = await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW });
+    expect(moved.changed).toBe(true);
+    expect(moved.appointment.startsAt).toEqual(NEW.startsAt);
+    // The Order keeps the collection time the customer booked.
+    expect((await repo.findById(order.id))!.fulfillment).toMatchObject({ date: "2026-10-03", slot: "4:30 PM – 5:00 PM" });
+
+    expect((await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW })).changed).toBe(false);
+    await expect(
+      repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, startsAt: new Date("2026-10-05T13:00:00Z"), endsAt: new Date("2026-10-05T13:30:00Z") }),
+    ).rejects.toThrow(AppointmentMovedError);
+    await expect(repo.rescheduleAppointment({ appointmentId: "nope", expectedStartsAt: OLD, ...NEW })).rejects.toThrow(AppointmentNotFoundError);
+
+    for (const status of ["COMPLETED", "CANCELLED"] as const) {
+      await prisma.appointment.update({ where: { id: appointmentId }, data: { status } });
+      await expect(repo.rescheduleAppointment({ appointmentId, expectedStartsAt: NEW.startsAt, ...OLDWINDOW() })).rejects.toThrow(AppointmentNotScheduledError);
+    }
+  });
+
+  function OLDWINDOW() {
+    return { startsAt: new Date("2026-10-06T13:00:00Z"), endsAt: new Date("2026-10-06T13:30:00Z") };
+  }
+
+  it("books one RETURN, treats a same-time replay as unchanged, reuses a CANCELLED row, and refuses a second", async () => {
+    const { order } = await repo.create(newOrder());
+
+    const first = await repo.bookReturnAppointment({ orderId: order.id, ...NEW });
+    expect(first).toMatchObject({ created: true, appointment: { kind: "RETURN", status: "SCHEDULED" } });
+    expect((await repo.bookReturnAppointment({ orderId: order.id, ...NEW })).created).toBe(false);
+    await expect(repo.bookReturnAppointment({ orderId: order.id, ...OLDWINDOW() })).rejects.toThrow(ReturnAlreadyBookedError);
+
+    // Today's Schedule reads SCHEDULED Appointments of any kind.
+    expect((await repo.listAppointmentsBetween(new Date("2026-10-04T00:00:00Z"), new Date("2026-10-05T00:00:00Z"))).map((a) => a.kind)).toEqual(["RETURN"]);
+
+    await prisma.appointment.update({ where: { id: first.appointment.id }, data: { status: "CANCELLED" } });
+    const revived = await repo.bookReturnAppointment({ orderId: order.id, ...OLDWINDOW() });
+    expect(revived).toMatchObject({ created: true, appointment: { id: first.appointment.id, status: "SCHEDULED" } });
+    expect(await prisma.appointment.count({ where: { orderId: order.id, kind: "RETURN" } })).toBe(1);
+
+    await prisma.appointment.update({ where: { id: first.appointment.id }, data: { status: "COMPLETED" } });
+    await expect(repo.bookReturnAppointment({ orderId: order.id, ...OLDWINDOW() })).rejects.toThrow(ReturnAlreadyBookedError);
+    await expect(repo.bookReturnAppointment({ orderId: "nope", ...NEW })).rejects.toThrow(OrderNotFoundError);
   });
 });
 
