@@ -4,8 +4,9 @@
 //
 // Booked orders and revenue follow the range picker; the work queues,
 // Recent Orders and Today's Schedule are always "right now". Sections
-// whose data doesn't exist yet (messages, stock, reviews) say so rather
-// than show numbers.
+// whose data doesn't exist yet (unread messages, low stock, reviews) show
+// sample data from sample-data.ts, tagged "Sample" on the page and tracked
+// in docs/TODO.md until real data replaces it.
 import {
   ArrowRightIcon,
   ChartBarIcon,
@@ -29,6 +30,7 @@ import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
+import { SAMPLE_LOW_STOCK_ITEMS, SAMPLE_REVIEWS, SAMPLE_UNREAD_MESSAGES, type SampleReview } from "@/features/admin-overview/sample-data";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
 import { builtScreenHref, OWNER_DISPLAY_NAME } from "./admin-screens";
@@ -158,8 +160,8 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} />
             <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} />
             <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} />
-            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={null} />
-            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={null} />
+            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sample />
+            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={SAMPLE_LOW_STOCK_ITEMS} sample />
           </ul>
         </section>
 
@@ -168,12 +170,13 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             <h2 id="ov-reviews-title" className="ov-card-title">
               Recent Reviews
             </h2>
-            <span className="ov-soon">Soon</span>
+            <SampleTag />
           </div>
-          <p className="ov-empty ov-reviews-empty">
-            <StarIcon size={20} weight="fill" aria-hidden="true" />
-            Customer reviews will show here once the Reviews screen is built.
-          </p>
+          <ul className="ov-reviews">
+            {SAMPLE_REVIEWS.map((review) => (
+              <Review key={`${review.name}-${review.date}`} review={review} />
+            ))}
+          </ul>
         </section>
       </aside>
     </div>
@@ -241,22 +244,33 @@ function TodaysSchedule({ collections }: { collections: ScheduledCollection[] })
   );
 }
 
+/** Marks sample data (sample-data.ts) so nobody reads it as real. */
+function SampleTag() {
+  return (
+    <span className="ov-sample" title="Sample data: the real figure arrives with its screen (docs/TODO.md)">
+      Sample
+    </span>
+  );
+}
+
 function AttentionItem({
   tone,
   icon: Icon,
   title,
   detail,
   count,
+  sample = false,
 }: {
   tone: "red" | "orange" | "blue" | "violet" | "gray";
   icon: Icon;
   title: string;
   detail: string;
-  /** null: nothing records this yet, so the row says "Soon" instead of a number. */
-  count: number | null;
+  count: number;
+  /** The count is sample data, not real. */
+  sample?: boolean;
 }) {
   return (
-    <li className="ov-attention-item" data-soon={count === null ? "true" : undefined}>
+    <li className="ov-attention-item">
       <span className="ov-attention-icon" data-tone={tone} aria-hidden="true">
         <Icon size={22} />
       </span>
@@ -264,13 +278,40 @@ function AttentionItem({
         <strong>{title}</strong>
         <span>{detail}</span>
       </span>
-      {count === null ? (
-        <span className="ov-soon">Soon</span>
-      ) : (
-        <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
-          {count}
+      {sample && <SampleTag />}
+      <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
+        {count}
+      </span>
+    </li>
+  );
+}
+
+const reviewDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+function Review({ review }: { review: SampleReview }) {
+  const initials = review.name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <li className="ov-review">
+      <span className="ov-review-avatar" aria-hidden="true">
+        {initials}
+      </span>
+      <div className="ov-review-body">
+        <div className="ov-review-head">
+          <strong>{review.name}</strong>
+          <span className="ov-cell-sub">{reviewDay.format(new Date(`${review.date}T00:00:00Z`))}</span>
+        </div>
+        <span className="ov-stars" role="img" aria-label={`${review.rating} out of 5 stars`}>
+          {Array.from({ length: 5 }, (_, i) => (
+            <StarIcon key={i} size={18} weight={i < review.rating ? "fill" : "regular"} aria-hidden="true" />
+          ))}
         </span>
-      )}
+        <p className="ov-review-text">{review.text}</p>
+      </div>
     </li>
   );
 }

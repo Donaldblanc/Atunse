@@ -952,16 +952,6 @@ a.admin-nav-item:hover {
   white-space: nowrap;
 }
 
-.ov-soon {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--color-muted);
-  color: var(--color-muted-foreground);
-  white-space: nowrap;
-}
-
 /* Recent Orders table. */
 .ov-table-scroll {
   overflow-x: auto;
@@ -1286,10 +1276,6 @@ a.admin-nav-item:hover {
   color: var(--color-muted-foreground);
 }
 
-.ov-attention-item[data-soon="true"] .ov-attention-text strong {
-  color: var(--color-muted-foreground);
-}
-
 .ov-attention-count {
   font-size: 18px;
   font-weight: 800;
@@ -1300,15 +1286,67 @@ a.admin-nav-item:hover {
   color: var(--delta-down-ink);
 }
 
-.ov-reviews-empty {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Sample data (sample-data.ts): dashed, so it never reads as a real figure. */
+.ov-sample {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px dashed #c9a24a;
+  color: #8a6400;
+  white-space: nowrap;
 }
 
-.ov-reviews-empty svg {
+/* Recent Reviews. */
+.ov-reviews {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ov-review {
+  display: flex;
+  gap: 14px;
+}
+
+.ov-review-avatar {
+  width: 52px;
+  height: 52px;
   flex: none;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #e4ebff;
+  color: var(--color-accent-deep);
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.ov-review-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.ov-review-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ov-stars {
+  display: inline-flex;
+  gap: 2px;
+  margin: 4px 0 6px;
   color: #eda100;
+}
+
+.ov-review-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-muted-foreground);
 }
 
 @media (max-width: 1440px) {

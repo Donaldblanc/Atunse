@@ -83,7 +83,7 @@ prove it against.
   - "Booked revenue" is the Orders' estimates (Rush included), not payments received. Fully cancelled Orders are left out.
   - The work queues are always "right now": pairs needing a quote, Orders awaiting their Deposit (no `MANUAL_PAYMENT_CONFIRMED` on any Item), and pairs Ready for Drop-Off/Shipping.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and deposit paid or pending) and Today's Schedule (today's Local Drop-Off collections).
-  - Unread Messages, Low Stock Items and Recent Reviews show "Soon": nothing records them yet.
+  - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
 - Not built yet:
   - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
