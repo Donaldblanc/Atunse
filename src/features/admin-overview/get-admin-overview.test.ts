@@ -3,7 +3,7 @@ import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
-import { getAdminOverview, percentChange } from "./get-admin-overview";
+import { getAdminOverview, percentChange, servicesSummary } from "./get-admin-overview";
 
 // Tuesday Sep 29, 2026, 10:00 AM in New York: "this week" is Sep 28 - Oct 4.
 const NOW = new Date("2026-09-29T14:00:00Z");
@@ -53,7 +53,16 @@ async function book(orders: InMemoryOrderRepository, createdAt: string, input: N
 
 function deps() {
   const orders = new InMemoryOrderRepository();
-  return { orders, now: () => NOW };
+  return { orders, photoUrl: async (key: string) => `https://photos.test/${key}`, now: () => NOW };
+}
+
+/** A Local Drop-Off booking collected at `slot` on `date`. */
+function collection(date: string, slot: string, contactName: string): NewOrderInput {
+  return {
+    ...order(3000),
+    contactName,
+    fulfillment: { method: "PICKUP", address: { line1: "1 Main St", line2: null, city: "Brooklyn", state: "NY", zip: "11201" }, date, slot },
+  };
 }
 
 describe("getAdminOverview", () => {
@@ -136,6 +145,75 @@ describe("getAdminOverview", () => {
     expect(overview.needsQuote).toBe(3); // old: submitted + under review; paid: under review
     expect(overview.readyForReturn).toBe(1);
     expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000) });
+  });
+});
+
+describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
+  it("lists the five latest bookings, newest first, with what each row shows", async () => {
+    const d = deps();
+    for (let day = 20; day <= 25; day++) await book(d.orders, `2026-09-${day}T15:00:00Z`, order(3000));
+    const latest = await book(
+      d.orders,
+      "2026-09-28T15:00:00Z",
+      { ...order(12000, [item(["premium", "laces"]), item(["standard"])]), contactName: "John Doe", estimateIsMinimum: true },
+    );
+    latest.items[0]!.brand = "Air Jordan 1";
+    latest.items[0]!.status = "IN_PROGRESS";
+    latest.items[1]!.status = "APPROVED";
+    await d.orders.transitionItemStatus({
+      itemId: latest.items[1]!.id,
+      toStatus: "AWAITING_SNEAKERS",
+      entry: { action: "MANUAL_PAYMENT_CONFIRMED", fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", actorAccountId: "acc_admin", idempotencyKey: "k" },
+    });
+
+    const { recentOrders } = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(recentOrders).toHaveLength(5);
+    expect(recentOrders.map((row) => row.bookedAt.toISOString().slice(0, 10))).toEqual(["2026-09-28", "2026-09-25", "2026-09-24", "2026-09-23", "2026-09-22"]);
+    expect(recentOrders[0]).toMatchObject({
+      customerName: "John Doe",
+      pairCount: 2,
+      firstPair: "Air Jordan 1",
+      services: "Standard Clean + 2 more",
+      status: "AWAITING_SNEAKERS", // the least-advanced pair
+      depositPaid: true,
+      total: Money.fromCents(12000),
+      totalIsMinimum: true,
+    });
+    expect(recentOrders[0]!.photoUrl).toMatch(/^https:\/\/photos\.test\/photos\//);
+    expect(recentOrders[1]!.depositPaid).toBe(false);
+  });
+
+  it("shows no photo when the link can't be made", async () => {
+    const d = { ...deps(), photoUrl: async () => null };
+    await book(d.orders, "2026-09-28T15:00:00Z", order(3000));
+
+    expect((await getAdminOverview(d, ADMIN, "this-week")).recentOrders[0]!.photoUrl).toBeNull();
+  });
+
+  it("lists today's Local Drop-Off collections in time order, skipping cancelled ones and other days", async () => {
+    const d = deps();
+    await book(d.orders, "2026-09-20T15:00:00Z", collection("2026-09-29", "6:30 PM – 7:00 PM", "Sarah Kim"));
+    await book(d.orders, "2026-09-21T15:00:00Z", collection("2026-09-29", "10:00 AM – 10:30 AM", "John Doe"));
+    const cancelled = await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-29", "8:00 AM – 8:30 AM", "Mike R."));
+    cancelled.items[0]!.status = "CANCELLED";
+    await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-30", "9:00 AM – 9:30 AM", "Jessica L."));
+
+    const { todaysCollections } = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(todaysCollections.map((c) => [c.time, c.customerName])).toEqual([
+      ["10:00 AM", "John Doe"],
+      ["6:30 PM", "Sarah Kim"],
+    ]);
+  });
+});
+
+describe("servicesSummary", () => {
+  it("names up to two Services, in catalog order, and counts the rest", () => {
+    expect(servicesSummary([["standard"]])).toBe("Standard Clean");
+    expect(servicesSummary([["laces", "premium"]])).toBe("Premium Clean + Lace Replacement");
+    expect(servicesSummary([["premium"], ["premium", "oxidation"], ["reglue"]])).toBe("Premium Clean + 2 more");
+    expect(servicesSummary([])).toBe("");
   });
 });
 

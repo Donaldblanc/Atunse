@@ -132,6 +132,23 @@ export class InMemoryOrderRepository implements OrderRepository {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
+  async listRecent(limit: number): Promise<Order[]> {
+    return [...this.orders.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
+  }
+
+  async listCollectionsOn(date: string): Promise<Order[]> {
+    return [...this.orders.values()]
+      .filter((order) => order.fulfillment.method === "PICKUP" && order.fulfillment.date === date)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async findPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
+    const paidItemIds = new Set(this.auditEntries.filter((e) => e.action === MANUAL_PAYMENT_CONFIRMED).map((e) => e.itemId));
+    return new Set(
+      orderIds.filter((id) => this.orders.get(id)?.items.some((item) => paidItemIds.has(item.id))),
+    );
+  }
+
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {
     const counts: Partial<Record<ItemStatus, number>> = {};
     for (const item of [...this.orders.values()].flatMap((order) => order.items)) {

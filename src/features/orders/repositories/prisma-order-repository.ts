@@ -1,7 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import { MANUAL_PAYMENT_CONFIRMED, type Order, type Item, type AuditEntry, type Fulfillment, type ItemStatus, type TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, type AuditEntry, type CalendarDate, type Fulfillment, type Item, type ItemStatus, type Order, type TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -253,6 +253,29 @@ export class PrismaOrderRepository implements OrderRepository {
       orderBy: { createdAt: "asc" },
     });
     return rows.map(toDomainOrder);
+  }
+
+  async listRecent(limit: number): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({ include: ORDER_INCLUDE, orderBy: { createdAt: "desc" }, take: limit });
+    return rows.map(toDomainOrder);
+  }
+
+  async listCollectionsOn(date: CalendarDate): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { fulfillmentMethod: "PICKUP", pickupDate: calendarDateToUtcMidnight(date) },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  async findPaidOrderIds(orderIds: string[]): Promise<Set<string>> {
+    const rows = await this.prisma.item.findMany({
+      where: { orderId: { in: orderIds }, auditEntries: { some: { action: MANUAL_PAYMENT_CONFIRMED } } },
+      select: { orderId: true },
+      distinct: ["orderId"],
+    });
+    return new Set(rows.map((row) => row.orderId));
   }
 
   async countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>> {

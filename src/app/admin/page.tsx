@@ -1,17 +1,21 @@
-// The admin Overview: the first screen of the admin design
-// (scratch/01-overview-dashboard.png). Reachable only past src/proxy.ts's
-// admin guard and the admin layout's own check; getAdminOverview checks
-// the role again itself (ADR-0012).
+// The admin Overview, from the admin design (scratch/overview-dashboard.jpeg).
+// Reachable only past src/proxy.ts's admin guard and the admin layout's
+// own check; getAdminOverview checks the role again itself (ADR-0012).
 //
-// Booked orders and revenue follow the range picker; the work queues
-// (quotes, deposits, pairs to return) are always "right now".
+// Booked orders and revenue follow the range picker; the work queues,
+// Recent Orders and Today's Schedule are always "right now". Sections
+// whose data doesn't exist yet (messages, stock, reviews) say so rather
+// than show numbers.
 import {
   ArrowRightIcon,
+  ChartBarIcon,
+  ChatCenteredTextIcon,
   ClipboardTextIcon,
   CreditCardIcon,
   PackageIcon,
-  ReceiptIcon,
+  StarIcon,
   TruckIcon,
+  WarningIcon,
 } from "@phosphor-icons/react/dist/ssr";
 import type { Icon } from "@phosphor-icons/react";
 import { cookies } from "next/headers";
@@ -19,10 +23,11 @@ import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
-import { getAdminOverview } from "@/features/admin-overview/get-admin-overview";
+import { getAdminOverview, type ScheduledCollection } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
 import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
+import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
 import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
@@ -42,110 +47,135 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   const today = calendarDateInShopTime(deps.now());
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
+  const calendarHref = builtScreenHref("calendar");
 
   return (
     <div className="ov">
-      <div className="ov-header">
-        <div>
-          <h1 className="ov-title">
-            {greeting(deps.now())}, <span>{OWNER_DISPLAY_NAME}</span>{" "}
-            <span className="ov-wave" aria-hidden="true">
-              👋
-            </span>
-          </h1>
-          <p className="ov-subtitle">Here&apos;s what&apos;s happening with your business today.</p>
-        </div>
-        <RangePicker current={rangeId} datesLabel={formatRangeDates(range)} />
-      </div>
-
-      <section className="ov-stats" aria-label="Key figures">
-        <StatCard label="Total Orders" icon={PackageIcon} value={String(overview.orders.current)}>
-          <Delta current={overview.orders.current} previous={overview.orders.previous} comparison={range.comparisonLabel} />
-        </StatCard>
-        <StatCard label="Booked Revenue" icon={ReceiptIcon} value={overview.bookedRevenue.current.format()}>
-          <Delta
-            current={overview.bookedRevenue.current.cents}
-            previous={overview.bookedRevenue.previous.cents}
-            comparison={range.comparisonLabel}
-          />
-        </StatCard>
-        <StatCard label="Awaiting Deposit" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
-          <p className="ov-stat-note">
-            {overview.awaitingDeposit.orders === 0
-              ? "Every deposit confirmed"
-              : `${overview.awaitingDeposit.deposits.format()} in Zelle/Cash to confirm`}
-          </p>
-        </StatCard>
-        <StatCard label="Ready for Drop-Off/Shipping" icon={TruckIcon} value={String(overview.readyForReturn)}>
-          {ordersHref ? (
-            <Link className="ov-stat-link" href={`${ordersHref}?status=READY_FOR_PICKUP_SHIPPING`}>
-              View orders <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
-            </Link>
-          ) : (
-            <p className="ov-stat-note">{overview.readyForReturn === 1 ? "Finished pair to return" : "Finished pairs to return"}</p>
-          )}
-        </StatCard>
-      </section>
-
-      <div className="ov-charts">
-        <section className="ov-card" aria-labelledby="ov-trend-title">
-          <div className="ov-card-head">
-            <h2 id="ov-trend-title" className="ov-card-title">
-              Revenue Trend
-            </h2>
-            <span className="ov-chip">{OVERVIEW_RANGE_LABELS[rangeId]}</span>
+      <div className="ov-primary">
+        <div className="ov-header">
+          <div>
+            <p className="ov-eyebrow">Welcome back</p>
+            <h1 className="ov-title">
+              {greeting(deps.now())}, <span>{OWNER_DISPLAY_NAME}</span>{" "}
+              <span className="ov-wave" aria-hidden="true">
+                👋
+              </span>
+            </h1>
+            <p className="ov-subtitle">Here&apos;s what&apos;s happening with your business today.</p>
           </div>
-          <div className="ov-trend-total">
-            <strong>{overview.bookedRevenue.current.format()}</strong>
+          <RangePicker current={rangeId} datesLabel={formatRangeDates(range)} />
+        </div>
+
+        <section className="ov-stats" aria-label="Key figures">
+          <StatCard label="Total Orders" icon={PackageIcon} value={String(overview.orders.current)}>
+            <Delta current={overview.orders.current} previous={overview.orders.previous} comparison={range.comparisonLabel} />
+          </StatCard>
+          <StatCard label="Booked Revenue" icon={ChartBarIcon} value={overview.bookedRevenue.current.format()}>
             <Delta
               current={overview.bookedRevenue.current.cents}
               previous={overview.bookedRevenue.previous.cents}
               comparison={range.comparisonLabel}
             />
-          </div>
-          <RevenueTrend days={overview.revenueByDay} highlight={highlight} />
-          <p className="ov-footnote">Booked estimates by the day they were booked, not payments received.</p>
+          </StatCard>
+          <StatCard label="Pending Payments" icon={CreditCardIcon} value={String(overview.awaitingDeposit.orders)}>
+            <p className="ov-stat-note">
+              {overview.awaitingDeposit.orders === 0
+                ? "Every deposit confirmed"
+                : `${overview.awaitingDeposit.deposits.format()} in deposits due`}
+            </p>
+          </StatCard>
+          <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)}>
+            {ordersHref ? (
+              <Link className="ov-stat-link" href={`${ordersHref}?status=READY_FOR_PICKUP_SHIPPING`}>
+                View orders <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+              </Link>
+            ) : (
+              <p className="ov-stat-note">Ready for Drop-Off/Shipping</p>
+            )}
+          </StatCard>
         </section>
 
-        <section className="ov-card" aria-labelledby="ov-services-title">
+        <div className="ov-charts">
+          <section className="ov-card" aria-labelledby="ov-trend-title">
+            <div className="ov-card-head">
+              <h2 id="ov-trend-title" className="ov-card-title">
+                Revenue Trend
+              </h2>
+              <span className="ov-chip">{OVERVIEW_RANGE_LABELS[rangeId]}</span>
+            </div>
+            <div className="ov-trend-total">
+              <strong>{overview.bookedRevenue.current.format()}</strong>
+              <Delta
+                current={overview.bookedRevenue.current.cents}
+                previous={overview.bookedRevenue.previous.cents}
+                comparison={range.comparisonLabel}
+              />
+            </div>
+            <RevenueTrend days={overview.revenueByDay} highlight={highlight} />
+            <p className="ov-footnote">Booked estimates by the day they were booked, not payments received.</p>
+          </section>
+
+          <section className="ov-card" aria-labelledby="ov-services-title">
+            <div className="ov-card-head">
+              <h2 id="ov-services-title" className="ov-card-title">
+                Orders by Service
+              </h2>
+              <span className="ov-chip">{OVERVIEW_RANGE_LABELS[rangeId]}</span>
+            </div>
+            <ServicesDonut services={overview.servicesBooked} />
+          </section>
+        </div>
+
+        <section className="ov-card" aria-labelledby="ov-recent-title">
           <div className="ov-card-head">
-            <h2 id="ov-services-title" className="ov-card-title">
-              Orders by Service
+            <h2 id="ov-recent-title" className="ov-card-title">
+              Recent Orders
             </h2>
-            <span className="ov-chip">{OVERVIEW_RANGE_LABELS[rangeId]}</span>
+            {ordersHref && <CardLink href={ordersHref}>View all orders</CardLink>}
           </div>
-          <ServicesDonut services={overview.servicesBooked} />
+          <RecentOrders orders={overview.recentOrders} />
         </section>
       </div>
 
-      <section className="ov-card" aria-labelledby="ov-attention-title">
-        <h2 id="ov-attention-title" className="ov-card-title">
-          Needs Attention
-        </h2>
-        <ul className="ov-attention">
-          <AttentionItem
-            tone="red"
-            icon={CreditCardIcon}
-            title="Pending Deposits"
-            detail="Awaiting customer payment"
-            count={overview.awaitingDeposit.orders}
-          />
-          <AttentionItem
-            tone="orange"
-            icon={PackageIcon}
-            title="Ready to Return"
-            detail="Completed and ready to go back"
-            count={overview.readyForReturn}
-          />
-          <AttentionItem
-            tone="violet"
-            icon={ClipboardTextIcon}
-            title="Needs a Quote"
-            detail="Pairs waiting on your review"
-            count={overview.needsQuote}
-          />
-        </ul>
-      </section>
+      <aside className="ov-secondary" aria-label="Today">
+        <BrandCard />
+
+        <section className="ov-card" aria-labelledby="ov-schedule-title">
+          <div className="ov-card-head">
+            <h2 id="ov-schedule-title" className="ov-card-title">
+              Today&apos;s Schedule
+            </h2>
+            {calendarHref && <CardLink href={calendarHref}>View calendar</CardLink>}
+          </div>
+          <TodaysSchedule collections={overview.todaysCollections} />
+        </section>
+
+        <section className="ov-card" aria-labelledby="ov-attention-title">
+          <h2 id="ov-attention-title" className="ov-card-title">
+            Needs Attention
+          </h2>
+          <ul className="ov-attention">
+            <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} />
+            <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} />
+            <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} />
+            <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={null} />
+            <AttentionItem tone="gray" icon={WarningIcon} title="Low Stock Items" detail="Restock soon" count={null} />
+          </ul>
+        </section>
+
+        <section className="ov-card" aria-labelledby="ov-reviews-title">
+          <div className="ov-card-head">
+            <h2 id="ov-reviews-title" className="ov-card-title">
+              Recent Reviews
+            </h2>
+            <span className="ov-soon">Soon</span>
+          </div>
+          <p className="ov-empty ov-reviews-empty">
+            <StarIcon size={20} weight="fill" aria-hidden="true" />
+            Customer reviews will show here once the Reviews screen is built.
+          </p>
+        </section>
+      </aside>
     </div>
   );
 }
@@ -155,11 +185,59 @@ function StatCard({ label, icon: Icon, value, children }: { label: string; icon:
     <div className="ov-card ov-stat">
       <div className="ov-stat-head">
         <h2 className="ov-stat-label">{label}</h2>
-        <Icon size={30} weight="light" className="ov-stat-icon" aria-hidden="true" />
+        <Icon size={26} weight="light" className="ov-stat-icon" aria-hidden="true" />
       </div>
       <p className="ov-stat-value">{value}</p>
       {children}
     </div>
+  );
+}
+
+function CardLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link className="ov-card-link" href={href}>
+      {children} <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+    </Link>
+  );
+}
+
+/** The design's brand panel: the wordmark and tagline beside a restored pair. Decorative. */
+function BrandCard() {
+  return (
+    <div className="ov-brand" aria-hidden="true">
+      <div className="ov-brand-text">
+        <span className="ov-brand-name">ATUNṢE</span>
+        <span className="ov-brand-tag">
+          Restore more
+          <br />
+          than sneakers.
+          <br />
+          Restore the feeling.
+        </span>
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small decorative crop, not worth next/image's loader */}
+      <img src="/images/admin/brand-sneaker.jpg" alt="" className="ov-brand-photo" />
+    </div>
+  );
+}
+
+/** Today's Local Drop-Off collections as a timeline. Return drop-offs aren't scheduled in the app yet. */
+function TodaysSchedule({ collections }: { collections: ScheduledCollection[] }) {
+  if (collections.length === 0) return <p className="ov-empty">No collections booked for today.</p>;
+  return (
+    <ol className="ov-schedule">
+      {collections.map((collection) => (
+        <li key={collection.orderId}>
+          <span className="ov-schedule-time">{collection.time}</span>
+          <span className="ov-schedule-dot" aria-hidden="true" />
+          <span className="ov-schedule-what">
+            <span className="ov-cell-main">{collection.customerName}</span>
+            <span className="ov-cell-sub">{collection.reference}</span>
+          </span>
+          <span className="ov-tag">Collection</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -170,14 +248,15 @@ function AttentionItem({
   detail,
   count,
 }: {
-  tone: "red" | "orange" | "violet";
+  tone: "red" | "orange" | "blue" | "violet" | "gray";
   icon: Icon;
   title: string;
   detail: string;
-  count: number;
+  /** null: nothing records this yet, so the row says "Soon" instead of a number. */
+  count: number | null;
 }) {
   return (
-    <li className="ov-attention-item">
+    <li className="ov-attention-item" data-soon={count === null ? "true" : undefined}>
       <span className="ov-attention-icon" data-tone={tone} aria-hidden="true">
         <Icon size={22} />
       </span>
@@ -185,7 +264,13 @@ function AttentionItem({
         <strong>{title}</strong>
         <span>{detail}</span>
       </span>
-      <span className="ov-attention-count">{count}</span>
+      {count === null ? (
+        <span className="ov-soon">Soon</span>
+      ) : (
+        <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
+          {count}
+        </span>
+      )}
     </li>
   );
 }

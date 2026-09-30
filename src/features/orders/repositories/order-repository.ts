@@ -3,7 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, Fulfillment, ItemStatus, Order, TermsAcceptance } from "../domain";
+import type { AuditEntry, CalendarDate, Fulfillment, ItemStatus, Order, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -117,6 +117,15 @@ export interface OrderRepository {
 
   /** Orders booked (created) in [from, to), oldest first. */
   listBookedBetween(from: Date, to: Date): Promise<Order[]>;
+
+  /** The most recently booked Orders, newest first. */
+  listRecent(limit: number): Promise<Order[]>;
+
+  /** Local Drop-Off Orders whose collection is booked on `date`, in booking order. */
+  listCollectionsOn(date: CalendarDate): Promise<Order[]>;
+
+  /** Which of these Orders have a payment confirmed on any of their Items (MANUAL_PAYMENT_CONFIRMED). */
+  findPaidOrderIds(orderIds: string[]): Promise<Set<string>>;
 
   /** How many Items are in each status right now; statuses with none are left out. */
   countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;

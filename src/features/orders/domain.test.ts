@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canTransition } from "./domain";
+import { canTransition, orderRollupStatus } from "./domain";
 
 describe("Item status pipeline", () => {
   it("allows the next linear step", () => {
@@ -22,5 +22,16 @@ describe("Item status pipeline", () => {
   it("has no transitions out of terminal states", () => {
     expect(canTransition("COMPLETED", "CANCELLED")).toBe(false);
     expect(canTransition("CANCELLED", "UNDER_REVIEW")).toBe(false);
+  });
+});
+
+describe("orderRollupStatus", () => {
+  it("is the least-advanced pair that isn't cancelled", () => {
+    expect(orderRollupStatus([{ status: "IN_PROGRESS" }, { status: "QUOTE_SENT" }, { status: "CANCELLED" }])).toBe("QUOTE_SENT");
+    expect(orderRollupStatus([{ status: "COMPLETED" }, { status: "CANCELLED" }])).toBe("COMPLETED");
+  });
+
+  it("is Cancelled only when every pair is", () => {
+    expect(orderRollupStatus([{ status: "CANCELLED" }, { status: "CANCELLED" }])).toBe("CANCELLED");
   });
 });

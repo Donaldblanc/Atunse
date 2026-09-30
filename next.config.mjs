@@ -56,9 +56,9 @@ const contentSecurityPolicy = [
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  // blob: for the photo thumbnails picked in the booking form. Add the
-  // storage origin here once a page displays stored photos (view links).
-  ["img-src 'self' data: blob:", assetsOrigin].filter(Boolean).join(" "),
+  // blob: for the photo thumbnails picked in the booking form; the storage
+  // origin for stored photos' view links (the admin Overview's thumbnails).
+  ["img-src 'self' data: blob:", assetsOrigin, storageOrigin].filter(Boolean).join(" "),
   // The storage origin only when the browser uploads to it directly.
   ["connect-src 'self'", storageOrigin, isDev ? "ws:" : null].filter(Boolean).join(" "),
   "object-src 'none'",

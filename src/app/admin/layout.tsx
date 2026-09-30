@@ -9,8 +9,8 @@ import { AdminNav } from "./admin-nav";
 import { OWNER_DISPLAY_NAME } from "./admin-screens";
 
 // Shared shell for every admin screen: the dark sidebar and the top bar
-// from the design (scratch/01-overview-dashboard.png), in the site's
-// Inter type and blue accent. Reachable only past src/proxy.ts's admin
+// from the design (scratch/overview-dashboard.jpeg), in the site's Inter
+// type and blue accent. Reachable only past src/proxy.ts's admin
 // guard, and it re-checks the session itself too (defense in depth).
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   // src/proxy.ts already guards every /admin request; this is a second,
@@ -24,10 +24,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="admin-shell">
         <aside className="admin-sidebar">
           <div className="admin-brand">
-            <span className="admin-brand-name">ATUNSE</span>
-            <span className="admin-brand-tag">Admin Dashboard</span>
+            <span className="admin-brand-name">ATUNṢE</span>
+            <span className="admin-brand-tag">Restore more than sneakers.</span>
           </div>
           <AdminNav />
+          <AccountMenu name={OWNER_DISPLAY_NAME} role="Admin" placement="sidebar" />
         </aside>
 
         <div className="admin-body">
@@ -38,7 +39,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <span className="sr-only">Search</span>
               <input type="search" placeholder="Search orders, customers, or reference #…" disabled title="Search arrives with the Orders screen" />
             </label>
-            <AccountMenu name={OWNER_DISPLAY_NAME} />
+            <AccountMenu name={OWNER_DISPLAY_NAME} role="Admin" placement="topbar" />
           </header>
 
           <main className="admin-main">{children}</main>

@@ -36,6 +36,32 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return FORWARD_TRANSITIONS[from].includes(to);
 }
 
+/** How admin screens name each status (CONTEXT.md: Status Pipeline). */
+export const ITEM_STATUS_LABELS: Record<ItemStatus, string> = {
+  REQUEST_SUBMITTED: "Request Submitted",
+  UNDER_REVIEW: "Under Review",
+  QUOTE_SENT: "Quote Sent",
+  APPROVED: "Approved",
+  AWAITING_SNEAKERS: "Awaiting Sneakers",
+  IN_PROGRESS: "In Progress",
+  QUALITY_CHECK: "Quality Check",
+  READY_FOR_PICKUP_SHIPPING: "Ready for Drop-Off/Shipping",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+};
+
+/**
+ * One status for a whole Order where an admin list needs it (CONTEXT.md:
+ * Order Status): its least-advanced pair that isn't cancelled, so an Order
+ * only reads "Completed" once every live pair is. Cancelled only when
+ * every pair is. Never stored.
+ */
+export function orderRollupStatus(items: { status: ItemStatus }[]): ItemStatus {
+  const live = items.filter((item) => item.status !== "CANCELLED");
+  if (live.length === 0) return "CANCELLED";
+  return live.reduce((least, item) => (ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf(least) ? item.status : least), live[0]!.status);
+}
+
 /**
  * CONTEXT.md: exactly two Fulfillment Methods. PICKUP is the code name for
  * **Local Drop-Off**: DJ collects the pair from the customer's address

@@ -26,6 +26,7 @@
   --sidebar-ink: #a3a3a8;
   --sidebar-ink-strong: #ffffff;
   --sidebar-active: #232326;
+  --sidebar-accent: #e8dcc4;
 
   /* Chart ink (dataviz reference palette, light mode). */
   --chart-grid: #e8e1d2;
@@ -124,43 +125,50 @@ body:has(> .admin-root) {
 /* ---------- Shell: sidebar + top bar ---------- */
 
 .admin-shell {
+  --sidebar-width: 224px;
   display: grid;
-  grid-template-columns: 264px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
-  padding: 16px 0 16px 16px;
+  /* Keeps the sidebar's black running the full height of a long page. */
+  background: linear-gradient(to right, var(--sidebar-bg) var(--sidebar-width), transparent var(--sidebar-width));
 }
 
 .admin-sidebar {
   background: var(--sidebar-bg);
   color: var(--sidebar-ink);
-  border-radius: var(--radius-lg);
-  padding: 32px 16px;
+  padding: 32px 14px 20px;
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 32px;
   position: sticky;
-  top: 16px;
-  height: calc(100vh - 32px);
+  top: 0;
+  height: 100vh;
   overflow-y: auto;
 }
 
 .admin-brand {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 0 12px;
+  gap: 8px;
+  padding: 0 10px;
 }
 
 .admin-brand-name {
   color: var(--sidebar-ink-strong);
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: 0.28em;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: 0.24em;
+  line-height: 1.1;
 }
 
 .admin-brand-tag {
-  font-size: 13px;
-  color: var(--sidebar-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sidebar-ink-strong);
+  max-width: 13em;
+  line-height: 1.5;
 }
 
 .admin-nav {
@@ -170,6 +178,7 @@ body:has(> .admin-root) {
 }
 
 .admin-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -190,6 +199,18 @@ a.admin-nav-item:hover {
 .admin-nav-item[data-active="true"] {
   background: var(--sidebar-active);
   color: var(--sidebar-ink-strong);
+}
+
+/* The design's accent bar on the current screen. */
+.admin-nav-item[data-active="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--sidebar-accent);
 }
 
 .admin-nav-item[data-soon="true"] {
@@ -221,18 +242,19 @@ a.admin-nav-item:hover {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 8px 32px 20px;
+  padding: 14px 32px;
   border-bottom: 1px solid var(--color-border);
 }
 
 .admin-search {
   flex: 1;
-  max-width: 880px;
+  max-width: 580px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 16px;
-  min-height: 48px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   background: var(--color-muted);
   color: var(--color-muted-foreground);
@@ -244,7 +266,7 @@ a.admin-nav-item:hover {
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--color-foreground);
 }
 
@@ -258,7 +280,12 @@ a.admin-nav-item:hover {
 
 .admin-account {
   position: relative;
-  margin-left: auto;
+}
+
+.admin-account[data-placement="sidebar"] {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-account-button {
@@ -272,16 +299,50 @@ a.admin-nav-item:hover {
   min-height: 44px;
 }
 
+.admin-account[data-placement="sidebar"] .admin-account-button {
+  width: 100%;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--sidebar-ink-strong);
+  text-align: left;
+}
+
+.admin-account[data-placement="sidebar"] .admin-account-button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-account-who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.admin-account-who span {
+  color: var(--sidebar-ink);
+  font-size: 13px;
+}
+
 .admin-avatar {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
+  flex: none;
   border-radius: 999px;
   display: grid;
   place-items: center;
   background: var(--color-muted);
   border: 1px solid var(--color-border);
+  color: var(--color-foreground);
   font-weight: 700;
   font-size: 15px;
+}
+
+.admin-account[data-placement="sidebar"] .admin-avatar {
+  background: #3a3a3e;
+  border-color: #4a4a4f;
+  color: #fff;
 }
 
 .admin-popover {
@@ -295,6 +356,15 @@ a.admin-nav-item:hover {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
+  color: var(--color-foreground);
+}
+
+/* The sidebar's account card sits at the foot, so its menu opens upwards. */
+.admin-account[data-placement="sidebar"] .admin-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
 }
 
 .admin-account-name {
@@ -325,22 +395,21 @@ a.admin-nav-item:hover {
 }
 
 .admin-main {
-  padding: 28px 32px 40px;
+  padding: 24px 28px 40px;
   width: 100%;
-  max-width: 1440px;
+  max-width: 1600px;
 }
 
 @media (max-width: 1024px) {
   .admin-shell {
     grid-template-columns: minmax(0, 1fr);
-    padding: 0;
+    background: none;
   }
 
   /* The sidebar becomes a top strip whose screens scroll sideways. */
   .admin-sidebar {
     position: static;
     height: auto;
-    border-radius: 0;
     padding: 16px;
     gap: 12px;
   }
@@ -356,6 +425,11 @@ a.admin-nav-item:hover {
     font-size: 18px;
   }
 
+  .admin-brand-tag {
+    max-width: none;
+    font-size: 10px;
+  }
+
   .admin-nav {
     flex-direction: row;
     overflow-x: auto;
@@ -367,8 +441,13 @@ a.admin-nav-item:hover {
     gap: 8px;
   }
 
+  /* The top bar's initials carry the account menu on small screens. */
+  .admin-account[data-placement="sidebar"] {
+    display: none;
+  }
+
   .admin-topbar {
-    padding: 16px;
+    padding: 12px 16px;
   }
 
   .admin-main {
@@ -418,9 +497,27 @@ a.admin-nav-item:hover {
 /* ---------- Overview ---------- */
 
 .ov {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.ov-primary,
+.ov-secondary {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  min-width: 0;
+}
+
+.ov-eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+  margin-bottom: 8px;
 }
 
 .ov-header {
@@ -516,10 +613,11 @@ a.admin-nav-item:hover {
 .ov-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 20px;
+  gap: 16px;
 }
 
 .ov-stat {
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -533,7 +631,7 @@ a.admin-nav-item:hover {
 }
 
 .ov-stat-label {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--color-muted-foreground);
 }
@@ -544,7 +642,7 @@ a.admin-nav-item:hover {
 }
 
 .ov-stat-value {
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1;
@@ -757,13 +855,15 @@ a.admin-nav-item:hover {
 /* Donut + legend. */
 .ov-donut {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 32px;
+  justify-content: center;
+  gap: 24px;
 }
 
 .ov-donut-ring {
   position: relative;
-  width: 220px;
+  width: 180px;
   flex: none;
 }
 
@@ -806,14 +906,14 @@ a.admin-nav-item:hover {
 }
 
 .ov-donut-center span {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12px;
   color: var(--color-muted-foreground);
   max-width: 9em;
 }
 
 .ov-legend {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -824,8 +924,8 @@ a.admin-nav-item:hover {
   display: grid;
   grid-template-columns: 12px minmax(0, 1fr) auto 3.2em;
   align-items: center;
-  gap: 12px;
-  font-size: 15px;
+  gap: 10px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -842,30 +942,301 @@ a.admin-nav-item:hover {
 }
 
 /* Needs Attention. */
-.ov-attention {
-  margin-top: 20px;
+.ov-card-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.ov-soon {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+/* Recent Orders table. */
+.ov-table-scroll {
+  overflow-x: auto;
+  margin: 0 -24px -8px;
+  padding: 0 24px 8px;
+}
+
+.ov-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ov-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+  padding: 10px 12px 10px 0;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.ov-table td {
+  padding: 12px 12px 12px 0;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.ov-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ov-num {
+  text-align: right;
+}
+
+.ov-table th.ov-num,
+.ov-table td.ov-num {
+  padding-right: 0;
+}
+
+.ov-ref {
+  font-weight: 700;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-total {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-cell-main {
+  display: block;
+  font-weight: 500;
+}
+
+.ov-cell-sub {
+  display: block;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.ov-table .ov-cell-main {
+  white-space: nowrap;
+}
+
+.ov-items {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ov-thumb {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  place-items: center;
+}
+
+.ov-chip-service {
+  display: inline-block;
+  max-width: 170px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ov-pill {
+  display: inline-block;
+  max-width: 150px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.ov-pill[data-tone="amber"] {
+  background: #fdf0dc;
+  color: #9a5b00;
+}
+
+.ov-pill[data-tone="blue"] {
+  background: #e4ebff;
+  color: #1c3fd6;
+}
+
+.ov-pill[data-tone="violet"] {
+  background: #ede7fb;
+  color: #5b3fc4;
+}
+
+.ov-pill[data-tone="green"] {
+  background: var(--delta-up-bg);
+  color: var(--delta-up-ink);
+}
+
+.ov-pill[data-nowrap="true"] {
+  max-width: none;
+  white-space: nowrap;
+}
+
+.ov-pill[data-tone="muted"] {
+  color: var(--color-muted-foreground);
+}
+
+.ov-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #b35300;
+}
+
+.ov-pending::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #eb6834;
+}
+
+/* Brand panel. */
+.ov-brand {
+  display: flex;
+  align-items: stretch;
+  min-height: 200px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #0b0b0c;
+  color: #fff;
+}
+
+.ov-brand-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  z-index: 1;
+}
+
+.ov-brand-name {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+}
+
+.ov-brand-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  line-height: 1.9;
+  text-transform: uppercase;
+}
+
+.ov-brand-photo {
+  width: 46%;
+  object-fit: cover;
+  /* Fades into the panel's black on the text side. */
+  mask-image: linear-gradient(to right, transparent, #000 30%);
+}
+
+/* Today's Schedule timeline. */
+.ov-schedule {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-schedule li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 68px 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.ov-schedule-time {
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-schedule-dot {
+  justify-self: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--color-foreground);
+  position: relative;
+}
+
+.ov-schedule li + li .ov-schedule-dot {
+  background: #c9c2b4;
+}
+
+/* The line joining the dots. */
+.ov-schedule li:not(:last-child) .ov-schedule-dot::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 12px;
+  width: 2px;
+  height: 44px;
+  background: var(--color-border);
+}
+
+.ov-tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--delta-up-bg);
+  color: var(--delta-up-ink);
+}
+
+/* Needs Attention. */
+.ov-attention {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
 }
 
 .ov-attention-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 4px 24px;
-}
-
-.ov-attention-item:first-child {
-  padding-left: 0;
+  gap: 14px;
+  padding: 12px 0;
 }
 
 .ov-attention-item + .ov-attention-item {
-  border-left: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
 }
 
 .ov-attention-icon {
-  width: 56px;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   flex: none;
   border-radius: 999px;
   display: grid;
@@ -882,9 +1253,19 @@ a.admin-nav-item:hover {
   color: #c25a0c;
 }
 
+.ov-attention-icon[data-tone="blue"] {
+  background: #e4ebff;
+  color: #1c3fd6;
+}
+
 .ov-attention-icon[data-tone="violet"] {
   background: #ece6fb;
   color: #5b3fc4;
+}
+
+.ov-attention-icon[data-tone="gray"] {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
 }
 
 .ov-attention-text {
@@ -892,22 +1273,55 @@ a.admin-nav-item:hover {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .ov-attention-text strong {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .ov-attention-text span {
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.ov-attention-item[data-soon="true"] .ov-attention-text strong {
   color: var(--color-muted-foreground);
 }
 
 .ov-attention-count {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-attention-count[data-alert="true"] {
+  color: var(--delta-down-ink);
+}
+
+.ov-reviews-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ov-reviews-empty svg {
+  flex: none;
+  color: #eda100;
+}
+
+@media (max-width: 1440px) {
+  .ov {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The right column's cards sit side by side under the main one. */
+  .ov-secondary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
 }
 
 @media (max-width: 1200px) {
@@ -921,7 +1335,8 @@ a.admin-nav-item:hover {
 }
 
 @media (max-width: 720px) {
-  .ov-stats {
+  .ov-stats,
+  .ov-secondary {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -934,6 +1349,11 @@ a.admin-nav-item:hover {
     padding: 18px;
   }
 
+  .ov-table-scroll {
+    margin: 0 -18px -8px;
+    padding: 0 18px 8px;
+  }
+
   .ov-donut {
     flex-direction: column;
     align-items: stretch;
@@ -942,20 +1362,6 @@ a.admin-nav-item:hover {
   .ov-donut-ring {
     align-self: center;
     width: 200px;
-  }
-
-  .ov-attention {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .ov-attention-item,
-  .ov-attention-item:first-child {
-    padding: 14px 0;
-  }
-
-  .ov-attention-item + .ov-attention-item {
-    border-left: none;
-    border-top: 1px solid var(--color-border);
   }
 }
 

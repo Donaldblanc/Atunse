@@ -362,6 +362,39 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect(booked[0]?.items).toHaveLength(1);
   });
 
+  it("lists the most recent Orders, newest first", async () => {
+    const orders = [];
+    for (const day of ["2026-09-20", "2026-09-22", "2026-09-21"]) {
+      const { order } = await repo.create(newOrder());
+      await prisma.order.update({ where: { id: order.id }, data: { createdAt: new Date(`${day}T15:00:00Z`) } });
+      orders.push(order);
+    }
+
+    const recent = await repo.listRecent(2);
+
+    expect(recent.map((order) => order.id)).toEqual([orders[1]!.id, orders[2]!.id]);
+  });
+
+  it("finds the Local Drop-Off collections booked on a day", async () => {
+    const today = (await repo.create(newOrder())).order; // collected 2026-10-03
+    await repo.create(
+      newOrder({ fulfillment: { method: "PICKUP", address: { line1: "1 Main St", line2: null, city: "New York", state: "NY", zip: "10001" }, date: "2026-10-04", slot: "4:30 PM – 5:00 PM" } }),
+    );
+    await repo.create(
+      newOrder({ fulfillment: { method: "MAIL_IN", address: { line1: "1 Main St", line2: null, city: "Austin", state: "TX", zip: "73301" }, preferredDate: "2026-10-03" } }),
+    );
+
+    expect((await repo.listCollectionsOn("2026-10-03")).map((order) => order.id)).toEqual([today.id]);
+  });
+
+  it("finds which Orders have a payment confirmed", async () => {
+    const paid = (await repo.create(newOrder({ items: [newItem(), newItem()] }))).order;
+    const unpaid = (await repo.create(newOrder())).order;
+    await transition(paid.items[1]!.id, "MANUAL_PAYMENT_CONFIRMED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
+
+    expect(await repo.findPaidOrderIds([paid.id, unpaid.id])).toEqual(new Set([paid.id]));
+  });
+
   it("counts Items by status", async () => {
     const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
     await transition(order.items[0]!.id, "REVIEW_STARTED", "REQUEST_SUBMITTED", "UNDER_REVIEW");
