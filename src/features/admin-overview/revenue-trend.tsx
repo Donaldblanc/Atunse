@@ -16,9 +16,15 @@ export function RevenueTrend({ days, highlight }: { days: { date: CalendarDate; 
   const ticks = dollarTicks(Math.max(...days.map((day) => day.revenue.cents)) / 100);
   const top = ticks[ticks.length - 1]!;
   const everyDay = days.length <= 7;
+  // Up to a month, every fifth day is labelled; beyond that (90 days, a
+  // custom range) about six labels, so they never run into each other.
+  const labelStep = days.length <= 31 ? 5 : Math.ceil(days.length / 6);
+  // A bar per day past a month is a sliver: tighter gaps, and no tab stop
+  // on each (hover still shows the value; every bar keeps its aria-label).
+  const veryDense = days.length > 45;
 
   return (
-    <div className="ov-bars" data-dense={everyDay ? undefined : "true"}>
+    <div className="ov-bars" data-dense={everyDay ? undefined : veryDense ? "very" : "true"}>
       <div className="ov-bars-axis" aria-hidden="true">
         {[...ticks].reverse().map((tick) => (
           <span key={tick}>${tick.toLocaleString("en-US")}</span>
@@ -32,14 +38,14 @@ export function RevenueTrend({ days, highlight }: { days: { date: CalendarDate; 
         </div>
         {days.map((day, i) => {
           const value = day.revenue.format();
-          // Label every day in a week; in 30 days, every fifth counting back from today.
-          const labelled = everyDay || (days.length - 1 - i) % 5 === 0;
+          // Label every day in a week; otherwise every few, counting back from the last day.
+          const labelled = everyDay || (days.length - 1 - i) % labelStep === 0;
           return (
             <div key={day.date} className="ov-bar-slot">
               <div
                 className="ov-bar-hit"
                 role="img"
-                tabIndex={0}
+                tabIndex={veryDense ? undefined : 0}
                 aria-label={`${longDay.format(asDate(day.date))}: ${value} booked`}
               >
                 <div

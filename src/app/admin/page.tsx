@@ -26,7 +26,7 @@ import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview, type ScheduledVisit } from "@/features/admin-overview/get-admin-overview";
 import { greeting } from "@/features/admin-overview/greeting";
-import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewRangeId } from "@/features/admin-overview/overview-range";
+import { formatRangeDates, OVERVIEW_RANGE_LABELS, parseOverviewSelection } from "@/features/admin-overview/overview-range";
 import { RangePicker } from "@/features/admin-overview/range-picker";
 import { RecentOrders } from "@/features/admin-overview/recent-orders";
 import { RevenueTrend } from "@/features/admin-overview/revenue-trend";
@@ -42,13 +42,16 @@ export const metadata = { title: "Overview · Atunṣe Admin" };
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
 export default async function AdminOverviewPage({ searchParams }: { searchParams: SearchParams }) {
-  const rangeId = parseOverviewRangeId((await searchParams).range);
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildAdminOverviewDeps();
-  const overview = await getAdminOverview(deps, actingUser, rangeId);
-  const { range } = overview;
-
   const today = calendarDateInShopTime(deps.now());
+  // ?range= (a preset) or ?from=&to= (custom); links that add their own
+  // params build on overviewHref(selection, {...}) to keep it.
+  const selection = parseOverviewSelection(await searchParams, deps.now());
+  const overview = await getAdminOverview(deps, actingUser, selection);
+  const { range } = overview;
+  const rangeId = range.id;
+
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
   const calendarHref = builtScreenHref("calendar");
@@ -67,7 +70,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             </h1>
             <p className="ov-subtitle">Here&apos;s what&apos;s happening with your business today.</p>
           </div>
-          <RangePicker current={rangeId} datesLabel={formatRangeDates(range)} />
+          <RangePicker selection={selection} today={today} datesLabel={formatRangeDates(range)} />
         </div>
 
         <section className="ov-stats" aria-label="Key figures">
