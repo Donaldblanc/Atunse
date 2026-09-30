@@ -99,6 +99,10 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Lazy loading**: step and FAQ photos load lazily; audit the rest.
 - [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
 - [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
+- [ ] **Database indexes, once the admin screens are ready for launch** (from the #118 review): the admin Overview filters and sorts `orders` by `createdAt` (both date ranges, Recent Orders) and `pickupDate` (Today's Schedule), and every Order load finds its pairs by `items.orderId`. Without indexes each of these reads the whole table. That's fine at today's size but grows with every booking.
+  - `Order` `@@index([createdAt])` and `@@index([pickupDate])`: already on #119's branch (`feature/admin-data-model`); confirm they landed.
+  - `Item` `@@index([orderId])`: missing everywhere. Postgres doesn't index foreign keys on its own, and Prisma doesn't add one.
+  - Then add indexes for whatever the finished admin screens (Orders queue, Calendar, Messages) filter or sort on that isn't covered, and check the busiest queries with `EXPLAIN ANALYZE` against production-sized data.
 
 ### Links & navigation
 - [ ] **Every nav and footer link**: checked in headless runs (Services, Gallery, Process, About, Contact, and the Terms and Privacy PDFs). Do a full manual pass.
