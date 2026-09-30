@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { adminStatusMoves, canTransition, liveEstimate, orderRollupStatus } from "./domain";
+import { adminStatusMoves, canTransition, isStepBack, liveEstimate, orderRollupStatus } from "./domain";
 
 describe("Item status pipeline", () => {
   it("allows the next linear step", () => {
@@ -40,10 +40,16 @@ describe("adminStatusMoves", () => {
     expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({ moves: ["QUALITY_CHECK", "CANCELLED"], held: null });
   });
 
-  it("holds Quote Sent for the quote step (ADR-0001)", () => {
+  it("holds Quote Sent for the quote step (ADR-0001), still offering the step back and Cancel", () => {
     const { moves, held } = adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"));
-    expect(moves).toEqual(["CANCELLED"]);
+    expect(moves).toEqual(["REQUEST_SUBMITTED", "CANCELLED"]);
     expect(held).toMatch(/quote/);
+  });
+
+  it("tells a step back from progress", () => {
+    expect(isStepBack("UNDER_REVIEW", "REQUEST_SUBMITTED")).toBe(true);
+    expect(isStepBack("REQUEST_SUBMITTED", "UNDER_REVIEW")).toBe(false);
+    expect(isStepBack("UNDER_REVIEW", "CANCELLED")).toBe(false);
   });
 
   it("holds a pair at Approved while the Deposit is pending (ADR-0002)", () => {

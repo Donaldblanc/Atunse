@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
+import { isStepBack, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
 import { updateItemStatusAction, type UpdateStatusState } from "./order-actions";
 
 /**
  * Update Status for one pair: offers only where the owner may move it (the
- * next step and Cancel, per adminStatusMoves), submitted to a server action.
+ * next step, a step back where the pipeline allows one, and Cancel, per
+ * adminStatusMoves), submitted to a server action.
  * A step that's held (on the quote or the deposit) says why instead.
  * Cancelling can't be undone, so it takes a second, explicit click.
  */
@@ -31,9 +32,11 @@ export function UpdateStatusForm({
 }) {
   const [state, formAction, pending] = useActionState<UpdateStatusState, FormData>(updateItemStatusAction, { error: null });
   const [confirmingCancel, setConfirmingCancel] = useState(false);
-  const forward = nextStatuses.find((status) => status !== "CANCELLED");
+  // A step back (Under Review to Request Submitted) is never the main "Move to" action: it isn't progress.
+  const forward = nextStatuses.find((status) => status !== "CANCELLED" && !isStepBack(fromStatus, status));
+  const back = nextStatuses.find((status) => isStepBack(fromStatus, status));
   const canCancel = nextStatuses.includes("CANCELLED");
-  if (!forward && !canCancel && !held) return null;
+  if (!forward && !back && !canCancel && !held) return null;
 
   return (
     <form action={formAction} className="od-status-form">
@@ -46,6 +49,11 @@ export function UpdateStatusForm({
         {forward && (
           <button type="submit" name="toStatus" value={forward} className="admin-btn" disabled={pending}>
             Move to {ITEM_STATUS_LABELS[forward]}
+          </button>
+        )}
+        {back && (
+          <button type="submit" name="toStatus" value={back} className="admin-btn" data-variant="secondary" disabled={pending}>
+            Back to {ITEM_STATUS_LABELS[back]}
           </button>
         )}
         {canCancel &&

@@ -41,6 +41,11 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return FORWARD_TRANSITIONS[from].includes(to);
 }
 
+/** A move to an earlier step (Under Review back to Request Submitted), not progress; Cancelled is neither. */
+export function isStepBack(from: ItemStatus, to: ItemStatus): boolean {
+  return to !== "CANCELLED" && ITEM_STATUSES.indexOf(to) < ITEM_STATUSES.indexOf(from);
+}
+
 /**
  * Where an admin's plain "Update Status" may move a pair: the pipeline's
  * next step and Cancel (canTransition), less two steps that are more than
