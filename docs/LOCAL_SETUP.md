@@ -84,7 +84,7 @@ from the admin one, so you can be signed in as both.
 - `POST /api/v1/orders` — customer-facing order submission from `/booking`. Creates the customer's Account on their first booking (ADR-0014). Send an `Idempotency-Key: <uuid>` header to make retries safe. `409 SIGN_IN_REQUIRED` means the email already has an Account (with customer sign-in on)
 - `POST /api/v1/auth/code/request`, `POST /api/v1/auth/code/verify` — customer email-code sign-in (404 unless `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true`)
 - `GET /api/v1/orders/:orderId/photos` — 5-minute photo view links, for the Order's owner or an admin
-- `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
+- `POST /api/v1/admin/items/:itemId/transitions` — admin status moves on the Item pipeline (review, manual payment confirmed, ...), admin-only. Moves to Quote Sent or Approved are refused with `409`: they go through Send Quote and Customer approved, which set the price and record the approval
 - `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
 - `POST /api/v1/auth/sign-out` — clears the session cookie
 
