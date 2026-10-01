@@ -30,6 +30,9 @@ Example: `updateItemStatusAction` in `order-actions.ts`.
 - Open it with a URL param on `/admin`, and build every link with `overviewHref(selection, extra)` (`overview-range.ts`) so the date range is kept.
 - Use `src/shared/ui/admin-dialog.tsx` (a native `<dialog>` with `showModal()`). Closing it navigates to the URL without the param.
 - Load the data on the server through an admin-only use-case. Never import Prisma into a page.
+- A new dialog = one slot file in `src/features/admin-overview/dialogs/` (a server component that loads its own data from the `OverviewDialogContext`, plus a `matches(params)` check) and one line in `OVERVIEW_DIALOGS` in `dialogs/registry.tsx`. Don't touch `app/admin/page.tsx`. Add the slot to `registry.test.ts`.
+- A new Overview panel = one file in `src/features/admin-overview/panels/`, rendered from `page.tsx` with only the props it needs.
+- New styles go in a per-area CSS file imported by the component that needs them (Next 16 allows global CSS imports from any layout, page or component under `app/`; the stylesheet stays global and isn't removed on navigation, so keep class names prefixed, e.g. `ov-`).
 - Confirm steps must render a **different element** from the button that opened them. If the same element is reused, one click submits too (bug found in #123).
 
 ## Migration
