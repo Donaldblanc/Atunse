@@ -41,6 +41,41 @@ export function canTransition(from: ItemStatus, to: ItemStatus): boolean {
   return FORWARD_TRANSITIONS[from].includes(to);
 }
 
+/** A move to an earlier step (Under Review back to Request Submitted), not progress; Cancelled is neither. */
+export function isStepBack(from: ItemStatus, to: ItemStatus): boolean {
+  return to !== "CANCELLED" && ITEM_STATUSES.indexOf(to) < ITEM_STATUSES.indexOf(from);
+}
+
+/**
+ * Where an admin's plain "Update Status" may move a pair: the pipeline's
+ * next step and Cancel (canTransition), less two steps that are more than
+ * a status change, each with the reason it's held:
+ * - Quote Sent is the owner's quote reaching the customer (ADR-0001), so it
+ *   waits for the quote step that sets the price.
+ * - Past Approved while the Order's Deposit is still PENDING: the Order is
+ *   held until the owner marks it received (ADR-0002).
+ */
+export function adminStatusMoves(
+  item: { status: ItemStatus },
+  order: { payments: { kind: PaymentKind; status: Payment["status"] }[] },
+): { moves: ItemStatus[]; held: string | null } {
+  let held: string | null = null;
+  const moves = ITEM_STATUSES.filter((next) => {
+    if (!canTransition(item.status, next)) return false;
+    if (next === "QUOTE_SENT") {
+      held = "Waiting on the quote: sending one arrives with the quote step.";
+      return false;
+    }
+    if (item.status === "APPROVED" && order.payments.some((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING")) {
+      if (next === "CANCELLED") return true;
+      held = "Waiting on the deposit: mark it paid in Pending Payments first.";
+      return false;
+    }
+    return true;
+  });
+  return { moves, held };
+}
+
 /** How admin screens name each status (CONTEXT.md: Status Pipeline). */
 export const ITEM_STATUS_LABELS: Record<ItemStatus, string> = {
   REQUEST_SUBMITTED: "Request Submitted",
@@ -159,7 +194,11 @@ export interface Appointment {
   status: "SCHEDULED" | "COMPLETED" | "CANCELLED";
   startsAt: Date;
   endsAt: Date;
+  /** What the owner wrote for this visit (gate code, "call on arrival"); null when there is none. */
+  notes: string | null;
 }
+
+export const APPOINTMENT_KIND_LABELS: Record<Appointment["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
 
 export interface Order {
   id: string;

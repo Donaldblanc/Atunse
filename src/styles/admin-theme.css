@@ -494,6 +494,85 @@ a.admin-nav-item:hover {
   cursor: not-allowed;
 }
 
+/* A secondary action beside .admin-btn: the same pill, outlined. */
+.admin-btn[data-variant="secondary"] {
+  background: var(--color-card);
+  color: var(--color-foreground);
+  border-color: var(--color-border);
+}
+
+.admin-btn[data-variant="secondary"]:hover {
+  background: var(--color-muted);
+}
+
+/* ---------- Dialog (src/shared/ui/admin-dialog.tsx) ---------- */
+
+.admin-dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-card);
+  color: var(--color-foreground);
+  box-shadow: var(--shadow-popover);
+  font-family: "Inter", sans-serif;
+}
+
+.admin-dialog[data-size="sm"] {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.admin-dialog[data-size="lg"] {
+  width: min(880px, calc(100vw - 32px));
+}
+
+.admin-dialog::backdrop {
+  background: rgba(11, 15, 26, 0.45);
+}
+
+.admin-dialog-body {
+  padding: 24px;
+}
+
+.admin-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.admin-dialog-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.admin-dialog-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px -10px 0 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-muted-foreground);
+  flex: none;
+}
+
+.admin-dialog-close:hover {
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+@media (max-width: 720px) {
+  .admin-dialog-body {
+    padding: 20px 16px;
+  }
+}
+
 /* ---------- Overview ---------- */
 
 .ov {
@@ -561,20 +640,6 @@ a.admin-nav-item:hover {
   background: var(--color-card);
   font-size: 15px;
   font-weight: 500;
-}
-
-.ov-range-panel {
-  min-width: 100%;
-}
-
-.ov-range-panel .admin-menu-item[aria-current="true"] {
-  font-weight: 700;
-}
-
-.ov-range-check {
-  width: 16px;
-  display: grid;
-  place-items: center;
 }
 
 .ov-card {
@@ -1040,6 +1105,14 @@ a.admin-nav-item:hover {
   color: var(--color-muted-foreground);
   display: grid;
   place-items: center;
+}
+
+/* A stored photo that couldn't be shown (pair-thumb.tsx): warning tone and a dashed edge, unlike the plain "no photo" placeholder. */
+.ov-thumb[data-state="broken"] {
+  background: var(--delta-down-bg);
+  color: var(--delta-down-ink);
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
 }
 
 .ov-chip-service {
@@ -1509,4 +1582,1125 @@ a.admin-nav-item:hover {
   margin-bottom: 16px;
   font-weight: 500;
   line-height: 1.5;
+}
+
+/* ---------- Select Date Range ---------- */
+
+.ov-range-panel {
+  width: min(560px, calc(100vw - 32px));
+  padding: 16px;
+}
+
+.ov-range-body {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+}
+
+.ov-range-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ov-range-preset {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ov-range-preset:hover {
+  background: var(--color-muted);
+}
+
+.ov-range-preset[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent-deep);
+  font-weight: 700;
+}
+
+.ov-cal-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ov-cal-title {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ov-cal-nav {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+}
+
+.ov-cal-nav:hover:not(:disabled) {
+  background: var(--color-muted);
+}
+
+.ov-cal-nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ov-cal-weekdays,
+.ov-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.ov-cal-weekdays span {
+  padding: 6px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.ov-cal-day {
+  height: 36px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ov-cal-day:hover:not(:disabled) {
+  background: var(--color-muted);
+  border-radius: 999px;
+}
+
+.ov-cal-day:disabled {
+  color: var(--color-muted-foreground);
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ov-cal-day[data-today="true"] {
+  font-weight: 700;
+}
+
+/* The range reads as a band: tinted between, filled at both ends. */
+.ov-cal-day[data-state="between"] {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent-deep);
+}
+
+.ov-cal-day[data-state="start"],
+.ov-cal-day[data-state="end"] {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+  border-radius: 999px;
+}
+
+.ov-cal-hint {
+  min-height: 20px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.ov-range-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* Very long ranges: a bar per day is a sliver, so the gaps close up. */
+.ov-bars[data-dense="very"] .ov-bars-plot {
+  gap: 1px;
+}
+
+@media (max-width: 720px) {
+  /* The panel spans the header rather than hanging off the (narrow) button. */
+  .ov-header {
+    position: relative;
+  }
+
+  .ov-range {
+    position: static;
+  }
+
+  .ov-range-panel {
+    left: 0;
+    right: 0;
+    width: auto;
+  }
+
+  .ov-range-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .ov-range-presets {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .ov-range-preset {
+    min-height: 40px;
+    border: 1px solid var(--color-border);
+  }
+}
+
+/* ---------- Metric details (src/features/admin-overview/metric-detail-dialog.tsx) ---------- */
+
+.ov-stat-clickable {
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.ov-stat-clickable:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-popover);
+}
+
+.ov-stat-clickable:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+.md {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.md-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.md-headline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.md-value {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.md-heading {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* Line chart: axis column beside the plot; labels hang below the plot. */
+.md-chart {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 28px;
+}
+
+.md-chart-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 200px;
+  margin: -8px 0;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+  color: var(--color-muted-foreground);
+}
+
+.md-chart-plot {
+  position: relative;
+  height: 200px;
+}
+
+.md-chart-grid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: space-between;
+}
+
+.md-chart-grid span {
+  border-top: 1px solid var(--chart-grid);
+}
+
+.md-chart-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.md-chart-area {
+  fill: var(--series-1);
+  fill-opacity: 0.12;
+}
+
+.md-chart-line {
+  fill: none;
+  stroke: var(--series-1);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.md-chart-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  outline: none;
+}
+
+.md-chart-dot {
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  background: var(--series-1);
+  box-shadow: 0 0 0 2px var(--color-card);
+  opacity: 0;
+}
+
+.md-chart-dot[data-highlight="true"],
+.md-chart-hit:hover .md-chart-dot,
+.md-chart-hit:focus-visible .md-chart-dot {
+  opacity: 1;
+}
+
+.md-chart-hit:focus-visible {
+  background: var(--color-muted);
+  border-radius: 6px;
+}
+
+.md-chart-tooltip {
+  bottom: auto;
+  transform: translate(-50%, calc(-100% - 10px));
+}
+
+.md-chart-hit:hover .md-chart-tooltip,
+.md-chart-hit:focus-visible .md-chart-tooltip {
+  display: flex;
+}
+
+.md-chart-labels {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  height: 16px;
+}
+
+.md-chart-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  color: var(--color-muted-foreground);
+}
+
+/* Order Status Breakdown. */
+.md-status {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.md-status li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto 48px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--chart-grid);
+  font-size: 15px;
+}
+
+.md-status-value {
+  font-weight: 700;
+}
+
+.md-status-share {
+  text-align: right;
+  color: var(--color-muted-foreground);
+}
+
+.md-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  background: #8a8578;
+}
+
+.md-dot[data-tone="amber"] {
+  background: var(--series-4);
+}
+
+.md-dot[data-tone="blue"] {
+  background: var(--series-1);
+}
+
+.md-dot[data-tone="violet"] {
+  background: #5b3fc4;
+}
+
+.md-dot[data-tone="green"] {
+  background: var(--delta-up-ink);
+}
+
+.md-dot[data-tone="muted"] {
+  background: #b9b3a7;
+}
+
+.md-cancelled {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.md-cancelled .md-dot {
+  margin-top: 5px;
+}
+
+@media (max-width: 720px) {
+  .md-value {
+    font-size: 34px;
+  }
+}
+
+/* ---------- Order detail dialog (src/features/admin-overview/order-detail-dialog.tsx) ---------- */
+
+/* Recent Orders: the reference link is stretched over its whole row. */
+.ov-row-link {
+  position: relative;
+}
+
+.ov-row-link:hover td {
+  background: var(--color-muted);
+}
+
+.ov-ref a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.ov-ref a:focus-visible {
+  outline: none;
+}
+
+.ov-row-link:has(.ov-ref a:focus-visible) {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+}
+
+.admin-btn[data-variant="danger"] {
+  background: var(--color-destructive);
+}
+
+.admin-btn[data-variant="danger"]:hover {
+  background: #8f1c12;
+}
+
+.od-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.od-title-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: var(--radius-md);
+  background: var(--color-muted);
+}
+
+.od-eyebrow {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.od-reference {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-title-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.od-muted {
+  color: var(--color-muted-foreground);
+  font-size: 13px;
+}
+
+.od-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.od-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.od-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-size: 14px;
+}
+
+.od-customer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.od-avatar {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--color-foreground);
+  color: var(--color-card);
+  font-weight: 700;
+}
+
+.od-customer-name {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.od-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent);
+  overflow-wrap: anywhere;
+}
+
+.od-facts,
+.od-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.od-facts > div,
+.od-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.od-facts dt,
+.od-totals dt {
+  color: var(--color-muted-foreground);
+  flex: none;
+}
+
+.od-facts dd,
+.od-totals dd {
+  text-align: right;
+  font-weight: 500;
+  min-width: 0;
+}
+
+.od-totals {
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.od-totals > div:last-child dd {
+  font-weight: 700;
+}
+
+.od-line {
+  display: block;
+}
+
+.od-pairs,
+.od-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.od-pair {
+  display: flex;
+  gap: 12px;
+}
+
+.od-pair-photo {
+  width: 64px;
+  height: 64px;
+}
+
+.od-pair-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.od-pair-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.od-pair-title {
+  font-weight: 700;
+}
+
+.od-pair-price {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-services {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.od-services li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.od-timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.od-step {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 0 14px 28px;
+  color: var(--color-muted-foreground);
+}
+
+/* The line joining a step's dot to the next one's. */
+.od-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 18px;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.od-step[data-state="done"]:not(:last-child)::before {
+  background: var(--color-accent);
+}
+
+.od-step-dot {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid var(--color-border);
+  background: var(--color-card);
+  color: #fff;
+}
+
+.od-step[data-state="done"] .od-step-dot {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.od-step[data-state="current"] {
+  color: var(--color-foreground);
+  font-weight: 700;
+}
+
+.od-step[data-state="current"] .od-step-dot {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px #e4ebff;
+}
+
+.od-step[data-cancelled="true"][data-state="current"] .od-step-dot {
+  border-color: var(--color-destructive);
+  box-shadow: 0 0 0 4px #fde8e6;
+}
+
+.od-step[data-state="done"] {
+  color: var(--color-foreground);
+}
+
+.od-step-time {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.od-status-note {
+  margin-top: -6px;
+}
+
+.od-status-forms {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.od-subhead {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.od-status-pair {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.od-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.od-status-held {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.od-status-error {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--delta-down-ink);
+}
+
+.od-notes li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.od-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.ov-pill[data-tone="red"] {
+  background: var(--delta-down-bg);
+  color: var(--delta-down-ink);
+}
+
+@media (max-width: 720px) {
+  .od-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .od-reference {
+    font-size: 20px;
+  }
+}
+
+/* ---------- Schedule Item dialog ---------- */
+
+/* Today's Schedule rows: the customer's name is the link, stretched over the row. */
+.ov-schedule-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.ov-schedule li:hover .ov-schedule-link {
+  color: var(--color-accent-deep);
+}
+
+.visit-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visit-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.visit-summary-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  border-radius: 999px;
+  background: #e4ebff;
+  color: var(--color-accent-deep);
+}
+
+.visit-summary-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.visit-summary-name .ov-tag {
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.visit-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.visit-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.visit-heading {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.visit-customer,
+.visit-order {
+  display: flex;
+  gap: 14px;
+}
+
+.visit-customer-lines,
+.visit-order-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 14px;
+}
+
+/* .ov-cell-sub doesn't wrap (it's made for table cells); in a dialog a long Services line must. */
+.visit-order-lines .ov-cell-sub {
+  white-space: normal;
+}
+
+.visit-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.visit-line svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+a.visit-line:hover,
+.visit-order-link:hover {
+  color: var(--color-accent-deep);
+  text-decoration: underline;
+}
+
+.visit-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+}
+
+.visit-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+
+.visit-facts dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted-foreground);
+}
+
+.visit-facts dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.visit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 720px) {
+  .visit-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .visit-actions > *,
+  .visit-actions form .admin-btn {
+    width: 100%;
+  }
+}
+
+/* ---------- Take Action from Needs Attention ---------- */
+
+/* Needs Attention rows that open a panel (?attention=); stat cards use .ov-stat-clickable. */
+.ov-attention-item[data-link="true"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* The row moved inside an <li>, so the divider is on the <li>s now. */
+.ov-attention > li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.ov-attention-item[data-link="true"] {
+  color: inherit;
+  border-radius: 12px;
+}
+
+.ov-attention-item[data-link="true"]:hover {
+  background: var(--color-muted);
+}
+
+/* Panel dialogs: tabs and search above a table. */
+.att-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.att-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.att-tab {
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-muted-foreground);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.att-tab[aria-selected="true"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.att-search {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+
+.att-search-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.att-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+}
+
+.att-scroll {
+  overflow-x: auto;
+}
+
+.att-table {
+  min-width: 620px;
+}
+
+.att-link {
+  color: var(--color-accent);
+}
+
+.att-link:hover {
+  text-decoration: underline;
+}
+
+.att-action {
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.att-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.att-error {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-destructive);
+  text-align: right;
+}
+
+/* Pending Payments on a phone: each row becomes a small card, so Mark Paid
+   stays on screen instead of past a sideways scroll. */
+@media (max-width: 720px) {
+  .att-table[data-kind="payments"] {
+    min-width: 0;
+  }
+
+  .att-table[data-kind="payments"] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .att-table[data-kind="payments"] tbody {
+    display: block;
+  }
+
+  .att-table[data-kind="payments"] tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .att-table[data-kind="payments"] td {
+    display: block;
+    padding: 0;
+    border: 0;
+  }
+
+  /* Order # and amount, then customer and method, then the booked date, then the action. */
+  .att-table[data-kind="payments"] td:nth-child(1) { grid-area: 1 / 1; }
+  .att-table[data-kind="payments"] td:nth-child(3) { grid-area: 1 / 2; text-align: right; }
+  .att-table[data-kind="payments"] td:nth-child(2) { grid-area: 2 / 1; }
+  .att-table[data-kind="payments"] td:nth-child(4) { grid-area: 2 / 2; text-align: right; }
+  .att-table[data-kind="payments"] td:nth-child(5) { grid-area: 3 / 1 / 4 / 3; color: var(--color-muted-foreground); font-size: 13px; }
+  .att-table[data-kind="payments"] td:nth-child(6) { grid-area: 4 / 1 / 5 / 3; margin-top: 6px; text-align: left; }
+
+  .att-table[data-kind="payments"] .att-action {
+    width: 100%;
+  }
+
+  .att-table[data-kind="payments"] .att-confirm {
+    display: flex;
+    justify-content: stretch;
+  }
+
+  .att-table[data-kind="payments"] .att-confirm .att-action {
+    flex: 1;
+  }
 }

@@ -13,6 +13,22 @@ export function dollarTicks(maxDollars: number): number[] {
   return [0, step, step * 2, step * 3];
 }
 
+/**
+ * How a chart with one column per day labels and tabs through its days.
+ * A week labels every day; up to a month, every fifth day; beyond that
+ * (90 days, a custom range) about six labels, so they never run into each
+ * other. Past 45 days a column is a sliver, so it gets no tab stop (hover
+ * still shows the value, and every column keeps its aria-label).
+ */
+export function dayAxis(dayCount: number): { everyDay: boolean; labelStep: number; veryDense: boolean } {
+  const everyDay = dayCount <= 7;
+  return {
+    everyDay,
+    labelStep: everyDay ? 1 : dayCount <= 31 ? 5 : Math.ceil(dayCount / 6),
+    veryDense: dayCount > 45,
+  };
+}
+
 export interface DonutSegment {
   /** Where the segment starts along the ring, and how long it is, as fractions of the whole ring. */
   offset: number;
@@ -41,4 +57,12 @@ export function sharesOf100(values: number[]): number[] {
   const missing = 100 - shares.reduce((sum, share) => sum + share, 0);
   for (let k = 0; k < missing; k++) shares[byRemainder[k]!.i]! += 1;
   return shares;
+}
+
+/** Y-axis ticks for a count: four whole numbers from 0 up to at least `max` (never a fractional order). */
+export function countTicks(max: number): number[] {
+  const step = Math.max(1, Math.ceil(max / 3));
+  const magnitude = 10 ** Math.floor(Math.log10(step));
+  const rounded = [1, 2, 5, 10].map((m) => m * magnitude).find((s) => s >= step)!;
+  return [0, rounded, rounded * 2, rounded * 3];
 }

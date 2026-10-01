@@ -15,7 +15,9 @@ import {
 import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
-import { overviewRange, type OverviewRange, type OverviewRangeId } from "./overview-range";
+import { metricDetail, type MetricDetail } from "./metric-detail";
+import { pairPhoto, type PairPhoto } from "./pair-photo";
+import { overviewRange, type OverviewRange, type OverviewSelection } from "./overview-range";
 
 export interface AdminOverviewDeps {
   orders: Pick<
@@ -38,8 +40,8 @@ export interface RecentOrder {
   reference: string;
   customerName: string;
   bookedAt: Date;
-  /** The first pair's first photo, or null. */
-  photoUrl: string | null;
+  /** The first pair's first photo. */
+  photo: PairPhoto;
   /** Pairs not cancelled (every pair for a fully cancelled Order, which shows what was booked). */
   pairCount: number;
   /** The first of those pairs' brand and model, e.g. "Nike Air Max 90". */
@@ -55,6 +57,8 @@ export interface RecentOrder {
 
 /** A Local Drop-Off visit scheduled for today: DJ collecting a pair, or dropping it back off. */
 export interface ScheduledVisit {
+  /** The Appointment, for the `?visit=` link to its Schedule Item dialog. */
+  appointmentId: string;
   orderId: string;
   reference: string;
   customerName: string;
@@ -63,7 +67,8 @@ export interface ScheduledVisit {
   time: string;
 }
 
-const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
+/** A visit's clock time in shop time, e.g. "9:30 AM". */
+export const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
 
 const RECENT_ORDERS = 5;
 
@@ -79,6 +84,8 @@ export interface AdminOverview {
   bookedRevenue: { current: Money; previous: Money };
   /** bookedRevenue per day of the range, oldest first. */
   revenueByDay: { date: CalendarDate; revenue: Money }[];
+  /** The range's Orders by day and by status, for the metric dialog (metric-detail.ts). */
+  metricDetail: MetricDetail;
   /** How many of the range's pairs included each Service, in catalog order; unbooked Services are left out. */
   servicesBooked: { serviceId: string; name: string; count: number }[];
   /** Right now, whatever the range: pairs waiting on the owner's quote (ADR-0001). */
@@ -105,11 +112,11 @@ function isLive(order: { items: { status: ItemStatus }[] }): boolean {
 }
 
 /** The admin Overview (the first admin screen): admin-only (ADR-0012). */
-export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: ActingUser, rangeId: OverviewRangeId): Promise<AdminOverview> {
+export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: ActingUser, selection: OverviewSelection): Promise<AdminOverview> {
   requireRole(actingUser, "ADMIN");
 
   const now = deps.now();
-  const range = overviewRange(rangeId, now);
+  const range = overviewRange(selection, now);
   const today = calendarDateInShopTime(now);
   const [booked, previous, statusCounts, awaitingDeposit, recent, appointments] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),
@@ -145,6 +152,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     orders: { current: current.length, previous: previous.orders },
     bookedRevenue: { current: current.reduce((sum, order) => sum.add(liveEstimate(order)), Money.zero()), previous: previous.value },
     revenueByDay,
+    metricDetail: metricDetail(booked, range.days),
     servicesBooked,
     needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
     awaitingDeposit,
@@ -153,6 +161,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     todaysSchedule: appointments
       .filter((appointment) => appointment.order.itemStatuses.some((status) => status !== "CANCELLED"))
       .map((appointment) => ({
+        appointmentId: appointment.id,
         orderId: appointment.order.id,
         reference: orderNumber(appointment.order.number),
         customerName: appointment.order.contactName,
@@ -175,7 +184,7 @@ async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl
     reference: orderNumber(order.number),
     customerName: order.contactName,
     bookedAt: order.createdAt,
-    photoUrl: photoKey ? await photoUrl(photoKey) : null,
+    photo: await pairPhoto(photoKey, photoUrl),
     pairCount: pairs.length,
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),

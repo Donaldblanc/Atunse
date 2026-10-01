@@ -72,6 +72,26 @@ export function addDays(date: CalendarDate, days: number): CalendarDate {
   return calendarDateFromUtcMidnight(next);
 }
 
+/** Whole days from `from` to `to` (negative if `to` is earlier). */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  return Math.round((calendarDateToUtcMidnight(to).getTime() - calendarDateToUtcMidnight(from).getTime()) / 86_400_000);
+}
+
+/** The first of the month `date` falls in. */
+export function firstOfMonth(date: CalendarDate): CalendarDate {
+  return `${date.slice(0, 7)}-01`;
+}
+
+/** The first of the month after the one `date` falls in (32 days on always lands in it). */
+export function firstOfNextMonth(date: CalendarDate): CalendarDate {
+  return firstOfMonth(addDays(firstOfMonth(date), 32));
+}
+
+/** The first of the month before the one `date` falls in. */
+export function firstOfPreviousMonth(date: CalendarDate): CalendarDate {
+  return firstOfMonth(addDays(firstOfMonth(date), -1));
+}
+
 /** Day of the week, 0 = Sunday ... 6 = Saturday. */
 export function dayOfWeek(date: CalendarDate): number {
   return calendarDateToUtcMidnight(date).getUTCDay();

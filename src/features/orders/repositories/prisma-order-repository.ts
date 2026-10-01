@@ -1,16 +1,23 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import type { Appointment, AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
+  NoPendingDepositError,
   PhotoKeyInUseError,
   BundleNotFoundError,
+  AppointmentCancelledError,
+  AppointmentNotFoundError,
+  type AppointmentWithOrder,
+  type AwaitingDepositOrder,
   type AwaitingDeposits,
   type BookedOrder,
   type NewOrderInput,
+  type OrderNote,
+  type StatusChange,
   type ScheduledAppointment,
   type OrderRepository,
 } from "./order-repository";
@@ -24,6 +31,13 @@ const ORDER_INCLUDE = {
   payments: { orderBy: { createdAt: "asc" as const } },
   appointments: { orderBy: { startsAt: "asc" as const } },
 } satisfies Prisma.OrderInclude;
+
+/**
+ * The Deposits Pending Payments is about: PENDING, on an Order with a live
+ * pair. One where-clause behind the summary, the list and confirmDeposit,
+ * so the count, the rows and what can be confirmed can't drift apart.
+ */
+const AWAITING_DEPOSIT = { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } } satisfies Prisma.PaymentWhereInput;
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -90,7 +104,7 @@ function toDomainPayment(row: OrderRow["payments"][number]): Payment {
 }
 
 function toDomainAppointment(row: OrderRow["appointments"][number]): Appointment {
-  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt };
+  return { id: row.id, kind: row.kind, status: row.status, startsAt: row.startsAt, endsAt: row.endsAt, notes: row.notes };
 }
 
 function toDomainOrder(row: OrderRow): Order {
@@ -365,7 +379,7 @@ export class PrismaOrderRepository implements OrderRepository {
   async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
     const groups = await this.prisma.payment.groupBy({
       by: ["method"],
-      where: { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } },
+      where: AWAITING_DEPOSIT,
       _count: { _all: true },
       _sum: { amountCents: true },
     });
@@ -377,5 +391,94 @@ export class PrismaOrderRepository implements OrderRepository {
     }
     // One Deposit per Order, so counting Deposits counts Orders.
     return { orders: groups.reduce((sum, g) => sum + g._count._all, 0), deposits: Money.fromCents(cents), byMethod };
+  }
+
+  async listOrderNotes(orderId: string): Promise<OrderNote[]> {
+    const rows = await this.prisma.note.findMany({ where: { orderId }, orderBy: { createdAt: "asc" } });
+    return rows.map((row) => ({ id: row.id, body: row.body, createdAt: row.createdAt }));
+  }
+
+  async listStatusChanges(orderId: string): Promise<StatusChange[]> {
+    const rows = await this.prisma.itemAuditEntry.findMany({
+      where: { item: { orderId }, toStatus: { not: null } },
+      orderBy: { createdAt: "asc" },
+    });
+    // Prisma can't compare two columns in a where, so same-status entries (a confirmed deposit) are dropped here.
+    return rows.filter((row) => row.toStatus !== row.fromStatus).map((row) => ({ itemId: row.itemId, toStatus: row.toStatus!, at: row.createdAt }));
+  }
+
+  async findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null> {
+    const row = await this.prisma.appointment.findUnique({ where: { id: appointmentId }, include: { order: { include: ORDER_INCLUDE } } });
+    return row ? { appointment: toDomainAppointment(row), order: toDomainOrder(row.order) } : null;
+  }
+
+  async completeAppointment(appointmentId: string): Promise<Appointment> {
+    // The status is part of the WHERE, so a concurrent cancel can't be
+    // overwritten. One transaction: the update holds the row's lock until
+    // the re-read, so a cancel can't land between them and turn a write we
+    // made into AppointmentCancelledError. The errors below only follow a
+    // write that matched nothing.
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.appointment.updateMany({ where: { id: appointmentId, status: "SCHEDULED" }, data: { status: "COMPLETED" } });
+      const row = await tx.appointment.findUnique({ where: { id: appointmentId } });
+      if (!row) throw new AppointmentNotFoundError(appointmentId);
+      if (count === 0 && row.status === "CANCELLED") throw new AppointmentCancelledError();
+      return toDomainAppointment(row);
+    });
+  }
+
+  async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {
+    const rows = await this.prisma.payment.findMany({
+      where: AWAITING_DEPOSIT,
+      select: { method: true, amountCents: true, order: { select: { id: true, number: true, contactName: true, createdAt: true } } },
+      orderBy: { order: { createdAt: "asc" } },
+    });
+    return rows.map((row) => ({
+      orderId: row.order.id,
+      number: row.order.number,
+      contactName: row.order.contactName,
+      createdAt: row.order.createdAt,
+      deposit: { method: row.method, amount: Money.fromCents(row.amountCents) },
+    }));
+  }
+
+  async listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({
+      where: { items: { some: { status: { in: statuses } } } },
+      include: ORDER_INCLUDE,
+      orderBy: { createdAt: "asc" },
+    });
+    return rows.map(toDomainOrder);
+  }
+
+  async confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      // Idempotency (ADR-0012): the key is recorded on the Order's audit entries, so a retry finds it.
+      const applied = await tx.itemAuditEntry.findFirst({
+        where: { idempotencyKey: params.idempotencyKey, item: { orderId: params.orderId } },
+        select: { id: true },
+      });
+      if (applied) return false;
+
+      // Conditional on the Deposit still being PENDING, so two admins (or tabs) can't both settle it.
+      const { count } = await tx.payment.updateMany({
+        where: { ...AWAITING_DEPOSIT, orderId: params.orderId },
+        data: { status: "RECEIVED", receivedAt: new Date(), confirmedByAccountId: params.actorAccountId, idempotencyKey: params.idempotencyKey },
+      });
+      if (count === 0) throw new NoPendingDepositError(params.orderId);
+
+      const live = await tx.item.findMany({ where: { orderId: params.orderId, status: { not: "CANCELLED" } }, select: { id: true, status: true } });
+      await tx.itemAuditEntry.createMany({
+        data: live.map((item) => ({
+          itemId: item.id,
+          action: MANUAL_PAYMENT_CONFIRMED,
+          fromStatus: item.status,
+          toStatus: item.status,
+          actorAccountId: params.actorAccountId,
+          idempotencyKey: params.idempotencyKey,
+        })),
+      });
+      return true;
+    });
   }
 }
