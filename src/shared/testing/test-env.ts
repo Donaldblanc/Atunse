@@ -53,9 +53,13 @@ export const OFFLINE_SERVICES_ENV: Record<string, string> = {
   EMAIL_FROM: "",
 };
 
-/** `.env` merged under the real environment, which wins (as Prisma and Next do). */
-export function loadEnv(cwd: string = process.cwd()): Record<string, string | undefined> {
-  const file = path.join(cwd, ".env");
+/**
+ * The project's `.env` merged under the real environment, which wins (as
+ * Prisma and Next do). Takes the project root, not the working directory, so
+ * a runner started from another folder still finds `.env`.
+ */
+export function loadEnv(root: string): Record<string, string | undefined> {
+  const file = path.join(root, ".env");
   const fromFile = existsSync(file) ? parseEnv(readFileSync(file, "utf8")) : {};
   return { ...fromFile, ...process.env };
 }

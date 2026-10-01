@@ -7,7 +7,8 @@
 ## First-time setup
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # fill in DATABASE_URL, TEST_DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+createdb -h localhost -U atunse atunse_test   # integration tests' own database (see below)
 npx prisma migrate dev --name init
 npm run prisma:generate
 npm run prisma:seed     # creates the bootstrap admin account

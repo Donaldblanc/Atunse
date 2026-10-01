@@ -6,9 +6,11 @@ import { OFFLINE_SERVICES_ENV, loadEnv, testDatabaseUrl } from "./src/shared/tes
 // build-strategy revision) — run via `npm run test:integration`. They delete
 // data, so they run only against TEST_DATABASE_URL (a database named *_test),
 // never DATABASE_URL: this throws before any test runs if it isn't one.
-const databaseUrl = testDatabaseUrl(loadEnv());
+const databaseUrl = testDatabaseUrl(loadEnv(__dirname));
 
 export default defineConfig({
+  // Paths below resolve from the repo, wherever the runner was started.
+  root: __dirname,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -20,6 +22,7 @@ export default defineConfig({
     testTimeout: 20_000,
     env: { ...OFFLINE_SERVICES_ENV, DATABASE_URL: databaseUrl },
     globalSetup: ["./src/shared/testing/migrate-test-database.ts"],
+    setupFiles: ["./src/shared/testing/assert-test-database.ts"],
     // Every integration file resets the same tables in beforeEach, so files
     // must not run concurrently against the shared database.
     fileParallelism: false,
