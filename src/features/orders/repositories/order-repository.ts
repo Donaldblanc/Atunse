@@ -107,6 +107,24 @@ export interface NewOrderInput {
   bundleId: string | null;
   /** One per pair, in the order the customer entered them. */
   items: NewItemInput[];
+  /**
+   * The body of the admins' NEW_BOOKING Notification, written in the same
+   * transaction as the Order (the repository adds the "New booking
+   * ATU-<number>" title, which needs the number the database assigns).
+   * Never carries an address, phone or email.
+   */
+  alertBody: string;
+}
+
+/** A bell notification for every admin (recipient null). */
+export interface AdminNotification {
+  id: string;
+  kind: "NEW_BOOKING" | "CUSTOMER_MESSAGE" | "PAYMENT_RECEIVED" | "LOW_STOCK" | "NEW_REVIEW";
+  title: string;
+  body: string | null;
+  orderId: string | null;
+  readAt: Date | null;
+  createdAt: Date;
 }
 
 export interface NewItemInput {
@@ -224,7 +242,9 @@ export interface OrderRepository {
    * transaction. Retry-safe (ADR-0012): if
    * an Order with the same `submissionKey` already exists, returns that
    * Order with `created: false` instead of inserting a duplicate. Throws
-   * EmailTakenError or PhotoKeyInUseError, having written nothing.
+   * EmailTakenError or PhotoKeyInUseError, having written nothing. A new
+   * Order also writes its NEW_BOOKING Notification (recipient null: every
+   * admin) in that transaction; a replay writes none.
    */
   create(input: NewOrderInput): Promise<{ order: Order; created: boolean }>;
   findById(orderId: string): Promise<Order | null>;
@@ -384,4 +404,13 @@ export interface OrderRepository {
    * Throws OrderNotFoundError, having written nothing.
    */
   bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
+
+  /** The latest `limit` Notifications for every admin (recipient null), newest first, with how many are unread in all. */
+  listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }>;
+
+  /**
+   * Marks the all-admin Notifications read at `at`: the listed ids, or all of them.
+   * Only rows still unread change, so a repeat is a no-op.
+   */
+  markAdminNotificationsRead(ids: string[] | "all", at: Date): Promise<void>;
 }

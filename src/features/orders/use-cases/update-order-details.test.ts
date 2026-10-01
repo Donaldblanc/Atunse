@@ -30,6 +30,7 @@ async function bookOrder(pairs = 1) {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: Array.from({ length: pairs }, (_, i) => ({
       brand: "Nike",
       model: null,

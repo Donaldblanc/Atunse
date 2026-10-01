@@ -59,6 +59,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [item()],
     ...overrides,
   };

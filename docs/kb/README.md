@@ -15,6 +15,7 @@ source of truth instead of copying it.
 | [commands.md](commands.md) | the exact command for dev, tests, Prisma, storage cleanup |
 | [gotchas.md](gotchas.md) | traps that have already cost time (Next 16, `.env`, terminology, releases) |
 | [agents.md](agents.md) | who does what: cheap agents execute, Opus plans and reviews |
+| [../plans/](../plans/) | active multi-PR plans (e.g. `overview-actionable.md`): read before starting a slice |
 
 ## Reading rules (they keep context small)
 - Don't read `docs/SPEC.md` or `docs/TODO.md` whole. `grep -n '^#' docs/TODO.md`, then read only the section you need.

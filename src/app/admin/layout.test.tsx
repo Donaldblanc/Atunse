@@ -11,6 +11,8 @@ const redirect = vi.fn((url: string) => {
 });
 vi.mock("next/navigation", () => ({ redirect: (url: string) => redirect(url) }));
 
+vi.mock("./notification-bell", () => ({ NotificationBell: () => null }));
+
 const { default: AdminLayout } = await import("./layout");
 
 beforeEach(() => {

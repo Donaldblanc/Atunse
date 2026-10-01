@@ -6,7 +6,7 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
@@ -23,6 +23,7 @@ import {
   AppointmentNotFoundError,
   AppointmentNotScheduledError,
   ReturnAlreadyBookedError,
+  type AdminNotification,
   type AppointmentWithOrder,
   type AwaitingDepositOrder,
   type AwaitingDeposits,
@@ -46,6 +47,8 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly auditEntries: (AuditEntry & { itemId: string; at?: Date })[] = [];
   /** Notes about Orders; nothing writes them yet, so tests seed this directly. */
   readonly notes: (OrderNote & { orderId: string })[] = [];
+  /** Every Notification written, newest last; recipient null means every admin. */
+  readonly notifications: (AdminNotification & { recipientAccountId: string | null })[] = [];
   private lastNumber = 1000;
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
   private readonly uploadKeysInUse = new Set<string>();
@@ -137,8 +140,34 @@ export class InMemoryOrderRepository implements OrderRepository {
     };
     for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
+    this.notifications.push({
+      id: fakeId("notification"),
+      kind: "NEW_BOOKING",
+      recipientAccountId: null,
+      title: `New booking ${orderNumber(order.number)}`,
+      body: input.alertBody,
+      orderId: order.id,
+      readAt: null,
+      createdAt: new Date(),
+    });
     if (input.submissionKey) this.orderIdsBySubmissionKey.set(input.submissionKey, order.id);
     return { order, created: true };
+  }
+
+  async listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }> {
+    const mine = this.notifications.filter((n) => n.recipientAccountId === null);
+    // Newest first; ties (same millisecond) fall back to insertion order, newest last written first.
+    const newestFirst = mine.map((n, i) => ({ n, i })).sort((a, b) => b.n.createdAt.getTime() - a.n.createdAt.getTime() || b.i - a.i);
+    return {
+      notifications: newestFirst.slice(0, limit).map(({ n }) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, orderId: n.orderId, readAt: n.readAt, createdAt: n.createdAt })),
+      unreadCount: mine.filter((n) => n.readAt === null).length,
+    };
+  }
+
+  async markAdminNotificationsRead(ids: string[] | "all", at: Date): Promise<void> {
+    for (const n of this.notifications) {
+      if (n.recipientAccountId === null && n.readAt === null && (ids === "all" || ids.includes(n.id))) n.readAt = at;
+    }
   }
 
   async findById(orderId: string): Promise<Order | null> {

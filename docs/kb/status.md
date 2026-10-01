@@ -16,6 +16,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
   - status emails at Quote Sent, Ready for Drop-Off/Shipping and Cancelled
   - book a Return visit
   - step back from Under Review to Request Submitted (#122)
+- **New-booking alerts:** each booking writes a `NEW_BOOKING` Notification in the Order's transaction (never on a replay) and emails the shop inbox (`CONTACT_EMAIL`). The admin top-bar bell lists the latest 10 and opens the Order; "Mark all read" clears them. Other notification kinds aren't written yet.
 - **Data model** for every admin screen (ADR-0016, #119).
 - **Tests:** integration tests use only a `*_test` database (#124).
 
@@ -25,7 +26,7 @@ Pricing, Inventory, Payments, Messages, Reviews, Settings. Unbuilt screens
 show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`).
 
 ## Top open items (see TODO.md for the rest)
-- **Launch blocker:** nobody tells the shop about a new booking. Add an owner email and/or build the Orders screen.
+- **Launch blocker:** the owner email for new bookings needs `CONTACT_EMAIL` and Resend set in production (unset means no email; the bell still works). The Orders screen is separate.
 - **Launch blocker:** sales tax decision. Set `ZELLE_RECIPIENT`/`ZELLE_NAME` and Resend in Vercel.
 - Customer "My bookings" page. Customers have no self-serve cancellation or rescheduling.
 - Booking still prices from `service-catalog.ts`. ADR-0016 step 2 moves it to the DB tables.

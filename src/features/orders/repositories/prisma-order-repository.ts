@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
-import { MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { MANUAL_PAYMENT_CONFIRMED, orderNumber, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -17,6 +17,7 @@ import {
   AppointmentNotFoundError,
   AppointmentNotScheduledError,
   ReturnAlreadyBookedError,
+  type AdminNotification,
   type AppointmentWithOrder,
   type AwaitingDepositOrder,
   type AwaitingDeposits,
@@ -188,62 +189,87 @@ export class PrismaOrderRepository implements OrderRepository {
   // role, photo key) settle races inside that single transaction.
   private async insert(input: NewOrderInput): Promise<Order> {
     const { fulfillment, owner } = input;
-    const row = await this.prisma.order.create({
-      data: {
-        account:
-          "accountId" in owner
-            ? { connect: { id: owner.accountId } }
-            : { create: { role: "CUSTOMER" as const, email: owner.newCustomer.email, phone: owner.newCustomer.phone, name: input.contactName } },
-        contactName: input.contactName,
-        contactEmail: input.contactEmail,
-        contactPhone: input.contactPhone,
-        policyAcceptedAt: input.policyAcceptedAt,
-        termsVersion: input.terms.version,
-        termsUrl: input.terms.url,
-        termsSha256: input.terms.sha256,
-        termsAcknowledgments: input.terms.acknowledgments,
-        fulfillmentMethod: fulfillment.method,
-        addressLine1: fulfillment.address.line1,
-        addressLine2: fulfillment.address.line2,
-        city: fulfillment.address.city,
-        state: fulfillment.address.state,
-        zip: fulfillment.address.zip,
-        pickupDate: fulfillment.method === "PICKUP" ? calendarDateToUtcMidnight(fulfillment.date) : null,
-        pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
-        mailInDate:
-          fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
-            ? calendarDateToUtcMidnight(fulfillment.preferredDate)
-            : null,
-        rush: input.rush,
-        estimateCents: input.estimate.cents,
-        estimateIsMinimum: input.estimateIsMinimum,
-        depositCents: input.deposit.cents,
-        submissionKey: input.submissionKey,
-        submissionFingerprint: input.submissionFingerprint,
-        bundle: input.bundleId ? { connect: { id: input.bundleId } } : undefined,
-        items: {
-          create: input.items.map((item, position) => ({
-            position,
-            brand: item.brand,
-            model: item.model,
-            description: item.description,
-            material: item.material,
-            serviceIds: item.serviceIds,
-            estimateCents: item.estimate.cents,
-            photos: {
-              create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
-            },
-            status: "REQUEST_SUBMITTED" as const,
-          })),
+    // One transaction: the Order and its admin alert commit together or not at all.
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.order.create({
+        data: {
+          account:
+            "accountId" in owner
+              ? { connect: { id: owner.accountId } }
+              : { create: { role: "CUSTOMER" as const, email: owner.newCustomer.email, phone: owner.newCustomer.phone, name: input.contactName } },
+          contactName: input.contactName,
+          contactEmail: input.contactEmail,
+          contactPhone: input.contactPhone,
+          policyAcceptedAt: input.policyAcceptedAt,
+          termsVersion: input.terms.version,
+          termsUrl: input.terms.url,
+          termsSha256: input.terms.sha256,
+          termsAcknowledgments: input.terms.acknowledgments,
+          fulfillmentMethod: fulfillment.method,
+          addressLine1: fulfillment.address.line1,
+          addressLine2: fulfillment.address.line2,
+          city: fulfillment.address.city,
+          state: fulfillment.address.state,
+          zip: fulfillment.address.zip,
+          pickupDate: fulfillment.method === "PICKUP" ? calendarDateToUtcMidnight(fulfillment.date) : null,
+          pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
+          mailInDate:
+            fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
+              ? calendarDateToUtcMidnight(fulfillment.preferredDate)
+              : null,
+          rush: input.rush,
+          estimateCents: input.estimate.cents,
+          estimateIsMinimum: input.estimateIsMinimum,
+          depositCents: input.deposit.cents,
+          submissionKey: input.submissionKey,
+          submissionFingerprint: input.submissionFingerprint,
+          bundle: input.bundleId ? { connect: { id: input.bundleId } } : undefined,
+          items: {
+            create: input.items.map((item, position) => ({
+              position,
+              brand: item.brand,
+              model: item.model,
+              description: item.description,
+              material: item.material,
+              serviceIds: item.serviceIds,
+              estimateCents: item.estimate.cents,
+              photos: {
+                create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
+              },
+              status: "REQUEST_SUBMITTED" as const,
+            })),
+          },
+          payments: input.depositPayment
+            ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
+            : undefined,
+          appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
         },
-        payments: input.depositPayment
-          ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
-          : undefined,
-        appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
-      },
-      include: ORDER_INCLUDE,
+        include: ORDER_INCLUDE,
+      });
+      await tx.notification.create({
+        data: { kind: "NEW_BOOKING", recipientAccountId: null, orderId: row.id, title: `New booking ${orderNumber(row.number)}`, body: input.alertBody },
+      });
+      return toDomainOrder(row);
     });
-    return toDomainOrder(row);
+  }
+
+  async listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }> {
+    const where = { recipientAccountId: null };
+    const [rows, unreadCount] = await Promise.all([
+      this.prisma.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit }),
+      this.prisma.notification.count({ where: { ...where, readAt: null } }),
+    ]);
+    return {
+      notifications: rows.map((row) => ({ id: row.id, kind: row.kind, title: row.title, body: row.body, orderId: row.orderId, readAt: row.readAt, createdAt: row.createdAt })),
+      unreadCount,
+    };
+  }
+
+  async markAdminNotificationsRead(ids: string[] | "all", at: Date): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { recipientAccountId: null, readAt: null, ...(ids === "all" ? {} : { id: { in: ids } }) },
+      data: { readAt: at },
+    });
   }
 
   async findBySubmissionKey(submissionKey: string): Promise<Order | null> {

@@ -8,6 +8,7 @@ import { orderNumber, pairsPhrase, type Fulfillment, type Order } from "../domai
 import type { PaymentInstructions } from "../payment-instructions";
 import { mapWithConcurrency } from "@/shared/concurrency";
 import type { FileStorage } from "@/shared/storage";
+import { redactForLog } from "@/shared/logging/redact";
 import { randomUUID } from "node:crypto";
 import { isBookingPhotoKey, MAX_PHOTOS_PER_ITEM, photoKeyContentType, photoMatchesKey, storedPhotoKey } from "../photo-keys";
 import { submissionFingerprint } from "../submission-fingerprint";
@@ -29,6 +30,7 @@ import {
   estimateOrder,
   findBundle,
   InvalidServiceSelectionError,
+  catalogService,
   MATERIALS,
   type ItemEstimate,
   type Material,
@@ -78,6 +80,8 @@ export interface SubmitOrderDeps {
   paymentInstructions: PaymentInstructions;
   /** FEATURE_CUSTOMER_SIGN_IN_ENABLED: decides what an existing email does (ADR-0014). */
   customerSignInEnabled: boolean;
+  /** The shop's inbox (CONTACT_EMAIL) for new-booking emails; null skips them quietly. */
+  ownerInbox: string | null;
   now?: () => Date;
 }
 
@@ -229,6 +233,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
         estimate: pairs[i]!.estimate.estimate,
         photos: photos[i]!,
       })),
+      alertBody: alertBody(contact.name, input.items.flatMap((_, i) => pairs[i]!.serviceIds), fulfillment),
     });
 
   let created;
@@ -252,8 +257,54 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
 
   // created is false when a concurrent request with the same key won.
-  const order = created.created ? created.order : await sameSubmission(deps, created.order, fingerprint, now);
-  return sendConfirmationOnce(deps, order, now);
+  if (!created.created) return sendConfirmationOnce(deps, await sameSubmission(deps, created.order, fingerprint, now), now);
+  // Only a booking this call wrote tells the owner; a replay never does.
+  await emailOwnerOfNewBooking(deps, created.order);
+  return sendConfirmationOnce(deps, created.order, now);
+}
+
+/** "Jordan · Standard Clean, Lace Replacement · Local Drop-Off 2026-10-03": never an address, phone or email. */
+function alertBody(contactName: string, serviceIds: string[], fulfillment: Fulfillment): string {
+  return [firstName(contactName), serviceNames(serviceIds), fulfillmentSummary(fulfillment)].join(" · ");
+}
+
+function firstName(contactName: string): string {
+  return contactName.split(/\s+/)[0] ?? contactName;
+}
+
+function serviceNames(serviceIds: string[]): string {
+  return [...new Set(serviceIds)].map((id) => catalogService(id).name).join(", ");
+}
+
+function fulfillmentSummary(fulfillment: Fulfillment): string {
+  return fulfillment.method === "PICKUP" ? `Local Drop-Off ${fulfillment.date}` : "Mail-In";
+}
+
+// The owner's copy of a new booking, after the write succeeded. Best
+// effort: the booking and its bell notification stand if the send fails.
+async function emailOwnerOfNewBooking(deps: SubmitOrderDeps, order: Order): Promise<void> {
+  if (!deps.ownerInbox) return;
+  try {
+    await deps.notifications.sendEmail({
+      to: deps.ownerInbox,
+      subject: `New booking ${orderNumber(order.number)}`,
+      body: ownerEmailBody(order),
+    });
+  } catch (err) {
+    console.error(`[new-booking] owner email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
+  }
+}
+
+function ownerEmailBody(order: Order): string {
+  const estimate = `${order.estimateIsMinimum ? "from " : ""}${order.estimate.format()}`;
+  return [
+    `New booking ${orderNumber(order.number)}`,
+    `Customer: ${firstName(order.contactName)}`,
+    `Services: ${serviceNames(order.items.flatMap((item) => item.serviceIds))}`,
+    `Fulfillment: ${fulfillmentSummary(order.fulfillment)}`,
+    `Estimate: ${estimate}`,
+    `Open it in the admin: /admin?order=${order.id}`,
+  ].join("\n");
 }
 
 /**
