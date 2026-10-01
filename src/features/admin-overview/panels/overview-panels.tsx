@@ -54,7 +54,7 @@ export async function OverviewPanels({ overview: overviewPromise, selection, now
         <BrandCard />
         <ScheduleCard overview={overview} selection={selection} calendarHref={calendarHref} />
         <AttentionCard overview={overview} selection={selection} />
-        <ReviewsCard />
+        <ReviewsCard selection={selection} />
       </aside>
     </>
   );
