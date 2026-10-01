@@ -1,4 +1,4 @@
-import { MAX_QUOTE_CENTS } from "@/features/orders/domain";
+import { MAX_QUOTE_CENTS, MIN_QUOTE_CENTS } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 
 /**
@@ -14,7 +14,7 @@ export function parseQuotePrice(input: string): { ok: true; cents: number } | { 
   if (!/^\d+(\.\d{1,2})?$/.test(text)) return { ok: false, error: "Enter the price in dollars, like 125 or 125.50." };
   const [dollars, fraction = ""] = text.split(".");
   const cents = Number(dollars) * 100 + Number(fraction.padEnd(2, "0"));
-  if (cents <= 0) return { ok: false, error: "Enter a price above $0." };
+  if (cents < MIN_QUOTE_CENTS) return { ok: false, error: `Enter a price of ${Money.fromCents(MIN_QUOTE_CENTS).format()} or more.` };
   if (cents > MAX_QUOTE_CENTS) return { ok: false, error: `Enter a price of ${Money.fromCents(MAX_QUOTE_CENTS).format()} or less.` };
   return { ok: true, cents };
 }

@@ -60,7 +60,7 @@ describe("sendQuote", () => {
     const { deps, notifications, order } = await seed();
     const input = { itemId: order.items[0]!.id, priceCents: 9000, idempotencyKey: "k1" };
     await sendQuote(deps, admin, input);
-    expect(await sendQuote(deps, admin, { ...input, priceCents: 1 })).toEqual({ status: "already-sent" });
+    expect(await sendQuote(deps, admin, { ...input, priceCents: 100 })).toEqual({ status: "already-sent" });
     expect(notifications.sent).toHaveLength(1);
   });
 
@@ -77,7 +77,7 @@ describe("sendQuote", () => {
     await expect(sendQuote(deps, admin, { itemId: "nope", priceCents: 9000, idempotencyKey: "k" })).rejects.toThrow(ItemNotFoundError);
   });
 
-  it.each([0, -100, 12.5, Number.NaN, 500_001])("refuses the price %s without writing", async (priceCents) => {
+  it.each([0, -100, 1, 99, 12.5, Number.NaN, 500_001])("refuses the price %s without writing", async (priceCents) => {
     const { deps, orders, order } = await seed();
     await expect(sendQuote(deps, admin, { itemId: order.items[0]!.id, priceCents, idempotencyKey: "k" })).rejects.toThrow(InvalidQuoteError);
     expect(orders.orders.get(order.id)!.items[0]!.status).toBe("UNDER_REVIEW");

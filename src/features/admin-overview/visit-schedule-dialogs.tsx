@@ -4,7 +4,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { overviewHref, rangeSearchParams, type OverviewSelection } from "./overview-range";
-import { getReturnBooking } from "./return-booking";
+import { getReturnBooking, type ReturnVisitSummary } from "./return-booking";
 import type { ScheduledVisitDetail } from "./scheduled-visit";
 import { buildVisitDeps } from "./visit-deps";
 import { VisitScheduleForm } from "./visit-schedule-form";
@@ -45,6 +45,7 @@ export function RescheduleDialog({ visit, selection, now }: { visit: ScheduledVi
         customer={visit.customer}
         now={now.toISOString()}
         initialDate={visitDay < today ? today : visitDay}
+        currentStartsAt={visit.startsAt.toISOString()}
         cancelHref={backHref}
       />
     </AdminDialog>
@@ -115,22 +116,20 @@ export async function ReturnBookingDialog({ orderId, selection, actingUser, now 
  * The Order dialog's entry to the Return picker: a "Book return visit"
  * button when a Return can be booked, the booked time (linking to the
  * visit) when one exists, and nothing for Mail-In or an Order with no pair
- * ready. Loads the Order itself so order-detail-dialog.tsx stays one line.
+ * ready. From the Order the dialog already loaded (OrderDetail.returnVisit).
  */
-export async function BookReturnAction({ orderId, selection, actingUser }: { orderId: string; selection: OverviewSelection; actingUser: ActingUser }) {
-  const booking = await getReturnBooking(buildVisitDeps(), actingUser, orderId);
-  if (!booking) return null;
-  if (booking.booked) {
+export function BookReturnAction({ orderId, returnVisit, selection }: { orderId: string; returnVisit: ReturnVisitSummary; selection: OverviewSelection }) {
+  if (returnVisit.kind === "booked") {
     return (
       <p className="od-return">
         Return visit:{" "}
-        <Link className="od-link" href={overviewHref(selection, { visit: booking.booked.appointmentId })} scroll={false}>
-          {booking.booked.when}
+        <Link className="od-link" href={overviewHref(selection, { visit: returnVisit.appointmentId })} scroll={false}>
+          {returnVisit.when}
         </Link>
       </p>
     );
   }
-  if (booking.state.kind !== "bookable") return null;
+  if (returnVisit.kind !== "bookable") return null;
   return (
     <div className="od-return">
       <Link className="admin-btn" data-variant="secondary" href={overviewHref(selection, { order: orderId, book: "return" })} replace scroll={false}>

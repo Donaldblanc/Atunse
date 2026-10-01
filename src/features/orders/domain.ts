@@ -77,6 +77,7 @@ export function adminStatusMoves(
 }
 
 /** A quote is a sane price for one pair: at least a dollar, and short of a typo like $12000 for $120.00. */
+export const MIN_QUOTE_CENTS = 100;
 export const MAX_QUOTE_CENTS = 500_000;
 
 /** How admin screens name each status (CONTEXT.md: Status Pipeline). */

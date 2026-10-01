@@ -1,6 +1,6 @@
 "use client";
 
-import { adminVisitSlots } from "@/features/orders/pickup-window";
+import { adminVisitSlots, collectionTimes } from "@/features/orders/pickup-window";
 import { isCalendarDate, shopClock } from "@/features/orders/calendar-date";
 
 /** "8:00 AM – 8:30 AM" -> "8:00 AM": a button only needs the start; the range is in its accessible name. */
@@ -16,7 +16,8 @@ export function slotStartLabel(slot: string): string {
  * customer copy. `now` is passed from the server so the first render agrees
  * with it. The date is a native date input (keyboard and screen-reader
  * friendly) and the slots are radios drawn as 44px buttons, so arrow keys
- * move between them and a focus ring shows where you are.
+ * move between them and a focus ring shows where you are. When moving a
+ * visit, its own slot (`currentStartsAt`) isn't offered: it's not a move.
  */
 export function VisitSlotPicker({
   date,
@@ -24,6 +25,7 @@ export function VisitSlotPicker({
   onChange,
   now,
   idPrefix,
+  currentStartsAt,
 }: {
   date: string;
   slot: string;
@@ -31,10 +33,13 @@ export function VisitSlotPicker({
   /** ISO instant, the server's "now". */
   now: string;
   idPrefix: string;
+  /** ISO instant of the visit being rescheduled; omitted when booking a new one. */
+  currentStartsAt?: string;
 }) {
   const nowDate = new Date(now);
   const today = shopClock(nowDate).date;
-  const slots = isCalendarDate(date) ? adminVisitSlots(date, nowDate) : [];
+  const current = currentStartsAt ? new Date(currentStartsAt).getTime() : null;
+  const slots = isCalendarDate(date) ? adminVisitSlots(date, nowDate).filter((option) => collectionTimes(date, option).startsAt.getTime() !== current) : [];
 
   return (
     <div className="vsp">

@@ -9,7 +9,7 @@ import type { OrderDetail, OrderDetailPair } from "./order-detail";
 import { OrderEditForm } from "./order-edit-form";
 import { OrderNoteForm } from "./order-note-form";
 import { PairThumb } from "./pair-thumb";
-import { PairQuoteControls } from "./quote-controls";
+import { PairQuoteControls, QuoteStepsFrame } from "./quote-controls";
 import { STATUS_TONE } from "./status-tone";
 import { UpdateStatusForm } from "./update-status-form";
 
@@ -350,10 +350,9 @@ function quoteDifference(price: Money, estimate: Money): string {
 function QuoteSteps({ detail }: { detail: OrderDetail }) {
   const multiple = detail.pairs.length > 1;
   const steps = detail.pairs.flatMap((pair, index) => (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT" ? [{ pair, index, status: pair.status }] : []));
-  if (steps.length === 0) return null;
+  // Rendered even with no steps left, so the frame keeps "Approval recorded." after the last pair moves on.
   return (
-    <div className="od-status-forms">
-      <h4 className="od-subhead">Quote &amp; Approval</h4>
+    <QuoteStepsFrame key={detail.orderId} hasSteps={steps.length > 0}>
       {steps.map(({ pair, index, status }) => (
         <PairQuoteControls
           key={pair.itemId}
@@ -367,7 +366,7 @@ function QuoteSteps({ detail }: { detail: OrderDetail }) {
           pairLabel={multiple ? `Pair ${index + 1}${pair.title ? `: ${pair.title}` : ""}` : null}
         />
       ))}
-    </div>
+    </QuoteStepsFrame>
   );
 }
 
@@ -383,7 +382,6 @@ function UpdateStatuses({ detail }: { detail: OrderDetail }) {
         // Keyed by status so a pair that just moved starts a fresh form (and a fresh key).
         <UpdateStatusForm
           key={`${pair.itemId}:${pair.status}`}
-          orderId={detail.orderId}
           itemId={pair.itemId}
           fromStatus={pair.status}
           nextStatuses={pair.nextStatuses}

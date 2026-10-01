@@ -26,6 +26,7 @@ export function VisitScheduleForm({
   customer,
   now,
   initialDate,
+  currentStartsAt,
   cancelHref,
 }: {
   mode: "reschedule" | "return";
@@ -33,6 +34,8 @@ export function VisitScheduleForm({
   customer: { name: string; email: string };
   now: string;
   initialDate: string;
+  /** Rescheduling: the visit's own start, which the picker leaves out. */
+  currentStartsAt?: string;
   cancelHref: string;
 }) {
   const action = mode === "reschedule" ? rescheduleVisitAction : bookReturnVisitAction;
@@ -91,6 +94,7 @@ export function VisitScheduleForm({
           date={choice.date}
           slot={choice.slot}
           onChange={setChoice}
+          currentStartsAt={currentStartsAt}
         />
       )}
 

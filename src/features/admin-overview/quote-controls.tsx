@@ -1,11 +1,41 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { createContext, useActionState, useContext, useState } from "react";
 import { Money } from "@/shared/money/money";
 import { centsToPriceField, parseQuotePrice } from "./quote-price";
 import { recordApprovalAction, sendQuoteAction, type QuoteStepState } from "./quote-actions";
 
 const IDLE: QuoteStepState = { error: null, notice: null };
+
+/** Lets a pair's controls report "Approval recorded." to the frame, which outlives them. */
+const ApprovalNotice = createContext<(notice: string) => void>(() => {});
+
+/**
+ * The Quote & Approval section around the pairs' controls. Recording an
+ * approval moves the pair to Approved, so its controls leave the section
+ * (and, for the last one, the section would too) in the same re-render
+ * that returns "Approval recorded.". The frame stays mounted (it shows
+ * nothing once there are no steps and no notice) and holds that notice,
+ * so the owner sees the click worked. Key it by Order so the notice
+ * doesn't carry over to another Order's dialog.
+ */
+export function QuoteStepsFrame({ hasSteps, children }: { hasSteps: boolean; children: React.ReactNode }) {
+  const [notice, setNotice] = useState<string | null>(null);
+  if (!hasSteps && !notice) return null;
+  return (
+    <ApprovalNotice.Provider value={setNotice}>
+      <div className="od-status-forms">
+        <h4 className="od-subhead">Quote &amp; Approval</h4>
+        {children}
+        {notice && (
+          <p role="status" className="od-quote-notice">
+            {notice}
+          </p>
+        )}
+      </div>
+    </ApprovalNotice.Provider>
+  );
+}
 
 /**
  * The two Approval Gate steps for one pair (ADR-0001): Send Quote while it's
@@ -37,14 +67,20 @@ export function PairQuoteControls({
   pairLabel: string | null;
 }) {
   const [quoteState, quoteAction, quoting] = useActionState(sendQuoteAction, IDLE);
-  const [approvalState, approvalAction, approving] = useActionState(recordApprovalAction, IDLE);
+  const announce = useContext(ApprovalNotice);
+  // The notice goes to the frame: by the time it's returned, this pair is Approved and these controls are gone.
+  const [approvalState, approvalAction, approving] = useActionState(async (previous: QuoteStepState, formData: FormData) => {
+    const result = await recordApprovalAction(previous, formData);
+    if (result.notice) announce(result.notice);
+    return result;
+  }, IDLE);
   const [price, setPrice] = useState(centsToPriceField(estimateCents));
   const [confirmingQuote, setConfirmingQuote] = useState(false);
   const [confirmingApproval, setConfirmingApproval] = useState(false);
   const parsed = parseQuotePrice(price);
   const [checked, setChecked] = useState(false);
   const inputError = checked && !parsed.ok ? parsed.error : null;
-  const message = [approvalState, quoteState].find((state) => state.error || state.notice);
+  const message = approvalState.error ? approvalState : quoteState;
 
   function reviewQuote() {
     setChecked(true);

@@ -2,7 +2,9 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
 import { PAIR_DETAIL_FIELDS, PAIR_DETAIL_MAX, pairFieldKey, type OrderDetailsInput, type PairDetailField } from "../order-details";
-import type { OrderRepository } from "../repositories/order-repository";
+import type { FulfillmentMethod } from "../domain";
+import { PICKUP_STATES, US_STATES } from "../pickup-window";
+import { OrderNotFoundError, type OrderRepository } from "../repositories/order-repository";
 
 /** What the Edit Order form posts: raw text, validated and cleaned here. */
 export interface RawOrderDetails {
@@ -20,14 +22,15 @@ export interface RawOrderDetails {
 /** Field name -> message. Contact and address fields use their own names; a pair's are `pair:<itemId>:<field>`. */
 export type OrderDetailsErrors = Record<string, string>;
 
-
 /**
  * Trims and checks the form, or says what's wrong with each field. The
- * contact rules are the booking's (contact-rules.ts), so an admin can't save
+ * contact rules are the booking's (contact-rules.ts), and so are the state
+ * rules for the Order's fulfillment method (submitOrder: Local Drop-Off only
+ * where DJ collects, Mail-In anywhere in the US), so an admin can't save
  * what the customer couldn't have submitted. Pair details are free text with
  * a max length; blank means "not known" and is stored as null.
  */
-export function cleanOrderDetails(raw: RawOrderDetails): { ok: true; details: OrderDetailsInput } | { ok: false; errors: OrderDetailsErrors } {
+export function cleanOrderDetails(raw: RawOrderDetails, method: FulfillmentMethod): { ok: true; details: OrderDetailsInput } | { ok: false; errors: OrderDetailsErrors } {
   const errors: OrderDetailsErrors = {};
   const name = raw.contactName.trim();
   const email = raw.contactEmail.trim();
@@ -47,7 +50,8 @@ export function cleanOrderDetails(raw: RawOrderDetails): { ok: true; details: Or
   if (line2.length > 120) errors.line2 = "Keep this under 120 characters.";
   if (!city) errors.city = "Enter the city.";
   else if (city.length > 80) errors.city = "Keep this under 80 characters.";
-  if (!/^[A-Z]{2}$/.test(state)) errors.state = "Use the 2-letter state, like NY.";
+  if (method === "PICKUP" && !(PICKUP_STATES as readonly string[]).includes(state)) errors.state = "Local Drop-Off is only in NY, NJ and CT.";
+  else if (!(US_STATES as readonly string[]).includes(state)) errors.state = "Use the 2-letter US state, like NY.";
   if (!isValidZip(zip)) errors.zip = "Enter a 5-digit zip code.";
 
   const pairs = raw.pairs.map((pair) => {
@@ -80,12 +84,15 @@ export function cleanOrderDetails(raw: RawOrderDetails): { ok: true; details: Or
  * (the customer's sign-in, ADR-0014) is a separate thing and is not changed.
  */
 export async function updateOrderDetails(
-  deps: { orders: Pick<OrderRepository, "updateOrderDetails"> },
+  deps: { orders: Pick<OrderRepository, "findById" | "updateOrderDetails"> },
   actingUser: ActingUser,
   input: { orderId: string; expectedUpdatedAt: Date; raw: RawOrderDetails; idempotencyKey: string },
 ): Promise<{ ok: true; outcome: "updated" | "unchanged" | "already-applied" } | { ok: false; errors: OrderDetailsErrors }> {
   requireRole(actingUser, "ADMIN");
-  const cleaned = cleanOrderDetails(input.raw);
+  // Edit Order can't change the fulfillment method, so the one read here is the one the save keeps.
+  const order = await deps.orders.findById(input.orderId);
+  if (!order) throw new OrderNotFoundError(input.orderId);
+  const cleaned = cleanOrderDetails(input.raw, order.fulfillment.method);
   if (!cleaned.ok) return cleaned;
   const outcome = await deps.orders.updateOrderDetails({
     orderId: input.orderId,

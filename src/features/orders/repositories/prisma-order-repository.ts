@@ -537,11 +537,10 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       if (count === 0) throw new OrderChangedError();
 
-      for (const pair of details.pairs) {
-        const { itemId, ...fields } = pair;
-        await tx.item.update({ where: { id: itemId }, data: fields });
-      }
+      // Only the pairs that changed, and only their changed fields: an untouched pair keeps its updatedAt.
       for (const change of diff.pairs) {
+        const data = Object.fromEntries(Object.entries(change.changes).map(([field, { to }]) => [field, to]));
+        await tx.item.update({ where: { id: change.itemId }, data });
         await tx.itemAuditEntry.create({
           data: { itemId: change.itemId, action: DETAILS_EDITED, actorAccountId: params.actorAccountId, idempotencyKey: params.idempotencyKey, metadata: { changes: change.changes } },
         });

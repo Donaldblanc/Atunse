@@ -10,7 +10,7 @@
 // is cancelled" and "quoted so far" read the new state.
 
 import { Money } from "@/shared/money/money";
-import { livePairs, orderNumber, type Item, type Order } from "./domain";
+import { livePairs, orderNumber, type Item, type ItemStatus, type Order } from "./domain";
 import { RUSH_FEE_CENTS } from "./service-catalog";
 
 export interface StatusEmail {
@@ -139,6 +139,9 @@ export function cancelledEmail(order: Order, item: Item): StatusEmail {
   lines.push("If this isn't what you expected, or you have any questions, just reply to this email and DJ will help.");
   return { subject: wholeOrder ? `Your booking ${reference} was cancelled` : `A pair on ${reference} was cancelled`, body: lines.join("\n\n") };
 }
+
+/** The statuses whose arrival emails the customer (statusChangeEmail); every other step stays silent. */
+export const EMAILED_STATUSES: readonly ItemStatus[] = ["READY_FOR_PICKUP_SHIPPING", "CANCELLED"];
 
 /** The email for the status an Item just reached, or null for the steps that stay silent. */
 export function statusChangeEmail(order: Order, item: Item): StatusEmail | null {

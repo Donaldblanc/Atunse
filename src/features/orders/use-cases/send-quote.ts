@@ -3,7 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { redactForLog } from "@/shared/logging/redact";
 import { Money } from "@/shared/money/money";
-import { MAX_QUOTE_CENTS } from "../domain";
+import { MAX_QUOTE_CENTS, MIN_QUOTE_CENTS } from "../domain";
 import type { OrderRepository } from "../repositories/order-repository";
 import { quoteSentEmail } from "../status-emails";
 
@@ -39,7 +39,7 @@ export async function sendQuote(
 ): Promise<SendQuoteResult> {
   requireRole(actingUser, "ADMIN");
   if (!input.idempotencyKey) throw new InvalidQuoteError("Reload and try again.");
-  if (!Number.isInteger(input.priceCents) || input.priceCents <= 0) throw new InvalidQuoteError("Enter a price above $0.");
+  if (!Number.isInteger(input.priceCents) || input.priceCents < MIN_QUOTE_CENTS) throw new InvalidQuoteError(`Enter a price of ${Money.fromCents(MIN_QUOTE_CENTS).format()} or more.`);
   if (input.priceCents > MAX_QUOTE_CENTS) throw new InvalidQuoteError(`Enter a price of ${Money.fromCents(MAX_QUOTE_CENTS).format()} or less.`);
 
   const price = Money.fromCents(input.priceCents);

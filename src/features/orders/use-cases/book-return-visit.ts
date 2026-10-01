@@ -6,6 +6,7 @@ import { OrderNotFoundError, type OrderRepository } from "../repositories/order-
 import { returnVisitState } from "../return-visit";
 import { returnBookedEmail } from "../visit-emails";
 import { resolveVisitSlot } from "../visit-slot";
+import { redactForLog } from "@/shared/logging/redact";
 
 export interface BookReturnVisitDeps {
   orders: Pick<OrderRepository, "findById" | "bookReturnAppointment">;
@@ -62,7 +63,9 @@ export async function bookReturnVisit(
   try {
     await deps.notifications.sendEmail(returnBookedEmail(order, target));
     return { appointment, created, emailed: true };
-  } catch {
+  } catch (err) {
+    // The owner sees the warning; the log is what explains it.
+    console.error(`[orders] return visit booked, but the customer email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
     return { appointment, created, emailed: false };
   }
 }

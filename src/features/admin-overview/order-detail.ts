@@ -21,6 +21,7 @@ import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
+import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
 
 // The Overview's Order detail dialog (design: View Recent Order Details).
 // Lives beside the Overview because Recent Orders, Today's Schedule and
@@ -91,6 +92,8 @@ export interface OrderDetail {
     quoted: { total: Money; complete: boolean; pairs: number; of: number } | null;
   };
   notes: OrderNote[];
+  /** Local Drop-Off's Return visit: bookable, booked (when), or none. */
+  returnVisit: ReturnVisitSummary;
   /** What Edit Order's form starts from: the stored values, and the Order's updatedAt for its optimistic check. */
   edit: OrderEditValues;
 }
@@ -168,6 +171,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       quoted: quotedSummary(order),
     },
     notes,
+    returnVisit: summarizeReturnVisit(order),
     edit: {
       updatedAt: order.updatedAt.toISOString(),
       contactName: order.contactName,

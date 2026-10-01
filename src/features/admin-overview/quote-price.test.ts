@@ -13,7 +13,7 @@ describe("parseQuotePrice", () => {
     expect(parseQuotePrice(input)).toEqual({ ok: true, cents });
   });
 
-  it.each(["", "abc", "12.345", "-5", "1e3", "0", "0.00", "5000.01", "12,5", "$", "1.", ".5"])("refuses %j", (input) => {
+  it.each(["", "abc", "12.345", "-5", "1e3", "0", "0.00", "0.01", "0.99", "5000.01", "12,5", "$", "1.", ".5"])("refuses %j", (input) => {
     expect(parseQuotePrice(input).ok).toBe(false);
   });
 });

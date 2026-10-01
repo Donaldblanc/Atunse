@@ -4,7 +4,7 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { adminStatusMoves, canTransition, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
 import { ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { redactForLog } from "@/shared/logging/redact";
-import { statusChangeEmail } from "../status-emails";
+import { EMAILED_STATUSES, statusChangeEmail } from "../status-emails";
 
 export class InvalidTransitionError extends Error {
   constructor(from: ItemStatus, to: ItemStatus) {
@@ -82,7 +82,8 @@ export async function transitionItemStatus(
 
   // updated === null means this idempotency key was already applied
   // (ADR-0012: retry-safe) — treat as success, but don't re-notify.
-  if (updated) await emailCustomer(deps, input.itemId);
+  // Only the moves that email re-read the Order (for the email's figures, after the write).
+  if (updated && EMAILED_STATUSES.includes(updated.status)) await emailCustomer(deps, input.itemId);
   return updated;
 }
 

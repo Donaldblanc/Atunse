@@ -77,7 +77,7 @@ describe("cleanOrderDetails", () => {
   it("trims, uppercases the state, and turns empty text into null", async () => {
     const { order } = await bookOrder();
     const raw = rawFor(order, { contactName: "  Sam  ", state: " ny ", line2: "  ", pairs: [{ ...rawFor(order).pairs[0]!, size: " 10 ", brand: "" }] });
-    const cleaned = cleanOrderDetails(raw);
+    const cleaned = cleanOrderDetails(raw, "MAIL_IN");
     expect(cleaned).toMatchObject({ ok: true, details: { contact: { name: "Sam" }, address: { state: "NY", line2: null } } });
     expect(cleaned.ok && cleaned.details.pairs[0]).toMatchObject({ size: "10", brand: null, model: null });
   });
@@ -95,11 +95,26 @@ describe("cleanOrderDetails", () => {
       zip: "1234",
       pairs: [{ ...rawFor(order).pairs[0]!, size: "x".repeat(21) }],
     });
-    const cleaned = cleanOrderDetails(raw);
+    const cleaned = cleanOrderDetails(raw, "MAIL_IN");
     expect(cleaned.ok).toBe(false);
     expect(!cleaned.ok && Object.keys(cleaned.errors).sort()).toEqual(
       ["city", "contactEmail", "contactName", "contactPhone", "line1", `pair:${pairId}:size`, "state", "zip"].sort(),
     );
+  });
+});
+
+describe("cleanOrderDetails state rules", () => {
+  it("keeps a Local Drop-Off address to the states DJ collects from", async () => {
+    const { order } = await bookOrder();
+    const cleaned = cleanOrderDetails(rawFor(order, { state: "CA" }), "PICKUP");
+    expect(!cleaned.ok && cleaned.errors.state).toBe("Local Drop-Off is only in NY, NJ and CT.");
+    expect(cleanOrderDetails(rawFor(order, { state: "nj" }), "PICKUP").ok).toBe(true);
+  });
+
+  it("allows any US state for Mail-In but not a made-up one", async () => {
+    const { order } = await bookOrder();
+    expect(cleanOrderDetails(rawFor(order, { state: "CA" }), "MAIL_IN").ok).toBe(true);
+    expect(cleanOrderDetails(rawFor(order, { state: "ZZ" }), "MAIL_IN").ok).toBe(false);
   });
 });
 

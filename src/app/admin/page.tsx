@@ -74,7 +74,8 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   // Independent reads, started together so opening a dialog costs one round trip, not two.
   const [overview, orderDetail, visit, attention] = await Promise.all([
     getAdminOverview(deps, actingUser, selection),
-    orderId ? getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null,
+    // ?book=return shows only the Return picker, which loads what it needs itself.
+    orderId && params.book !== "return" ? getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null,
     visitId ? getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null,
     attentionPanel ? getAttentionPanel(buildAttentionPanelDeps(), actingUser, attentionPanel) : null,
   ]);
@@ -219,7 +220,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
             viewHref={overviewHref(selection, { order: orderId })}
             editHref={overviewHref(selection, { order: orderId, edit: "order" })}
             editing={params.edit === "order"}
-            returnAction={<BookReturnAction orderId={orderId} selection={selection} actingUser={actingUser} />}
+            returnAction={<BookReturnAction orderId={orderId} returnVisit={orderDetail.returnVisit} selection={selection} />}
           />
         ) : (
           <OrderNotFoundDialog closeHref={closeHref} />

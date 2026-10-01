@@ -33,12 +33,11 @@ function staleStatusMessage(err: ItemStatusChangedError): string {
  * Failures come back as a message for the form to show.
  */
 export async function updateItemStatusAction(_previous: UpdateStatusState, formData: FormData): Promise<UpdateStatusState> {
-  const orderId = formData.get("orderId");
   const itemId = formData.get("itemId");
   const idempotencyKey = formData.get("idempotencyKey");
   const fromStatus = statusField(formData, "fromStatus");
   const toStatus = statusField(formData, "toStatus");
-  if (typeof orderId !== "string" || !orderId || typeof itemId !== "string" || !itemId || typeof idempotencyKey !== "string" || !idempotencyKey || !fromStatus || !toStatus) {
+  if (typeof itemId !== "string" || !itemId || typeof idempotencyKey !== "string" || !idempotencyKey || !fromStatus || !toStatus) {
     return { error: "That request wasn't valid. Reload and try again." };
   }
 

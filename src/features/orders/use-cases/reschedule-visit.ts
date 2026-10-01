@@ -5,6 +5,7 @@ import type { Appointment } from "../domain";
 import { AppointmentNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { rescheduledEmail } from "../visit-emails";
 import { resolveVisitSlot, VisitSlotError } from "../visit-slot";
+import { redactForLog } from "@/shared/logging/redact";
 
 export interface RescheduleVisitDeps {
   orders: Pick<OrderRepository, "findAppointment" | "rescheduleAppointment">;
@@ -54,7 +55,9 @@ export async function rescheduleVisit(
   try {
     await deps.notifications.sendEmail(rescheduledEmail(found.order, appointment.kind, was, target));
     return { appointment, changed, emailed: true };
-  } catch {
+  } catch (err) {
+    // The owner sees the warning; the log is what explains it.
+    console.error(`[orders] visit rescheduled, but the customer email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
     return { appointment, changed, emailed: false };
   }
 }

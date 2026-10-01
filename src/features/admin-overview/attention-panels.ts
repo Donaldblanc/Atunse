@@ -3,8 +3,8 @@ import { requireRole } from "@/features/accounts/authz";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
-import { returnVisitState } from "@/features/orders/return-visit";
 import { servicesSummary } from "./get-admin-overview";
+import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
 
 // The three lists behind the Overview's Needs Attention items (?attention=…).
 // Rows are plain serialisable values (dates already formatted in shop
@@ -56,32 +56,22 @@ export interface ReadyToReturnRow {
   fulfillment: string;
   bookedOn: string;
   /** Local Drop-Off only: can DJ's Return be booked now, is it booked (with when), or n/a (Mail-In ships). */
-  returnVisit: { kind: "bookable" } | { kind: "booked"; appointmentId: string; when: string } | { kind: "none" };
+  returnVisit: ReturnVisitSummary;
 }
-
-const returnWhen = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/New_York" });
 
 /** Orders with pairs in Ready for Drop-Off/Shipping, oldest first. */
 export async function getReadyToReturn(deps: AttentionPanelDeps, actingUser: ActingUser): Promise<ReadyToReturnRow[]> {
   requireRole(actingUser, "ADMIN");
   const orders = await deps.orders.listWithItemsIn(["READY_FOR_PICKUP_SHIPPING"]);
-  return orders.map((order) => {
-    const state = returnVisitState(order);
-    return {
-      orderId: order.id,
-      reference: orderNumber(order.number),
-      customerName: order.contactName,
-      pairsReady: order.items.filter((item) => item.status === "READY_FOR_PICKUP_SHIPPING").length,
-      fulfillment: FULFILLMENT_LABELS[order.fulfillment.method],
-      bookedOn: bookedDay.format(order.createdAt),
-      returnVisit:
-        state.kind === "bookable"
-          ? { kind: "bookable" as const }
-          : state.kind === "booked"
-            ? { kind: "booked" as const, appointmentId: state.appointment.id, when: returnWhen.format(state.appointment.startsAt) }
-            : { kind: "none" as const },
-    };
-  });
+  return orders.map((order) => ({
+    orderId: order.id,
+    reference: orderNumber(order.number),
+    customerName: order.contactName,
+    pairsReady: order.items.filter((item) => item.status === "READY_FOR_PICKUP_SHIPPING").length,
+    fulfillment: FULFILLMENT_LABELS[order.fulfillment.method],
+    bookedOn: bookedDay.format(order.createdAt),
+    returnVisit: summarizeReturnVisit(order),
+  }));
 }
 
 export interface NeedsQuoteRow {

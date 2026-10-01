@@ -12,7 +12,6 @@ import { updateItemStatusAction, type UpdateStatusState } from "./order-actions"
  * Cancelling can't be undone, so it takes a second, explicit click.
  */
 export function UpdateStatusForm({
-  orderId,
   itemId,
   fromStatus,
   nextStatuses,
@@ -20,7 +19,6 @@ export function UpdateStatusForm({
   idempotencyKey,
   pairLabel,
 }: {
-  orderId: string;
   itemId: string;
   fromStatus: ItemStatus;
   nextStatuses: ItemStatus[];
@@ -40,7 +38,6 @@ export function UpdateStatusForm({
 
   return (
     <form action={formAction} className="od-status-form">
-      <input type="hidden" name="orderId" value={orderId} />
       <input type="hidden" name="itemId" value={itemId} />
       <input type="hidden" name="fromStatus" value={fromStatus} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
