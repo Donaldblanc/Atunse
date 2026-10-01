@@ -7,6 +7,7 @@ import { SESSION_COOKIE_NAME } from "@/features/accounts/session";
 import { AccountMenu } from "./account-menu";
 import { AdminNav } from "./admin-nav";
 import { OWNER_DISPLAY_NAME } from "./admin-screens";
+import { NotificationBell } from "./notification-bell";
 
 // Shared shell for every admin screen: the dark sidebar and the top bar
 // from the design (scratch/overview-dashboard.jpeg), in the site's Inter
@@ -39,6 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <span className="sr-only">Search</span>
               <input type="search" placeholder="Search orders, customers, or reference #…" disabled title="Search arrives with the Orders screen" />
             </label>
+            <NotificationBell />
             <AccountMenu name={OWNER_DISPLAY_NAME} role="Admin" placement="topbar" />
           </header>
 

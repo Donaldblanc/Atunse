@@ -82,6 +82,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [newItem()],
     ...overrides,
   };
@@ -273,6 +274,53 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(retry.created).toBe(false);
     expect(retry.order.id).toBe(first.order.id);
     expect(await prisma.order.count()).toBe(1);
+  });
+
+  it("writes the admins' NEW_BOOKING notification with the Order, and none for a replay", async () => {
+    const { order } = await repo.create(newOrder({ submissionKey: "alert-1", alertBody: "Jordan · Standard Clean · Mail-In" }));
+    await repo.create(newOrder({ submissionKey: "alert-1" }));
+    const rows = await prisma.notification.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "NEW_BOOKING",
+      recipientAccountId: null,
+      orderId: order.id,
+      title: `New booking ATU-${order.number}`,
+      body: "Jordan · Standard Clean · Mail-In",
+      readAt: null,
+    });
+  });
+
+  it("writes no notification when the booking fails", async () => {
+    const dup = photos();
+    await repo.create(newOrder({ items: [newItem({ photos: dup })] }));
+    await prisma.notification.deleteMany();
+    await expect(repo.create(newOrder({ items: [newItem({ photos: dup })] }))).rejects.toThrow(PhotoKeyInUseError);
+    expect(await prisma.notification.count()).toBe(0);
+  });
+
+  it("lists the latest admin notifications newest first with the unread count, and marks them read", async () => {
+    for (let i = 0; i < 3; i++) await repo.create(newOrder({ alertBody: `booking ${i}` }));
+    // Another recipient's notification is neither listed nor counted nor marked.
+    const other = await prisma.account.create({ data: { role: "CUSTOMER", email: "someone@example.com", name: "S" } });
+    await prisma.notification.create({ data: { kind: "LOW_STOCK", title: "private", recipientAccountId: other.id } });
+
+    const first = await repo.listAdminNotifications(2);
+    expect(first.notifications.map((n) => n.body)).toEqual(["booking 2", "booking 1"]);
+    expect(first.unreadCount).toBe(3);
+
+    const at = new Date("2026-10-02T12:00:00Z");
+    await repo.markAdminNotificationsRead([first.notifications[0]!.id], at);
+    const afterOne = await repo.listAdminNotifications(10);
+    expect(afterOne.unreadCount).toBe(2);
+    expect(afterOne.notifications[0]!.readAt).toEqual(at);
+
+    await repo.markAdminNotificationsRead("all", new Date("2026-10-03T12:00:00Z"));
+    const afterAll = await repo.listAdminNotifications(10);
+    expect(afterAll.unreadCount).toBe(0);
+    expect(afterAll.notifications[0]!.readAt).toEqual(at); // already read: unchanged
+    expect(afterAll.notifications.some((n) => n.title === "private")).toBe(false);
+    expect((await prisma.notification.findFirst({ where: { title: "private" } }))?.readAt).toBeNull();
   });
 
   it("records when the confirmation email was sent", async () => {
@@ -543,7 +591,8 @@ describe("admin-screen data: reviews, notes, stock, payments (integration)", () 
     await prisma.notification.create({ data: { kind: "NEW_BOOKING", title: "New booking", orderId: order.id } });
 
     expect(await prisma.note.count({ where: { accountId: order.accountId } })).toBe(2);
-    expect(await prisma.notification.count({ where: { readAt: null } })).toBe(1);
+    // The booking's own NEW_BOOKING alert plus this one.
+    expect(await prisma.notification.count({ where: { readAt: null } })).toBe(2);
   });
 
   it("tracks stock changes, never a zero change, with unique SKUs", async () => {

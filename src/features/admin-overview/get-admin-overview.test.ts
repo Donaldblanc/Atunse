@@ -43,6 +43,7 @@ function order(estimateCents: number, items: NewItemInput[] = [item(["standard"]
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items,
   };
 }

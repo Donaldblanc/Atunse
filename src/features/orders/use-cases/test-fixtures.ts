@@ -36,6 +36,7 @@ export function bookingDeps<O extends Partial<SubmitOrderDeps> = object>(overrid
     notifications: new RecordingNotificationService(),
     paymentInstructions: { zelle: { recipient: "pay@restoredbydj.com", name: "RestoredByDJ" } } as PaymentInstructions,
     customerSignInEnabled: false, // the production default
+    ownerInbox: null as string | null, // tests of the owner's email set it
     now: () => FIXED_NOW,
   };
   // Keep the concrete test doubles' types (e.g. `.sent`) unless overridden.

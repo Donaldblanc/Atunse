@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderNumber, pairsPhrase } from "../domain";
 import { BUNDLE_PAIR_SERVICE_IDS } from "../service-catalog";
@@ -582,6 +582,74 @@ describe("submitOrder", () => {
     it("words the pairs the same way everywhere", () => {
       expect(pairsPhrase(1)).toBe("your pair");
       expect(pairsPhrase(3)).toBe("your 3 pairs");
+    });
+  });
+
+  describe("new-booking alerts", () => {
+    const INBOX = "shop@example.com";
+
+    it("writes a NEW_BOOKING notification for every admin, with no address, phone or email", async () => {
+      const deps = bookingDeps({ ownerInbox: INBOX });
+      const order = await submitOrder(deps, guest, validBookingInput({ items: [validPair({ serviceIds: ["standard", "laces"] })] }));
+      expect(deps.orders.notifications).toHaveLength(1);
+      const note = deps.orders.notifications[0]!;
+      expect(note).toMatchObject({
+        kind: "NEW_BOOKING",
+        recipientAccountId: null,
+        orderId: order.id,
+        title: `New booking ${orderNumber(order.number)}`,
+        body: "Jordan · Standard Clean, Lace Replacement · Local Drop-Off 2026-10-03",
+      });
+      for (const pii of ["123 Main", "555", "customer@example.com", "Smith"]) expect(`${note.title} ${note.body}`).not.toContain(pii);
+    });
+
+    it("says Mail-In for a mail-in booking", async () => {
+      const deps = bookingDeps();
+      await submitOrder(deps, guest, validBookingInput({ fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate: null } }));
+      expect(deps.orders.notifications[0]?.body).toBe("Jordan · Standard Clean · Mail-In");
+    });
+
+    it("emails the shop inbox once, without the customer's address, phone or email", async () => {
+      const deps = bookingDeps({ ownerInbox: INBOX });
+      const order = await submitOrder(deps, guest, validBookingInput());
+      const owner = deps.notifications.sent.filter((m) => m.to === INBOX);
+      expect(owner).toHaveLength(1);
+      expect(owner[0]!.subject).toBe(`New booking ${orderNumber(order.number)}`);
+      expect(owner[0]!.body).toContain(`/admin?order=${order.id}`);
+      expect(owner[0]!.body).toContain("Jordan");
+      for (const pii of ["123 Main", "555", "customer@example.com", "Smith"]) expect(owner[0]!.body).not.toContain(pii);
+    });
+
+    it("creates no second notification and sends no second owner email on a replay", async () => {
+      const deps = bookingDeps({ ownerInbox: INBOX });
+      const input = validBookingInput({ submissionKey: "9d8c7b6a-5e4f-4a3b-8c2d-1e0f9a8b7c6d" });
+      await submitOrder(deps, guest, input);
+      await submitOrder(deps, guest, input);
+      expect(deps.orders.notifications).toHaveLength(1);
+      expect(deps.notifications.sent.filter((m) => m.to === INBOX)).toHaveLength(1);
+    });
+
+    it("books anyway when the owner email fails", async () => {
+      const deps = bookingDeps({ ownerInbox: INBOX });
+      const real = deps.notifications.sendEmail.bind(deps.notifications);
+      deps.notifications.sendEmail = async (message) => {
+        if (message.to === INBOX) throw new Error("provider down for owner@example.com");
+        return real(message);
+      };
+      const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const order = await submitOrder(deps, guest, validBookingInput());
+      expect(order.items).toHaveLength(1);
+      expect(deps.orders.notifications).toHaveLength(1);
+      expect(deps.notifications.sent.map((m) => m.to)).toEqual(["customer@example.com"]);
+      expect(log.mock.calls.join(" ")).not.toContain("owner@example.com");
+      log.mockRestore();
+    });
+
+    it("sends no owner email when the inbox isn't configured", async () => {
+      const deps = bookingDeps({ ownerInbox: null });
+      await submitOrder(deps, guest, validBookingInput());
+      expect(deps.notifications.sent.map((m) => m.to)).toEqual(["customer@example.com"]);
+      expect(deps.orders.notifications).toHaveLength(1);
     });
   });
 });
