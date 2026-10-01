@@ -48,3 +48,4 @@ next-env.d.ts
 
 # CORS backups written by `npm run storage:configure -- --apply`
 /.storage-backups
+.next

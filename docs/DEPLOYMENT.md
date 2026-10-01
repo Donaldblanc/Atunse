@@ -88,14 +88,15 @@ what replaces it later.
    database its `DATABASE_URL` points at before building.
 
 ## Repository security settings (GitHub → Settings → Code security)
-These are GitHub settings, not files, so they have to be turned on by a
-repo admin. They were all off at the time of the vulnerability scan.
-- **Dependabot security updates:** on. `.github/dependabot.yml` already
-  schedules weekly npm and Actions updates into `develop`; this adds
-  immediate PRs for security advisories.
-- **Secret scanning** and **push protection:** on. Push protection blocks
-  a commit that contains a recognisable secret (API keys, database URLs)
-  before it reaches GitHub.
+These are GitHub settings, not files, so a repo admin has to turn them on.
+All three were off at the vulnerability scan. Checked 2026-10-01: secret
+scanning is on; the other two are still off (`docs/TODO.md`, Housekeeping).
+- **Dependabot security updates** (off): `.github/dependabot.yml` already
+  schedules weekly npm and Actions updates into `develop`; turning this on
+  adds immediate PRs for security advisories.
+- **Secret scanning** (on) and **push protection** (off): push protection
+  blocks a commit that contains a recognisable secret (API keys, database
+  URLs) before it reaches GitHub.
 
 Workflows pin every action to a full commit SHA (with the version in a
 comment), so a moved tag can't change what runs with the repo's token.

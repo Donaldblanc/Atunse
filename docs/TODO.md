@@ -4,7 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
-- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up as a count on the admin Overview. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up on the admin Overview (Recent Orders and Pending Payments, verified 2026-09-30), which the owner has to open to notice it. Add an owner notification email for new bookings and/or build the Orders queue before launch.
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 
 ### Legal & policies
@@ -71,7 +71,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [x] **Server-side input validation**: zod request shapes plus the use-case rules on every public route.
 - [x] **CORS**: the photo bucket allows only the site's origins, POST only (#107); the API sends no CORS headers (same-origin only).
 - [x] **Cookie flags**: session cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax`.
-- [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning and push protection are still off (entry above).
+- [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning is on; push protection is still off (Housekeeping).
 
 ### SEO & social
 - [ ] **Unique page titles**: every page has its own title except home, which uses the generic "Atunṣe".
@@ -100,7 +100,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
 - [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
 - [ ] **Database indexes, once the admin screens are ready for launch** (from the #118 review): the admin Overview filters and sorts `orders` by `createdAt` (both date ranges, Recent Orders) and `pickupDate` (Today's Schedule), and every Order load finds its pairs by `items.orderId`. Without indexes each of these reads the whole table. That's fine at today's size but grows with every booking.
-  - `Order` `@@index([createdAt])` and `@@index([pickupDate])`: already on #119's branch (`feature/admin-data-model`); confirm they landed.
+  - [x] `Order` `@@index([createdAt])` landed. The `pickupDate` index was added and then dropped, because Today's Schedule reads Appointments now.
   - `Item` `@@index([orderId])`: missing everywhere. Postgres doesn't index foreign keys on its own, and Prisma doesn't add one.
   - Then add indexes for whatever the finished admin screens (Orders queue, Calendar, Messages) filter or sort on that isn't covered, and check the busiest queries with `EXPLAIN ANALYZE` against production-sized data.
 
@@ -135,10 +135,10 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] Review and edit the order.
 - [ ] Accept the required agreements.
 - [ ] Complete checkout. *Today: the booking submits and shows Zelle deposit instructions; there's no online payment.*
-- [ ] Confirm payment. *Today: the owner marks the Zelle deposit received; that admin screen isn't built yet.*
+- [ ] Confirm payment. *Today: the owner marks the Zelle deposit received with Mark Paid (Overview → Needs Attention → Pending Payments).*
 - [ ] Confirm the booking appears in the customer's account. *Needs "My bookings".*
 - [ ] Confirm the customer receives the confirmation email. *Needs Resend.*
-- [ ] Confirm the booking appears in the admin dashboard. *Needs the Orders queue (blocker above).*
+- [ ] Confirm the booking appears in the admin dashboard. *It does on the Overview (Recent Orders), verified locally 2026-09-30; repeat on production.*
 - [ ] Test admin actions on the booking.
 - [ ] Test the cancellation and refund path.
 - [ ] Repeat the critical flow on mobile.
@@ -201,7 +201,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
   - [ ] **Add the custom domain to the bucket CORS** once there is one (`docs/DEPLOYMENT.md`, "Adding an origin"), or uploads from it will fail.
   - [ ] **Clean up abandoned uploads** now and then: `STORAGE_CLEANUP_DATABASE_URL=<the database for this bucket> npm run storage:cleanup` (dry run), then add `-- --apply`. Uploads are throwaway once a booking copies them; this also removes uploads from bookings never submitted. It never reads `DATABASE_URL`, and refuses to delete if none of the database's photos are in the bucket. Could become a Vercel cron route later.
   - [ ] **Scope the storage keys** in Neon's console to this one bucket: read, write and **list**. `storage:cleanup` needs `s3:ListBucket`, and so does a clean "photo not uploaded" answer on AWS (without it, a missing object is a 403, which the app also handles).
-- [ ] **Turn on GitHub's security settings** (repo admin only): Dependabot security updates, secret scanning, and push protection, all under Settings → Code security. They were off at the vulnerability scan; see `docs/DEPLOYMENT.md`.
+- [ ] **Turn on GitHub's security settings** (repo admin only, Settings → Code security). Checked 2026-10-01: secret scanning is **on**; Dependabot security updates and push protection are still **off**. See `docs/DEPLOYMENT.md`.
 - [ ] **Content-Security-Policy: roll out to nonce-based enforcement.** `next.config.mjs` sends it as `Content-Security-Policy-Report-Only` (vulnerability scan, #88), so browsers only log what it would block. The target state isn't just "flip it to enforcing": it's **nonce- (or hash-) based scripts with no `'unsafe-inline'`**, which is transitional debt kept only because Next's inline bootstrap has no nonce yet. Rollout:
   1. Report-Only: browse a preview (landing, services, booking with a photo upload, admin) and collect violations.
   2. Tighten sources to what's actually used.
@@ -213,7 +213,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).
 - [ ] **Legacy orders with a blank `contactPhone`.** The ADR-0014 migration marked pre-booking-flow smoke-test orders that had no phone with `''`. Check production for any before launch.
 - [x] **Landing booking panel copy** now matches the catalog and ADR-0010 (#105): prices come from `SERVICE_CATALOG`, no prepaid-label promise, and the local tab is "Local Drop-Off".
-- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now: `chore/back-merge-ce98fe9` (0.2.2 `package.json` bump) needs a manual PR into `develop`.
+- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now (checked 2026-10-01): five branches, `chore/back-merge-{ce98fe9,6ed92a8,78d9eba,a53335c,ca3b744}`, never reached `develop`, so `develop`'s `package.json` says 0.2.1 while `main` is 0.5.0. Only `package.json` and `package-lock.json` differ. One PR from `main` into `develop` would reconcile them, and then the stale branches can be deleted.
 
 ## Client feedback — landing page & booking flow (2026-09-26)
 Raw feedback checked against current code. Items already done or already

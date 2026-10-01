@@ -6,6 +6,9 @@ decisions is `docs/adr/`; source of truth for outstanding work is
 `docs/TODO.md`. This file is a summary/index over all three — if this file
 and one of those disagree, the dedicated file wins and this one is stale.
 
+**New session? Start at `docs/kb/README.md`.** It's a short index of
+task-sized notes, so you don't need to read this whole file.
+
 ## What we're building
 RestoredByDJ (business name) / Atunṣe (public site name): a sneaker
 cleaning/restoration business in NYC, serving the NY/NJ/CT Tri-State area
@@ -28,7 +31,7 @@ basis for this build.
 - **Policy Acceptance**: single checkbox covering all legal policies (ToS, Refund, Restoration Disclaimer, Payment Policy) at final order review/submit, before the Deposit is charged.
 - **Route access**: strictly role-partitioned server-side — `customer` accounts can only reach customer-facing routes (their own orders/account); every other route, including admin and the future customer-import screen, is `admin`-only.
 - **Photo retention**: sneaker condition photos are retained indefinitely; accessible only to the owner/admin and the Account that owns the Order.
-- **Fulfillment Method**: exactly two, **Local Drop-Off** (DJ collects from the customer's address at a booked time and drops the finished pair back off, NY/NJ/CT only; code name `PICKUP`) and **Mail-In** (nationwide; shipped back). Customers never come in person (resolved 2026-09-26; renamed from "Pickup" and return leg decided 2026-09-28). The original `docs/notes.txt` answers mention drop-off; that is superseded. Open: how finished sneakers return to Pickup customers, and renaming the "Ready for Pickup/Shipping" status to match (see `CONTEXT.md` open questions).
+- **Fulfillment Method**: exactly two, **Local Drop-Off** (DJ collects from the customer's address at a booked time and drops the finished pair back off, NY/NJ/CT only; code name `PICKUP`) and **Mail-In** (nationwide; shipped back). Customers never come in person (resolved 2026-09-26; renamed from "Pickup" and return leg decided 2026-09-28). The original `docs/notes.txt` answers mention drop-off; that is superseded. DJ drops Local Drop-Off pairs back off and Mail-In pairs are shipped back; the status reads "Ready for Drop-Off/Shipping" (code name `READY_FOR_PICKUP_SHIPPING`).
 - **Loyalty rewards**: dropped from MVP entirely (was ambiguous between must-have and deferred in the original notes — resolved to "not in MVP"). Accounts still track order history without any points system at launch.
 
 ## Architecture decisions (full text in docs/adr/)
@@ -60,10 +63,10 @@ the rest of the use-cases — rather than building every use-case's business
 logic before any of them has a working UI or a deployed admin panel to
 prove it against.
 
-## Where the build stands (as of 2026-09-26)
+## Where the build stands (as of 2026-10-01, Release 0.5.0)
 **Phase 0 — done.**
 - Next.js scaffold with the feature-based layout (ADR-0011).
-- CI runs typecheck, lint, unit tests, migrations, and integration tests against a real Postgres service container.
+- CI runs typecheck, lint, unit tests, and integration tests against a real Postgres service container. Integration tests run only against a database named `*_test`, and migrate it themselves (#124).
 - `/admin/*` and `/api/v1/admin/*` fail closed via `src/proxy.ts`.
 - Narrow schema: `Account`, `Order`, `Item`, `ItemAuditEntry`.
 - Interim sign-in (ADR-0005 addendum): `/sign-in`, `POST /api/v1/auth/sign-in` and `sign-out`, and a bootstrap admin created by `npm run prisma:seed`.
@@ -74,8 +77,8 @@ prove it against.
 - Server-side rules: Policy Acceptance, Local Drop-Off only in NY/NJ/CT within the 8:00 AM–10:00 PM collection window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
 - Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
-- `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. **Deploys can't take bookings until the S3 bucket and its env vars exist** (uploads answer 503).
-- `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key.
+- `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. Production uploads to the Neon bucket `atunse-images` (verified 2026-09-28).
+- `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key. It applies `adminStatusMoves`: Quote Sent and Approved are reached only through Send Quote and Customer approved, and a pair can't pass Approved while its Deposit is pending (the API answers 409). The one backward move is Under Review → Request Submitted (#122).
 - **Customer Accounts (ADR-0014).** Every booking creates or uses a Customer Account (`orders.accountId` is required). With `FEATURE_CUSTOMER_SIGN_IN_ENABLED` on, a signed-out booking whose email already has an Account gets the booking flow's email-code login screen (`POST /api/v1/auth/code/request` and `/verify`). With it off (the default), that booking attaches to the existing Account.
 - **Photo viewing**: `GET /api/v1/orders/:orderId/photos` issues 5-minute presigned GET links to the Order's Account owner or an admin only. A photo key can belong to only one Order.
 - Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
@@ -86,6 +89,20 @@ prove it against.
   - The work queues are always "right now": pairs needing a quote, Orders whose Deposit Payment is still PENDING (confirming a payment marks it RECEIVED), and pairs Ready for Drop-Off/Shipping.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and the deposit's status) and Today's Schedule (today's scheduled collections and returns, read from the Calendar's Appointments, so a rescheduled visit shows on its new day).
   - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
+  - **Dialogs** (#121), each opened by a URL param on `/admin`:
+    - Date range: presets plus a custom calendar.
+    - Metric details: a daily chart plus a status breakdown.
+    - Order detail: customer, pairs, a timeline from the audit log, payment, notes, Update Status.
+    - Schedule Item: Mark as Completed, Contact Customer.
+    - Needs Attention: Pending Payments with **Mark Paid** (`confirmDeposit`: Deposit RECEIVED plus a `MANUAL_PAYMENT_CONFIRMED` audit entry, without moving any pair), Ready to Return, Needs a Quote.
+  - **Order flows** (#123, landed by #125):
+    - Send Quote: price, confirm step, customer email.
+    - Customer approved, recorded by DJ.
+    - Customer emails at Quote Sent, Ready for Drop-Off/Shipping and Cancelled.
+    - Edit Order: contact, address and pair details, with an optimistic-lock save and audit entries.
+    - Add note.
+    - Reschedule a visit.
+    - Book a Return visit.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
 - **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)):
   - Payments (incl. Apple Pay, failed and refunded) and Appointments (with status and assignee).
@@ -97,12 +114,13 @@ prove it against.
   - Order numbers (ATU-1001 on), customer names, item size, colorway and condition. Booking creates each Order's PENDING Deposit Payment and, for Local Drop-Off, its COLLECTION Appointment.
 - Not built yet:
   - Booking still prices from `service-catalog.ts`; switching it (and the Services page) to the `services`/`bundles` tables is step 2 of ADR-0016.
-  - Admin Item detail: view photos, send the Quote, confirm the Zelle Deposit.
+  - No Balance Payment is created or collected yet. The quote email only states the balance.
+  - The owner isn't told about new bookings: no email, and no Orders screen.
   - The other admin working screens (Orders, Calendar, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
 
 **Customer site (marketing + booking UI).**
-- Pages: `/`, `/services`, `/about`, `/booking`.
-- `/coming-soon` is the placeholder destination for Process, Contact, Terms and Privacy.
+- Pages: `/`, `/services`, `/process`, `/about`, `/contact` (the form emails the shop's inbox), `/booking`.
+- Terms of Service and Privacy Policy are versioned PDFs in `public/legal/` (ADR-0015). `/coming-soon` is still public, but nothing links to it.
 - `/booking` is a five-step flow: Service → Details → Schedule → Your Info → Review, then a confirmation.
   - **Service:** one pair with additive Services (one cleaning tier plus any restoration add-ons), or a three-pair Bundle.
   - **Details:** at least one photo per pair.
@@ -121,7 +139,7 @@ prove it against.
 - Auth wired and **admin routes protected from the very first deployment** — never ship an open `/admin` even temporarily, even before there's anything sensitive behind it
 - Narrow initial schema: just enough for the one workflow below (Order, Item, Customer/Account) — not the full domain model up front
 
-**Phase 1 — One real vertical slice, fully engineered** (in progress: backend use-cases and API only)
+**Phase 1 — One real vertical slice, fully engineered** (built through the admin Overview's dialogs. Still left: Resend in production, so the customer emails actually go out, and a real pass on production.)
 Pick the core workflow: a customer submits an Order with one Item and photos →
 owner reviews and sends a quote → customer pays the deposit manually
 (Zelle/Cash, ADR-0002) → owner confirms payment → Item moves through the
@@ -151,7 +169,7 @@ This slice is the thing that proves the architecture, not a diagram.
 
 ## Admin panel screen inventory (MVP)
 The admin follows the approved design images (`scratch/01-09`); the data model already holds what each needs (ADR-0016).
-1. **Overview** (built) — booked orders and revenue for a date range, and the work queues right now.
+1. **Overview** (built) — booked orders and revenue for a date range, and the work queues right now. Its dialogs cover Order detail, quoting, Mark Paid, visits and Edit Order until the screens below exist.
 2. **Orders** — every Order, with status tabs derived from its Items and Payments, filters by Service, payment method and date.
 3. **Order detail** — progress, customer, Items and Services (photos, size, colorway, quote), Payments (manual Zelle/Cash confirmation per ADR-0002), totals.
 4. **Calendar** — Local Drop-Off collection and return Appointments, plus pairs in progress and ready.
@@ -170,7 +188,7 @@ The admin follows the approved design images (`scratch/01-09`); the data model a
 - [ ] Mail-in label generation via third-party carrier API — not in MVP (ADR-0010)
 - [x] Connect `/booking` to `POST /api/v1/orders` for a single pair
 - [x] Bundles: three Items in one Order, priced from `BUNDLE_CATALOG`
-- [ ] Create the S3 bucket and set its env vars; `/booking` can't be submitted on a deploy until then
+- [x] Photo storage in production: Neon bucket `atunse-images`, uploads verified 2026-09-28
 - [ ] Real Terms of Service, Refund Policy, Restoration Disclaimer, Payment Policy and Privacy pages (the Policy Acceptance checkbox links to `/coming-soon`)
 - [x] Return leg (2026-09-28): DJ drops Local Drop-Off pairs back off; Mail-In pairs are shipped back. The status reads "Ready for Drop-Off/Shipping"; its code name `READY_FOR_PICKUP_SHIPPING` is unchanged
 
