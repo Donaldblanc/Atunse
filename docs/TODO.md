@@ -156,9 +156,18 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
 - [x] **Order #: ATU-1008 numbers** in Recent Orders and Today's Schedule (#119).
 - [x] **Today's Schedule: return drop-offs.** It reads SCHEDULED Appointments of both kinds (#119); returns appear once Order detail or the Calendar can book one.
+- [ ] **Schedule Item: Reschedule.** The dialog's Reschedule button is disabled: no flow moves an Appointment yet (CONTEXT.md: "rescheduling moves it"). Build it with the Calendar, then enable it.
+- [ ] **Schedule Item: completing a Collection doesn't move the pairs.** "Mark as Completed" changes only the Appointment (no doc ties it to an Item status). Decide whether a completed Collection should also advance its pairs (e.g. Awaiting Sneakers to In Progress) and record it in CONTEXT.md; there's no `completedAt` column either, add one if the Calendar wants it.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
+- [ ] **Needs Attention panels are read-only except Mark Paid:** Ready to Return and Needs a Quote list their Orders and link to the Order dialog (`?order=`), where the actions live. The Ready to Return stat card no longer links to `Orders?status=READY_FOR_PICKUP_SHIPPING`; it opens the panel. Pending Payments only handles the Deposit: the Balance (ADR-0002) is confirmed from the Payments screen once it exists.
 - [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
+- [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
+  - [ ] **Edit Order** and the dialog's "…" menu: no feature behind them yet, so they aren't drawn (order fields such as size, colorway, quoted price, drop-off fee and tax are editable only in the database).
+  - [ ] **Add a note**: Order detail shows an Order's notes but nothing writes them yet.
+  - [ ] **Quote a pair**: Update Status holds a pair at Under Review (adminStatusMoves in domain.ts) because Quote Sent means the owner's quote (`Item.price`, the Approval Gate) reached the customer; that needs its own step. It also holds a pair at Approved until its Deposit is marked paid (ADR-0002). The admin API route (`/api/v1/admin/items/[itemId]/transitions`) doesn't apply that rule yet.
+  - [ ] **Customer email on status change**: Update Status doesn't email the customer (the use-case sends only when given an address and message); decide which steps notify.
+  - [ ] **Per-Service prices** on a pair are the catalog's base prices; the Suede Fee and a quoted minimum aren't broken out, and Bundle pairs show none.
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
 - [ ] **Search** in the top bar: enable with the Orders screen, which it searches.

@@ -1,6 +1,6 @@
 import { calendarDateToUtcMidnight, type CalendarDate } from "@/features/orders/calendar-date";
 import type { Money } from "@/shared/money/money";
-import { dollarTicks } from "./chart-scale";
+import { dayAxis, dollarTicks } from "./chart-scale";
 
 const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "UTC" });
 const longDay = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
@@ -15,10 +15,11 @@ const asDate = calendarDateToUtcMidnight;
 export function RevenueTrend({ days, highlight }: { days: { date: CalendarDate; revenue: Money }[]; highlight: CalendarDate }) {
   const ticks = dollarTicks(Math.max(...days.map((day) => day.revenue.cents)) / 100);
   const top = ticks[ticks.length - 1]!;
-  const everyDay = days.length <= 7;
+  // A bar per day past 45 days is a sliver: tighter gaps, and no tab stop on each.
+  const { everyDay, labelStep, veryDense } = dayAxis(days.length);
 
   return (
-    <div className="ov-bars" data-dense={everyDay ? undefined : "true"}>
+    <div className="ov-bars" data-dense={everyDay ? undefined : veryDense ? "very" : "true"}>
       <div className="ov-bars-axis" aria-hidden="true">
         {[...ticks].reverse().map((tick) => (
           <span key={tick}>${tick.toLocaleString("en-US")}</span>
@@ -32,14 +33,14 @@ export function RevenueTrend({ days, highlight }: { days: { date: CalendarDate; 
         </div>
         {days.map((day, i) => {
           const value = day.revenue.format();
-          // Label every day in a week; in 30 days, every fifth counting back from today.
-          const labelled = everyDay || (days.length - 1 - i) % 5 === 0;
+          // Label every day in a week; otherwise every few, counting back from the last day.
+          const labelled = (days.length - 1 - i) % labelStep === 0;
           return (
             <div key={day.date} className="ov-bar-slot">
               <div
                 className="ov-bar-hit"
                 role="img"
-                tabIndex={0}
+                tabIndex={veryDense ? undefined : 0}
                 aria-label={`${longDay.format(asDate(day.date))}: ${value} booked`}
               >
                 <div

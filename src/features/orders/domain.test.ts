@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { canTransition, liveEstimate, orderRollupStatus } from "./domain";
+import { adminStatusMoves, canTransition, isStepBack, liveEstimate, orderRollupStatus } from "./domain";
 
 describe("Item status pipeline", () => {
   it("allows the next linear step", () => {
@@ -30,6 +30,38 @@ describe("Item status pipeline", () => {
   it("has no transitions out of terminal states", () => {
     expect(canTransition("COMPLETED", "CANCELLED")).toBe(false);
     expect(canTransition("CANCELLED", "UNDER_REVIEW")).toBe(false);
+  });
+});
+
+describe("adminStatusMoves", () => {
+  const deposit = (status: "PENDING" | "RECEIVED") => ({ payments: [{ kind: "DEPOSIT" as const, status }] });
+
+  it("offers the next step and Cancel", () => {
+    expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({ moves: ["QUALITY_CHECK", "CANCELLED"], held: null });
+  });
+
+  it("holds Quote Sent for the quote step (ADR-0001), still offering the step back and Cancel", () => {
+    const { moves, held } = adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"));
+    expect(moves).toEqual(["REQUEST_SUBMITTED", "CANCELLED"]);
+    expect(held).toMatch(/quote/);
+  });
+
+  it("tells a step back from progress", () => {
+    expect(isStepBack("UNDER_REVIEW", "REQUEST_SUBMITTED")).toBe(true);
+    expect(isStepBack("REQUEST_SUBMITTED", "UNDER_REVIEW")).toBe(false);
+    expect(isStepBack("UNDER_REVIEW", "CANCELLED")).toBe(false);
+  });
+
+  it("holds a pair at Approved while the Deposit is pending (ADR-0002)", () => {
+    const { moves, held } = adminStatusMoves({ status: "APPROVED" }, deposit("PENDING"));
+    expect(moves).toEqual(["CANCELLED"]);
+    expect(held).toMatch(/deposit/);
+    expect(adminStatusMoves({ status: "APPROVED" }, deposit("RECEIVED")).moves).toEqual(["AWAITING_SNEAKERS", "CANCELLED"]);
+    expect(adminStatusMoves({ status: "APPROVED" }, { payments: [] }).moves).toEqual(["AWAITING_SNEAKERS", "CANCELLED"]);
+  });
+
+  it("offers nothing from a finished pair", () => {
+    expect(adminStatusMoves({ status: "COMPLETED" }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
   });
 });
 
