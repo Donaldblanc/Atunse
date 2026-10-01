@@ -15,6 +15,25 @@ Each slice is one PR off `develop`, run as **one fresh session per PR**:
 
 Follow `docs/kb/patterns.md` for every use-case, repository method, action and dialog. Every dialog is opened by a URL param built with `overviewHref`.
 
+## Order, set up to avoid merge conflicts
+```
+PR 1 alerts (#128, merged)
+  └─ Groundwork: panels + dialog lookup table   (no behaviour change)
+       ├─ PR 2 Visits + Balance   ┐
+       ├─ PR 3 Find orders        │ wave 1: run in parallel,
+       ├─ PR 5 Stock + Reviews    │ almost no shared files
+       └─ PR 6 Messages           ┘
+            └─ PR 4 Charts drill-down (after PR 3)
+                 └─ Docs wrap-up: docs/kb/status.md, close this plan
+```
+Rules for wave 1, so the branches don't collide:
+- **Own repository per area.** PR 3 adds `OrderSearchRepository`, PR 5 adds `InventoryRepository` and `ReviewRepository`, PR 6 adds `MessageRepository`. Each gets its own Prisma and in-memory files. Only PR 2 changes `OrderRepository`.
+- **New panel:** a file in `admin-overview/panels/`.
+- **New dialog:** a slot in `admin-overview/dialogs/` plus **one line** in its lookup table.
+- **Styles:** in a per-area CSS file, not appended to `admin-theme.css`.
+- **Docs:** each PR ticks only its own `docs/TODO.md` entry. `docs/kb/status.md` is updated once, in the wrap-up.
+- **Before merging,** update the branch from `develop`. Expected conflicts are one-line ones in `deps.ts` and the lookup table.
+
 ## Baseline (already actionable, #121/#123)
 - Range picker.
 - The 4 stat cards.
@@ -22,7 +41,7 @@ Follow `docs/kb/patterns.md` for every use-case, repository method, action and d
 - Today's Schedule rows (open the visit).
 - Needs Attention: Pending Payments, Ready to Return, Needs a Quote.
 
-## PR 1: New-booking alerts 🔒 (`feature/overview-alerts`)
+## PR 1: New-booking alerts 🔒 (`feature/overview-alerts`), merged as #128
 - **Notification row:** `submitOrder` writes a `NEW_BOOKING` Notification (recipient null means every admin) **in the same transaction** as the Order. An idempotent replay writes nothing.
 - **Owner email:** sent to `CONTACT_EMAIL` after the write, never on a replay. If it fails, log it through `redactForLog` and still let the booking succeed.
   - The subject is the order number. The body is the number, the first name, the Services, the fulfillment method and the date, plus a link to `/admin?order=`. No full address, phone or email.
@@ -57,7 +76,7 @@ Status-rule change: update `CONTEXT.md` (Balance, Appointment) and `docs/kb/doma
 - **Known edge:** if the Collection is completed before a pair is approved, that pair later takes the normal steps (Approved → Awaiting Sneakers → In Progress) through Update Status.
 
 ## PR 3: Find orders (`feature/overview-find-orders`)
-- **Repository:** `searchOrders({ q, status, from, to, serviceId, limit, offset })`.
+- **Repository:** a new `OrderSearchRepository` (Prisma and in-memory) with `searchOrders({ q, status, from, to, serviceId, limit, offset })`.
   - `q` matches the order number (`ATU-1234` or `1234`), the contact name, email or phone, case-insensitively.
   - It uses Prisma `contains`, which is parameterized.
   - Inputs are validated with zod: `q` up to 100 characters, `limit` up to 50.
@@ -79,6 +98,7 @@ Status-rule change: update `CONTEXT.md` (Balance, Appointment) and `docs/kb/doma
 - Every target uses an accessible link, with a focus ring and an `aria-label` such as "Orders booked Wed Sep 30".
 
 ## PR 5: Low Stock + Reviews 🔒 (`feature/overview-stock-reviews`)
+New `InventoryRepository` and `ReviewRepository`, each with Prisma and in-memory versions.
 - **Low Stock** card: the real count of active items with `stock <= lowStockAt`. Its dialog (`?attention=low-stock`):
   - lists those items;
   - **Adjust stock** takes a change, a reason (RESTOCK or ADJUSTMENT) and a note.
@@ -92,6 +112,7 @@ Status-rule change: update `CONTEXT.md` (Balance, Appointment) and `docs/kb/doma
 - Delete `SAMPLE_LOW_STOCK_ITEMS` and `SAMPLE_REVIEWS`.
 
 ## PR 6: Messages with email reply 🔒 (`feature/overview-messages`)
+New `MessageRepository`, with Prisma and in-memory versions.
 - **Migration:** `Message.idempotencyKey String? @unique`, so a replayed reply sends no second email (ADR-0012).
 - **Unread Messages** card: the real count of CUSTOMER messages with `readAt` null, in Conversations that aren't archived. Its dialog (`?attention=messages`):
   - conversations that have unread messages;
@@ -120,7 +141,7 @@ Status-rule change: update `CONTEXT.md` (Balance, Appointment) and `docs/kb/doma
 - **Browser check:** one Playwright screenshot of the changed panel at 1440px and 375px (`docs/kb/testing.md`). Test data comes from `npm run seed:sample`.
 - **Docs:**
   - tick the matching `docs/TODO.md` entries;
-  - update `docs/kb/status.md`;
+  - leave `docs/kb/status.md` to the wrap-up PR;
   - update `CONTEXT.md` if a term changes.
 
 ## Still undecided (not in these PRs)
