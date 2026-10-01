@@ -48,10 +48,13 @@ export function isStepBack(from: ItemStatus, to: ItemStatus): boolean {
 
 /**
  * Where an admin's plain "Update Status" may move a pair: the pipeline's
- * next step and Cancel (canTransition), less two steps that are more than
+ * next step and Cancel (canTransition), less the steps that are more than
  * a status change, each with the reason it's held:
- * - Quote Sent is the owner's quote reaching the customer (ADR-0001), so it
- *   waits for the quote step that sets the price.
+ * - Quote Sent and Approved have their own steps. Sending the quote sets
+ *   the price and emails the customer (ADR-0001); Approved is the owner
+ *   recording the customer's yes. Order detail offers each as its own
+ *   control (sendQuote, recordApproval), never as a bare move, so no pair
+ *   is Quote Sent without a price or Approved without a recorded yes.
  * - Past Approved while the Order's Deposit is still PENDING: the Order is
  *   held until the owner marks it received (ADR-0002).
  */
@@ -62,10 +65,7 @@ export function adminStatusMoves(
   let held: string | null = null;
   const moves = ITEM_STATUSES.filter((next) => {
     if (!canTransition(item.status, next)) return false;
-    if (next === "QUOTE_SENT") {
-      held = "Waiting on the quote: sending one arrives with the quote step.";
-      return false;
-    }
+    if (next === "QUOTE_SENT" || next === "APPROVED") return false;
     if (item.status === "APPROVED" && order.payments.some((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING")) {
       if (next === "CANCELLED") return true;
       held = "Waiting on the deposit: mark it paid in Pending Payments first.";
@@ -75,6 +75,10 @@ export function adminStatusMoves(
   });
   return { moves, held };
 }
+
+/** A quote is a sane price for one pair: at least a dollar, and short of a typo like $12000 for $120.00. */
+export const MIN_QUOTE_CENTS = 100;
+export const MAX_QUOTE_CENTS = 500_000;
 
 /** How admin screens name each status (CONTEXT.md: Status Pipeline). */
 export const ITEM_STATUS_LABELS: Record<ItemStatus, string> = {
@@ -141,6 +145,8 @@ export interface Item {
   size: string | null;
   /** e.g. "Black / White"; null until the owner enters it. */
   colorway: string | null;
+  /** The owner's assessment on Order detail, e.g. "Good"; null until entered. */
+  condition: string | null;
   serviceIds: string[];
   /** This pair's estimate from the service catalog, before Rush. */
   estimate: Money;
@@ -210,6 +216,8 @@ export interface Order {
   contactEmail: string;
   contactPhone: string;
   createdAt: Date;
+  /** Bumped by every write to the Order row itself; Edit Order's optimistic check reads it. */
+  updatedAt: Date;
   policyAcceptedAt: Date;
   /** Null only for Orders from before the agreement existed. */
   termsAcceptance: TermsAcceptance | null;

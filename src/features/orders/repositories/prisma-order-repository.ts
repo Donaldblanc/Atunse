@@ -1,16 +1,22 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
+import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
 import { MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
   NoPendingDepositError,
+  OrderChangedError,
+  OrderNotFoundError,
   PhotoKeyInUseError,
   BundleNotFoundError,
   AppointmentCancelledError,
+  AppointmentMovedError,
   AppointmentNotFoundError,
+  AppointmentNotScheduledError,
+  ReturnAlreadyBookedError,
   type AppointmentWithOrder,
   type AwaitingDepositOrder,
   type AwaitingDeposits,
@@ -52,6 +58,7 @@ function toDomainItem(row: ItemRow): Item {
     material: row.material,
     size: row.size,
     colorway: row.colorway,
+    condition: row.condition,
     serviceIds: row.serviceIds,
     estimate: Money.fromCents(row.estimateCents),
     status: row.status,
@@ -116,6 +123,7 @@ function toDomainOrder(row: OrderRow): Order {
     contactEmail: row.contactEmail,
     contactPhone: row.contactPhone,
     createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
     policyAcceptedAt: row.policyAcceptedAt,
     termsAcceptance: toDomainTermsAcceptance(row),
     fulfillment: toDomainFulfillment(row),
@@ -260,6 +268,7 @@ export class PrismaOrderRepository implements OrderRepository {
     toStatus: Item["status"];
     entry: AuditEntry;
     receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Item | null> {
     return this.prisma.$transaction(async (tx) => {
       // Idempotency (ADR-0012): a repeat call with the same idempotencyKey
@@ -280,7 +289,7 @@ export class PrismaOrderRepository implements OrderRepository {
       // request can't skip a step in the pipeline.
       const { count } = await tx.item.updateMany({
         where: { id: params.itemId, ...(params.entry.fromStatus ? { status: params.entry.fromStatus } : {}) },
-        data: { status: params.toStatus },
+        data: { status: params.toStatus, ...(params.price ? { priceCents: params.price.cents } : {}) },
       });
       if (count === 0) {
         const current = await tx.item.findUnique({ where: { id: params.itemId }, select: { status: true } });
@@ -480,5 +489,135 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       return true;
     });
+  }
+
+  async updateOrderDetails(params: {
+    orderId: string;
+    expectedUpdatedAt: Date;
+    details: OrderDetailsInput;
+    actorAccountId: string | null;
+    idempotencyKey: string;
+  }): Promise<"updated" | "unchanged" | "already-applied"> {
+    const { details } = params;
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.order.findUnique({ where: { id: params.orderId }, include: ORDER_INCLUDE });
+      if (!row) throw new OrderNotFoundError(params.orderId);
+
+      // Idempotency (ADR-0012): the key is recorded on the entries this writes, so a retry finds it.
+      const applied = await tx.itemAuditEntry.findFirst({
+        where: { idempotencyKey: { in: [params.idempotencyKey, `${params.idempotencyKey}:contact`] }, item: { orderId: params.orderId } },
+        select: { id: true },
+      });
+      if (applied) return "already-applied";
+
+      if (row.updatedAt.getTime() !== params.expectedUpdatedAt.getTime()) throw new OrderChangedError();
+      const order = toDomainOrder(row);
+      const itemIds = new Set(order.items.map((item) => item.id));
+      const stranger = details.pairs.find((pair) => !itemIds.has(pair.itemId));
+      if (stranger) throw new ItemNotFoundError(stranger.itemId);
+
+      const diff = diffOrderDetails(order, details);
+      if (isNoop(diff)) return "unchanged";
+
+      // Conditional on updatedAt again: a write that landed between the read above and here (another
+      // transaction) makes this match nothing, so two saves can't both win. Writing every field, even
+      // when only a pair changed, is what bumps updatedAt for the next editor's check.
+      const { count } = await tx.order.updateMany({
+        where: { id: params.orderId, updatedAt: params.expectedUpdatedAt },
+        data: {
+          contactName: details.contact.name,
+          contactEmail: details.contact.email,
+          contactPhone: details.contact.phone,
+          addressLine1: details.address.line1,
+          addressLine2: details.address.line2,
+          city: details.address.city,
+          state: details.address.state,
+          zip: details.address.zip,
+        },
+      });
+      if (count === 0) throw new OrderChangedError();
+
+      // Only the pairs that changed, and only their changed fields: an untouched pair keeps its updatedAt.
+      for (const change of diff.pairs) {
+        const data = Object.fromEntries(Object.entries(change.changes).map(([field, { to }]) => [field, to]));
+        await tx.item.update({ where: { id: change.itemId }, data });
+        await tx.itemAuditEntry.create({
+          data: { itemId: change.itemId, action: DETAILS_EDITED, actorAccountId: params.actorAccountId, idempotencyKey: params.idempotencyKey, metadata: { changes: change.changes } },
+        });
+      }
+      if (diff.contact.length > 0) {
+        // No Order-level audit table: the Order's first pair carries it. Field names only, never the customer's details.
+        await tx.itemAuditEntry.create({
+          data: {
+            itemId: row.items[0]!.id,
+            action: ORDER_CONTACT_EDITED,
+            actorAccountId: params.actorAccountId,
+            idempotencyKey: `${params.idempotencyKey}:contact`,
+            metadata: { fields: diff.contact },
+          },
+        });
+      }
+      return "updated";
+    });
+  }
+
+  async addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote> {
+    const order = await this.prisma.order.findUnique({ where: { id: params.orderId }, select: { accountId: true } });
+    if (!order) throw new OrderNotFoundError(params.orderId);
+    const row = await this.prisma.note.create({
+      data: { accountId: order.accountId, orderId: params.orderId, authorAccountId: params.authorAccountId, body: params.body },
+    });
+    return { id: row.id, body: row.body, createdAt: row.createdAt };
+  }
+
+  async findByItemId(itemId: string): Promise<Order | null> {
+    const row = await this.prisma.order.findFirst({ where: { items: { some: { id: itemId } } }, include: ORDER_INCLUDE });
+    return row ? toDomainOrder(row) : null;
+  }
+
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+    // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
+    const moved = await this.prisma.appointment.updateMany({
+      where: { id: params.appointmentId, status: "SCHEDULED", startsAt: params.expectedStartsAt },
+      data: { startsAt: params.startsAt, endsAt: params.endsAt },
+    });
+    const row = await this.prisma.appointment.findUnique({ where: { id: params.appointmentId } });
+    if (!row) throw new AppointmentNotFoundError(params.appointmentId);
+    if (moved.count === 1) return { appointment: toDomainAppointment(row), changed: true };
+    if (row.status !== "SCHEDULED") throw new AppointmentNotScheduledError(row.status);
+    if (row.startsAt.getTime() === params.startsAt.getTime()) return { appointment: toDomainAppointment(row), changed: false };
+    throw new AppointmentMovedError();
+  }
+
+  async bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }) {
+    if (!(await this.prisma.order.findUnique({ where: { id: params.orderId }, select: { id: true } }))) throw new OrderNotFoundError(params.orderId);
+    // A concurrent booking can insert between the read and the create; the unique index catches it and the loop re-reads.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const existing = await this.prisma.appointment.findUnique({ where: { orderId_kind: { orderId: params.orderId, kind: "RETURN" } } });
+      if (existing?.status === "CANCELLED") {
+        const revived = await this.prisma.appointment.updateMany({
+          where: { id: existing.id, status: "CANCELLED" },
+          data: { status: "SCHEDULED", startsAt: params.startsAt, endsAt: params.endsAt, notes: null },
+        });
+        if (revived.count === 1) {
+          const row = await this.prisma.appointment.findUniqueOrThrow({ where: { id: existing.id } });
+          return { appointment: toDomainAppointment(row), created: true };
+        }
+        continue;
+      }
+      if (existing) {
+        if (existing.status === "SCHEDULED" && existing.startsAt.getTime() === params.startsAt.getTime()) {
+          return { appointment: toDomainAppointment(existing), created: false };
+        }
+        throw new ReturnAlreadyBookedError();
+      }
+      try {
+        const row = await this.prisma.appointment.create({ data: { orderId: params.orderId, kind: "RETURN", startsAt: params.startsAt, endsAt: params.endsAt } });
+        return { appointment: toDomainAppointment(row), created: true };
+      } catch (err) {
+        if (!uniqueViolationFields(err)) throw err;
+      }
+    }
+    throw new ReturnAlreadyBookedError();
   }
 }

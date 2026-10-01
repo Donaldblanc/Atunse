@@ -4,6 +4,7 @@ import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { servicesSummary } from "./get-admin-overview";
+import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
 
 // The three lists behind the Overview's Needs Attention items (?attention=…).
 // Rows are plain serialisable values (dates already formatted in shop
@@ -54,6 +55,8 @@ export interface ReadyToReturnRow {
   pairsReady: number;
   fulfillment: string;
   bookedOn: string;
+  /** Local Drop-Off only: can DJ's Return be booked now, is it booked (with when), or n/a (Mail-In ships). */
+  returnVisit: ReturnVisitSummary;
 }
 
 /** Orders with pairs in Ready for Drop-Off/Shipping, oldest first. */
@@ -67,6 +70,7 @@ export async function getReadyToReturn(deps: AttentionPanelDeps, actingUser: Act
     pairsReady: order.items.filter((item) => item.status === "READY_FOR_PICKUP_SHIPPING").length,
     fulfillment: FULFILLMENT_LABELS[order.fulfillment.method],
     bookedOn: bookedDay.format(order.createdAt),
+    returnVisit: summarizeReturnVisit(order),
   }));
 }
 

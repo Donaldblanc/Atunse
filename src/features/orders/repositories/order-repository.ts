@@ -3,6 +3,7 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
+import type { OrderDetailsInput } from "../order-details";
 import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
@@ -61,6 +62,22 @@ export class PhotoKeyInUseError extends Error {
   constructor() {
     super("A photo is already attached to another booking.");
     this.name = "PhotoKeyInUseError";
+  }
+}
+
+/** No Order has this id. Nothing was written. */
+export class OrderNotFoundError extends Error {
+  constructor(readonly orderId: string) {
+    super("Order not found.");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+/** The Order was edited after the admin's form was rendered (a second tab, another admin). Nothing was written. */
+export class OrderChangedError extends Error {
+  constructor() {
+    super("This order changed since you opened it. Reload and try again.");
+    this.name = "OrderChangedError";
   }
 }
 
@@ -127,6 +144,30 @@ export class AppointmentNotFoundError extends Error {
   constructor(readonly appointmentId: string) {
     super("Appointment not found.");
     this.name = "AppointmentNotFoundError";
+  }
+}
+
+/** Rescheduling only moves a SCHEDULED Appointment; this one is COMPLETED or CANCELLED. Nothing was written. */
+export class AppointmentNotScheduledError extends Error {
+  constructor(readonly status: Appointment["status"]) {
+    super("Only a scheduled visit can be moved.");
+    this.name = "AppointmentNotScheduledError";
+  }
+}
+
+/** The Appointment is at neither the time the caller saw nor the time it asked for: someone moved it meanwhile. */
+export class AppointmentMovedError extends Error {
+  constructor() {
+    super("This visit was moved by someone else. Reload to see its current time.");
+    this.name = "AppointmentMovedError";
+  }
+}
+
+/** The Order's Return is already booked (SCHEDULED at another time, or COMPLETED). Nothing was written. */
+export class ReturnAlreadyBookedError extends Error {
+  constructor() {
+    super("This order already has a return visit booked.");
+    this.name = "ReturnAlreadyBookedError";
   }
 }
 
@@ -205,12 +246,16 @@ export interface OrderRepository {
    * With `receivesDeposit`, the same transaction also marks the Item's
    * Order's PENDING Deposit Payment RECEIVED (ADR-0002), so a confirmed
    * deposit leaves Pending Payments at once.
+   *
+   * With `price`, the same transaction also sets the Item's quoted price
+   * (Approval Gate), so a Quote Sent pair always has one.
    */
   transitionItemStatus(params: {
     itemId: string;
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
     receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Order["items"][number] | null>;
 
   /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
@@ -280,4 +325,63 @@ export interface OrderRepository {
    * (same rule as listAwaitingDeposit), having written nothing.
    */
   confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
+
+  /**
+   * Edit Order: writes the contact, address and pair details in one
+   * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
+   * (else OrderChangedError, nothing written). Records what changed
+   * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
+   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
+   * address changes (there is no Order-level audit table). Returns
+   * "unchanged" when nothing differs (nothing written), "already-applied"
+   * when `idempotencyKey` was recorded by an earlier call (a retry).
+   * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
+   */
+  updateOrderDetails(params: {
+    orderId: string;
+    expectedUpdatedAt: Date;
+    details: OrderDetailsInput;
+    actorAccountId: string | null;
+    idempotencyKey: string;
+  }): Promise<"updated" | "unchanged" | "already-applied">;
+
+  /**
+   * Adds an admin's note to the Order (filed under the Order's customer
+   * Account; customers never see Notes). Append-only: nothing edits or
+   * removes one yet. Throws OrderNotFoundError.
+   */
+  addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
+
+  /** The Order that holds this Item, or null if no Item has this id. */
+  findByItemId(itemId: string): Promise<Order | null>;
+
+  /**
+   * Moves a SCHEDULED Appointment to a new time, changing startsAt/endsAt
+   * only (the Order keeps the collection time the customer booked, CONTEXT.md).
+   * `expectedStartsAt` is the time the caller saw: the move applies only if the
+   * Appointment is still there, which makes it idempotent without a stored key
+   * (ADR-0012; there is no column for one). Already at the requested time
+   * returns `changed: false` (a replay); at some third time throws
+   * AppointmentMovedError. Throws AppointmentNotFoundError, or
+   * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
+   * written nothing.
+   */
+  rescheduleAppointment(params: {
+    appointmentId: string;
+    expectedStartsAt: Date;
+    startsAt: Date;
+    endsAt: Date;
+  }): Promise<{ appointment: Appointment; changed: boolean }>;
+
+  /**
+   * Books the Order's RETURN Appointment (SCHEDULED). There is one RETURN per
+   * Order (unique on orderId + kind), so: none yet creates it; a CANCELLED one
+   * is reused (set back to SCHEDULED at the new time) because a second row
+   * would violate the constraint; one already SCHEDULED at exactly this time
+   * is a replay (`created: false`); anything else (SCHEDULED elsewhere, or
+   * COMPLETED) throws ReturnAlreadyBookedError. Whether the Order may have a
+   * Return at all (Local Drop-Off, a pair ready) is the use-case's rule.
+   * Throws OrderNotFoundError, having written nothing.
+   */
+  bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
 }

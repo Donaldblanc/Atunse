@@ -124,6 +124,34 @@ describe("getOrderDetail", () => {
     ]);
   });
 
+  it("shows the quote per pair and a quoted total once any pair is quoted", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ rush: false, bundleId: "revival", items: [item(), item(), item()] }));
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.payment.quoted).toBeNull();
+
+    deps.orders.orders.get(order.id)!.items[0]!.price = Money.fromCents(7000);
+    let detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.pairs.map((pair) => pair.price?.cents ?? null)).toEqual([7000, null, null]);
+    expect(detail.payment.quoted).toMatchObject({ complete: false, pairs: 1, of: 3 });
+    expect(detail.payment.quoted!.total.cents).toBe(7000);
+
+    for (const pair of deps.orders.orders.get(order.id)!.items) pair.price = Money.fromCents(7000);
+    deps.orders.orders.get(order.id)!.items[2]!.status = "CANCELLED";
+    detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.payment.quoted).toMatchObject({ complete: true, pairs: 2, of: 2 });
+    expect(detail.payment.quoted!.total.cents).toBe(14000);
+  });
+
+  it("offers no plain move forward at Under Review and Quote Sent: the quote and approval have their own controls", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    const expected = { UNDER_REVIEW: ["REQUEST_SUBMITTED", "CANCELLED"], QUOTE_SENT: ["CANCELLED"] } as const;
+    for (const status of ["UNDER_REVIEW", "QUOTE_SENT"] as const) {
+      deps.orders.orders.get(order.id)!.items[0]!.status = status;
+      expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual(expected[status]);
+    }
+  });
+
   it("names Mail-In and leaves a Bundle's Service prices off", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(
@@ -180,6 +208,14 @@ describe("getOrderDetail", () => {
     );
 
     expect((await getOrderDetail(deps, ADMIN, order.id))!.notes.map((note) => note.body)).toEqual(["First", "Second"]);
+  });
+
+  it("carries what Edit Order starts from: stored values, blanks as empty text, and the Order's stamp", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    const { edit } = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(edit).toMatchObject({ updatedAt: order.updatedAt.toISOString(), contactName: order.contactName, line1: "12 Elm St", line2: "Apt 4", state: "NY", zip: "11201" });
+    expect(edit.pairs).toEqual([expect.objectContaining({ itemId: order.items[0]!.id, label: "Pair", size: "", condition: "" })]);
   });
 
   it("doesn't read a confirmed deposit as a status change", async () => {
