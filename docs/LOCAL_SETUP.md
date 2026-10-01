@@ -7,7 +7,8 @@
 ## First-time setup
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # fill in DATABASE_URL, TEST_DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+createdb -h localhost -U atunse atunse_test   # integration tests' own database (see below)
 npx prisma migrate dev --name init
 npm run prisma:generate
 npm run prisma:seed     # creates the bootstrap admin account
@@ -44,20 +45,25 @@ npm run dev              # Next.js dev server
 npm run typecheck
 npm run lint
 npm test                 # unit tests (no DB required)
-npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres (see below)
+npm run test:integration # repository/migration tests — needs TEST_DATABASE_URL (see below)
 npm run build
 ```
 
-### Run integration tests against a separate database
+### Integration tests use their own database
 Integration tests **delete every order and customer account** in the
-database they run against. Point them at a throwaway database, not
-`atunse_dev`:
+database they run against, so they never use `DATABASE_URL`. They run only
+against `TEST_DATABASE_URL`, whose database name must end in `_test`; the
+run stops before any test if it's missing or named anything else. Create the
+database once:
 
 ```bash
-createdb -h localhost -U atunse atunse_test   # once
-DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npx prisma migrate deploy
-DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:integration
+createdb -h localhost -U atunse atunse_test
 ```
+
+and set `TEST_DATABASE_URL` in `.env` (see `.env.example`). Each run applies
+pending migrations to it first. Tests also blank the S3 and Resend settings
+and use local storage, so they never reach the real photo bucket or send
+email.
 
 ### Rate limits in development
 The public routes are rate-limited per IP (#77). Locally every request

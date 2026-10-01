@@ -2,7 +2,7 @@
 // migration from service-catalog.ts, which booking still prices from.
 // Until booking reads the tables (docs/adr/0016), this proves the two
 // agree, so a price changed in one place can't go unnoticed.
-// Requires DATABASE_URL; run with `npm run test:integration`.
+// Requires TEST_DATABASE_URL; run with `npm run test:integration`.
 
 import { PrismaClient } from "@prisma/client";
 import { afterAll, describe, expect, it } from "vitest";

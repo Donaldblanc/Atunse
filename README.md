@@ -47,7 +47,7 @@ npm run typecheck            # tsc --noEmit
 npm run lint                 # eslint
 
 npm test                     # unit tests — no database required
-npm run test:integration     # repository/migration tests — needs DATABASE_URL pointed at a real Postgres
+npm run test:integration     # repository/migration tests — needs TEST_DATABASE_URL (a *_test database; docs/LOCAL_SETUP.md)
 
 npm run prisma:generate      # regenerate the Prisma client after a schema change
 npm run prisma:migrate       # create + apply a new migration (dev)

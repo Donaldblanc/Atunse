@@ -1,6 +1,6 @@
 // Settings' Operating Hours are seeded from pickup-window.ts, which
 // booking still uses. Until booking reads the table, this proves the two
-// agree. Requires DATABASE_URL; run with `npm run test:integration`.
+// agree. Requires TEST_DATABASE_URL; run with `npm run test:integration`.
 
 import { PrismaClient } from "@prisma/client";
 import { afterAll, describe, expect, it } from "vitest";
