@@ -64,3 +64,61 @@ export function shopClock(instant: Date): { date: CalendarDate; minutes: number 
 export function calendarDateInShopTime(instant: Date): CalendarDate {
   return shopClock(instant).date;
 }
+
+/** The day `days` after (or, negative, before) `date`. */
+export function addDays(date: CalendarDate, days: number): CalendarDate {
+  const next = calendarDateToUtcMidnight(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return calendarDateFromUtcMidnight(next);
+}
+
+/** Whole days from `from` to `to` (negative if `to` is earlier). */
+export function daysBetween(from: CalendarDate, to: CalendarDate): number {
+  return Math.round((calendarDateToUtcMidnight(to).getTime() - calendarDateToUtcMidnight(from).getTime()) / 86_400_000);
+}
+
+/** The first of the month `date` falls in. */
+export function firstOfMonth(date: CalendarDate): CalendarDate {
+  return `${date.slice(0, 7)}-01`;
+}
+
+/** The first of the month after the one `date` falls in (32 days on always lands in it). */
+export function firstOfNextMonth(date: CalendarDate): CalendarDate {
+  return firstOfMonth(addDays(firstOfMonth(date), 32));
+}
+
+/** The first of the month before the one `date` falls in. */
+export function firstOfPreviousMonth(date: CalendarDate): CalendarDate {
+  return firstOfMonth(addDays(firstOfMonth(date), -1));
+}
+
+/** Day of the week, 0 = Sunday ... 6 = Saturday. */
+export function dayOfWeek(date: CalendarDate): number {
+  return calendarDateToUtcMidnight(date).getUTCDay();
+}
+
+/** How far New York's wall clock is ahead of UTC at an instant, in ms (negative). */
+function shopOffsetMs(instant: Date): number {
+  const { date, minutes } = shopClock(instant);
+  const wallClock = calendarDateToUtcMidnight(date).getTime() + minutes * 60_000;
+  return wallClock - Math.floor(instant.getTime() / 60_000) * 60_000;
+}
+
+/**
+ * The instant New York's wall clock reads `minutesPastMidnight` on `date`,
+ * e.g. a booked collection slot. DST-safe: New York changes clocks at
+ * 2 AM, and the shop's times (midnight, 8 AM-10 PM) never fall in the
+ * skipped or repeated hour.
+ */
+export function shopTime(date: CalendarDate, minutesPastMidnight: number): Date {
+  const wallClockAsUtc = calendarDateToUtcMidnight(date).getTime() + minutesPastMidnight * 60_000;
+  const firstGuess = wallClockAsUtc - shopOffsetMs(new Date(wallClockAsUtc));
+  // The offset at the real instant can differ from the first guess's when
+  // a DST change falls between them; re-reading it there settles it.
+  return new Date(wallClockAsUtc - shopOffsetMs(new Date(firstGuess)));
+}
+
+/** The instant a day starts in the shop's (New York's) time, e.g. to count the Orders booked on it. */
+export function shopMidnight(date: CalendarDate): Date {
+  return shopTime(date, 0);
+}

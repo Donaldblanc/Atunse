@@ -3,7 +3,8 @@
 // implementation and ./in-memory-order-repository.ts for unit tests.
 
 import type { Money } from "@/shared/money/money";
-import type { AuditEntry, Fulfillment, Order, TermsAcceptance } from "../domain";
+import type { OrderDetailsInput } from "../order-details";
+import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -44,11 +45,39 @@ export class ItemStatusChangedError extends Error {
   }
 }
 
+/**
+ * The Order names a Bundle the bundles table doesn't have (e.g. one taken
+ * out of the catalog while the booking page still offered it). Nothing
+ * was written.
+ */
+export class BundleNotFoundError extends Error {
+  constructor(readonly bundleId: string) {
+    super("That bundle is no longer offered.");
+    this.name = "BundleNotFoundError";
+  }
+}
+
 /** An upload is already attached to an Item (unique item_photos.uploadKey). Nothing was written. */
 export class PhotoKeyInUseError extends Error {
   constructor() {
     super("A photo is already attached to another booking.");
     this.name = "PhotoKeyInUseError";
+  }
+}
+
+/** No Order has this id. Nothing was written. */
+export class OrderNotFoundError extends Error {
+  constructor(readonly orderId: string) {
+    super("Order not found.");
+    this.name = "OrderNotFoundError";
+  }
+}
+
+/** The Order was edited after the admin's form was rendered (a second tab, another admin). Nothing was written. */
+export class OrderChangedError extends Error {
+  constructor() {
+    super("This order changed since you opened it. Reload and try again.");
+    this.name = "OrderChangedError";
   }
 }
 
@@ -65,6 +94,13 @@ export interface NewOrderInput {
   estimate: Money;
   estimateIsMinimum: boolean;
   deposit: Money;
+  /**
+   * The Deposit Payment to create PENDING with the Order, or null when
+   * none is due. submitOrder decides; repositories just store it.
+   */
+  depositPayment: { method: PaymentMethod; amount: Money } | null;
+  /** Local Drop-Off's COLLECTION Appointment, from its booked slot; null for Mail-In. */
+  collection: { startsAt: Date; endsAt: Date } | null;
   submissionKey: string | null;
   submissionFingerprint: string | null;
   /** The Bundle bought, or null for a single pair. */
@@ -84,10 +120,108 @@ export interface NewItemInput {
   photos: { key: string; uploadKey: string }[];
 }
 
+/** An Order as the Overview's range figures read it, without photos, payments or appointments. */
+export interface BookedOrder {
+  id: string;
+  createdAt: Date;
+  estimate: Money;
+  items: Pick<Item, "status" | "serviceIds" | "estimate">[];
+}
+
+/** A Calendar Appointment with what Today's Schedule shows about its Order. */
+export interface ScheduledAppointment extends Appointment {
+  order: { id: string; number: number; contactName: string; itemStatuses: ItemStatus[] };
+}
+
+/** One Appointment with the whole Order it belongs to (the Overview's Schedule Item dialog). */
+export interface AppointmentWithOrder {
+  appointment: Appointment;
+  order: Order;
+}
+
+/** No Appointment has this id. Nothing was written. */
+export class AppointmentNotFoundError extends Error {
+  constructor(readonly appointmentId: string) {
+    super("Appointment not found.");
+    this.name = "AppointmentNotFoundError";
+  }
+}
+
+/** Rescheduling only moves a SCHEDULED Appointment; this one is COMPLETED or CANCELLED. Nothing was written. */
+export class AppointmentNotScheduledError extends Error {
+  constructor(readonly status: Appointment["status"]) {
+    super("Only a scheduled visit can be moved.");
+    this.name = "AppointmentNotScheduledError";
+  }
+}
+
+/** The Appointment is at neither the time the caller saw nor the time it asked for: someone moved it meanwhile. */
+export class AppointmentMovedError extends Error {
+  constructor() {
+    super("This visit was moved by someone else. Reload to see its current time.");
+    this.name = "AppointmentMovedError";
+  }
+}
+
+/** The Order's Return is already booked (SCHEDULED at another time, or COMPLETED). Nothing was written. */
+export class ReturnAlreadyBookedError extends Error {
+  constructor() {
+    super("This order already has a return visit booked.");
+    this.name = "ReturnAlreadyBookedError";
+  }
+}
+
+/** A cancelled Appointment can't be completed. Nothing was written. */
+export class AppointmentCancelledError extends Error {
+  constructor() {
+    super("This visit was cancelled, so it can't be completed.");
+    this.name = "AppointmentCancelledError";
+  }
+}
+
+/** Nothing to confirm: the Order has no PENDING Deposit on a live pair (already received, or fully cancelled). Nothing was written. */
+export class NoPendingDepositError extends Error {
+  constructor(readonly orderId: string) {
+    super("This order has no deposit waiting to be confirmed.");
+    this.name = "NoPendingDepositError";
+  }
+}
+
+/** One row of Pending Payments: an Order whose Deposit is still PENDING. */
+export interface AwaitingDepositOrder {
+  orderId: string;
+  number: number;
+  contactName: string;
+  createdAt: Date;
+  deposit: { method: PaymentMethod; amount: Money };
+}
+
+export interface AwaitingDeposits {
+  orders: number;
+  deposits: Money;
+  byMethod: Record<PaymentMethod, number>;
+}
+
+/** An owner's note about an Order (Order detail's Notes). */
+export interface OrderNote {
+  id: string;
+  body: string;
+  createdAt: Date;
+}
+
+/** When an Item moved to a status, from its audit log (Order detail's timeline). */
+export interface StatusChange {
+  itemId: string;
+  toStatus: ItemStatus;
+  at: Date;
+}
+
 export interface OrderRepository {
   /**
-   * Creates the Order with its Items and their photos, and the owner's Account when
-   * it's a new customer, all in one transaction. Retry-safe (ADR-0012): if
+   * Creates the Order with its Items and their photos, its PENDING Deposit
+   * Payment, its COLLECTION Appointment (Local Drop-Off), and the owner's
+   * Account when it's a new customer (named after contactName), all in one
+   * transaction. Retry-safe (ADR-0012): if
    * an Order with the same `submissionKey` already exists, returns that
    * Order with `created: false` instead of inserting a duplicate. Throws
    * EmailTakenError or PhotoKeyInUseError, having written nothing.
@@ -108,10 +242,146 @@ export interface OrderRepository {
    * recorded for this item (ADR-0012: retry-safe); the caller should treat
    * that as "already applied", not an error. Throws ItemNotFoundError or
    * ItemStatusChangedError, having written nothing.
+   *
+   * With `receivesDeposit`, the same transaction also marks the Item's
+   * Order's PENDING Deposit Payment RECEIVED (ADR-0002), so a confirmed
+   * deposit leaves Pending Payments at once.
+   *
+   * With `price`, the same transaction also sets the Item's quoted price
+   * (Approval Gate), so a Quote Sent pair always has one.
    */
   transitionItemStatus(params: {
     itemId: string;
     toStatus: Order["items"][number]["status"];
     entry: AuditEntry;
+    receivesDeposit?: boolean;
+    price?: Money;
   }): Promise<Order["items"][number] | null>;
+
+  /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
+  listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]>;
+
+  /**
+   * The Orders booked in [from, to) that still have a live pair, and what
+   * they're worth (liveEstimate in domain.ts), without loading them.
+   */
+  summarizeBookedBetween(from: Date, to: Date): Promise<{ orders: number; value: Money }>;
+
+  /** The most recently booked Orders, newest first. */
+  listRecent(limit: number): Promise<Order[]>;
+
+  /** SCHEDULED Appointments starting in [from, to), earliest first, with their Order's summary. */
+  listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]>;
+
+  /** How many Items are in each status right now; statuses with none are left out. */
+  countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;
+
+  /**
+   * Deposits still PENDING on Orders with at least one Item not cancelled:
+   * how many, their amounts added up, and how many by method.
+   */
+  summarizeAwaitingDeposit(): Promise<AwaitingDeposits>;
+
+  /** The notes kept about an Order, oldest first. */
+  listOrderNotes(orderId: string): Promise<OrderNote[]>;
+
+  /**
+   * Every status change recorded on the Order's Items, oldest first. Booking
+   * isn't one (an Item starts in its first status), nor is an entry that
+   * leaves the status as it was, such as a confirmed deposit.
+   */
+  listStatusChanges(orderId: string): Promise<StatusChange[]>;
+
+  /** One Appointment (any status) with its Order, or null if no Appointment has this id. */
+  findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null>;
+
+  /**
+   * Marks an Appointment COMPLETED, only from SCHEDULED. Already COMPLETED
+   * is success (a double-click or retry changes nothing), so this is
+   * idempotent without a key. It changes the Appointment only: the pairs'
+   * statuses move through transitionItemStatus, never as a side effect.
+   * Throws AppointmentNotFoundError or AppointmentCancelledError, having
+   * written nothing.
+   */
+  completeAppointment(appointmentId: string): Promise<Appointment>;
+
+  /**
+   * The Orders summarizeAwaitingDeposit counts, oldest booking first: one
+   * row per PENDING Deposit on an Order with a live pair. Same rule as the
+   * summary, so the Pending Payments list and its count always agree.
+   */
+  listAwaitingDeposit(): Promise<AwaitingDepositOrder[]>;
+
+  /** Orders with at least one Item in one of `statuses`, oldest booking first. */
+  listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]>;
+
+  /**
+   * Marks the Order's PENDING Deposit Payment RECEIVED (receivedAt now) and
+   * appends a MANUAL_PAYMENT_CONFIRMED audit entry to each live Item, without
+   * changing any Item's status, all in one transaction (ADR-0002/0012).
+   * Returns false, having written nothing, if `idempotencyKey` was already
+   * applied to this Order (a retry); the caller treats that as success.
+   * Throws NoPendingDepositError when there is no PENDING Deposit to settle
+   * (same rule as listAwaitingDeposit), having written nothing.
+   */
+  confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
+
+  /**
+   * Edit Order: writes the contact, address and pair details in one
+   * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
+   * (else OrderChangedError, nothing written). Records what changed
+   * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
+   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
+   * address changes (there is no Order-level audit table). Returns
+   * "unchanged" when nothing differs (nothing written), "already-applied"
+   * when `idempotencyKey` was recorded by an earlier call (a retry).
+   * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
+   */
+  updateOrderDetails(params: {
+    orderId: string;
+    expectedUpdatedAt: Date;
+    details: OrderDetailsInput;
+    actorAccountId: string | null;
+    idempotencyKey: string;
+  }): Promise<"updated" | "unchanged" | "already-applied">;
+
+  /**
+   * Adds an admin's note to the Order (filed under the Order's customer
+   * Account; customers never see Notes). Append-only: nothing edits or
+   * removes one yet. Throws OrderNotFoundError.
+   */
+  addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
+
+  /** The Order that holds this Item, or null if no Item has this id. */
+  findByItemId(itemId: string): Promise<Order | null>;
+
+  /**
+   * Moves a SCHEDULED Appointment to a new time, changing startsAt/endsAt
+   * only (the Order keeps the collection time the customer booked, CONTEXT.md).
+   * `expectedStartsAt` is the time the caller saw: the move applies only if the
+   * Appointment is still there, which makes it idempotent without a stored key
+   * (ADR-0012; there is no column for one). Already at the requested time
+   * returns `changed: false` (a replay); at some third time throws
+   * AppointmentMovedError. Throws AppointmentNotFoundError, or
+   * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
+   * written nothing.
+   */
+  rescheduleAppointment(params: {
+    appointmentId: string;
+    expectedStartsAt: Date;
+    startsAt: Date;
+    endsAt: Date;
+  }): Promise<{ appointment: Appointment; changed: boolean }>;
+
+  /**
+   * Books the Order's RETURN Appointment (SCHEDULED). There is one RETURN per
+   * Order (unique on orderId + kind), so: none yet creates it; a CANCELLED one
+   * is reused (set back to SCHEDULED at the new time) because a second row
+   * would violate the constraint; one already SCHEDULED at exactly this time
+   * is a replay (`created: false`); anything else (SCHEDULED elsewhere, or
+   * COMPLETED) throws ReturnAlreadyBookedError. Whether the Order may have a
+   * Return at all (Local Drop-Off, a pair ready) is the use-case's rule.
+   * Throws OrderNotFoundError, having written nothing.
+   */
+  bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
 }

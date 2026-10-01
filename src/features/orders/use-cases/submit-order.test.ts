@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
-import { orderReference, pairsPhrase } from "../domain";
+import { orderNumber, pairsPhrase } from "../domain";
 import { BUNDLE_PAIR_SERVICE_IDS } from "../service-catalog";
 import {
   BookingValidationError,
@@ -368,7 +368,8 @@ describe("submitOrder", () => {
       expect(deps.notifications.sent).toHaveLength(1);
       const email = deps.notifications.sent[0]!;
       expect(email.to).toBe("customer@example.com");
-      expect(email.subject).toContain(orderReference(order.id));
+      expect(email.subject).toContain(orderNumber(order.number));
+      expect(email.subject).toMatch(/ATU-\d{4}/);
       expect(email.body).toContain("Deposit due: $15");
       expect(email.body).toContain("pay@restoredbydj.com");
     });
@@ -398,7 +399,7 @@ describe("submitOrder", () => {
       const edited = validBookingInput({ submissionKey: key, rush: true });
       const attempt = submitOrder(deps, guest, edited);
       await expect(attempt).rejects.toThrow(SubmissionConflictError);
-      await expect(attempt).rejects.toMatchObject({ reference: orderReference(first.id) });
+      await expect(attempt).rejects.toMatchObject({ reference: orderNumber(first.number) });
       expect(deps.orders.orders.size).toBe(1);
     });
 

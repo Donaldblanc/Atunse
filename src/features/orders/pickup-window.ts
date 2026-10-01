@@ -4,14 +4,19 @@
 // features/orders, next to service-catalog.ts, so a UI refactor can't
 // silently change server validation. Pure: no React.
 
-import { shopClock, type CalendarDate } from "./calendar-date";
+import { shopClock, shopTime, type CalendarDate } from "./calendar-date";
 
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;
 
-// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots.
+// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots, every day. The
+// operating_hours table (Settings) is seeded to match; a parity test
+// keeps them in step until booking reads the table.
 const WINDOW_START_MINUTES = 8 * 60;
 const WINDOW_END_MINUTES = 22 * 60;
+
+/** The daily collection window in minutes past midnight, shop time. */
+export const PICKUP_WINDOW_MINUTES = { opensAt: WINDOW_START_MINUTES, closesAt: WINDOW_END_MINUTES } as const;
 
 function formatClock(minutes: number) {
   const h = Math.floor(minutes / 60);
@@ -47,6 +52,17 @@ export const PICKUP_WINDOW_LABEL = `${formatClock(WINDOW_START_MINUTES)} – ${f
 export const PICKUP_TIME_SLOTS: readonly string[] = SLOTS.map((slot) => slot.label);
 
 /**
+ * When a booked collection slot starts and ends, as instants: the
+ * Calendar's COLLECTION Appointment. Throws for a slot that isn't one of
+ * PICKUP_TIME_SLOTS (submitOrder has already validated it).
+ */
+export function collectionTimes(date: CalendarDate, slot: string): { startsAt: Date; endsAt: Date } {
+  const match = SLOTS.find((s) => s.label === slot);
+  if (!match) throw new Error(`Unknown collection slot: ${slot}`);
+  return { startsAt: shopTime(date, match.startMinutes), endsAt: shopTime(date, match.startMinutes + 30) };
+}
+
+/**
  * The slots a customer can still book on `date`, at instant `now`. The
  * shop's (New York's) clock decides, on client and server alike: none for
  * a past date, all for a future one, and on today only those starting at
@@ -57,6 +73,21 @@ export function availablePickupSlots(date: CalendarDate, now: Date): string[] {
   if (date < clock.date) return [];
   if (date > clock.date) return SLOTS.map((slot) => slot.label);
   return SLOTS.filter((slot) => slot.startMinutes >= clock.minutes + PICKUP_LEAD_MINUTES).map((slot) => slot.label);
+}
+
+/**
+ * The slots the owner can book a visit into on `date`, at instant `now`
+ * (rescheduling a Collection, booking a Return). The same window and slot
+ * grid as customers get, but WITHOUT the customer lead time: the lead time
+ * exists so the owner can plan a route around a booking, and here the owner
+ * is the one planning. A slot that has already started is still refused,
+ * so today offers the slots from now on.
+ */
+export function adminVisitSlots(date: CalendarDate, now: Date): string[] {
+  const clock = shopClock(now);
+  if (date < clock.date) return [];
+  if (date > clock.date) return SLOTS.map((slot) => slot.label);
+  return SLOTS.filter((slot) => slot.startMinutes >= clock.minutes).map((slot) => slot.label);
 }
 
 /**

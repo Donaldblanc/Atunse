@@ -1,5 +1,12 @@
 # Design System Master File
 
+> **Superseded look (2026-09-29):** the admin now follows the admin design
+> images (`scratch/01-09`): a black sidebar on the site's cream page, in
+> the customer site's Inter type, blue accent and pill buttons.
+> `src/styles/admin-theme.css` is the source of truth for colours, type and
+> components. The dark slate/green palette and Fira fonts below no longer
+> apply; the accessibility and interaction rules still do.
+
 > **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file.
 > If not, strictly follow the rules below.

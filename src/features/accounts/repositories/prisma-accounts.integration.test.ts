@@ -7,6 +7,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { MAX_CODE_ATTEMPTS, MAX_GUESSES_PER_DAY } from "../sign-in-codes";
 import { PrismaAccountRepository } from "./prisma-account-repository";
 import { PrismaSignInCodes } from "./prisma-sign-in-codes";
+import { deleteAllOrders } from "@/shared/testing/delete-all-orders";
 
 const prisma = new PrismaClient();
 const accounts = new PrismaAccountRepository(prisma);
@@ -17,10 +18,7 @@ let adminId: string;
 
 beforeEach(async () => {
   await prisma.signInCode.deleteMany();
-  await prisma.itemAuditEntry.deleteMany();
-  await prisma.itemPhoto.deleteMany();
-  await prisma.item.deleteMany();
-  await prisma.order.deleteMany();
+  await deleteAllOrders(prisma);
   await prisma.account.deleteMany({ where: { email: "codes@example.com" } });
   customerId = (await prisma.account.create({ data: { email: "codes@example.com", phone: "2125550142" } })).id;
   adminId = (await prisma.account.create({ data: { email: "codes@example.com", role: "ADMIN" } })).id;

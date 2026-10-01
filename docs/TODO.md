@@ -4,7 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
-- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin dashboard's Orders queue is still "Next up" (`src/app/admin/page.tsx`), so today a new booking is only visible in the database. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up as a count on the admin Overview. Add an owner notification email for new bookings and/or build the Orders queue before launch.
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 
 ### Legal & policies
@@ -99,6 +99,10 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Lazy loading**: step and FAQ photos load lazily; audit the rest.
 - [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
 - [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
+- [ ] **Database indexes, once the admin screens are ready for launch** (from the #118 review): the admin Overview filters and sorts `orders` by `createdAt` (both date ranges, Recent Orders) and `pickupDate` (Today's Schedule), and every Order load finds its pairs by `items.orderId`. Without indexes each of these reads the whole table. That's fine at today's size but grows with every booking.
+  - `Order` `@@index([createdAt])` and `@@index([pickupDate])`: already on #119's branch (`feature/admin-data-model`); confirm they landed.
+  - `Item` `@@index([orderId])`: missing everywhere. Postgres doesn't index foreign keys on its own, and Prisma doesn't add one.
+  - Then add indexes for whatever the finished admin screens (Orders queue, Calendar, Messages) filter or sort on that isn't covered, and check the busiest queries with `EXPLAIN ANALYZE` against production-sized data.
 
 ### Links & navigation
 - [ ] **Every nav and footer link**: checked in headless runs (Services, Gallery, Process, About, Contact, and the Terms and Privacy PDFs). Do a full manual pass.
@@ -138,6 +142,42 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] Test admin actions on the booking.
 - [ ] Test the cancellation and refund path.
 - [ ] Repeat the critical flow on mobile.
+
+## Admin Overview: replace sample data and placeholders with real data
+
+The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample data where nothing records the real thing yet. Sample figures live in `src/features/admin-overview/sample-data.ts`, are marked `TODO(sample-data)`, and carry a dashed "Sample" tag on the page. Delete each one as its real source lands.
+
+**Sample data (shown now, not real):**
+- [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
+- [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
+- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): the Review table exists (#119); decide how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram), then show the latest PUBLISHED ones.
+
+**Placeholders (real data exists, but the design shows more):**
+- [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
+- [x] **Order #: ATU-1008 numbers** in Recent Orders and Today's Schedule (#119).
+- [x] **Today's Schedule: return drop-offs.** It reads SCHEDULED Appointments of both kinds (#119); a Return now appears once the owner books one from Order detail or Ready to Return ("Book return visit").
+- [x] **Schedule Item: Reschedule.** Done from the dialog (`?visit=<id>&reschedule=1`): any slot in the booking window, no customer lead time (only slots not yet started), two visits may share a slot (booking has no capacity rule), confirm step, customer emailed after a real change. Moves the Appointment only, never the Order's booked collection time. Idempotent on the time the owner saw (no key column; ADR-0012).
+- [ ] **Reschedule / Return polish.** A failed customer email after a saved change is only warned about on screen (no outbox, ADR-0006); a cancelled Return row is reused on rebooking, but nothing cancels Appointments yet; booking will read operating_hours (ADR-0016) instead of pickup-window.ts, and this picker with it; the Calendar should reuse VisitSlotPicker.
+- [ ] **Schedule Item: completing a Collection doesn't move the pairs.** "Mark as Completed" changes only the Appointment (no doc ties it to an Item status). Decide whether a completed Collection should also advance its pairs (e.g. Awaiting Sneakers to In Progress) and record it in CONTEXT.md; there's no `completedAt` column either, add one if the Calendar wants it.
+- [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
+- [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
+- [ ] **Needs Attention panels are read-only except Mark Paid:** Ready to Return and Needs a Quote list their Orders and link to the Order dialog (`?order=`), where the actions live. The Ready to Return stat card no longer links to `Orders?status=READY_FOR_PICKUP_SHIPPING`; it opens the panel. Pending Payments only handles the Deposit: the Balance (ADR-0002) is confirmed from the Payments screen once it exists.
+- [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
+- [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
+  - [x] **Edit Order** (`?order=<id>&edit=order`): contact, address and every pair's brand, model, size, colorway, material, condition and description, saved in one transaction (`updateOrderDetails`) with an optimistic check on the Order's `updatedAt`. Changes are audited as `DETAILS_EDITED` (per pair, with before/after) and `ORDER_CONTACT_EDITED` (on the Order's first pair, field names only: there is no Order-level audit table). Not editable here: fulfillment method, dates and slots (rescheduling), price, services, status, and the Account's own email (ADR-0014).
+  - [ ] **The dialog's "…" menu** has no feature behind it yet, so it isn't drawn. The drop-off fee and tax are still editable only in the database (the quoted price is set by Send Quote).
+  - [ ] **Order-level audit log:** contact and address edits are recorded on the Order's first pair because `ItemAuditEntry` is the only audit table; an Order-level one would be honest about them (and would also fit rescheduling and Notes).
+  - [x] **Add a note**: a textarea and Add note in the Notes section (`addOrderNote`, 1-2000 characters, admin-only), newest first. Notes are append-only: no edit or delete yet, and no idempotency key (a Note has no key column, so a deliberate second click adds a second note).
+  - [x] **Quote a pair and record approval**: Send Quote (price in dollars, confirm step, one transaction sets `Item.priceCents` and moves Under Review to Quote Sent, audit action `QUOTE_SENT`, emails the customer) and "Customer approved" (Quote Sent to Approved, audit action `APPROVAL_RECORDED`, actor recorded). Update Status no longer offers Quote Sent or Approved; it still holds a pair at Approved until the Deposit is paid. The admin API route now applies the same rule (via `transitionItemStatus`).
+  - [x] **Customer email on status change**: Quote Sent, Ready for Drop-Off/Shipping and Cancelled only (`src/features/orders/status-emails.ts`); internal steps stay silent.
+  - [ ] **Quote emails don't cover the Balance payment record**: the emails state the balance (quoted total less Deposit) but nothing creates or collects a Balance Payment yet. Drop-off fee and tax aren't in the quoted total until they're computed (see Open questions in CONTEXT.md).
+  - [ ] **Email failures aren't retried**: a status/quote email that fails is logged (quote: the dialog tells the owner) and not resent; move to the outbox (ADR-0006) when it lands.
+  - [ ] **Per-Service prices** on a pair are the catalog's base prices; the Suede Fee and a quoted minimum aren't broken out, and Bundle pairs show none.
+- [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
+- [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
+- [ ] **Search** in the top bar: enable with the Orders screen, which it searches.
+- [ ] **Booking reads Settings** (ADR-0016): the booking flow and `submitOrder` use `operating_hours` and `business_settings.allowLocalDropOff`/`allowMailIn` instead of `pickup-window.ts`, then drop `pickup-window.integration.test.ts`.
+- [ ] **Settings tabs not modeled yet:** Notifications, Payments, Shipping & Pickup, Email & Templates, Team (multi-admin, see "Still to grill") and Billing. Design each when its tab is designed.
 
 ## Housekeeping
 - [x] Before/After section used to fake a side-by-side split with CSS on one stacked photo — real, separate before/after image pairs now exist in both `scratch/landing-mock.html` and `public/images/landing/` (Services grid also swapped to real category photos).
@@ -201,4 +241,6 @@ tracked elsewhere are marked; everything else is new.
 - [ ] SMS notifications (Twilio or equivalent) — build the adapter now, gate actual sending behind a feature toggle (off by default) until there's budget to pay for real sending. See ADR-0009. Email (Resend) covers all required notification events in the meantime.
 - [ ] Customer data import — a dedicated admin-only screen/flow to import existing customer records, format TBD. Not an MVP-launch blocker; build once the source format is confirmed.
 - [ ] Mail-in label generation via a third-party carrier API (e.g. Shippo/EasyPost) — behind the same adapter pattern as address validation. Not in MVP; MVP only captures/validates the shipping address (ADR-0010).
-- [ ] Standalone cross-order messages inbox screen — behind a feature toggle. MVP messaging lives inside Item detail only; the inbox is a post-MVP admin screen.
+- [ ] **Messages inbox screen** (design `09-messages.png`): now MVP, one Conversation per Order (ADR-0016). The data model exists; the screen, sending, and customer-side replies don't yet.
+- [ ] **Booking reads the catalog from the database** (ADR-0016 step 2): `submitOrder`, the booking flow and the Services page read the `services`/`bundles` tables instead of `service-catalog.ts`, then drop the parity test.
+- [ ] **Decide tax and a Local Drop-Off fee** (Order detail design shows 8.875% tax): Orders can store both; nothing computes them yet (CONTEXT.md open question).

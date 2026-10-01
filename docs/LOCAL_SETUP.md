@@ -7,7 +7,8 @@
 ## First-time setup
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+cp .env.example .env   # fill in DATABASE_URL, TEST_DATABASE_URL, SESSION_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
+createdb -h localhost -U atunse atunse_test   # integration tests' own database (see below)
 npx prisma migrate dev --name init
 npm run prisma:generate
 npm run prisma:seed     # creates the bootstrap admin account
@@ -44,20 +45,25 @@ npm run dev              # Next.js dev server
 npm run typecheck
 npm run lint
 npm test                 # unit tests (no DB required)
-npm run test:integration # repository/migration tests — needs DATABASE_URL pointed at a real Postgres (see below)
+npm run test:integration # repository/migration tests — needs TEST_DATABASE_URL (see below)
 npm run build
 ```
 
-### Run integration tests against a separate database
+### Integration tests use their own database
 Integration tests **delete every order and customer account** in the
-database they run against. Point them at a throwaway database, not
-`atunse_dev`:
+database they run against, so they never use `DATABASE_URL`. They run only
+against `TEST_DATABASE_URL`, whose database name must end in `_test`; the
+run stops before any test if it's missing or named anything else. Create the
+database once:
 
 ```bash
-createdb -h localhost -U atunse atunse_test   # once
-DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npx prisma migrate deploy
-DATABASE_URL=postgresql://atunse:atunse@localhost:5432/atunse_test npm run test:integration
+createdb -h localhost -U atunse atunse_test
 ```
+
+and set `TEST_DATABASE_URL` in `.env` (see `.env.example`). Each run applies
+pending migrations to it first. Tests also blank the S3 and Resend settings
+and use local storage, so they never reach the real photo bucket or send
+email.
 
 ### Rate limits in development
 The public routes are rate-limited per IP (#77). Locally every request
@@ -78,7 +84,7 @@ from the admin one, so you can be signed in as both.
 - `POST /api/v1/orders` — customer-facing order submission from `/booking`. Creates the customer's Account on their first booking (ADR-0014). Send an `Idempotency-Key: <uuid>` header to make retries safe. `409 SIGN_IN_REQUIRED` means the email already has an Account (with customer sign-in on)
 - `POST /api/v1/auth/code/request`, `POST /api/v1/auth/code/verify` — customer email-code sign-in (404 unless `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true`)
 - `GET /api/v1/orders/:orderId/photos` — 5-minute photo view links, for the Order's owner or an admin
-- `POST /api/v1/admin/items/:itemId/transitions` — every admin action on the Item pipeline (review, quote, manual payment confirmed, approve, ...), admin-only
+- `POST /api/v1/admin/items/:itemId/transitions` — admin status moves on the Item pipeline (review, manual payment confirmed, ...), admin-only. Moves to Quote Sent or Approved are refused with `409`: they go through Send Quote and Customer approved, which set the price and record the approval
 - `POST /api/v1/auth/sign-in` — interim credential login (ADR-0005 addendum); sets the signed session cookie
 - `POST /api/v1/auth/sign-out` — clears the session cookie
 

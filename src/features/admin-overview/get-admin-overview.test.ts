@@ -1,0 +1,266 @@
+import { describe, expect, it } from "vitest";
+import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
+import { collectionTimes } from "@/features/orders/pickup-window";
+import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
+import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
+import { Money } from "@/shared/money/money";
+import { changeBadge, getAdminOverview, percentChange, servicesSummary } from "./get-admin-overview";
+
+// Tuesday Sep 29, 2026, 10:00 AM in New York: "this week" is Sep 28 - Oct 4.
+const NOW = new Date("2026-09-29T14:00:00Z");
+const ADMIN: ActingUser = { accountId: "acc_admin", role: "ADMIN" };
+
+let counter = 0;
+function item(serviceIds: string[]): NewItemInput {
+  counter += 1;
+  return {
+    brand: null,
+    model: null,
+    description: null,
+    material: null,
+    serviceIds,
+    estimate: Money.fromCents(3000),
+    photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
+  };
+}
+
+function order(estimateCents: number, items: NewItemInput[] = [item(["standard"])]): NewOrderInput {
+  counter += 1;
+  return {
+    owner: { newCustomer: { email: `c${counter}@example.com`, phone: "2125550142" } },
+    contactName: "Jordan Smith",
+    contactEmail: `c${counter}@example.com`,
+    contactPhone: "2125550142",
+    policyAcceptedAt: NOW,
+    terms: { version: "v1", url: "/terms.pdf", sha256: "x", acknowledgments: {} },
+    fulfillment: { method: "MAIL_IN", address: { line1: "1 Main St", line2: null, city: "Austin", state: "TX", zip: "73301" }, preferredDate: null },
+    rush: false,
+    estimate: Money.fromCents(estimateCents),
+    estimateIsMinimum: false,
+    deposit: Money.fromCents(estimateCents / 2),
+    depositPayment: { method: "ZELLE", amount: Money.fromCents(estimateCents / 2) },
+    collection: null,
+    submissionKey: null,
+    submissionFingerprint: null,
+    bundleId: null,
+    items,
+  };
+}
+
+/** Books an Order as if it were submitted at `createdAt`. */
+async function book(orders: InMemoryOrderRepository, createdAt: string, input: NewOrderInput) {
+  const { order } = await orders.create(input);
+  order.createdAt = new Date(createdAt);
+  return order;
+}
+
+function deps() {
+  const orders = new InMemoryOrderRepository();
+  return { orders, photoUrl: async (key: string) => `https://photos.test/${key}`, now: () => NOW };
+}
+
+/** A Local Drop-Off booking collected at `slot` on `date`. */
+function collection(date: string, slot: string, contactName: string): NewOrderInput {
+  return {
+    ...order(3000),
+    contactName,
+    fulfillment: { method: "PICKUP", address: { line1: "1 Main St", line2: null, city: "Brooklyn", state: "NY", zip: "11201" }, date, slot },
+    collection: collectionTimes(date, slot),
+  };
+}
+
+describe("getAdminOverview", () => {
+  it("is admin-only", async () => {
+    await expect(getAdminOverview(deps(), { accountId: "acc_c", role: "CUSTOMER" }, "this-week")).rejects.toThrow(UnauthorizedError);
+    await expect(getAdminOverview(deps(), { accountId: null, role: "GUEST" }, "this-week")).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("counts this week's Orders and booked revenue against the same stretch of last week", async () => {
+    const d = deps();
+    await book(d.orders, "2026-09-28T13:00:00Z", order(3000)); // Mon 9 AM
+    await book(d.orders, "2026-09-29T13:30:00Z", order(8000)); // Tue 9:30 AM
+    await book(d.orders, "2026-09-22T13:00:00Z", order(5000)); // last Tue 9 AM: counted before
+    await book(d.orders, "2026-09-22T20:00:00Z", order(9000)); // last Tue 4 PM: after the same point last week
+
+    const overview = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(overview.orders).toEqual({ current: 2, previous: 1 });
+    expect(overview.bookedRevenue.current.cents).toBe(11000);
+    expect(overview.bookedRevenue.previous.cents).toBe(5000);
+    expect(overview.revenueByDay.map((day) => day.revenue.cents)).toEqual([3000, 8000, 0, 0, 0, 0, 0]);
+  });
+
+  it("buckets revenue by New York's day, not UTC's", async () => {
+    const d = deps();
+    // 11:30 PM Monday in New York is already Tuesday in UTC.
+    await book(d.orders, "2026-09-29T03:30:00Z", order(4000));
+
+    const overview = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(overview.revenueByDay[0]).toEqual({ date: "2026-09-28", revenue: Money.fromCents(4000) });
+  });
+
+  it("leaves cancelled pairs out of every figure, and fully cancelled Orders altogether", async () => {
+    const d = deps();
+    const cancelled = await book(d.orders, "2026-09-28T13:00:00Z", order(3000));
+    cancelled.items[0]!.status = "CANCELLED";
+    // $90 for two $30 pairs plus $30 of order-level charges; the second pair is cancelled.
+    const partly = await book(d.orders, "2026-09-28T14:00:00Z", order(9000, [item(["premium", "laces"]), item(["standard"])]));
+    partly.items[1]!.status = "CANCELLED";
+    const cancelledLastWeek = await book(d.orders, "2026-09-21T13:00:00Z", order(4000));
+    cancelledLastWeek.items[0]!.status = "CANCELLED";
+
+    const overview = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(overview.orders).toEqual({ current: 1, previous: 0 });
+    expect(overview.bookedRevenue.current.cents).toBe(6000); // $90 less the cancelled pair's $30
+    expect(overview.bookedRevenue.previous.cents).toBe(0);
+    expect(overview.revenueByDay[0]!.revenue.cents).toBe(6000);
+    expect(overview.servicesBooked).toEqual([
+      { serviceId: "premium", name: "Premium Clean", count: 1 },
+      { serviceId: "laces", name: "Lace Replacement", count: 1 },
+    ]);
+  });
+
+  it("counts Services per pair, in catalog order", async () => {
+    const d = deps();
+    await book(d.orders, "2026-09-28T13:00:00Z", order(12000, [item(["laces", "standard"]), item(["standard"]), item(["premium", "oxidation"])]));
+
+    const overview = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(overview.servicesBooked.map((s) => [s.serviceId, s.count])).toEqual([
+      ["standard", 2],
+      ["premium", 1],
+      ["oxidation", 1],
+      ["laces", 1],
+    ]);
+  });
+
+  it("reports the work queues as they stand now, whatever the range", async () => {
+    const d = deps();
+    const old = await book(d.orders, "2026-06-01T13:00:00Z", order(6000, [item(["standard"]), item(["standard"]), item(["standard"])]));
+    old.items[1]!.status = "UNDER_REVIEW";
+    old.items[2]!.status = "READY_FOR_PICKUP_SHIPPING";
+    const paid = await book(d.orders, "2026-06-02T13:00:00Z", order(4000));
+    paid.items[0]!.status = "UNDER_REVIEW";
+    Object.assign(paid.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
+
+    const overview = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(overview.orders.current).toBe(0);
+    expect(overview.needsQuote).toBe(3); // old: submitted + under review; paid: under review
+    expect(overview.readyForReturn).toBe(1);
+    expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0, APPLE_PAY: 0 } });
+  });
+});
+
+describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
+  it("lists the five latest bookings, newest first, with what each row shows", async () => {
+    const d = deps();
+    for (let day = 20; day <= 25; day++) await book(d.orders, `2026-09-${day}T15:00:00Z`, order(3000));
+    const latest = await book(
+      d.orders,
+      "2026-09-28T15:00:00Z",
+      { ...order(12000, [item(["premium", "laces"]), item(["standard"])]), contactName: "John Doe", estimateIsMinimum: true },
+    );
+    latest.items[0]!.brand = "Air Jordan 1";
+    latest.items[0]!.status = "IN_PROGRESS";
+    latest.items[1]!.status = "AWAITING_SNEAKERS";
+    Object.assign(latest.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
+
+    const { recentOrders } = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(recentOrders).toHaveLength(5);
+    expect(recentOrders.map((row) => row.bookedAt.toISOString().slice(0, 10))).toEqual(["2026-09-28", "2026-09-25", "2026-09-24", "2026-09-23", "2026-09-22"]);
+    expect(recentOrders[0]).toMatchObject({
+      customerName: "John Doe",
+      pairCount: 2,
+      firstPair: "Air Jordan 1",
+      services: "Standard Clean + 2 more",
+      status: "AWAITING_SNEAKERS", // the least-advanced pair
+      reference: `ATU-${latest.number}`,
+      deposit: { method: "ZELLE", status: "RECEIVED" },
+      total: Money.fromCents(12000),
+      totalIsMinimum: true,
+    });
+    expect(recentOrders[0]!.photo).toEqual({ kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) });
+    expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", status: "PENDING" });
+  });
+
+  it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {
+    const d = deps();
+    const partly = await book(d.orders, "2026-09-27T15:00:00Z", order(9000, [item(["standard"]), item(["premium"])]));
+    Object.assign(partly.items[0]!, { status: "CANCELLED", brand: "Cancelled Pair" });
+    Object.assign(partly.items[1]!, { brand: "Nike", model: "Air Max 90" });
+    const gone = await book(d.orders, "2026-09-26T15:00:00Z", order(3000, [item(["standard"])]));
+    gone.items[0]!.status = "CANCELLED";
+
+    const [partlyRow, goneRow] = (await getAdminOverview(d, ADMIN, "this-week")).recentOrders;
+
+    expect(partlyRow).toMatchObject({ pairCount: 1, firstPair: "Nike Air Max 90", services: "Premium Clean", total: Money.fromCents(6000) });
+    expect(partlyRow!.photo).toEqual({ kind: "stored", url: `https://photos.test/${partly.items[1]!.photoKeys[0]}` });
+    expect(goneRow).toMatchObject({ pairCount: 1, services: "Standard Clean", status: "CANCELLED", total: Money.fromCents(3000) });
+  });
+
+  it("tells a photo whose link can't be made apart from no photo", async () => {
+    const d = { ...deps(), photoUrl: async () => null };
+    await book(d.orders, "2026-09-28T15:00:00Z", order(3000));
+
+    expect((await getAdminOverview(d, ADMIN, "this-week")).recentOrders[0]!.photo).toEqual({ kind: "stored", url: null });
+  });
+
+  it("lists today's scheduled collections and returns in time order, from the Appointments", async () => {
+    const d = deps();
+    await book(d.orders, "2026-09-20T15:00:00Z", collection("2026-09-29", "6:30 PM – 7:00 PM", "Sarah Kim"));
+    const john = await book(d.orders, "2026-09-21T15:00:00Z", collection("2026-09-29", "10:00 AM – 10:30 AM", "John Doe"));
+    const cancelled = await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-29", "8:00 AM – 8:30 AM", "Mike R."));
+    cancelled.items[0]!.status = "CANCELLED";
+    await book(d.orders, "2026-09-22T15:00:00Z", collection("2026-09-30", "9:00 AM – 9:30 AM", "Jessica L."));
+    // Booked for today, but the Calendar moved the collection to tomorrow.
+    const moved = await book(d.orders, "2026-09-23T15:00:00Z", collection("2026-09-29", "9:00 AM – 9:30 AM", "Chris P."));
+    Object.assign(moved.appointments[0]!, collectionTimes("2026-09-30", "9:00 AM – 9:30 AM"));
+    // A Collection called off, and John's pair going back this afternoon.
+    const calledOff = await book(d.orders, "2026-09-24T15:00:00Z", collection("2026-09-29", "11:00 AM – 11:30 AM", "Lauren S."));
+    calledOff.appointments[0]!.status = "CANCELLED";
+    john.appointments.push({ id: "apt_return", kind: "RETURN", status: "SCHEDULED", notes: null, ...collectionTimes("2026-09-29", "4:00 PM – 4:30 PM") });
+
+    const { todaysSchedule } = await getAdminOverview(d, ADMIN, "this-week");
+
+    expect(todaysSchedule.map((visit) => [visit.time, visit.customerName, visit.kind])).toEqual([
+      ["10:00 AM", "John Doe", "COLLECTION"],
+      ["4:00 PM", "John Doe", "RETURN"],
+      ["6:30 PM", "Sarah Kim", "COLLECTION"],
+    ]);
+    expect(todaysSchedule[0]!.reference).toBe(`ATU-${john.number}`);
+    expect(todaysSchedule[0]!.appointmentId).toBe(john.appointments[0]!.id);
+  });
+});
+
+describe("servicesSummary", () => {
+  it("names up to two Services, in catalog order, and counts the rest", () => {
+    expect(servicesSummary([["standard"]])).toBe("Standard Clean");
+    expect(servicesSummary([["laces", "premium"]])).toBe("Premium Clean + Lace Replacement");
+    expect(servicesSummary([["premium"], ["premium", "oxidation"], ["reglue"]])).toBe("Premium Clean + 2 more");
+    expect(servicesSummary([])).toBe("");
+  });
+});
+
+describe("changeBadge", () => {
+  it("takes its direction from the real difference, so a small change isn't flat", () => {
+    expect(changeBadge(12, 10)).toEqual({ tone: "up", label: "20%" });
+    expect(changeBadge(5, 10)).toEqual({ tone: "down", label: "50%" });
+    expect(changeBadge(100_400, 100_000)).toEqual({ tone: "up", label: "<1%" });
+    expect(changeBadge(199, 200)).toEqual({ tone: "down", label: "<1%" });
+    expect(changeBadge(200, 200)).toEqual({ tone: "flat", label: "0%" });
+    expect(changeBadge(3, 0)).toBeNull();
+  });
+});
+
+describe("percentChange", () => {
+  it("rounds to a whole percent and has no answer against zero", () => {
+    expect(percentChange(12, 10)).toBe(20);
+    expect(percentChange(5, 10)).toBe(-50);
+    expect(percentChange(2, 3)).toBe(-33);
+    expect(percentChange(4, 0)).toBeNull();
+  });
+});
