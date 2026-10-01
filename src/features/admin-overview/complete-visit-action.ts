@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
+import { UnauthorizedError } from "@/features/accounts/authz";
 import { AppointmentCancelledError, AppointmentNotFoundError } from "@/features/orders/repositories/order-repository";
 import { completeAppointment } from "./complete-appointment";
 import { overviewHref, parseOverviewSelection } from "./overview-range";
@@ -14,7 +15,9 @@ import { buildVisitDeps } from "./visit-deps";
  * visit out of Today's Schedule, so the dialog closes (back to the
  * Overview with the same range). If the visit was cancelled or removed
  * meanwhile, it reloads the dialog instead, which then shows what is true
- * now. The range params come back as hidden fields so the redirect keeps them.
+ * now. A session that ended (or isn't an admin's) goes to sign-in, as the
+ * admin layout does. The range params come back as hidden fields so the
+ * redirect keeps them.
  */
 export async function completeVisitAction(formData: FormData): Promise<void> {
   const field = (name: string) => {
@@ -27,14 +30,17 @@ export async function completeVisitAction(formData: FormData): Promise<void> {
 
   const actingUser = await actingUserFromCookies(await cookies());
   let stale = false;
+  let signedOut = false;
   try {
     await completeAppointment(buildVisitDeps(), actingUser, { appointmentId });
   } catch (err) {
-    if (!(err instanceof AppointmentCancelledError || err instanceof AppointmentNotFoundError)) throw err;
-    stale = true;
+    if (err instanceof UnauthorizedError) signedOut = true;
+    else if (err instanceof AppointmentCancelledError || err instanceof AppointmentNotFoundError) stale = true;
+    else throw err;
   }
+  // redirect() throws, so these stay outside the try.
+  if (signedOut) redirect("/sign-in");
 
   revalidatePath("/admin");
-  // redirect() throws, so it stays outside the try.
   redirect(overviewHref(selection, stale ? { visit: appointmentId } : {}));
 }

@@ -413,12 +413,18 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   async completeAppointment(appointmentId: string): Promise<Appointment> {
-    // The status is part of the WHERE, so a concurrent cancel can't be overwritten.
-    await this.prisma.appointment.updateMany({ where: { id: appointmentId, status: "SCHEDULED" }, data: { status: "COMPLETED" } });
-    const row = await this.prisma.appointment.findUnique({ where: { id: appointmentId } });
-    if (!row) throw new AppointmentNotFoundError(appointmentId);
-    if (row.status === "CANCELLED") throw new AppointmentCancelledError();
-    return toDomainAppointment(row);
+    // The status is part of the WHERE, so a concurrent cancel can't be
+    // overwritten. One transaction: the update holds the row's lock until
+    // the re-read, so a cancel can't land between them and turn a write we
+    // made into AppointmentCancelledError. The errors below only follow a
+    // write that matched nothing.
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.appointment.updateMany({ where: { id: appointmentId, status: "SCHEDULED" }, data: { status: "COMPLETED" } });
+      const row = await tx.appointment.findUnique({ where: { id: appointmentId } });
+      if (!row) throw new AppointmentNotFoundError(appointmentId);
+      if (count === 0 && row.status === "CANCELLED") throw new AppointmentCancelledError();
+      return toDomainAppointment(row);
+    });
   }
 
   async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {

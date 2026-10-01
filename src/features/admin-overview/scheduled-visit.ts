@@ -1,10 +1,10 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
-import { calendarDateInShopTime, calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
+import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { liveEstimate, livePairs, orderNumber, type Address, type Appointment } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import type { Money } from "@/shared/money/money";
-import { servicesSummary, type AdminOverviewDeps } from "./get-admin-overview";
+import { servicesSummary, visitTime, type AdminOverviewDeps } from "./get-admin-overview";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 export interface ScheduledVisitDeps {
@@ -46,7 +46,6 @@ export interface ScheduledVisitDetail {
   };
 }
 
-const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
 const visitDate = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 export function formatAddress(address: Address): string {

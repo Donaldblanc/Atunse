@@ -3,7 +3,7 @@
 import { CalendarBlankIcon, CaretDownIcon, CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react/dist/ssr";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
-import { addDays, calendarDateToUtcMidnight, dayOfWeek, type CalendarDate } from "@/features/orders/calendar-date";
+import { addDays, calendarDateToUtcMidnight, dayOfWeek, daysBetween, firstOfMonth, firstOfNextMonth, firstOfPreviousMonth, type CalendarDate } from "@/features/orders/calendar-date";
 import { usePopover } from "@/shared/ui/use-popover";
 import {
   MAX_CUSTOM_RANGE_DAYS,
@@ -21,12 +21,6 @@ type Draft = { preset: OverviewPresetId } | { preset: null; from: CalendarDate |
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const monthTitle = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 const fullDay = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
-
-const firstOfMonth = (date: CalendarDate): CalendarDate => `${date.slice(0, 7)}-01`;
-const nextMonth = (month: CalendarDate): CalendarDate => firstOfMonth(addDays(month, 32));
-const previousMonth = (month: CalendarDate): CalendarDate => firstOfMonth(addDays(month, -1));
-const daysBetween = (from: CalendarDate, to: CalendarDate) =>
-  Math.round((calendarDateToUtcMidnight(to).getTime() - calendarDateToUtcMidnight(from).getTime()) / 86_400_000);
 
 function draftFrom(selection: OverviewSelection): Draft {
   return typeof selection === "object" ? { preset: null, ...selection } : { preset: selection };
@@ -135,7 +129,7 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
   }
 
   // The day the arrow keys start from: the last one focused if it's on screen, else the month's first open day.
-  const monthDays = Array.from({ length: daysBetween(month, nextMonth(month)) }, (_, i) => addDays(month, i));
+  const monthDays = Array.from({ length: daysBetween(month, firstOfNextMonth(month)) }, (_, i) => addDays(month, i));
   const tabStop = monthDays.includes(focusDate) && !isDisabled(focusDate) ? focusDate : (monthDays.find((date) => !isDisabled(date)) ?? month);
 
   return (
@@ -171,15 +165,15 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
               <h3 id={monthId} className="ov-cal-title" aria-live="polite">
                 {monthTitle.format(calendarDateToUtcMidnight(month))}
               </h3>
-              <button type="button" className="ov-cal-nav" aria-label="Previous month" onClick={() => setMonth(previousMonth(month))}>
+              <button type="button" className="ov-cal-nav" aria-label="Previous month" onClick={() => setMonth(firstOfPreviousMonth(month))}>
                 <CaretLeftIcon size={16} weight="bold" aria-hidden="true" />
               </button>
               <button
                 type="button"
                 className="ov-cal-nav"
                 aria-label="Next month"
-                disabled={nextMonth(month) > today}
-                onClick={() => setMonth(nextMonth(month))}
+                disabled={firstOfNextMonth(month) > today}
+                onClick={() => setMonth(firstOfNextMonth(month))}
               >
                 <CaretRightIcon size={16} weight="bold" aria-hidden="true" />
               </button>

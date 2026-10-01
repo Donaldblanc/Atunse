@@ -1,5 +1,6 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { servicesSummary } from "./get-admin-overview";
@@ -17,7 +18,7 @@ export function parseAttentionPanel(value: string | string[] | undefined): Atten
 
 export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingDeposit" | "listWithItemsIn"> };
 
-const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
 
 export interface PendingPaymentRow {
   orderId: string;
@@ -97,4 +98,22 @@ export async function getNeedsQuote(deps: AttentionPanelDeps, actingUser: Acting
         bookedOn: bookedDay.format(order.createdAt),
       })),
   );
+}
+
+/** One panel's rows, tagged with the panel they belong to. */
+export type AttentionPanelData =
+  | { panel: "pending-payments"; rows: PendingPaymentRow[] }
+  | { panel: "ready-to-return"; rows: ReadyToReturnRow[] }
+  | { panel: "needs-quote"; rows: NeedsQuoteRow[] };
+
+/** The rows behind `panel`, so the page can load them alongside its other reads rather than after them. */
+export async function getAttentionPanel(deps: AttentionPanelDeps, actingUser: ActingUser, panel: AttentionPanelId): Promise<AttentionPanelData> {
+  switch (panel) {
+    case "pending-payments":
+      return { panel, rows: await getPendingPayments(deps, actingUser) };
+    case "ready-to-return":
+      return { panel, rows: await getReadyToReturn(deps, actingUser) };
+    case "needs-quote":
+      return { panel, rows: await getNeedsQuote(deps, actingUser) };
+  }
 }

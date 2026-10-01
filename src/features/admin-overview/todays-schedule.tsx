@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { APPOINTMENT_KIND_LABELS } from "@/features/orders/domain";
 import type { ScheduledVisit } from "./get-admin-overview";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 
-const VISIT_LABELS: Record<ScheduledVisit["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
 
 /**
  * Today's Local Drop-Off visits as a timeline: collections and returns, from
@@ -21,12 +21,12 @@ export function TodaysSchedule({ visits, selection }: { visits: ScheduledVisit[]
             {/* The link's ::after stretches over the whole row, so the row is one big target. */}
             <Link className="ov-schedule-link ov-cell-main" href={overviewHref(selection, { visit: visit.appointmentId })} scroll={false}>
               {visit.customerName}
-              <span className="sr-only">, {VISIT_LABELS[visit.kind]} at {visit.time}</span>
+              <span className="sr-only">, {APPOINTMENT_KIND_LABELS[visit.kind]} at {visit.time}</span>
             </Link>
             <span className="ov-cell-sub">{visit.reference}</span>
           </span>
           <span className="ov-tag" data-kind={visit.kind}>
-            {VISIT_LABELS[visit.kind]}
+            {APPOINTMENT_KIND_LABELS[visit.kind]}
           </span>
         </li>
       ))}

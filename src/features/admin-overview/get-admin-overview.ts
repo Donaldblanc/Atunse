@@ -67,7 +67,8 @@ export interface ScheduledVisit {
   time: string;
 }
 
-const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
+/** A visit's clock time in shop time, e.g. "9:30 AM". */
+export const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
 
 const RECENT_ORDERS = 5;
 

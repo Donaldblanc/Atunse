@@ -28,6 +28,8 @@ export function AdminDialog({
   const ref = useRef<HTMLDialogElement>(null);
   const router = useRouter();
   const titleId = useId();
+  // Whether the current press started on the backdrop (see onClick).
+  const pressedBackdrop = useRef(false);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -49,9 +51,15 @@ export function AdminDialog({
         event.preventDefault();
         close();
       }}
+      onPointerDown={(event) => {
+        pressedBackdrop.current = event.target === event.currentTarget;
+      }}
       onClick={(event) => {
         // A click on the backdrop lands on the <dialog> itself, not its contents.
-        if (event.target === event.currentTarget) close();
+        // So does a drag that starts inside (selecting an email) and ends on the
+        // backdrop, so the press must have started there too.
+        if (event.target === event.currentTarget && pressedBackdrop.current) close();
+        pressedBackdrop.current = false;
       }}
     >
       <div className="admin-dialog-body">

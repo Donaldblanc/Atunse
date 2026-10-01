@@ -1,5 +1,6 @@
 import { CheckCircleIcon, ClockIcon, EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
+import { APPOINTMENT_KIND_LABELS } from "@/features/orders/domain";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { completeVisitAction } from "./complete-visit-action";
 import { overviewHref, rangeSearchParams, type OverviewSelection } from "./overview-range";
@@ -7,7 +8,6 @@ import { PairThumb } from "./pair-thumb";
 import type { ScheduledVisitDetail } from "./scheduled-visit";
 
 
-const KIND_LABELS: Record<ScheduledVisitDetail["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
 const STATUS_LABELS: Record<ScheduledVisitDetail["status"], string> = { SCHEDULED: "Scheduled", COMPLETED: "Completed", CANCELLED: "Cancelled" };
 const STATUS_TONE: Record<ScheduledVisitDetail["status"], string> = { SCHEDULED: "blue", COMPLETED: "green", CANCELLED: "muted" };
 
@@ -43,7 +43,7 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
     );
   }
 
-  const detailsLabel = `${KIND_LABELS[visit.kind]} Details`;
+  const detailsLabel = `${APPOINTMENT_KIND_LABELS[visit.kind]} Details`;
   const orderHref = overviewHref(selection, { order: visit.order.id });
   return (
     <AdminDialog title={title} closeHref={closeHref} size="lg">
@@ -53,9 +53,9 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
         </span>
         <div className="visit-summary-text">
           <p className="visit-summary-name">
-            {KIND_LABELS[visit.kind]} – {visit.customer.name}{" "}
+            {APPOINTMENT_KIND_LABELS[visit.kind]} – {visit.customer.name}{" "}
             <span className="ov-tag" data-kind={visit.kind}>
-              {KIND_LABELS[visit.kind]}
+              {APPOINTMENT_KIND_LABELS[visit.kind]}
             </span>
           </p>
           <p className="ov-cell-sub">

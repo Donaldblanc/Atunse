@@ -170,7 +170,8 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
 /**
  * The pipeline as steps: done up to the Order's current status, then the
  * ones still to come. A done step carries when its pairs reached it, from
- * the audit log (the last of them, once every pair is there); it stays
+ * the audit log (the last of them, once every pair is there, each pair's
+ * latest time if it stepped back and reached it again); it stays
  * untimed when the log has nothing, rather than guessing. The first step is
  * the booking itself. A cancelled Order stops where it was: the steps it
  * reached, then Cancelled.
@@ -179,7 +180,8 @@ export function buildTimeline(status: ItemStatus, pairs: { id: string }[], chang
   /** When every pair had reached `step`, or null if any didn't or the log doesn't say. */
   const reachedAt = (step: ItemStatus): Date | null => {
     if (step === "REQUEST_SUBMITTED") return bookedAt;
-    const times = pairs.map((pair) => changes.find((change) => change.itemId === pair.id && change.toStatus === step)?.at);
+    // The latest entry: a pair stepped back and moved on again shows when it reached the step this time.
+    const times = pairs.map((pair) => changes.findLast((change) => change.itemId === pair.id && change.toStatus === step)?.at);
     return times.every((time): time is Date => time !== undefined) ? new Date(Math.max(...times.map((time) => time.getTime()))) : null;
   };
 

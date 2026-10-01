@@ -1,32 +1,21 @@
 import Link from "next/link";
-import type { ActingUser } from "@/features/accounts/authz";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
-import { buildAttentionPanelDeps } from "./attention-deps";
-import { getNeedsQuote, getPendingPayments, getReadyToReturn, type AttentionPanelId } from "./attention-panels";
+import type { AttentionPanelData } from "./attention-panels";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 import { PendingPaymentsTable } from "./pending-payments-table";
 
 /**
- * The dialog behind a Needs Attention item (`?attention=`), loaded on the
- * server. Pending Payments can mark a Deposit paid; the other two are
- * read-only lists whose Order links open the Order dialog, where the
- * actions live.
+ * The dialog behind a Needs Attention item (`?attention=`), from rows the
+ * page loaded (getAttentionPanel). Pending Payments can mark a Deposit
+ * paid; the other two are read-only lists whose Order links open the Order
+ * dialog, where the actions live.
  */
-export async function AttentionPanel({
-  panel,
-  selection,
-  actingUser,
-}: {
-  panel: AttentionPanelId;
-  selection: OverviewSelection;
-  actingUser: ActingUser;
-}) {
-  const deps = buildAttentionPanelDeps();
+export function AttentionPanel({ data, selection }: { data: AttentionPanelData; selection: OverviewSelection }) {
   const closeHref = overviewHref(selection);
   const linkTo = (orderId: string) => overviewHref(selection, { order: orderId });
 
-  if (panel === "pending-payments") {
-    const rows = await getPendingPayments(deps, actingUser);
+  if (data.panel === "pending-payments") {
+    const { rows } = data;
     return (
       <AdminDialog title={`Pending Payments (${rows.length})`} closeHref={closeHref} size="lg">
         <PendingPaymentsTable rows={rows.map((row) => ({ ...row, href: linkTo(row.orderId) }))} />
@@ -34,10 +23,12 @@ export async function AttentionPanel({
     );
   }
 
-  if (panel === "ready-to-return") {
-    const rows = await getReadyToReturn(deps, actingUser);
+  if (data.panel === "ready-to-return") {
+    const { rows } = data;
+    // Pairs, not Orders, like the stat card and Needs Attention row that open this.
+    const pairsReady = rows.reduce((sum, row) => sum + row.pairsReady, 0);
     return (
-      <AdminDialog title={`Ready to Return (${rows.length})`} closeHref={closeHref} size="lg">
+      <AdminDialog title={`Ready to Return (${pairsReady})`} closeHref={closeHref} size="lg">
         {rows.length === 0 ? (
           <p className="ov-empty">Nothing is waiting to go back.</p>
         ) : (
@@ -76,7 +67,7 @@ export async function AttentionPanel({
     );
   }
 
-  const rows = await getNeedsQuote(deps, actingUser);
+  const { rows } = data;
   return (
     <AdminDialog title={`Needs a Quote (${rows.length})`} closeHref={closeHref} size="lg">
       {rows.length === 0 ? (
