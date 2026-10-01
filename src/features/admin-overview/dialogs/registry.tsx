@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AttentionSlot, matchesAttention } from "./attention-slot";
+import { matchesMessages, MessagesSlot } from "./messages-slot";
 import { matchesMetric, MetricSlot } from "./metric-slot";
 import { matchesOrder, OrderSlot } from "./order-slot";
 import type { OverviewDialogContext, OverviewParams } from "./overview-dialog-context";
@@ -21,6 +22,7 @@ export const OVERVIEW_DIALOGS: OverviewDialogSlot[] = [
   { id: "return-booking", matches: matchesReturnBooking, Slot: ReturnBookingSlot },
   { id: "order", matches: matchesOrder, Slot: OrderSlot },
   { id: "attention", matches: matchesAttention, Slot: AttentionSlot },
+  { id: "messages", matches: matchesMessages, Slot: MessagesSlot },
 ];
 
 /** The ids of the slots these params open, in render order. */

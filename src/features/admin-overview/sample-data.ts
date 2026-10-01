@@ -5,9 +5,6 @@
 // Overview: replace sample data") saying what real data replaces it.
 // Delete each export once its real source exists.
 
-/** TODO(sample-data): unread customer Messages (Conversation/Message, #119). */
-export const SAMPLE_UNREAD_MESSAGES = 3;
-
 /** TODO(sample-data): Inventory Items at or below their low-stock level (InventoryItem, #119). */
 export const SAMPLE_LOW_STOCK_ITEMS = 3;
 

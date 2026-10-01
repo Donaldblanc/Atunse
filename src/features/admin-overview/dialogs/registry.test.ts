@@ -11,6 +11,7 @@ describe("overview dialog registry", () => {
   it("opens only the return picker for book=return", () => expect(ids("order=x&book=return")).toEqual(["return-booking"]));
   it("opens the visit dialog (reschedule is the same slot)", () => expect(ids("visit=x&reschedule=1")).toEqual(["visit"]));
   it("opens the attention panel", () => expect(ids("attention=pending-payments")).toEqual(["attention"]));
+  it("opens the unread messages dialog", () => expect(ids("attention=messages")).toEqual(["messages"]));
   it("renders every match in the page's old order", () =>
     expect(ids("attention=needs-quote&order=x&visit=y&metric=revenue")).toEqual(["metric", "visit", "order", "attention"]));
 });

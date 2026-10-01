@@ -148,7 +148,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample data where nothing records the real thing yet. Sample figures live in `src/features/admin-overview/sample-data.ts`, are marked `TODO(sample-data)`, and carry a dashed "Sample" tag on the page. Delete each one as its real source lands.
 
 **Sample data (shown now, not real):**
-- [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
+- [x] **Unread Messages** count: real count of CUSTOMER Messages with `readAt` null in unarchived Conversations; its dialog (`?attention=messages`) has Mark read and an email Reply.
 - [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
 - [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): the Review table exists (#119); decide how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram), then show the latest PUBLISHED ones.
 
