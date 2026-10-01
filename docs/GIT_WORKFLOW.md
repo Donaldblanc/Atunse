@@ -19,6 +19,11 @@ Day-to-day work: branch `feature/<short-name>` off `develop`, PR back into
 maintainer today), but direct pushes to `develop` are blocked, so every
 change is still a reviewable, revertible PR.
 
+**Stacked PRs:** if a feature PR is based on another feature branch,
+retarget it to `develop` once its base merges, and only then merge it.
+Merged into a base branch that has already landed, its commits never reach
+`develop` (#123 needed #125 to land).
+
 ## Cutting a release
 
 ```bash
