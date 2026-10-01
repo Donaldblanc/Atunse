@@ -3,10 +3,7 @@
 // own check; getAdminOverview checks the role again itself (ADR-0012).
 //
 // Booked orders and revenue follow the range picker; the work queues,
-// Recent Orders and Today's Schedule are always "right now". Sections
-// whose data doesn't exist yet (unread messages, low stock, reviews) show
-// sample data from sample-data.ts, tagged "Sample" on the page and tracked
-// in docs/TODO.md until real data replaces it.
+// Recent Orders and Today's Schedule are always "right now".
 
 import { cookies } from "next/headers";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";

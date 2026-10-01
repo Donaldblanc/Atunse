@@ -1,0 +1,128 @@
+/* Overview: Low Stock dialog and Reviews dialog. Prefixed stk-/rev- (global sheet, see docs/kb/patterns.md). */
+
+.stk-list,
+.rev-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.stk-item,
+.rev-item {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.stk-item:last-child,
+.rev-item:last-child {
+  border-bottom: 0;
+}
+
+.stk-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stk-level {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.stk-level[data-out="true"] {
+  color: var(--color-danger, #b42318);
+}
+
+.stk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.stk-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.stk-note {
+  flex: 1 1 200px;
+}
+
+.stk-label {
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.stk-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.rev-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.rev-tab {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  font-size: 14px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.rev-tab[aria-current="page"] {
+  background: var(--color-accent-deep);
+  border-color: var(--color-accent-deep);
+  color: #fff;
+}
+
+.rev-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rev-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rev-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rev-reply {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--color-muted, #f3f4f6);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rev-reply-form {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.rev-reply-form textarea {
+  width: 100%;
+}

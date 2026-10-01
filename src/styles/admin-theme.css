@@ -1499,18 +1499,6 @@ a.admin-nav-item:hover {
   color: var(--delta-down-ink);
 }
 
-/* Sample data (sample-data.ts): dashed, so it never reads as a real figure. */
-.ov-sample {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px dashed #c9a24a;
-  color: #8a6400;
-  white-space: nowrap;
-}
 
 /* Recent Reviews. */
 .ov-reviews {
