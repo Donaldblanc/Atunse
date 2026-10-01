@@ -11,6 +11,10 @@ import {
   calendarDateInShopTime,
   calendarDateToUtcMidnight,
   dayOfWeek,
+  daysBetween,
+  firstOfMonth,
+  firstOfNextMonth,
+  firstOfPreviousMonth,
   isCalendarDate,
   shopClock,
   shopMidnight,
@@ -104,29 +108,9 @@ export function overviewHref(selection: OverviewSelection, extra: Record<string,
   return query ? `/admin?${query}` : "/admin";
 }
 
-/** Whole days from `from` to `to` (negative if `to` is earlier). */
-function daysBetween(from: CalendarDate, to: CalendarDate): number {
-  return Math.round((calendarDateToUtcMidnight(to).getTime() - calendarDateToUtcMidnight(from).getTime()) / 86_400_000);
-}
-
 /** Monday of the week `date` falls in (the shop's weeks run Monday-Sunday). */
 function mondayOf(date: CalendarDate): CalendarDate {
   return addDays(date, -((dayOfWeek(date) + 6) % 7));
-}
-
-/** The first of the month `date` falls in. */
-function firstOfMonth(date: CalendarDate): CalendarDate {
-  return `${date.slice(0, 7)}-01`;
-}
-
-/** The first of the month after the one `date` falls in (32 days on always lands in it). */
-function firstOfNextMonth(date: CalendarDate): CalendarDate {
-  return firstOfMonth(addDays(firstOfMonth(date), 32));
-}
-
-/** The first of the month before the one `date` falls in. */
-function firstOfPreviousMonth(date: CalendarDate): CalendarDate {
-  return firstOfMonth(addDays(firstOfMonth(date), -1));
 }
 
 /**

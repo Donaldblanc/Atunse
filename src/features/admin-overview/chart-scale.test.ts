@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countTicks, dollarTicks, donutSegments, sharesOf100 } from "./chart-scale";
+import { countTicks, dayAxis, dollarTicks, donutSegments, sharesOf100 } from "./chart-scale";
 
 describe("dollarTicks", () => {
   it("steps in round amounts that cover the tallest bar", () => {
@@ -46,5 +46,17 @@ describe("countTicks", () => {
     expect(countTicks(4)).toEqual([0, 2, 4, 6]);
     expect(countTicks(9)).toEqual([0, 5, 10, 15]);
     expect(countTicks(11)).toEqual([0, 5, 10, 15]);
+  });
+});
+
+describe("dayAxis", () => {
+  it("labels every day of a week and every fifth day up to a month", () => {
+    expect(dayAxis(7)).toEqual({ everyDay: true, labelStep: 1, veryDense: false });
+    expect(dayAxis(31)).toEqual({ everyDay: false, labelStep: 5, veryDense: false });
+  });
+
+  it("keeps a long range to about six labels and drops the per-day tab stops", () => {
+    expect(dayAxis(90)).toEqual({ everyDay: false, labelStep: 15, veryDense: true });
+    expect(dayAxis(366)).toEqual({ everyDay: false, labelStep: 61, veryDense: true });
   });
 });

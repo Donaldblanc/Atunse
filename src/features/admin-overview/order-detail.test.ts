@@ -282,6 +282,16 @@ describe("buildTimeline", () => {
     expect(timeline.find((step) => step.status === "QUOTE_SENT")!.at).toBeNull();
   });
 
+  it("times a step a pair reached again after stepping back by the latest time", () => {
+    const again: StatusChange[] = [
+      { itemId: "a", toStatus: "UNDER_REVIEW", at: at("2026-10-01T11:00:00Z") },
+      { itemId: "a", toStatus: "REQUEST_SUBMITTED", at: at("2026-10-01T12:00:00Z") },
+      { itemId: "a", toStatus: "UNDER_REVIEW", at: at("2026-10-01T15:00:00Z") },
+    ];
+    const timeline = buildTimeline("UNDER_REVIEW", [{ id: "a" }], again, booked);
+    expect(timeline.find((step) => step.status === "UNDER_REVIEW")!.at).toEqual(at("2026-10-01T15:00:00Z"));
+  });
+
   it("doesn't invent a time when the log has none", () => {
     const timeline = buildTimeline("QUOTE_SENT", [{ id: "c" }], [], booked);
     expect(timeline.filter((step) => step.state === "done").map((step) => [step.status, step.at])).toEqual([

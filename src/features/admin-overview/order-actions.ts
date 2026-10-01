@@ -16,6 +16,12 @@ function statusField(formData: FormData, name: string): ItemStatus | null {
   return ITEM_STATUSES.find((status) => status === value) ?? null;
 }
 
+/** The pair moved since the dialog loaded: name where it is now, in the owner's words. */
+function staleStatusMessage(err: ItemStatusChangedError): string {
+  const now = ITEM_STATUSES.find((status) => status === err.currentStatus);
+  return now ? `This pair is now ${ITEM_STATUS_LABELS[now]}. Reload and try again.` : "This pair changed since you opened it. Reload and try again.";
+}
+
 /**
  * Order detail's Update Status: moves one pair to the next step or cancels
  * it, through the same use-case the admin API route uses. `fromStatus` is
@@ -51,7 +57,8 @@ export async function updateItemStatusAction(_previous: UpdateStatusState, formD
       idempotencyKey,
     });
   } catch (err) {
-    if (err instanceof ItemStatusChangedError || err instanceof MoveNotAllowedError) return { error: err.message };
+    if (err instanceof ItemStatusChangedError) return { error: staleStatusMessage(err) };
+    if (err instanceof MoveNotAllowedError) return { error: err.message };
     if (err instanceof InvalidTransitionError)
       return {
         error: `A pair can't move from ${ITEM_STATUS_LABELS[fromStatus]} to ${ITEM_STATUS_LABELS[toStatus]}.`,

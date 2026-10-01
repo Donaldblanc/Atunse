@@ -24,7 +24,8 @@ import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { AttentionItem } from "@/features/admin-overview/attention-item";
 import { AttentionPanel } from "@/features/admin-overview/attention-panel";
-import { parseAttentionPanel } from "@/features/admin-overview/attention-panels";
+import { buildAttentionPanelDeps } from "@/features/admin-overview/attention-deps";
+import { getAttentionPanel, parseAttentionPanel } from "@/features/admin-overview/attention-panels";
 import { Delta } from "@/features/admin-overview/delta";
 import { buildAdminOverviewDeps } from "@/features/admin-overview/deps";
 import { getAdminOverview } from "@/features/admin-overview/get-admin-overview";
@@ -63,18 +64,22 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   // ?range= (a preset) or ?from=&to= (custom); links that add their own
   // params build on overviewHref(selection, {...}) to keep it.
   const selection = parseOverviewSelection(params, deps.now());
-  const overview = await getAdminOverview(deps, actingUser, selection);
-  const { range } = overview;
-  const rangeId = range.id;
   // At most one dialog is open over the Overview, named by its param
   // (?metric=, ?order=, ...); closing it goes back to the bare range.
   const closeHref = overviewHref(selection);
   const metric = parseOverviewMetric(params.metric);
   const orderId = orderIdFromSearchParams(params);
-  const orderDetail = orderId ? await getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null;
   const visitId = typeof params.visit === "string" ? params.visit : null;
-  const visit = visitId ? await getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null;
   const attentionPanel = parseAttentionPanel(params.attention);
+  // Independent reads, started together so opening a dialog costs one round trip, not two.
+  const [overview, orderDetail, visit, attention] = await Promise.all([
+    getAdminOverview(deps, actingUser, selection),
+    orderId ? getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null,
+    visitId ? getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null,
+    attentionPanel ? getAttentionPanel(buildAttentionPanelDeps(), actingUser, attentionPanel) : null,
+  ]);
+  const { range } = overview;
+  const rangeId = range.id;
 
   const highlight = range.days.includes(today) ? today : range.days[range.days.length - 1]!;
   const ordersHref = builtScreenHref("orders");
@@ -219,7 +224,7 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
         ) : (
           <OrderNotFoundDialog closeHref={closeHref} />
         ))}
-      {attentionPanel && <AttentionPanel panel={attentionPanel} selection={selection} actingUser={actingUser} />}
+      {attention && <AttentionPanel data={attention} selection={selection} />}
     </div>
   );
 }

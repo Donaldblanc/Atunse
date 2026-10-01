@@ -1,4 +1,5 @@
 import { calendarDateToUtcMidnight, type CalendarDate } from "@/features/orders/calendar-date";
+import { dayAxis } from "./chart-scale";
 
 const longDay = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
 const shortDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -13,8 +14,9 @@ const asDate = calendarDateToUtcMidnight;
  *
  * The line is stretched SVG (so it fills any width) with non-scaling strokes;
  * everything that must stay round or readable, the points and every label,
- * is HTML positioned by percentage. Each day is a focusable column that
- * shows its value on hover and focus and names it for screen readers.
+ * is HTML positioned by percentage. Each day is a column that shows its value
+ * on hover and focus (focusable unless the range is very dense, see
+ * dayAxis) and names it for screen readers.
  */
 export function MetricChart({
   days,
@@ -33,7 +35,7 @@ export function MetricChart({
   describe: (value: number) => string;
 }) {
   const top = ticks[ticks.length - 1]!;
-  const everyDay = days.length <= 7;
+  const { everyDay, labelStep, veryDense } = dayAxis(days.length);
   const x = (i: number) => ((i + 0.5) / days.length) * 100;
   const y = (value: number) => 100 - (value / top) * 100;
   const last = Math.max(0, days.findLastIndex((day) => day.date <= through));
@@ -66,7 +68,7 @@ export function MetricChart({
             className="md-chart-hit"
             style={{ left: `${(i / days.length) * 100}%`, width: `${100 / days.length}%` }}
             role="img"
-            tabIndex={0}
+            tabIndex={veryDense ? undefined : 0}
             aria-label={`${longDay.format(asDate(day.date))}: ${i > last ? "still to come" : describe(day.value)}`}
           >
             {i <= last && (
@@ -82,8 +84,8 @@ export function MetricChart({
         ))}
         <div className="md-chart-labels" aria-hidden="true">
           {days.map((day, i) => {
-            // A week labels every day; a longer range every fifth counting back from its last day.
-            const labelled = everyDay || (days.length - 1 - i) % 5 === 0;
+            // Counting back from the last day (dayAxis: every day, every fifth, or about six in all).
+            const labelled = (days.length - 1 - i) % labelStep === 0;
             return (
               labelled && (
                 <span key={day.date} style={{ left: `${x(i)}%` }}>

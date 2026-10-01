@@ -203,6 +203,8 @@ export interface Appointment {
   notes: string | null;
 }
 
+export const APPOINTMENT_KIND_LABELS: Record<Appointment["kind"], string> = { COLLECTION: "Collection", RETURN: "Return" };
+
 export interface Order {
   id: string;
   /** Sequential from 1001; shown as orderNumber(number), "ATU-1008". */
