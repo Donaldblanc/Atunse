@@ -18,11 +18,14 @@ export function AdminDialog({
   title,
   closeHref,
   size = "md",
+  actions,
   children,
 }: {
   title: React.ReactNode;
   closeHref: string;
   size?: "sm" | "md" | "lg";
+  /** Buttons for the header, beside the close button (e.g. Edit Order). */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -67,6 +70,7 @@ export function AdminDialog({
           <h2 id={titleId} className="admin-dialog-title">
             {title}
           </h2>
+          {actions && <div className="admin-dialog-actions">{actions}</div>}
           <button type="button" className="admin-dialog-close" aria-label="Close" onClick={close}>
             <XIcon size={20} aria-hidden="true" />
           </button>

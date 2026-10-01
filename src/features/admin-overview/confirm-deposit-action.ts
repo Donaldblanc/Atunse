@@ -8,6 +8,7 @@ import { NoPendingDepositError } from "@/features/orders/repositories/order-repo
 import { confirmDeposit } from "@/features/orders/use-cases/confirm-deposit";
 import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
 import { prisma } from "@/shared/db/prisma-client";
+import { redactForLog } from "@/shared/logging/redact";
 
 export type ConfirmDepositResult = { ok: true } | { ok: false; error: string };
 
@@ -27,7 +28,7 @@ export async function confirmDepositAction(orderId: string, idempotencyKey: stri
   } catch (err) {
     if (err instanceof UnauthorizedError) return { ok: false, error: "Your session has ended. Sign in again." };
     if (!(err instanceof NoPendingDepositError)) {
-      console.error("[admin-overview] confirming a deposit failed", err);
+      console.error(`[admin-overview] confirming a deposit failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
       return { ok: false, error: "Couldn't mark it paid. Try again." };
     }
   }

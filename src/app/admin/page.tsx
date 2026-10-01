@@ -46,6 +46,7 @@ import { ServicesDonut } from "@/features/admin-overview/services-donut";
 import { TodaysSchedule } from "@/features/admin-overview/todays-schedule";
 import { buildVisitDeps } from "@/features/admin-overview/visit-deps";
 import { VisitDialog } from "@/features/admin-overview/visit-dialog";
+import { BookReturnAction, RescheduleDialog, ReturnBookingDialog } from "@/features/admin-overview/visit-schedule-dialogs";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
@@ -73,7 +74,8 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
   // Independent reads, started together so opening a dialog costs one round trip, not two.
   const [overview, orderDetail, visit, attention] = await Promise.all([
     getAdminOverview(deps, actingUser, selection),
-    orderId ? getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null,
+    // ?book=return shows only the Return picker, which loads what it needs itself.
+    orderId && params.book !== "return" ? getOrderDetail(buildOrderDetailDeps(), actingUser, orderId) : null,
     visitId ? getScheduledVisit(buildVisitDeps(), actingUser, visitId) : null,
     attentionPanel ? getAttentionPanel(buildAttentionPanelDeps(), actingUser, attentionPanel) : null,
   ]);
@@ -207,8 +209,22 @@ export default async function AdminOverviewPage({ searchParams }: { searchParams
 
       {/* A modal <dialog> sits in the top layer, so it doesn't take part in this grid. */}
       {metric && <MetricDetailDialog metric={metric} overview={overview} through={highlight} closeHref={closeHref} />}
-      {visitId && <VisitDialog visit={visit} selection={selection} />}
-      {orderId && (orderDetail ? <OrderDetailDialog detail={orderDetail} closeHref={closeHref} /> : <OrderNotFoundDialog closeHref={closeHref} />)}
+      {visitId && (params.reschedule === "1" && visit ? <RescheduleDialog visit={visit} selection={selection} now={deps.now()} /> : <VisitDialog visit={visit} selection={selection} />)}
+      {orderId && params.book === "return" && <ReturnBookingDialog orderId={orderId} selection={selection} actingUser={actingUser} now={deps.now()} />}
+      {orderId &&
+        params.book !== "return" &&
+        (orderDetail ? (
+          <OrderDetailDialog
+            detail={orderDetail}
+            closeHref={closeHref}
+            viewHref={overviewHref(selection, { order: orderId })}
+            editHref={overviewHref(selection, { order: orderId, edit: "order" })}
+            editing={params.edit === "order"}
+            returnAction={<BookReturnAction orderId={orderId} returnVisit={orderDetail.returnVisit} selection={selection} />}
+          />
+        ) : (
+          <OrderNotFoundDialog closeHref={closeHref} />
+        ))}
       {attention && <AttentionPanel data={attention} selection={selection} />}
     </div>
   );

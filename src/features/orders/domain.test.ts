@@ -40,10 +40,9 @@ describe("adminStatusMoves", () => {
     expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({ moves: ["QUALITY_CHECK", "CANCELLED"], held: null });
   });
 
-  it("holds Quote Sent for the quote step (ADR-0001), still offering the step back and Cancel", () => {
-    const { moves, held } = adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"));
-    expect(moves).toEqual(["REQUEST_SUBMITTED", "CANCELLED"]);
-    expect(held).toMatch(/quote/);
+  it("never offers Quote Sent or Approved as a plain move: each has its own step (ADR-0001); the step back stays", () => {
+    expect(adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"))).toEqual({ moves: ["REQUEST_SUBMITTED", "CANCELLED"], held: null });
+    expect(adminStatusMoves({ status: "QUOTE_SENT" }, deposit("RECEIVED"))).toEqual({ moves: ["CANCELLED"], held: null });
   });
 
   it("tells a step back from progress", () => {

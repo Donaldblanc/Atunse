@@ -12,7 +12,6 @@ import { updateItemStatusAction, type UpdateStatusState } from "./order-actions"
  * Cancelling can't be undone, so it takes a second, explicit click.
  */
 export function UpdateStatusForm({
-  orderId,
   itemId,
   fromStatus,
   nextStatuses,
@@ -20,7 +19,6 @@ export function UpdateStatusForm({
   idempotencyKey,
   pairLabel,
 }: {
-  orderId: string;
   itemId: string;
   fromStatus: ItemStatus;
   nextStatuses: ItemStatus[];
@@ -40,7 +38,6 @@ export function UpdateStatusForm({
 
   return (
     <form action={formAction} className="od-status-form">
-      <input type="hidden" name="orderId" value={orderId} />
       <input type="hidden" name="itemId" value={itemId} />
       <input type="hidden" name="fromStatus" value={fromStatus} />
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
@@ -59,7 +56,8 @@ export function UpdateStatusForm({
         {canCancel &&
           (confirmingCancel ? (
             <>
-              <button type="submit" name="toStatus" value="CANCELLED" className="admin-btn" data-variant="danger" disabled={pending}>
+              {/* Keyed apart from "Cancel order": reused in place, the click that swaps them would also submit. */}
+              <button key="confirm-cancel" type="submit" name="toStatus" value="CANCELLED" className="admin-btn" data-variant="danger" disabled={pending}>
                 Confirm cancel
               </button>
               <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(false)} disabled={pending}>
@@ -67,7 +65,7 @@ export function UpdateStatusForm({
               </button>
             </>
           ) : (
-            <button type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(true)} disabled={pending}>
+            <button key="ask-cancel" type="button" className="admin-btn" data-variant="secondary" onClick={() => setConfirmingCancel(true)} disabled={pending}>
               Cancel {pairLabel ? "pair" : "order"}
             </button>
           ))}
