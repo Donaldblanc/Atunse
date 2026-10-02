@@ -12,7 +12,7 @@ import {
   type Payment,
   type PaymentMethod,
 } from "@/features/orders/domain";
-import type { AwaitingDeposits, OrderRepository } from "@/features/orders/repositories/order-repository";
+import type { AwaitingPayments, OrderRepository } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { metricDetail, type MetricDetail } from "./metric-detail";
@@ -25,7 +25,7 @@ export interface AdminOverviewDeps {
     | "listBookedBetween"
     | "summarizeBookedBetween"
     | "countItemsByStatus"
-    | "summarizeAwaitingDeposit"
+    | "summarizeAwaitingPayments"
     | "listRecent"
     | "listAppointmentsBetween"
   >;
@@ -90,8 +90,8 @@ export interface AdminOverview {
   servicesBooked: { serviceId: string; name: string; count: number }[];
   /** Right now, whatever the range: pairs waiting on the owner's quote (ADR-0001). */
   needsQuote: number;
-  /** Right now: Orders whose Deposit Payment is still PENDING (ADR-0002), and how they're paying. */
-  awaitingDeposit: AwaitingDeposits;
+  /** Right now: Deposits and Balances still PENDING (ADR-0002), and how they're paying. */
+  awaitingPayments: AwaitingPayments;
   /** Right now: pairs finished and waiting to go back (Ready for Drop-Off/Shipping). */
   readyForReturn: number;
   /** The latest bookings, whatever the range. */
@@ -118,12 +118,12 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   const now = deps.now();
   const range = overviewRange(selection, now);
   const today = calendarDateInShopTime(now);
-  const [booked, previous, statusCounts, awaitingDeposit, recent, appointments] = await Promise.all([
+  const [booked, previous, statusCounts, awaitingPayments, recent, appointments] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),
     // Only totals are needed for the stretch before, so it's aggregated, not loaded.
     deps.orders.summarizeBookedBetween(range.previous.start, range.previous.end),
     deps.orders.countItemsByStatus(),
-    deps.orders.summarizeAwaitingDeposit(),
+    deps.orders.summarizeAwaitingPayments(),
     deps.orders.listRecent(RECENT_ORDERS),
     deps.orders.listAppointmentsBetween(shopMidnight(today), shopMidnight(addDays(today, 1))),
   ]);
@@ -155,7 +155,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     metricDetail: metricDetail(booked, range.days),
     servicesBooked,
     needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
-    awaitingDeposit,
+    awaitingPayments,
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
     recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
     todaysSchedule: appointments

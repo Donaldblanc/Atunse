@@ -84,6 +84,8 @@ export interface OrderDetail {
   payment: {
     /** The Order's Deposit Payment, or null if it has none. */
     deposit: Pick<Payment, "method" | "status" | "amount" | "receivedAt"> | null;
+    /** The Order's Balance Payment once its pairs are ready to go back, or null before then. */
+    balance: (Pick<Payment, "method" | "status" | "amount" | "receivedAt"> & { id: string }) | null;
     estimate: Money;
     estimateIsMinimum: boolean;
     depositDue: Money;
@@ -128,6 +130,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   const live = livePairs(order);
   const status = orderRollupStatus(order.items);
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
+  const balance = order.payments.find((payment) => payment.kind === "BALANCE");
   const { fulfillment } = order;
   const { address } = fulfillment;
   const schedule =
@@ -164,6 +167,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
             receivedAt: deposit.receivedAt,
           }
         : null,
+      balance: balance ? { id: balance.id, method: balance.method, status: balance.status, amount: balance.amount, receivedAt: balance.receivedAt } : null,
       estimate: live.length > 0 ? liveEstimate(order) : order.estimate,
       estimateIsMinimum: order.estimateIsMinimum,
       depositDue: order.deposit,

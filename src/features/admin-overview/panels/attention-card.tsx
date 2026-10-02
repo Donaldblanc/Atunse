@@ -12,7 +12,7 @@ export function AttentionCard({ overview, selection }: { overview: AdminOverview
         Needs Attention
       </h2>
       <ul className="ov-attention">
-        <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer deposit" count={overview.awaitingDeposit.orders} href={overviewHref(selection, { attention: "pending-payments" })} />
+        <AttentionItem tone="red" icon={CreditCardIcon} title="Pending Payments" detail="Awaiting customer payment" count={overview.awaitingPayments.payments} href={overviewHref(selection, { attention: "pending-payments" })} />
         <AttentionItem tone="orange" icon={PackageIcon} title="Ready to Return" detail="Completed and ready to go back" count={overview.readyForReturn} href={overviewHref(selection, { attention: "ready-to-return" })} />
         <AttentionItem tone="blue" icon={ClipboardTextIcon} title="Needs a Quote" detail="Pairs waiting on your review" count={overview.needsQuote} href={overviewHref(selection, { attention: "needs-quote" })} />
         <AttentionItem tone="violet" icon={ChatCenteredTextIcon} title="Unread Messages" detail="Customer inquiries" count={SAMPLE_UNREAD_MESSAGES} sampleTag={<SampleTag />} />

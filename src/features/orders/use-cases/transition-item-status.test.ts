@@ -3,6 +3,7 @@ import { UnauthorizedError } from "@/features/accounts/authz";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order-repository";
+import { Money } from "@/shared/money/money";
 import type { ItemStatus } from "../domain";
 import { submitOrder } from "./submit-order";
 import { bookingDeps, RecordingNotificationService, validBookingInput } from "./test-fixtures";
@@ -215,5 +216,83 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     notifications.failing = true;
     await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "UNDER_REVIEW", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
     expect(orders.orders.get(order.id)!.items[0]!.status).toBe("CANCELLED");
+  });
+});
+
+describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
+  const ready = (itemId: string, from: ItemStatus = "QUALITY_CHECK") => ({ itemId, fromStatus: from, toStatus: "READY_FOR_PICKUP_SHIPPING" as const, action: "STATUS_TRANSITION" });
+
+  async function seedPairs(statuses: ItemStatus[], prices: number[]) {
+    const orders = new InMemoryOrderRepository();
+    const notifications = new RecordingNotificationService();
+    const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
+    const stored = orders.orders.get(order.id)!;
+    // Booking takes one pair (or a Bundle); further pairs are cloned in.
+    statuses.slice(1).forEach((_, index) => stored.items.push({ ...stored.items[0]!, id: `item_extra_${index}` }));
+    stored.items.forEach((item, index) => {
+      item.status = statuses[index]!;
+      item.price = Money.fromCents(prices[index]!);
+    });
+    stored.payments[0]!.status = "RECEIVED";
+    return { orders, stored, deps: { orders, notifications } };
+  }
+
+  it("is created PENDING, for the quoted total less the Deposit, when the last live pair is ready", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "QUALITY_CHECK"], [20000, 30000]);
+    const deposit = stored.payments[0]!;
+
+    await transitionItemStatus(deps, admin, ready(stored.items[1]!.id));
+
+    const balance = stored.payments.find((payment) => payment.kind === "BALANCE");
+    expect(balance).toMatchObject({ status: "PENDING", method: deposit.method, amount: Money.fromCents(50000).subtract(deposit.amount) });
+  });
+
+  it("isn't created while a live pair isn't ready, and isn't made twice", async () => {
+    const { deps, stored } = await seedPairs(["QUALITY_CHECK", "QUALITY_CHECK"], [20000, 30000]);
+    await transitionItemStatus(deps, admin, ready(stored.items[0]!.id));
+    expect(stored.payments.filter((payment) => payment.kind === "BALANCE")).toEqual([]);
+
+    await transitionItemStatus(deps, admin, ready(stored.items[1]!.id));
+    expect(stored.payments.filter((payment) => payment.kind === "BALANCE")).toHaveLength(1);
+  });
+
+  it("follows a cancelled pair while pending, and is dropped when the Order is fully cancelled", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "READY_FOR_PICKUP_SHIPPING", "QUALITY_CHECK"], [20000, 30000, 10000]);
+    await transitionItemStatus(deps, admin, { itemId: stored.items[2]!.id, fromStatus: "QUALITY_CHECK", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    const balance = () => stored.payments.find((payment) => payment.kind === "BALANCE")!;
+    const deposit = stored.payments[0]!;
+    // Cancelling the last unready pair makes the rest ready, so the Balance appears for the remaining total.
+    expect(balance()).toMatchObject({ status: "PENDING", amount: Money.fromCents(50000).subtract(deposit.amount) });
+
+    await transitionItemStatus(deps, admin, { itemId: stored.items[1]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    expect(balance().amount).toEqual(Money.fromCents(20000).subtract(deposit.amount));
+
+    await transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    expect(balance().status).toBe("FAILED");
+  });
+
+  it("holds Completed until it is received, saying why", async () => {
+    const { deps, orders, stored } = await seedPairs(["QUALITY_CHECK"], [20000]);
+    const itemId = stored.items[0]!.id;
+    await transitionItemStatus(deps, admin, ready(itemId));
+    const complete = () => transitionItemStatus(deps, admin, { itemId, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
+
+    await expect(complete()).rejects.toThrow(/Balance not collected/);
+
+    await orders.confirmPayment({ paymentId: stored.payments.find((payment) => payment.kind === "BALANCE")!.id, method: "CASH", actorAccountId: "acc_admin", idempotencyKey: "k" });
+    expect((await complete())?.status).toBe("COMPLETED");
+  });
+
+  it("holds a pair readied early while another pair isn't ready, even with no Balance yet", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "IN_PROGRESS"], [20000, 30000]);
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" }),
+    ).rejects.toThrow(/every pair is ready/);
+    expect(stored.items[0]!.status).toBe("READY_FOR_PICKUP_SHIPPING");
+  });
+
+  it("allows Completed when the Deposit already covers the quoted total", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING"], [1000]);
+    expect((await transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" }))?.status).toBe("COMPLETED");
   });
 });

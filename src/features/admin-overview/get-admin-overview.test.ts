@@ -151,7 +151,7 @@ describe("getAdminOverview", () => {
     expect(overview.orders.current).toBe(0);
     expect(overview.needsQuote).toBe(3); // old: submitted + under review; paid: under review
     expect(overview.readyForReturn).toBe(1);
-    expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0, APPLE_PAY: 0 } });
+    expect(overview.awaitingPayments).toEqual({ payments: 1, amount: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0, APPLE_PAY: 0 } });
   });
 });
 

@@ -2,7 +2,7 @@ import { ChartBarIcon, CreditCardIcon, PackageIcon, TruckIcon } from "@phosphor-
 import type { Icon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
-import type { AwaitingDeposits } from "@/features/orders/repositories/order-repository";
+import type { AwaitingPayments } from "@/features/orders/repositories/order-repository";
 import { Delta } from "../delta";
 import type { AdminOverview } from "../get-admin-overview";
 import { overviewHref, type OverviewSelection } from "../overview-range";
@@ -21,9 +21,9 @@ export function StatsRow({ overview, selection }: { overview: AdminOverview; sel
           comparison={range.comparisonLabel}
         />
       </StatCard>
-      <StatCard label="Pending Payments" icon={CreditCardIcon} href={overviewHref(selection, { attention: "pending-payments" })} value={String(overview.awaitingDeposit.orders)}>
+      <StatCard label="Pending Payments" icon={CreditCardIcon} href={overviewHref(selection, { attention: "pending-payments" })} value={String(overview.awaitingPayments.payments)}>
         <p className="ov-stat-note">
-          {overview.awaitingDeposit.orders === 0 ? "Every deposit confirmed" : depositSplit(overview.awaitingDeposit)}
+          {overview.awaitingPayments.payments === 0 ? "Every payment confirmed" : depositSplit(overview.awaitingPayments)}
         </p>
       </StatCard>
       <StatCard label="Ready to Return" icon={TruckIcon} value={String(overview.readyForReturn)} href={overviewHref(selection, { attention: "ready-to-return" })}>
@@ -33,10 +33,10 @@ export function StatsRow({ overview, selection }: { overview: AdminOverview; sel
   );
 }
 
-/** "3 Zelle · 3 Cash · $280 due": each method that has a Deposit waiting, then the total. */
-function depositSplit({ byMethod, deposits }: AwaitingDeposits): string {
+/** "3 Zelle · 3 Cash · $280 due": each method that has a payment waiting, then the total. */
+function depositSplit({ byMethod, amount }: AwaitingPayments): string {
   const methods = PAYMENT_METHODS.filter((method) => byMethod[method] > 0).map((method) => `${byMethod[method]} ${PAYMENT_METHOD_LABELS[method]}`);
-  return [...methods, `${deposits.format()} due`].join(" · ");
+  return [...methods, `${amount.format()} due`].join(" · ");
 }
 
 /** With an `href`, the whole card is a link to it (a metric's detail dialog or a Needs Attention panel). */

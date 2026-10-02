@@ -1,8 +1,8 @@
-import { CheckCircleIcon, ClockIcon, EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
+import { ClockIcon, EnvelopeSimpleIcon, MapPinIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import { APPOINTMENT_KIND_LABELS } from "@/features/orders/domain";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
-import { completeVisitAction } from "./complete-visit-action";
+import { CompleteVisitForm } from "./complete-visit-form";
 import { overviewHref, rangeSearchParams, type OverviewSelection } from "./overview-range";
 import { PairThumb } from "./pair-thumb";
 import type { ScheduledVisitDetail } from "./scheduled-visit";
@@ -141,17 +141,13 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
       </div>
 
       <div className="visit-actions">
-        {visit.status === "SCHEDULED" && (
-          <form action={completeVisitAction}>
-            <input type="hidden" name="appointmentId" value={visit.appointmentId} />
-            {[...rangeSearchParams(selection)].map(([name, value]) => (
-              <input key={name} type="hidden" name={name} value={value} />
-            ))}
-            <button type="submit" className="admin-btn">
-              <CheckCircleIcon size={18} aria-hidden="true" /> Mark as Completed
-            </button>
-          </form>
-        )}
+        <CompleteVisitForm
+          appointmentId={visit.appointmentId}
+          scheduled={visit.status === "SCHEDULED"}
+          plan={visit.plan}
+          pairLabels={visit.pairLabels}
+          rangeFields={[...rangeSearchParams(selection)]}
+        />
         <a className="admin-btn" data-variant="secondary" href={`tel:${visit.customer.phone.replace(/[^\d+]/g, "")}`}>
           <PhoneIcon size={18} aria-hidden="true" /> Contact Customer
         </a>
