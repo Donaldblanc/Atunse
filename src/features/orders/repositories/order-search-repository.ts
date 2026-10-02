@@ -42,3 +42,16 @@ export function orderNumberFromQuery(q: string): number | null {
   const match = /^(?:ATU-?)?(\d{1,9})$/i.exec(q.trim());
   return match ? Number(match[1]) : null;
 }
+
+/**
+ * The digits to look for in phone numbers when `q` reads like one ("347-555-0111",
+ * "(347) 555 0111", "+1 347…"): stored numbers keep whatever formatting they were
+ * booked with, so they're compared digit to digit. Null for other text or fewer
+ * than 3 digits. A leading US country code is dropped.
+ */
+export function phoneDigitsFromQuery(q: string): string | null {
+  if (!/^[\d\s().+-]+$/.test(q.trim())) return null;
+  const digits = q.replace(/\D/g, "");
+  if (digits.length < 3) return null;
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}

@@ -3,11 +3,10 @@ import { ITEM_STATUSES, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/o
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import "./find-orders.css";
 import { overviewHref, type OverviewSelection } from "./overview-range";
+import { bookedDay } from "./get-admin-overview";
 import { DepositCell } from "./recent-orders";
 import type { OrderList } from "./search-orders";
 import { STATUS_TONE } from "./status-tone";
-
-const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" });
 
 /**
  * The dialog behind "View all orders" and the top-bar search

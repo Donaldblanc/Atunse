@@ -3,7 +3,7 @@
 
 import { orderRollupStatus } from "../domain";
 import type { InMemoryOrderRepository } from "./in-memory-order-repository";
-import { orderNumberFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
+import { orderNumberFromQuery, phoneDigitsFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
 
 export class InMemoryOrderSearchRepository implements OrderSearchRepository {
   constructor(private readonly orders: InMemoryOrderRepository) {}
@@ -11,11 +11,13 @@ export class InMemoryOrderSearchRepository implements OrderSearchRepository {
   async searchOrders(filters: OrderSearchFilters): Promise<{ rows: OrderSearchRow[]; total: number }> {
     const needle = filters.q?.trim().toLowerCase() ?? "";
     const number = needle ? orderNumberFromQuery(needle) : null;
+    const digits = needle ? phoneDigitsFromQuery(needle) : null;
     const matches = [...this.orders.orders.values()]
       .filter((order) => {
         if (needle) {
           const text = [order.contactName, order.contactEmail, order.contactPhone].some((field) => field.toLowerCase().includes(needle));
-          if (!text && order.number !== number) return false;
+          const phone = digits !== null && order.contactPhone.replace(/\D/g, "").includes(digits);
+          if (!text && !phone && order.number !== number) return false;
         }
         if (filters.status && orderRollupStatus(order.items) !== filters.status) return false;
         if (filters.from && order.createdAt < filters.from) return false;

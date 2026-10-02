@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { ITEM_STATUSES, type ItemStatus } from "../domain";
-import { orderNumberFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
+import { orderNumberFromQuery, phoneDigitsFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
 
 /**
  * An Order's derived status (orderRollupStatus) is its least advanced pair
@@ -17,7 +17,8 @@ function statusWhere(status: ItemStatus): Prisma.OrderWhereInput {
 /** Prisma's `contains` passes LIKE wildcards through, so a "%" or "_" typed by the owner would match everything: match them literally. */
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
 
-function whereFor(filters: OrderSearchFilters): Prisma.OrderWhereInput {
+/** `phoneMatches`: Orders whose phone holds the query's digits once formatting is ignored (see searchOrders). */
+function whereFor(filters: OrderSearchFilters, phoneMatches: string[]): Prisma.OrderWhereInput {
   const clauses: Prisma.OrderWhereInput[] = [];
   const q = filters.q?.trim();
   if (q) {
@@ -29,6 +30,7 @@ function whereFor(filters: OrderSearchFilters): Prisma.OrderWhereInput {
         { contactName: { contains: escapeLike(q), mode: "insensitive" } },
         { contactEmail: { contains: escapeLike(q), mode: "insensitive" } },
         { contactPhone: { contains: escapeLike(q), mode: "insensitive" } },
+        ...(phoneMatches.length > 0 ? [{ id: { in: phoneMatches } }] : []),
       ],
     });
   }
@@ -42,7 +44,13 @@ export class PrismaOrderSearchRepository implements OrderSearchRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async searchOrders(filters: OrderSearchFilters): Promise<{ rows: OrderSearchRow[]; total: number }> {
-    const where = whereFor(filters);
+    // Prisma can't strip a column's formatting in a where, so phone digits are matched in SQL first.
+    // The digits are bound as a parameter and are only 0-9, so the LIKE pattern holds no wildcards of the owner's.
+    const digits = filters.q ? phoneDigitsFromQuery(filters.q) : null;
+    const phoneMatches = digits
+      ? (await this.prisma.$queryRaw<{ id: string }[]>`SELECT id FROM orders WHERE regexp_replace("contactPhone", '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`).map((row) => row.id)
+      : [];
+    const where = whereFor(filters, phoneMatches);
     const [total, found] = await Promise.all([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({

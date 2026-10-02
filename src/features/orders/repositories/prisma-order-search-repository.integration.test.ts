@@ -99,11 +99,26 @@ describe("PrismaOrderSearchRepository (integration)", () => {
     expect(await names({ q: "nobody" })).toEqual([]);
   });
 
+  it("matches a phone number however it's formatted, on either side", async () => {
+    await book("Formatted", { phone: "(347) 555-0111" });
+    await book("Bare", { phone: "9175550122" });
+    for (const q of ["3475550111", "347-555-0111", "+1 (347) 555 0111", "555-0111"]) expect(await names({ q })).toEqual(["Formatted"]);
+    expect(await names({ q: "(917) 555-0122" })).toEqual(["Bare"]);
+  });
+
   it("treats SQL and wildcard characters in the text as plain text", async () => {
     await book("Sam Rivera");
     expect(await names({ q: "'; DROP TABLE orders; --" })).toEqual([]);
     expect(await names({ q: "%" })).toEqual([]);
     expect(await prisma.order.count()).toBe(1);
+  });
+
+  it("still finds text that really contains an underscore or percent sign", async () => {
+    await book("Sam Rivera", { email: "sam_rivera@example.com" });
+    await book("Samxrivera", { email: "samxrivera@example.com" });
+    await book("100% Kicks");
+    expect(await names({ q: "sam_rivera" })).toEqual(["Sam Rivera"]);
+    expect(await names({ q: "100%" })).toEqual(["100% Kicks"]);
   });
 
   it("filters by the derived Order status", async () => {

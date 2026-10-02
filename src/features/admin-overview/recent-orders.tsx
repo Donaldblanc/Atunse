@@ -1,24 +1,17 @@
 import Link from "next/link";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import type { ItemStatus } from "@/features/orders/domain";
-import type { RecentOrder } from "./get-admin-overview";
+import { bookedDay, type RecentOrder } from "./get-admin-overview";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 import { PairThumb } from "./pair-thumb";
 import { RecentOrderMenu } from "./recent-order-menu";
 import { STATUS_TONE } from "./status-tone";
 
-const bookedDay = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "America/New_York",
-});
-
 /**
  * The latest bookings (design: Recent Orders). Each row opens its Order's
  * detail dialog through the reference, a real link stretched over the row
  * (so it works without JavaScript and can be opened in a new tab). The "..."
- * menu opens it too, and can mark a Deposit paid or cancel the Order.
+ * menu opens it too, and can mark a pending Deposit or Balance paid or cancel the Order.
  */
 export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; selection: OverviewSelection }) {
   if (orders.length === 0) return <p className="ov-empty">No bookings yet.</p>;

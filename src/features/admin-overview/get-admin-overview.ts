@@ -70,6 +70,9 @@ export interface ScheduledVisit {
   time: string;
 }
 
+/** The day an Order was booked, in shop time, e.g. "Sep 30, 2026" (Recent Orders, All orders, Needs Attention). */
+export const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
+
 /** A visit's clock time in shop time, e.g. "9:30 AM". */
 export const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
 

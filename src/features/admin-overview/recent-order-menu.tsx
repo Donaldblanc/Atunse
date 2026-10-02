@@ -68,8 +68,8 @@ export function RecentOrderMenu({
         <span aria-hidden="true">…</span>
       </button>
       {open && (
-        <div className="ro-menu-panel" id={panelId}>
-          <Link className="ro-menu-item" href={openHref} scroll={false}>
+        <div className="admin-popover ro-menu-panel" id={panelId}>
+          <Link className="admin-menu-item ro-menu-item" href={openHref} scroll={false}>
             Open order
           </Link>
           {pendingPayment &&
@@ -77,24 +77,24 @@ export function RecentOrderMenu({
               <button
                 key="confirm-paid"
                 type="button"
-                className="ro-menu-item"
+                className="admin-menu-item ro-menu-item"
                 onClick={() => run(() => confirmPaymentAction(pendingPayment.id, pendingPayment.method, paidKey))}
                 disabled={pending}
               >
                 {pending ? "Saving…" : `Confirm ${PAYMENT_METHOD_LABELS[pendingPayment.method]} ${pendingPayment.kind === "BALANCE" ? "balance" : "deposit"} received`}
               </button>
             ) : (
-              <button key="ask-paid" type="button" className="ro-menu-item" onClick={() => setAsking("paid")} disabled={pending}>
+              <button key="ask-paid" type="button" className="admin-menu-item ro-menu-item" onClick={() => setAsking("paid")} disabled={pending}>
                 Mark Paid
               </button>
             ))}
           {canCancel &&
             (asking === "cancel" ? (
-              <button key="confirm-cancel" type="button" className="ro-menu-item" data-tone="danger" onClick={() => run(() => cancelOrderAction(orderId, cancelKey))} disabled={pending}>
+              <button key="confirm-cancel" type="button" className="admin-menu-item ro-menu-item" data-tone="danger" onClick={() => run(() => cancelOrderAction(orderId, cancelKey))} disabled={pending}>
                 {pending ? "Cancelling…" : "Confirm cancel order"}
               </button>
             ) : (
-              <button key="ask-cancel" type="button" className="ro-menu-item" data-tone="danger" onClick={() => setAsking("cancel")} disabled={pending}>
+              <button key="ask-cancel" type="button" className="admin-menu-item ro-menu-item" data-tone="danger" onClick={() => setAsking("cancel")} disabled={pending}>
                 Cancel order
               </button>
             ))}
