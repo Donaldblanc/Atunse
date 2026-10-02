@@ -82,7 +82,7 @@ export function completionHold(order: CompletionOrder): string | null {
   const due = balanceDue(order);
   if (due && due.cents <= 0) return null;
   const allReady = livePairs(order).every((item) => item.status === "READY_FOR_PICKUP_SHIPPING" || item.status === "COMPLETED");
-  return allReady ? "Balance not collected yet: mark it received in Pending Payments first." : "Collected once every pair is ready; the Balance is due then.";
+  return allReady ? "No Balance recorded yet: create it in this order's Payment section." : "Collected once every pair is ready; the Balance is due then.";
 }
 
 export function adminStatusMoves(

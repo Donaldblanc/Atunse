@@ -438,6 +438,16 @@ export interface OrderRepository {
    */
   bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
 
+  /**
+   * Creates the Order's PENDING Balance when every live pair is Ready for
+   * Drop-Off/Shipping (or Completed), a Balance is owed (more than 0) and none
+   * exists (planBalance). It covers Orders that were ready before Balances
+   * existed. Same Order lock and key as the transition that normally creates
+   * it, so it is idempotent: returns false, having written nothing, when
+   * there is nothing to create. Throws OrderNotFoundError.
+   */
+  ensureBalance(orderId: string): Promise<boolean>;
+
   /** The latest `limit` Notifications for every admin (recipient null), newest first, with how many are unread in all. */
   listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }>;
 

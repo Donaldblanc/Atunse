@@ -270,6 +270,14 @@ export class PrismaOrderRepository implements OrderRepository {
     });
   }
 
+  async ensureBalance(orderId: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      if (!(await tx.order.findUnique({ where: { id: orderId }, select: { id: true } }))) throw new OrderNotFoundError(orderId);
+      await lockOrder(tx, orderId);
+      return this.settleBalance(tx, orderId, true);
+    });
+  }
+
   async listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }> {
     const where = { recipientAccountId: null };
     const [rows, unreadCount] = await Promise.all([
@@ -384,25 +392,26 @@ export class PrismaOrderRepository implements OrderRepository {
   }
 
   /** Applies planBalance (domain.ts) to the Order as this transaction now sees it. */
-  private async settleBalance(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+  private async settleBalance(tx: Prisma.TransactionClient, orderId: string, createOnly = false): Promise<boolean> {
     const row = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
     const change = planBalance(toDomainOrder(row));
+    if (createOnly && change.type !== "create") return false;
     switch (change.type) {
       case "create":
         // The fixed key makes this idempotent; a concurrent transition that got here first wins quietly.
-        await tx.payment.createMany({
+        const made = await tx.payment.createMany({
           data: [{ orderId, kind: "BALANCE", method: change.method, amountCents: change.amount.cents, idempotencyKey: balanceKey(orderId) }],
           skipDuplicates: true,
         });
-        return;
+        return made.count > 0;
       case "update":
         await tx.payment.updateMany({ where: { id: change.paymentId, status: "PENDING" }, data: { amountCents: change.amount.cents } });
-        return;
+        return false;
       case "cancel":
         await tx.payment.updateMany({ where: { id: change.paymentId, status: "PENDING" }, data: { status: "FAILED", failureReason: change.reason } });
-        return;
+        return false;
       case "none":
-        return;
+        return false;
     }
   }
 

@@ -81,6 +81,12 @@ describe("adminStatusMoves", () => {
       expect(result.held).toMatch(/^Balance not collected yet/);
     });
 
+    it("says so when every pair is ready and a Balance is owed but none was recorded", () => {
+      const result = completed(orderOf([pay("DEPOSIT", "RECEIVED")], [ready]));
+      expect(result.moves).toEqual(["CANCELLED"]);
+      expect(result.held).toBe("No Balance recorded yet: create it in this order's Payment section.");
+    });
+
     it("allows Completed once the Balance is RECEIVED", () => {
       expect(completed(orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "RECEIVED", 4000)], [ready]))).toEqual({ moves: ["COMPLETED", "CANCELLED"], held: null });
     });

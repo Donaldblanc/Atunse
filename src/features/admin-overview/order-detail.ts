@@ -3,6 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import type { CalendarDate } from "@/features/orders/calendar-date";
 import {
   adminStatusMoves,
+  planBalance,
   canTransition,
   FULFILLMENT_LABELS,
   ITEM_STATUSES,
@@ -86,6 +87,8 @@ export interface OrderDetail {
     deposit: Pick<Payment, "method" | "status" | "amount" | "receivedAt"> | null;
     /** The Order's Balance Payment once its pairs are ready to go back, or null before then. */
     balance: (Pick<Payment, "method" | "status" | "amount" | "receivedAt"> & { id: string }) | null;
+    /** What a Balance would be, when one should exist but doesn't (the Order was ready before Balances were recorded); else null. */
+    balanceOwed: Money | null;
     estimate: Money;
     estimateIsMinimum: boolean;
     depositDue: Money;
@@ -168,6 +171,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
           }
         : null,
       balance: balance ? { id: balance.id, method: balance.method, status: balance.status, amount: balance.amount, receivedAt: balance.receivedAt } : null,
+      balanceOwed: missingBalance(order),
       estimate: live.length > 0 ? liveEstimate(order) : order.estimate,
       estimateIsMinimum: order.estimateIsMinimum,
       depositDue: order.deposit,
@@ -193,6 +197,12 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       })),
     },
   };
+}
+
+/** The amount of the Balance the Order is missing, per planBalance, or null when none is missing. */
+function missingBalance(order: Order): Money | null {
+  const change = planBalance(order);
+  return change.type === "create" ? change.amount : null;
 }
 
 function quotedSummary(order: Order): OrderDetail["payment"]["quoted"] {

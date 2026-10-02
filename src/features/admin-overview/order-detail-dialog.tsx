@@ -6,6 +6,7 @@ import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type Payment } from "@/featu
 import { Money } from "@/shared/money/money";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import type { OrderDetail, OrderDetailPair } from "./order-detail";
+import { CreateBalanceButton } from "./create-balance-button";
 import { MarkReceived } from "./mark-received";
 import { OrderEditForm } from "./order-edit-form";
 import { OrderNoteForm } from "./order-note-form";
@@ -267,6 +268,7 @@ export function OrderDetailDialog({
                 </>
               )}
             </dl>
+            {!payment.balance && payment.balanceOwed && <CreateBalanceButton orderId={detail.orderId} amount={payment.balanceOwed.format()} />}
             {payment.balance?.status === "PENDING" && (
               <div className="od-balance-action">
                 <MarkReceived paymentId={payment.balance.id} amount={payment.balance.amount.format()} method={payment.balance.method} label="Mark Received" />

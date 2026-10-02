@@ -217,23 +217,29 @@ export class InMemoryOrderRepository implements OrderRepository {
     return item;
   }
 
+  async ensureBalance(orderId: string): Promise<boolean> {
+    if (!this.orders.has(orderId)) throw new OrderNotFoundError(orderId);
+    return this.settleBalance(orderId, true);
+  }
+
   /** Applies planBalance (domain.ts) to the Order, like the Prisma repository does inside its transaction. */
-  private settleBalance(orderId: string): void {
+  private settleBalance(orderId: string, createOnly = false): boolean {
     const order = this.orders.get(orderId);
-    if (!order) return;
+    if (!order) return false;
     const change = planBalance(order);
+    if (createOnly && change.type !== "create") return false;
     switch (change.type) {
       case "create":
         order.payments.push({ id: fakeId("payment"), kind: "BALANCE", method: change.method, amount: change.amount, status: "PENDING", receivedAt: null, createdAt: new Date() });
-        return;
+        return true;
       case "update":
         Object.assign(order.payments.find((payment) => payment.id === change.paymentId)!, { amount: change.amount });
-        return;
+        return false;
       case "cancel":
         Object.assign(order.payments.find((payment) => payment.id === change.paymentId)!, { status: "FAILED" });
-        return;
+        return false;
       case "none":
-        return;
+        return false;
     }
   }
 

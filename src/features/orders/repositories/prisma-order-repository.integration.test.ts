@@ -1117,4 +1117,23 @@ describe("PrismaOrderRepository Balance Payment (integration)", () => {
     ).rejects.toThrow(CompletionHeldError);
     expect((await prisma.item.findUniqueOrThrow({ where: { id: order.items[0]!.id } })).status).toBe("READY_FOR_PICKUP_SHIPPING");
   });
+
+  it("ensureBalance creates a missing Balance once for an Order that was ready before Balances, and is a no-op otherwise", async () => {
+    const order = await quotedOrder([4000, 6000]);
+    await prisma.item.updateMany({ where: { orderId: order.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } }); // no transition, so no Balance
+    expect(await balanceOf(order.id)).toBeNull();
+
+    expect(await repo.ensureBalance(order.id)).toBe(true);
+    expect(await repo.ensureBalance(order.id)).toBe(false);
+    expect(await balanceOf(order.id)).toMatchObject({ status: "PENDING", method: "CASH", amountCents: 8500, idempotencyKey: `balance:${order.id}` });
+    expect(await prisma.payment.count({ where: { orderId: order.id, kind: "BALANCE" } })).toBe(1);
+
+    const notReady = await quotedOrder([4000]);
+    expect(await repo.ensureBalance(notReady.id)).toBe(false);
+    const covered = await quotedOrder([1500]);
+    await prisma.item.updateMany({ where: { orderId: covered.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } });
+    expect(await repo.ensureBalance(covered.id)).toBe(false);
+    expect(await balanceOf(covered.id)).toBeNull();
+    await expect(repo.ensureBalance("no-such-order")).rejects.toThrow(OrderNotFoundError);
+  });
 });
