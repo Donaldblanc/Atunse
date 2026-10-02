@@ -1,0 +1,124 @@
+/* All orders / Upcoming visits dialogs and the Recent Orders "..." menu (prefixed fo- / ro-). */
+/* The top-bar search form adds no box of its own: .admin-search stays the top bar's flex child. */
+.admin-search-form {
+  display: contents;
+}
+
+.fo {
+  display: grid;
+  gap: 12px;
+}
+
+.fo-search {
+  display: flex;
+  gap: 8px;
+}
+
+.fo-search .att-search-input {
+  flex: 1;
+}
+
+.fo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fo-tabs .att-tab {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.fo-tabs .att-tab[aria-current="page"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.fo-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Recent Orders: the actions cell sits above the row's stretched link. */
+.ro-actions-cell {
+  position: relative;
+  z-index: 2;
+  width: 1%;
+  text-align: right;
+}
+
+.ro-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.ro-menu-button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ro-menu-button:hover,
+.ro-menu-button[aria-expanded="true"] {
+  background: var(--color-muted);
+}
+
+.ro-menu-panel {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 5;
+  display: grid;
+  gap: 4px;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-card);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  text-align: left;
+}
+
+.ro-menu-item {
+  display: block;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+}
+
+.ro-menu-item:hover {
+  background: var(--color-muted);
+}
+
+.ro-menu-item[data-tone="danger"] {
+  color: var(--color-destructive);
+}
+
+.ro-menu-error {
+  margin: 0;
+  padding: 4px 12px;
+  color: var(--color-destructive);
+  font-size: 13px;
+}
+
+/* Let the open menu spill past the table's scroll box. */
+.ov-table-scroll:has(.ro-menu-panel) {
+  overflow: visible;
+}

@@ -50,7 +50,7 @@ export interface RecentOrder {
   services: string;
   status: ItemStatus;
   /** The Order's Deposit Payment, or null if it has none (e.g. a $0 estimate). */
-  deposit: { method: PaymentMethod; status: Payment["status"] } | null;
+  deposit: { id: string; method: PaymentMethod; status: Payment["status"] } | null;
   total: Money;
   totalIsMinimum: boolean;
 }
@@ -189,7 +189,7 @@ async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
     status: orderRollupStatus(order.items),
-    deposit: deposit ? { method: deposit.method, status: deposit.status } : null,
+    deposit: deposit ? { id: deposit.id, method: deposit.method, status: deposit.status } : null,
     total: live.length > 0 ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };

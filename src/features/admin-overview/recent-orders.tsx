@@ -3,6 +3,7 @@ import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/features/orders/dom
 import type { RecentOrder } from "./get-admin-overview";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 import { PairThumb } from "./pair-thumb";
+import { RecentOrderMenu } from "./recent-order-menu";
 import { STATUS_TONE } from "./status-tone";
 
 const bookedDay = new Intl.DateTimeFormat("en-US", {
@@ -15,8 +16,8 @@ const bookedDay = new Intl.DateTimeFormat("en-US", {
 /**
  * The latest bookings (design: Recent Orders). Each row opens its Order's
  * detail dialog through the reference, a real link stretched over the row
- * (so it works without JavaScript and can be opened in a new tab). The
- * design's per-row actions menu has no actions to offer yet (docs/TODO.md).
+ * (so it works without JavaScript and can be opened in a new tab). The "..."
+ * menu opens it too, and can mark a Deposit paid or cancel the Order.
  */
 export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; selection: OverviewSelection }) {
   if (orders.length === 0) return <p className="ov-empty">No bookings yet.</p>;
@@ -34,6 +35,9 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
             <th scope="col">Payment</th>
             <th scope="col" className="ov-num">
               Total
+            </th>
+            <th scope="col">
+              <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
@@ -91,6 +95,15 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
               <td className="ov-num ov-total">
                 {order.total.format()}
                 {order.totalIsMinimum ? "+" : ""}
+              </td>
+              <td className="ro-actions-cell">
+                <RecentOrderMenu
+                  orderId={order.orderId}
+                  reference={order.reference}
+                  openHref={overviewHref(selection, { order: order.orderId })}
+                  pendingDeposit={order.status !== "CANCELLED" && order.deposit?.status === "PENDING" ? { paymentId: order.deposit.id, method: order.deposit.method } : null}
+                  canCancel={order.status !== "CANCELLED" && order.status !== "COMPLETED"}
+                />
               </td>
             </tr>
           ))}

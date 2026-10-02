@@ -185,7 +185,7 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
       totalIsMinimum: true,
     });
     expect(recentOrders[0]!.photo).toEqual({ kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) });
-    expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", status: "PENDING" });
+    expect(recentOrders[1]!.deposit).toEqual({ id: expect.any(String), method: "ZELLE", status: "PENDING" });
   });
 
   it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {

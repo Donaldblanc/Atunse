@@ -15,6 +15,14 @@ describe("overview dialog registry", () => {
   it("opens the low stock panel", () => expect(ids("attention=low-stock")).toEqual(["low-stock"]));
   it("opens the reviews dialog", () => expect(ids("reviews=all")).toEqual(["reviews"]));
   it("ignores an unknown reviews value", () => expect(ids("reviews=x")).toEqual([]));
+  it("opens All orders only for orders=all", () => {
+    expect(ids("orders=all&q=ATU-1001&status=APPROVED&page=2")).toEqual(["all-orders"]);
+    expect(ids("orders=bogus")).toEqual([]);
+  });
+  it("opens Upcoming visits only for visits=upcoming", () => {
+    expect(ids("visits=upcoming")).toEqual(["upcoming-visits"]);
+    expect(ids("visits=x")).toEqual([]);
+  });
   it("renders every match in the page's old order", () =>
     expect(ids("attention=needs-quote&order=x&visit=y&metric=revenue")).toEqual(["metric", "visit", "order", "attention"]));
 });

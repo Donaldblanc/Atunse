@@ -1,4 +1,5 @@
 import "@/styles/admin-theme.css";
+import "@/features/admin-overview/find-orders.css";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -34,12 +35,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
         <div className="admin-body">
           <header className="admin-topbar">
-            {/* Search arrives with the Orders screen, which it searches. */}
-            <label className="admin-search">
-              <MagnifyingGlassIcon size={18} aria-hidden="true" />
-              <span className="sr-only">Search</span>
-              <input type="search" placeholder="Search orders, customers, or reference #…" disabled title="Search arrives with the Orders screen" />
-            </label>
+            {/* A plain GET form: it opens the All orders dialog (/admin?orders=all&q=). */}
+            <form action="/admin" method="get" role="search" className="admin-search-form">
+              <input type="hidden" name="orders" value="all" />
+              <label className="admin-search">
+                <MagnifyingGlassIcon size={18} aria-hidden="true" />
+                <span className="sr-only">Search</span>
+                <input type="search" name="q" maxLength={100} placeholder="Search orders, customers, or reference #…" />
+              </label>
+            </form>
             <NotificationBell />
             <AccountMenu name={OWNER_DISPLAY_NAME} role="Admin" placement="topbar" />
           </header>
