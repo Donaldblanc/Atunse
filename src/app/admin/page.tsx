@@ -4,7 +4,7 @@
 //
 // Booked orders and revenue follow the range picker; the work queues,
 // Recent Orders and Today's Schedule are always "right now". Sections
-// whose data doesn't exist yet (unread messages, low stock, reviews) show
+// whose data doesn't exist yet (unread messages) show
 // sample data from sample-data.ts, tagged "Sample" on the page and tracked
 // in docs/TODO.md until real data replaces it.
 
