@@ -3,7 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import { addDays, calendarDateInShopTime, SHOP_TIMEZONE, shopMidnight } from "@/features/orders/calendar-date";
 import { orderNumber, type Appointment } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
-import { visitTime } from "./get-admin-overview";
+import { isLiveVisit, visitTime } from "./get-admin-overview";
 
 /** How far ahead the Upcoming visits dialog looks, today included. */
 export const UPCOMING_VISIT_DAYS = 14;
@@ -36,7 +36,7 @@ export async function getUpcomingVisits(
   const today = calendarDateInShopTime(now);
   const appointments = await deps.orders.listAppointmentsBetween(shopMidnight(today), shopMidnight(addDays(today, UPCOMING_VISIT_DAYS)));
   return appointments
-    .filter((appointment) => appointment.order.itemStatuses.some((status) => status !== "CANCELLED"))
+    .filter(isLiveVisit)
     .map((appointment) => ({
       appointmentId: appointment.id,
       reference: orderNumber(appointment.order.number),

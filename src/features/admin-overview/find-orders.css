@@ -18,22 +18,11 @@
   flex: 1;
 }
 
-.fo-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.fo-tabs .att-tab {
+/* The status tabs are links (each is a URL), so they take .att-tab's look without its button defaults. */
+a.att-tab {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
-}
-
-.fo-tabs .att-tab[aria-current="page"] {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: #fff;
 }
 
 .fo-pages {

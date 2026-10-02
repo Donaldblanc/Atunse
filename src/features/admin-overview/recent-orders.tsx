@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
+import type { ItemStatus } from "@/features/orders/domain";
 import type { RecentOrder } from "./get-admin-overview";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 import { PairThumb } from "./pair-thumb";
@@ -69,28 +70,7 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
                 </span>
               </td>
               <td>
-                {order.deposit === null ? null : order.deposit.status === "RECEIVED" ? (
-                  <span className="ov-pill" data-tone="green" data-nowrap="true">
-                    Deposit paid
-                  </span>
-                ) : order.deposit.status === "REFUNDED" ? (
-                  <span className="ov-pill" data-tone="muted" data-nowrap="true">
-                    Deposit refunded
-                  </span>
-                ) : order.deposit.status === "FAILED" ? (
-                  <>
-                    <span className="ov-cell-main">{PAYMENT_METHOD_LABELS[order.deposit.method]}</span>
-                    <span className="ov-failed">Failed</span>
-                  </>
-                ) : order.status === "CANCELLED" ? (
-                  // A cancelled Order's unpaid deposit isn't owed, so it isn't chased (nor counted in Pending Payments).
-                  <span className="ov-cell-sub">No deposit due</span>
-                ) : (
-                  <>
-                    <span className="ov-cell-main">{PAYMENT_METHOD_LABELS[order.deposit.method]}</span>
-                    <span className="ov-pending">Pending</span>
-                  </>
-                )}
+                <DepositCell deposit={order.deposit} orderStatus={order.status} />
               </td>
               <td className="ov-num ov-total">
                 {order.total.format()}
@@ -101,7 +81,7 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
                   orderId={order.orderId}
                   reference={order.reference}
                   openHref={overviewHref(selection, { order: order.orderId })}
-                  pendingDeposit={order.status !== "CANCELLED" && order.deposit?.status === "PENDING" ? { paymentId: order.deposit.id, method: order.deposit.method } : null}
+                  pendingPayment={order.pendingPayment}
                   canCancel={order.status !== "CANCELLED" && order.status !== "COMPLETED"}
                 />
               </td>
@@ -110,5 +90,32 @@ export function RecentOrders({ orders, selection }: { orders: RecentOrder[]; sel
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** An Order row's Deposit column (Recent Orders, All orders). */
+export function DepositCell({ deposit, orderStatus }: { deposit: RecentOrder["deposit"]; orderStatus: ItemStatus }) {
+  if (deposit === null) return null;
+  if (deposit.status === "RECEIVED") {
+    return (
+      <span className="ov-pill" data-tone="green" data-nowrap="true">
+        Deposit paid
+      </span>
+    );
+  }
+  if (deposit.status === "REFUNDED") {
+    return (
+      <span className="ov-pill" data-tone="muted" data-nowrap="true">
+        Deposit refunded
+      </span>
+    );
+  }
+  // A cancelled Order's unpaid deposit isn't owed, so it isn't chased (nor counted in Pending Payments).
+  if (deposit.status === "PENDING" && orderStatus === "CANCELLED") return <span className="ov-cell-sub">No deposit due</span>;
+  return (
+    <>
+      <span className="ov-cell-main">{PAYMENT_METHOD_LABELS[deposit.method]}</span>
+      {deposit.status === "FAILED" ? <span className="ov-failed">Failed</span> : <span className="ov-pending">Pending</span>}
+    </>
   );
 }

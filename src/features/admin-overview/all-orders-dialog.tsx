@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ITEM_STATUSES, ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type ItemStatus } from "@/features/orders/domain";
+import { ITEM_STATUSES, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import "./find-orders.css";
 import { overviewHref, type OverviewSelection } from "./overview-range";
+import { DepositCell } from "./recent-orders";
 import type { OrderList } from "./search-orders";
 import { STATUS_TONE } from "./status-tone";
 
@@ -43,7 +44,7 @@ export function AllOrdersDialog({ list, selection }: { list: OrderList; selectio
           </button>
         </form>
 
-        <nav className="fo-tabs" aria-label="Order status">
+        <nav className="att-tabs" aria-label="Order status">
           <Link className="att-tab" href={hrefFor({ status: null })} scroll={false} aria-current={query.status === null ? "page" : undefined}>
             All
           </Link>
@@ -91,7 +92,9 @@ export function AllOrdersDialog({ list, selection }: { list: OrderList; selectio
                         {ITEM_STATUS_LABELS[row.status]}
                       </span>
                     </td>
-                    <td>{row.deposit ? `${PAYMENT_METHOD_LABELS[row.deposit.method]}, ${row.deposit.status.toLowerCase()}` : null}</td>
+                    <td>
+                      <DepositCell deposit={row.deposit} orderStatus={row.status} />
+                    </td>
                     <td className="ov-num ov-total">
                       {row.total.format()}
                       {row.totalIsMinimum ? "+" : ""}

@@ -4,16 +4,16 @@ import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 import { usePopover } from "@/shared/ui/use-popover";
 import { cancelOrderAction } from "./cancel-order-action";
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
+import { PAYMENT_METHOD_LABELS, type PaymentKind, type PaymentMethod } from "@/features/orders/domain";
 import { confirmPaymentAction } from "./confirm-payment-action";
 import "./find-orders.css";
 
 type Asking = "paid" | "cancel" | null;
 
 /**
- * The "..." menu on a Recent Orders row: Open order, Mark Paid (a Deposit is
- * waiting; confirmed as booked, by its own method: Pending Payments is where
- * the owner picks another, or settles a Balance) and Cancel order. Mark Paid and Cancel are money or customer
+ * The "..." menu on a Recent Orders row: Open order, Mark Paid (a Deposit or
+ * Balance is waiting; confirmed by its own method, and Pending Payments is
+ * where the owner picks another) and Cancel order. Mark Paid and Cancel are money or customer
  * emails, so the first click only asks; the confirm button is a different
  * element (keyed apart), or the click that swaps them would also submit.
  * Each key is made once per row, so a double click settles once (ADR-0012).
@@ -22,14 +22,14 @@ export function RecentOrderMenu({
   orderId,
   reference,
   openHref,
-  pendingDeposit,
+  pendingPayment,
   canCancel,
 }: {
   orderId: string;
   reference: string;
   openHref: string;
-  /** The Deposit waiting on the owner, or null when none is. */
-  pendingDeposit: { paymentId: string; method: PaymentMethod } | null;
+  /** The Deposit, else the Balance, waiting on the owner, or null when none is. */
+  pendingPayment: { id: string; kind: PaymentKind; method: PaymentMethod } | null;
   canCancel: boolean;
 }) {
   const { open, setOpen, toggle, rootRef } = usePopover<HTMLDivElement>();
@@ -72,16 +72,16 @@ export function RecentOrderMenu({
           <Link className="ro-menu-item" href={openHref} scroll={false}>
             Open order
           </Link>
-          {pendingDeposit &&
+          {pendingPayment &&
             (asking === "paid" ? (
               <button
                 key="confirm-paid"
                 type="button"
                 className="ro-menu-item"
-                onClick={() => run(() => confirmPaymentAction(pendingDeposit.paymentId, pendingDeposit.method, paidKey))}
+                onClick={() => run(() => confirmPaymentAction(pendingPayment.id, pendingPayment.method, paidKey))}
                 disabled={pending}
               >
-                {pending ? "Saving…" : `Confirm ${PAYMENT_METHOD_LABELS[pendingDeposit.method]} deposit received`}
+                {pending ? "Saving…" : `Confirm ${PAYMENT_METHOD_LABELS[pendingPayment.method]} ${pendingPayment.kind === "BALANCE" ? "balance" : "deposit"} received`}
               </button>
             ) : (
               <button key="ask-paid" type="button" className="ro-menu-item" onClick={() => setAsking("paid")} disabled={pending}>

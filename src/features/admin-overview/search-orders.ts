@@ -1,10 +1,10 @@
 import { z } from "zod";
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
-import { ITEM_STATUSES, liveEstimate, livePairs, orderNumber, orderRollupStatus, type ItemStatus, type Payment, type PaymentMethod } from "@/features/orders/domain";
-import type { OrderSearchRepository } from "@/features/orders/repositories/order-search-repository";
+import { ITEM_STATUSES, orderNumber, type ItemStatus } from "@/features/orders/domain";
+import type { OrderSearchRepository, OrderSearchRow } from "@/features/orders/repositories/order-search-repository";
 import type { Money } from "@/shared/money/money";
-import { servicesSummary } from "./get-admin-overview";
+import { orderRowFigures } from "./get-admin-overview";
 
 export const ORDERS_PAGE_SIZE = 10;
 const MAX_QUERY_LENGTH = 100;
@@ -49,7 +49,7 @@ export interface OrderListRow {
   services: string;
   /** The derived Order status (orderRollupStatus), the same one Recent Orders shows. */
   status: ItemStatus;
-  deposit: { method: PaymentMethod; status: Payment["status"] } | null;
+  deposit: OrderSearchRow["deposit"];
   total: Money;
   totalIsMinimum: boolean;
 }
@@ -88,22 +88,15 @@ export async function searchOrders(deps: { orderSearch: OrderSearchRepository },
     found = await find(page);
   }
 
-  const rows = found.rows.map((order): OrderListRow => {
-    const items = order.items.map((item) => ({ ...item }));
-    const live = livePairs({ items });
-    const pairs = live.length > 0 ? live : items;
-    return {
+  const rows = found.rows.map(
+    (order): OrderListRow => ({
       orderId: order.orderId,
       reference: orderNumber(order.number),
       customerName: order.contactName,
       bookedAt: order.bookedAt,
-      pairCount: pairs.length,
-      services: servicesSummary(pairs.map((item) => item.serviceIds)),
-      status: orderRollupStatus(items),
+      ...orderRowFigures(order),
       deposit: order.deposit,
-      total: live.length > 0 ? liveEstimate({ estimate: order.estimate, items }) : order.estimate,
-      totalIsMinimum: order.estimateIsMinimum,
-    };
-  });
+    }),
+  );
   return { query, rows, total: found.total, page, pageCount };
 }
