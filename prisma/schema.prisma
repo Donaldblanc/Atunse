@@ -541,6 +541,8 @@ model Message {
   channel         MessageChannel @default(IN_APP)
   body            String
   readAt          DateTime? // when the other side read it
+  // Set on an admin reply so a replayed submit stores and emails nothing twice (ADR-0012).
+  idempotencyKey  String?        @unique
 
   attachments MessageAttachment[]
 
