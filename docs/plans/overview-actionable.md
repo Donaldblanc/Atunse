@@ -123,7 +123,7 @@ New `MessageRepository`, with Prisma and in-memory versions.
   - stores an ADMIN `EMAIL` Message;
   - bumps `lastMessageAt`;
   - then emails the Conversation's Account email.
-  - The body is plain text, 1–5000 characters, and HTML-escaped in the email.
+  - The body is plain text, 1–5000 characters, and sent as plain text (`text:`), so no escaping.
   - If the send fails, the owner is told and it is logged through `redactForLog`.
 - Delete `sample-data.ts` and the "Sample" tag.
 

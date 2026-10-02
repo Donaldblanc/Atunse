@@ -88,7 +88,8 @@ prove it against.
   - One rule for cancelled pairs across every figure (Total Orders, revenue, the trend, Orders by Service, Recent Orders): they drop out. An Order counts at its estimate less its cancelled pairs' share (`liveEstimate`), and a fully cancelled Order not at all.
   - The work queues are always "right now": pairs needing a quote, Orders whose Deposit Payment is still PENDING (confirming a payment marks it RECEIVED), and pairs Ready for Drop-Off/Shipping.
   - Recent Orders (the five latest, with the first pair's photo through a short-lived view link, an Order status rolled up from its pairs, and the deposit's status) and Today's Schedule (today's scheduled collections and returns, read from the Calendar's Appointments, so a rescheduled visit shows on its new day).
-  - Unread Messages, Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
+  - Unread Messages is real: the count of customer messages not yet read in unarchived Conversations, opening a dialog (`?attention=messages`) with each thread, Mark read and an emailed Reply.
+  - Low Stock Items and Recent Reviews show **sample data** (`src/features/admin-overview/sample-data.ts`, tagged "Sample" on the page): nothing records them yet. `docs/TODO.md` ("Admin Overview: replace sample data") lists what replaces each.
   - **Dialogs** (#121), each opened by a URL param on `/admin`:
     - Date range: presets plus a custom calendar.
     - Metric details: a daily chart plus a status breakdown.
