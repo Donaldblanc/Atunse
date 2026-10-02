@@ -2,6 +2,7 @@
 // import here (ADR-0003/0011: Prisma stays inside repositories).
 
 import { Money } from "@/shared/money/money";
+import { RUSH_FEE_CENTS } from "./service-catalog";
 
 export const ITEM_STATUSES = [
   "REQUEST_SUBMITTED",
@@ -57,10 +58,36 @@ export function isStepBack(from: ItemStatus, to: ItemStatus): boolean {
  *   is Quote Sent without a price or Approved without a recorded yes.
  * - Past Approved while the Order's Deposit is still PENDING: the Order is
  *   held until the owner marks it received (ADR-0002).
+ * - Completed while money is outstanding (completionHold): allowed only
+ *   once the Balance is RECEIVED, or when nothing is owed beyond the
+ *   Deposit (ADR-0002).
  */
+/** What completionHold and adminStatusMoves read about an Order. */
+export interface CompletionOrder {
+  rush: boolean;
+  items: { status: ItemStatus; price: Money | null }[];
+  payments: PaymentFigures[];
+}
+
+/**
+ * Why a pair can't be Completed yet, or null when it can: the Order's
+ * Balance exists and is RECEIVED, or every live pair is quoted and the
+ * quoted total less the Deposit is 0 or less (no Balance is owed).
+ * Otherwise money is outstanding: a PENDING Balance, or pairs not all
+ * ready yet (the Balance is due once they are).
+ */
+export function completionHold(order: CompletionOrder): string | null {
+  const balance = order.payments.find((payment) => payment.kind === "BALANCE" && payment.status !== "FAILED" && payment.status !== "REFUNDED");
+  if (balance) return balance.status === "RECEIVED" ? null : "Balance not collected yet: mark it received in Pending Payments first.";
+  const due = balanceDue(order);
+  if (due && due.cents <= 0) return null;
+  const allReady = livePairs(order).every((item) => item.status === "READY_FOR_PICKUP_SHIPPING" || item.status === "COMPLETED");
+  return allReady ? "No Balance recorded yet: create it in this order's Payment section." : "Collected once every pair is ready; the Balance is due then.";
+}
+
 export function adminStatusMoves(
   item: { status: ItemStatus },
-  order: { payments: { kind: PaymentKind; status: Payment["status"] }[] },
+  order: CompletionOrder,
 ): { moves: ItemStatus[]; held: string | null } {
   let held: string | null = null;
   const moves = ITEM_STATUSES.filter((next) => {
@@ -70,6 +97,13 @@ export function adminStatusMoves(
       if (next === "CANCELLED") return true;
       held = "Waiting on the deposit: mark it paid in Pending Payments first.";
       return false;
+    }
+    if (next === "COMPLETED") {
+      const reason = completionHold(order);
+      if (reason) {
+        held = reason;
+        return false;
+      }
     }
     return true;
   });
@@ -284,4 +318,123 @@ export interface AuditEntry {
 /** How customer-facing copy refers to an Order's sneakers: "your pair" or "your 3 pairs". */
 export function pairsPhrase(pairCount: number): string {
   return pairCount === 1 ? "your pair" : `your ${pairCount} pairs`;
+}
+
+/**
+ * The Order's price once every pair that's still live is quoted, or null
+ * while any isn't. Rush is an Order-level charge on top of the pairs. The
+ * quote email and the Balance Payment both use this one formula.
+ */
+export function quotedTotal(order: { rush: boolean; items: { status: ItemStatus; price: Money | null }[] }): Money | null {
+  const live = livePairs(order);
+  if (live.length === 0 || live.some((item) => item.price === null)) return null;
+  const pairs = live.reduce((sum, item) => sum.add(item.price!), Money.zero());
+  return order.rush ? pairs.add(Money.fromCents(RUSH_FEE_CENTS)) : pairs;
+}
+
+/** The Balance Payment's idempotency key: one per Order (`@@unique([orderId, idempotencyKey])`). */
+export function balanceKey(orderId: string): string {
+  return `balance:${orderId}`;
+}
+
+type PaymentFigures = Pick<Payment, "kind" | "status" | "amount" | "method">;
+
+/** The Deposit that counts against the quoted total: the Order's Deposit unless it failed or was refunded. */
+function standingDeposit(order: { payments: PaymentFigures[] }): PaymentFigures | null {
+  return order.payments.find((payment) => payment.kind === "DEPOSIT" && payment.status !== "FAILED" && payment.status !== "REFUNDED") ?? null;
+}
+
+/** What's still to pay once the whole Order is quoted: the quoted total less the Deposit (CONTEXT.md: Balance). Null while a live pair is unquoted. */
+export function balanceDue(order: Parameters<typeof quotedTotal>[0] & { payments: PaymentFigures[] }): Money | null {
+  const total = quotedTotal(order);
+  return total ? total.subtract(standingDeposit(order)?.amount ?? Money.zero()) : null;
+}
+
+/** What the Balance Payment needs after an Order's pairs changed: nothing, a new row, a new amount, or to be dropped. */
+export type BalanceChange =
+  | { type: "none" }
+  | { type: "create"; amount: Money; method: PaymentMethod }
+  | { type: "update"; paymentId: string; amount: Money }
+  | { type: "cancel"; paymentId: string; reason: string };
+
+/**
+ * ADR-0002's Balance rules, applied by the repository inside the
+ * transaction of every status change:
+ * - Created once every live pair is Ready for Drop-Off/Shipping (or already
+ *   Completed), as a PENDING Payment for balanceDue, with the Deposit's
+ *   method. Nothing is created when the amount is 0 or less.
+ * - While PENDING: follows a cancelled pair's smaller total, and is dropped
+ *   (FAILED, with the reason) when the Order is cancelled or nothing is left to pay.
+ * - Once received (or dropped) it is left alone.
+ */
+export function planBalance(order: Parameters<typeof quotedTotal>[0] & { payments: (PaymentFigures & { id: string })[] }): BalanceChange {
+  const existing = order.payments.find((payment) => payment.kind === "BALANCE");
+  const live = livePairs(order);
+  if (existing) {
+    if (existing.status !== "PENDING") return { type: "none" };
+    if (live.length === 0) return { type: "cancel", paymentId: existing.id, reason: "The order was cancelled." };
+    const due = balanceDue(order);
+    if (!due) return { type: "none" };
+    if (due.cents <= 0) return { type: "cancel", paymentId: existing.id, reason: "Nothing is left to pay." };
+    return due.cents === existing.amount.cents ? { type: "none" } : { type: "update", paymentId: existing.id, amount: due };
+  }
+  if (live.length === 0 || !live.every((item) => item.status === "READY_FOR_PICKUP_SHIPPING" || item.status === "COMPLETED")) return { type: "none" };
+  const due = balanceDue(order);
+  if (!due || due.cents <= 0) return { type: "none" };
+  return { type: "create", amount: due, method: standingDeposit(order)?.method ?? "ZELLE" };
+}
+
+/** The audit reasons (metadata.reason on a STATUS_TRANSITION) for pairs the owner moved along by completing a visit. */
+export const COLLECTION_COMPLETED = "COLLECTION_COMPLETED";
+export const RETURN_COMPLETED = "RETURN_COMPLETED";
+
+export interface VisitMove {
+  itemId: string;
+  from: ItemStatus;
+  to: ItemStatus;
+}
+
+export interface VisitStay {
+  itemId: string;
+  status: ItemStatus;
+  reason: string;
+}
+
+/** What completing a visit did to the Order's pairs: who moved, and who stayed and why. */
+export interface VisitPlan {
+  moves: VisitMove[];
+  stays: VisitStay[];
+}
+
+/**
+ * Completing a Collection moves each live pair in Awaiting Sneakers to In
+ * Progress; completing a Return moves each pair in Ready for Drop-Off/Shipping
+ * to Completed. A move that adminStatusMoves holds (the Deposit, the Balance)
+ * stays put, as does a pair that hasn't reached the step the visit moves
+ * from. Pairs already past it, or cancelled, are neither.
+ */
+export function planVisitMoves(
+  kind: Appointment["kind"],
+  order: CompletionOrder & { items: { id: string }[] },
+): VisitPlan {
+  const from: ItemStatus = kind === "COLLECTION" ? "AWAITING_SNEAKERS" : "READY_FOR_PICKUP_SHIPPING";
+  const to: ItemStatus = kind === "COLLECTION" ? "IN_PROGRESS" : "COMPLETED";
+  const plan: VisitPlan = { moves: [], stays: [] };
+  for (const item of order.items) {
+    if (item.status === "CANCELLED" || ITEM_STATUSES.indexOf(item.status) > ITEM_STATUSES.indexOf(from)) continue;
+    if (item.status === from) {
+      const { moves, held } = adminStatusMoves(item, order);
+      if (moves.includes(to)) plan.moves.push({ itemId: item.id, from, to });
+      else plan.stays.push({ itemId: item.id, status: item.status, reason: held ?? "This step is on hold." });
+      continue;
+    }
+    const reason =
+      kind === "RETURN"
+        ? "Not ready to go back yet."
+        : ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf("APPROVED")
+          ? "Not approved yet."
+          : (adminStatusMoves(item, order).held ?? "Not moved to Awaiting Sneakers yet.");
+    plan.stays.push({ itemId: item.id, status: item.status, reason });
+  }
+  return plan;
 }

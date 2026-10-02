@@ -2,7 +2,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { adminStatusMoves, canTransition, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
-import { ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
+import { CompletionHeldError, ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { redactForLog } from "@/shared/logging/redact";
 import { EMAILED_STATUSES, statusChangeEmail } from "../status-emails";
 
@@ -62,23 +62,31 @@ export async function transitionItemStatus(
   if (current.status === input.fromStatus) {
     // Confirming the payment settles the Deposit in the same write, so it can't be what holds the move (ADR-0002).
     const payments = receivesDeposit ? before.payments.map((payment) => (payment.kind === "DEPOSIT" ? { ...payment, status: "RECEIVED" as const } : payment)) : before.payments;
-    const { moves, held } = adminStatusMoves(current, { payments });
+    const { moves, held } = adminStatusMoves(current, { ...before, payments });
     if (!moves.includes(input.toStatus)) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, held);
   }
 
-  const updated = await deps.orders.transitionItemStatus({
-    itemId: input.itemId,
-    toStatus: input.toStatus,
-    entry: {
-      action: input.action,
-      fromStatus: input.fromStatus,
+  let updated: Item | null;
+  try {
+    updated = await deps.orders.transitionItemStatus({
+      itemId: input.itemId,
       toStatus: input.toStatus,
-      actorAccountId: actingUser.accountId,
-      idempotencyKey: input.idempotencyKey ?? null,
-    },
-    // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
-    receivesDeposit,
-  });
+      entry: {
+        action: input.action,
+        fromStatus: input.fromStatus,
+        toStatus: input.toStatus,
+        actorAccountId: actingUser.accountId,
+        idempotencyKey: input.idempotencyKey ?? null,
+      },
+      // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
+      receivesDeposit,
+      // The hold is checked again on the locked Order, in case a payment or pair changed since it was read here.
+      enforceCompletionHold: true,
+    });
+  } catch (err) {
+    if (err instanceof CompletionHeldError) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, err.reason);
+    throw err;
+  }
 
   // updated === null means this idempotency key was already applied
   // (ADR-0012: retry-safe) — treat as success, but don't re-notify.

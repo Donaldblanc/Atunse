@@ -10,7 +10,7 @@
 // is cancelled" and "quoted so far" read the new state.
 
 import { Money } from "@/shared/money/money";
-import { livePairs, orderNumber, type Item, type ItemStatus, type Order } from "./domain";
+import { livePairs, orderNumber, quotedTotal, type Item, type ItemStatus, type Order } from "./domain";
 import { RUSH_FEE_CENTS } from "./service-catalog";
 
 export interface StatusEmail {
@@ -25,13 +25,7 @@ function pairName(order: Order, item: Item): string {
   return `Pair ${order.items.indexOf(item) + 1}${title ? ` (${title})` : ""}`;
 }
 
-/** The Order's price once every pair that's still live is quoted, or null while any isn't. Rush is an Order-level charge on top of the pairs. */
-export function quotedTotal(order: Order): Money | null {
-  const live = livePairs(order);
-  if (live.length === 0 || live.some((item) => item.price === null)) return null;
-  const pairs = live.reduce((sum, item) => sum.add(item.price!), Money.zero());
-  return order.rush ? pairs.add(Money.fromCents(RUSH_FEE_CENTS)) : pairs;
-}
+export { quotedTotal };
 
 function depositLine(order: Order): string | null {
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");

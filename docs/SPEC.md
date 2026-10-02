@@ -78,7 +78,7 @@ prove it against.
 - Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
 - `FileStorage` adapter (ADR-0004 addendum): S3 presigned POST, plus a local-disk driver for development. Production uploads to the Neon bucket `atunse-images` (verified 2026-09-28).
-- `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key. It applies `adminStatusMoves`: Quote Sent and Approved are reached only through Send Quote and Customer approved, and a pair can't pass Approved while its Deposit is pending (the API answers 409). The one backward move is Under Review → Request Submitted (#122).
+- `transitionItemStatus` + `POST /api/v1/admin/items/:itemId/transitions`: admin-only, validated against the Status Pipeline, audited, and idempotent when the caller passes a key. It applies `adminStatusMoves`: Quote Sent and Approved are reached only through Send Quote and Customer approved, a pair can't pass Approved while its Deposit is pending, and can't be Completed while a Balance is owed and not received, or before every pair is ready (the API answers 409 for each). The one backward move is Under Review → Request Submitted (#122).
 - **Customer Accounts (ADR-0014).** Every booking creates or uses a Customer Account (`orders.accountId` is required). With `FEATURE_CUSTOMER_SIGN_IN_ENABLED` on, a signed-out booking whose email already has an Account gets the booking flow's email-code login screen (`POST /api/v1/auth/code/request` and `/verify`). With it off (the default), that booking attaches to the existing Account.
 - **Photo viewing**: `GET /api/v1/orders/:orderId/photos` issues 5-minute presigned GET links to the Order's Account owner or an admin only. A photo key can belong to only one Order.
 - Notifications use Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set, otherwise the console logger (where sign-in codes show up in development).
@@ -95,7 +95,7 @@ prove it against.
     - Metric details: a daily chart plus a status breakdown.
     - Order detail: customer, pairs, a timeline from the audit log, payment, notes, Update Status.
     - Schedule Item: Mark as Completed, Contact Customer.
-    - Needs Attention: Pending Payments with **Mark Paid** (`confirmDeposit`: Deposit RECEIVED plus a `MANUAL_PAYMENT_CONFIRMED` audit entry, without moving any pair), Ready to Return, Needs a Quote.
+    - Needs Attention: Pending Payments (Deposits and Balances) with **Mark Paid** (`confirmPayment`: the Payment RECEIVED plus a `MANUAL_PAYMENT_CONFIRMED` audit entry, without moving any pair), Ready to Return, Needs a Quote.
   - **Order flows** (#123, landed by #125):
     - Send Quote: price, confirm step, customer email.
     - Customer approved, recorded by DJ.

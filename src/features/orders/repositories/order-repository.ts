@@ -4,7 +4,7 @@
 
 import type { Money } from "@/shared/money/money";
 import type { OrderDetailsInput } from "../order-details";
-import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentMethod, TermsAcceptance } from "../domain";
+import type { Appointment, AuditEntry, Fulfillment, Item, ItemStatus, Order, PaymentKind, PaymentMethod, TermsAcceptance, VisitPlan } from "../domain";
 
 /**
  * Who the Order belongs to: an existing Customer Account, or a new one the
@@ -54,6 +54,14 @@ export class BundleNotFoundError extends Error {
   constructor(readonly bundleId: string) {
     super("That bundle is no longer offered.");
     this.name = "BundleNotFoundError";
+  }
+}
+
+/** The Completed move was refused inside the transaction: money is still outstanding (completionHold in domain.ts). Nothing was written. */
+export class CompletionHeldError extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = "CompletionHeldError";
   }
 }
 
@@ -197,27 +205,37 @@ export class AppointmentCancelledError extends Error {
   }
 }
 
-/** Nothing to confirm: the Order has no PENDING Deposit on a live pair (already received, or fully cancelled). Nothing was written. */
-export class NoPendingDepositError extends Error {
-  constructor(readonly orderId: string) {
-    super("This order has no deposit waiting to be confirmed.");
-    this.name = "NoPendingDepositError";
+/** Nothing to confirm: the Payment isn't PENDING on an Order with a live pair (already received, dropped, or fully cancelled). Nothing was written. */
+export class NoPendingPaymentError extends Error {
+  constructor(readonly paymentId: string) {
+    super("This payment isn't waiting to be confirmed.");
+    this.name = "NoPendingPaymentError";
   }
 }
 
-/** One row of Pending Payments: an Order whose Deposit is still PENDING. */
-export interface AwaitingDepositOrder {
+/** One row of Pending Payments: a Deposit or Balance that is still PENDING. */
+export interface AwaitingPaymentRow {
+  paymentId: string;
+  kind: Extract<PaymentKind, "DEPOSIT" | "BALANCE">;
   orderId: string;
   number: number;
   contactName: string;
   createdAt: Date;
-  deposit: { method: PaymentMethod; amount: Money };
+  payment: { method: PaymentMethod; amount: Money };
 }
 
-export interface AwaitingDeposits {
-  orders: number;
-  deposits: Money;
+/** The Deposits and Balances still PENDING: how many, what they add up to, and how many by method. */
+export interface AwaitingPayments {
+  payments: number;
+  amount: Money;
   byMethod: Record<PaymentMethod, number>;
+}
+
+/** A completed visit and what it did to the Order's pairs (planVisitMoves). A replay moves none. */
+export interface CompletedVisit extends VisitPlan {
+  appointment: Appointment;
+  /** True when the visit was already completed (a replay): nothing was moved this time. */
+  alreadyCompleted: boolean;
 }
 
 /** An owner's note about an Order (Order detail's Notes). */
@@ -269,6 +287,15 @@ export interface OrderRepository {
    *
    * With `price`, the same transaction also sets the Item's quoted price
    * (Approval Gate), so a Quote Sent pair always has one.
+   *
+   * Every write below the Order's row lock (SELECT ... FOR UPDATE), so two
+   * concurrent changes to one Order see each other's result: none is lost
+   * and the Balance is settled from the final state.
+   *
+   * The same transaction also settles the Order's Balance Payment
+   * (planBalance in domain.ts, ADR-0002): created when the last live pair
+   * reaches Ready for Drop-Off/Shipping, kept in step while a pair is
+   * cancelled, dropped when the Order is cancelled.
    */
   transitionItemStatus(params: {
     itemId: string;
@@ -276,6 +303,8 @@ export interface OrderRepository {
     entry: AuditEntry;
     receivesDeposit?: boolean;
     price?: Money;
+    /** With a move to Completed, re-checks completionHold on the locked Order and throws CompletionHeldError. */
+    enforceCompletionHold?: boolean;
   }): Promise<Order["items"][number] | null>;
 
   /** Orders booked (created) in [from, to), oldest first: just what the Overview's figures need. */
@@ -297,10 +326,10 @@ export interface OrderRepository {
   countItemsByStatus(): Promise<Partial<Record<ItemStatus, number>>>;
 
   /**
-   * Deposits still PENDING on Orders with at least one Item not cancelled:
-   * how many, their amounts added up, and how many by method.
+   * Deposits and Balances still PENDING on Orders with at least one Item not
+   * cancelled: how many, their amounts added up, and how many by method.
    */
-  summarizeAwaitingDeposit(): Promise<AwaitingDeposits>;
+  summarizeAwaitingPayments(): Promise<AwaitingPayments>;
 
   /** The notes kept about an Order, oldest first. */
   listOrderNotes(orderId: string): Promise<OrderNote[]>;
@@ -316,35 +345,39 @@ export interface OrderRepository {
   findAppointment(appointmentId: string): Promise<AppointmentWithOrder | null>;
 
   /**
-   * Marks an Appointment COMPLETED, only from SCHEDULED. Already COMPLETED
-   * is success (a double-click or retry changes nothing), so this is
-   * idempotent without a key. It changes the Appointment only: the pairs'
-   * statuses move through transitionItemStatus, never as a side effect.
-   * Throws AppointmentNotFoundError or AppointmentCancelledError, having
-   * written nothing.
+   * Marks an Appointment COMPLETED, only from SCHEDULED, and in the same
+   * transaction moves the Order's pairs along (planVisitMoves): a Collection
+   * takes each Awaiting Sneakers pair to In Progress, a Return each Ready for
+   * Drop-Off/Shipping pair to Completed, each audited as STATUS_TRANSITION
+   * with metadata.reason COLLECTION_COMPLETED / RETURN_COMPLETED. Pairs a
+   * hold applies to stay, and come back in `stays` with why. Already
+   * COMPLETED is success and changes nothing (empty moves and stays), so
+   * this is idempotent without a key. Throws AppointmentNotFoundError or
+   * AppointmentCancelledError, having written nothing.
    */
-  completeAppointment(appointmentId: string): Promise<Appointment>;
+  completeAppointment(params: { appointmentId: string; actorAccountId: string | null }): Promise<CompletedVisit>;
 
   /**
-   * The Orders summarizeAwaitingDeposit counts, oldest booking first: one
-   * row per PENDING Deposit on an Order with a live pair. Same rule as the
-   * summary, so the Pending Payments list and its count always agree.
+   * The Payments summarizeAwaitingPayments counts, oldest booking first: one
+   * row per PENDING Deposit or Balance on an Order with a live pair. Same
+   * rule as the summary, so the Pending Payments list and its count always agree.
    */
-  listAwaitingDeposit(): Promise<AwaitingDepositOrder[]>;
+  listAwaitingPayments(): Promise<AwaitingPaymentRow[]>;
 
   /** Orders with at least one Item in one of `statuses`, oldest booking first. */
   listWithItemsIn(statuses: ItemStatus[]): Promise<Order[]>;
 
   /**
-   * Marks the Order's PENDING Deposit Payment RECEIVED (receivedAt now) and
-   * appends a MANUAL_PAYMENT_CONFIRMED audit entry to each live Item, without
-   * changing any Item's status, all in one transaction (ADR-0002/0012).
-   * Returns false, having written nothing, if `idempotencyKey` was already
-   * applied to this Order (a retry); the caller treats that as success.
-   * Throws NoPendingDepositError when there is no PENDING Deposit to settle
-   * (same rule as listAwaitingDeposit), having written nothing.
+   * Marks a PENDING Deposit or Balance RECEIVED (receivedAt now, `method`
+   * as the owner confirmed it) and appends a MANUAL_PAYMENT_CONFIRMED audit
+   * entry to each of its Order's live Items, without changing any Item's
+   * status, all in one transaction (ADR-0002/0012). Returns false, having
+   * written nothing, if `idempotencyKey` was already applied to this Order
+   * (a retry); the caller treats that as success. Throws
+   * NoPendingPaymentError when the Payment isn't PENDING on an Order with a
+   * live pair (same rule as listAwaitingPayments), having written nothing.
    */
-  confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
+  confirmPayment(params: { paymentId: string; method: PaymentMethod; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean>;
 
   /**
    * Edit Order: writes the contact, address and pair details in one
@@ -404,6 +437,16 @@ export interface OrderRepository {
    * Throws OrderNotFoundError, having written nothing.
    */
   bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }): Promise<{ appointment: Appointment; created: boolean }>;
+
+  /**
+   * Creates the Order's PENDING Balance when every live pair is Ready for
+   * Drop-Off/Shipping (or Completed), a Balance is owed (more than 0) and none
+   * exists (planBalance). It covers Orders that were ready before Balances
+   * existed. Same Order lock and key as the transition that normally creates
+   * it, so it is idempotent: returns false, having written nothing, when
+   * there is nothing to create. Throws OrderNotFoundError.
+   */
+  ensureBalance(orderId: string): Promise<boolean>;
 
   /** The latest `limit` Notifications for every admin (recipient null), newest first, with how many are unread in all. */
   listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }>;

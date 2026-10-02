@@ -6,6 +6,8 @@ import { ITEM_STATUS_LABELS, PAYMENT_METHOD_LABELS, type Payment } from "@/featu
 import { Money } from "@/shared/money/money";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import type { OrderDetail, OrderDetailPair } from "./order-detail";
+import { CreateBalanceButton } from "./create-balance-button";
+import { MarkReceived } from "./mark-received";
 import { OrderEditForm } from "./order-edit-form";
 import { OrderNoteForm } from "./order-note-form";
 import { PairThumb } from "./pair-thumb";
@@ -246,7 +248,32 @@ export function OrderDetailDialog({
                   <dd className="od-muted">None due</dd>
                 </div>
               )}
+              {payment.balance && (
+                <>
+                  <div>
+                    <dt>Balance</dt>
+                    <dd>
+                      {payment.balance.amount.format()} by {PAYMENT_METHOD_LABELS[payment.balance.method]}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Balance status</dt>
+                    <dd>
+                      <span className="ov-pill" data-tone={PAYMENT_STATUS[payment.balance.status].tone}>
+                        {PAYMENT_STATUS[payment.balance.status].label}
+                      </span>
+                      {payment.balance.receivedAt && <span className="od-muted"> {shopDay.format(payment.balance.receivedAt)}</span>}
+                    </dd>
+                  </div>
+                </>
+              )}
             </dl>
+            {!payment.balance && payment.balanceOwed && <CreateBalanceButton orderId={detail.orderId} amount={payment.balanceOwed.format()} />}
+            {payment.balance?.status === "PENDING" && (
+              <div className="od-balance-action">
+                <MarkReceived paymentId={payment.balance.id} amount={payment.balance.amount.format()} method={payment.balance.method} label="Mark Received" />
+              </div>
+            )}
             <dl className="od-totals">
               <div>
                 <dt>Estimate</dt>

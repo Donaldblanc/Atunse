@@ -77,10 +77,23 @@ describe("getPendingPayments", () => {
     const rows = await getPendingPayments({ orders }, ADMIN);
 
     expect(rows).toEqual([
-      { orderId: zelle.id, reference: `ATU-${zelle.number}`, customerName: "Zoe Zelle", method: "ZELLE", methodLabel: "Zelle", amount: "$15", bookedOn: "Sep 28, 2026" },
-      { orderId: cash.id, reference: `ATU-${cash.number}`, customerName: "Sam Cash", method: "CASH", methodLabel: "Cash", amount: "$120", bookedOn: "Sep 29, 2026" },
+      { paymentId: zelle.payments[0]!.id, kind: "DEPOSIT", orderId: zelle.id, reference: `ATU-${zelle.number}`, customerName: "Zoe Zelle", method: "ZELLE", methodLabel: "Zelle", amount: "$15", bookedOn: "Sep 28, 2026" },
+      { paymentId: cash.payments[0]!.id, kind: "DEPOSIT", orderId: cash.id, reference: `ATU-${cash.number}`, customerName: "Sam Cash", method: "CASH", methodLabel: "Cash", amount: "$120", bookedOn: "Sep 29, 2026" },
     ]);
-    expect(rows.length).toBe((await orders.summarizeAwaitingDeposit()).orders);
+    expect(rows.length).toBe((await orders.summarizeAwaitingPayments()).payments);
+  });
+
+  it("lists a PENDING Balance beside the Deposits, and counts it", async () => {
+    const orders = new InMemoryOrderRepository();
+    const ready = await book(orders, "2026-09-28T14:00:00Z");
+    ready.payments[0]!.status = "RECEIVED";
+    ready.items[0]!.price = Money.fromCents(4000);
+    ready.payments.push({ id: "pay_balance", kind: "BALANCE", method: "CASH", amount: Money.fromCents(2500), status: "PENDING", receivedAt: null, createdAt: new Date() });
+
+    const rows = await getPendingPayments({ orders }, ADMIN);
+
+    expect(rows).toEqual([expect.objectContaining({ paymentId: "pay_balance", kind: "BALANCE", method: "CASH", amount: "$25" })]);
+    expect(await orders.summarizeAwaitingPayments()).toMatchObject({ payments: 1, amount: Money.fromCents(2500), byMethod: { CASH: 1 } });
   });
 
   it("is admin-only", async () => {
