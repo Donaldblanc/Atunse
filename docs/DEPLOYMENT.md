@@ -118,7 +118,9 @@ characters or a placeholder: check the Vercel value first
 **Order.**
 1. **Preview first.** Deploy the PR to a Vercel preview and run the full
    automated suite (`npm test`, `npm run test:integration`, `tsc`,
-   `eslint`, `next build`, `npm audit`), all on Node 24.
+   `eslint`, `next build`, `npm audit`), all on Node 24. `npm audit` is
+   expected to show the dev-only `braces` advisory (5 "high" entries, no
+   patch exists; `docs/TODO.md`, Housekeeping). Anything else needs a look.
 2. **Manual abuse checks on the preview:**
    - 11 bad admin sign-ins from one IP: the 11th gets 429 with Retry-After.
    - Repeated attempts on one email from several IPs: the 21st gets 429.
