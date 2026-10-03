@@ -15,7 +15,15 @@ import { ServicesCard } from "./services-card";
 import { StatsRow } from "./stats-row";
 
 /** Every panel (the grid's two columns). Awaits the overview itself so the dialogs can load beside it. */
-export async function OverviewPanels({ overview: overviewPromise, selection, now }: { overview: Promise<AdminOverview>; selection: OverviewSelection; now: Date }) {
+export async function OverviewPanels({
+  overview: overviewPromise,
+  selection,
+  now,
+}: {
+  overview: Promise<AdminOverview>;
+  selection: OverviewSelection;
+  now: Date;
+}) {
   const overview = await overviewPromise;
   const { range } = overview;
   const today = calendarDateInShopTime(now);
@@ -44,8 +52,8 @@ export async function OverviewPanels({ overview: overviewPromise, selection, now
         <StatsRow overview={overview} selection={selection} />
 
         <div className="ov-charts">
-          <RevenueTrendCard overview={overview} highlight={highlight} />
-          <ServicesCard overview={overview} />
+          <RevenueTrendCard overview={overview} highlight={highlight} today={today} selection={selection} />
+          <ServicesCard overview={overview} selection={selection} />
         </div>
 
         <RecentOrdersCard overview={overview} selection={selection} ordersHref={ordersHref} />
