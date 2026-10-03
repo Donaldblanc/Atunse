@@ -1,5 +1,6 @@
 import "@/styles/admin-theme.css";
 import "@/features/admin-overview/find-orders.css";
+import "@/styles/overview-chart-drilldown.css";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react/dist/ssr";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";

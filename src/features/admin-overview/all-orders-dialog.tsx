@@ -14,22 +14,48 @@ import { STATUS_TONE } from "./status-tone";
  * the tabs and pages are links, so it all works without JavaScript and each
  * state can be linked to. Rows open the Order dialog.
  */
-export function AllOrdersDialog({ list, selection }: { list: OrderList; selection: OverviewSelection }) {
+export function AllOrdersDialog({ list, selection, filterLabel = null }: { list: OrderList; selection: OverviewSelection; filterLabel?: string | null }) {
   const { query, rows, total, page, pageCount } = list;
   const hrefFor = (overrides: { status?: ItemStatus | null; page?: number }) => {
     const status = overrides.status === undefined ? query.status : overrides.status;
     const extra: Record<string, string> = { orders: "all" };
     if (query.q) extra.q = query.q;
     if (status) extra.status = status;
+    if (query.day) extra.day = query.day;
+    if (query.serviceId) extra.service = query.serviceId;
     if (overrides.page && overrides.page > 1) extra.page = String(overrides.page);
     return overviewHref(selection, extra);
   };
-  // The form keeps the range and the status; typing a new search starts again at page 1.
-  const hidden = [...new URL(overviewHref(selection, { orders: "all", ...(query.status ? { status: query.status } : {}) }), "http://admin.local").searchParams];
+  // The form keeps the range, status and day/Service filter; typing a new search starts again at page 1.
+  const hidden = [
+    ...new URL(
+      overviewHref(selection, {
+        orders: "all",
+        ...(query.status ? { status: query.status } : {}),
+        ...(query.day ? { day: query.day } : {}),
+        ...(query.serviceId ? { service: query.serviceId } : {}),
+      }),
+      "http://admin.local",
+    ).searchParams,
+  ];
+  // Clearing the day/Service filter keeps the search and the status tab.
+  const clearHref = overviewHref(selection, {
+    orders: "all",
+    ...(query.q ? { q: query.q } : {}),
+    ...(query.status ? { status: query.status } : {}),
+  });
 
   return (
     <AdminDialog title={`All orders (${total})`} closeHref={overviewHref(selection)} size="lg">
       <div className="fo">
+        {filterLabel && (
+          <p className="fo-filter">
+            <span className="fo-filter-chip">{filterLabel}</span>
+            <Link className="fo-filter-clear" href={clearHref} scroll={false}>
+              Clear filter
+            </Link>
+          </p>
+        )}
         <form action="/admin" method="get" role="search" className="fo-search">
           {hidden.map(([name, value]) => (
             <input key={name} type="hidden" name={name} value={value} />
@@ -37,7 +63,15 @@ export function AllOrdersDialog({ list, selection }: { list: OrderList; selectio
           <label htmlFor="fo-q" className="sr-only">
             Search orders
           </label>
-          <input id="fo-q" name="q" type="search" className="att-search-input" maxLength={100} defaultValue={query.q} placeholder="Order #, name, email or phone" />
+          <input
+            id="fo-q"
+            name="q"
+            type="search"
+            className="att-search-input"
+            maxLength={100}
+            defaultValue={query.q}
+            placeholder="Order #, name, email or phone"
+          />
           <button type="submit" className="admin-btn">
             Search
           </button>

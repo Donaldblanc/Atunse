@@ -1,5 +1,8 @@
+import Link from "next/link";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { serviceLegendHref } from "./chart-links";
 import { donutSegments, sharesOf100 } from "./chart-scale";
+import type { OverviewSelection } from "./overview-range";
 
 const RADIUS = 46;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -21,7 +24,7 @@ function seriesVar(serviceId: string): string {
  * not pairs. The legend always prints every name, count and share, so no
  * value depends on colour or hover alone.
  */
-export function ServicesDonut({ services }: { services: { serviceId: string; name: string; count: number }[] }) {
+export function ServicesDonut({ services, selection }: { services: { serviceId: string; name: string; count: number }[]; selection: OverviewSelection }) {
   const total = services.reduce((sum, service) => sum + service.count, 0);
   const segments = donutSegments(services.map((service) => service.count));
   const shares = sharesOf100(services.map((service) => service.count));
@@ -62,10 +65,17 @@ export function ServicesDonut({ services }: { services: { serviceId: string; nam
         <ul className="ov-legend">
           {services.map((service, i) => (
             <li key={service.serviceId}>
-              <span className="ov-legend-key" style={{ background: seriesVar(service.serviceId) }} aria-hidden="true" />
-              <span className="ov-legend-name">{service.name}</span>
-              <span className="ov-legend-count">{service.count}</span>
-              <span className="ov-legend-share">{shares[i]}%</span>
+              <Link
+                className="cd-legend-link"
+                href={serviceLegendHref(selection, service.serviceId)}
+                scroll={false}
+                aria-label={`${service.name}: ${service.count} ${service.count === 1 ? "order" : "orders"} this range`}
+              >
+                <span className="ov-legend-key" style={{ background: seriesVar(service.serviceId) }} aria-hidden="true" />
+                <span className="ov-legend-name">{service.name}</span>
+                <span className="ov-legend-count">{service.count}</span>
+                <span className="ov-legend-share">{shares[i]}%</span>
+              </Link>
             </li>
           ))}
         </ul>
