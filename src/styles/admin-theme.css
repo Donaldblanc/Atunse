@@ -2697,7 +2697,8 @@ a.visit-line:hover,
   font-weight: 600;
 }
 
-.att-tab[aria-selected="true"] {
+.att-tab[aria-selected="true"],
+.att-tab[aria-current="page"] {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #fff;

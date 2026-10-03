@@ -1,9 +1,9 @@
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
-import { builtScreenHref, OWNER_DISPLAY_NAME } from "@/app/admin/admin-screens";
+import { OWNER_DISPLAY_NAME } from "@/app/admin/admin-screens";
 import type { AdminOverview } from "../get-admin-overview";
 import { greeting } from "../greeting";
 import { highlightDay } from "../highlight-day";
-import { formatRangeDates, type OverviewSelection } from "../overview-range";
+import { formatRangeDates, overviewHref, type OverviewSelection } from "../overview-range";
 import { RangePicker } from "../range-picker";
 import { AttentionCard } from "./attention-card";
 import { BrandCard } from "./brand-card";
@@ -20,8 +20,9 @@ export async function OverviewPanels({ overview: overviewPromise, selection, now
   const { range } = overview;
   const today = calendarDateInShopTime(now);
   const highlight = highlightDay(range, today);
-  const ordersHref = builtScreenHref("orders");
-  const calendarHref = builtScreenHref("calendar");
+  // The All orders and Upcoming visits dialogs, until the Orders and Calendar screens are built.
+  const ordersHref = overviewHref(selection, { orders: "all" });
+  const calendarHref = overviewHref(selection, { visits: "upcoming" });
 
   return (
     <>

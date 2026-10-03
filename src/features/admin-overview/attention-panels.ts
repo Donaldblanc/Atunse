@@ -3,7 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
-import { servicesSummary } from "./get-admin-overview";
+import { bookedDay, servicesSummary } from "./get-admin-overview";
 import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
 
 // The three lists behind the Overview's Needs Attention items (?attention=…).
@@ -18,8 +18,6 @@ export function parseAttentionPanel(value: string | string[] | undefined): Atten
 }
 
 export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingPayments" | "listWithItemsIn"> };
-
-const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
 
 export interface PendingPaymentRow {
   paymentId: string;

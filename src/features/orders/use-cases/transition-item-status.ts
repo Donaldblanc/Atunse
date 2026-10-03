@@ -28,6 +28,8 @@ export interface TransitionItemStatusInput {
   /** Required for actions with a real-world side effect the customer
    * could trigger twice (e.g. confirming a Zelle payment) — ADR-0012. */
   idempotencyKey?: string;
+  /** Email the customer at the moments that matter (default true). False only for a caller that sends its own summary, like cancelOrder. */
+  notifyCustomer?: boolean;
 }
 
 /**
@@ -91,7 +93,7 @@ export async function transitionItemStatus(
   // updated === null means this idempotency key was already applied
   // (ADR-0012: retry-safe) — treat as success, but don't re-notify.
   // Only the moves that email re-read the Order (for the email's figures, after the write).
-  if (updated && EMAILED_STATUSES.includes(updated.status)) await emailCustomer(deps, input.itemId);
+  if (updated && input.notifyCustomer !== false && EMAILED_STATUSES.includes(updated.status)) await emailCustomer(deps, input.itemId);
   return updated;
 }
 

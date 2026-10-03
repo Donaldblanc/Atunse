@@ -10,9 +10,10 @@ import {
   type ItemStatus,
   type Order,
   type Payment,
+  type PaymentKind,
   type PaymentMethod,
 } from "@/features/orders/domain";
-import type { AwaitingPayments, OrderRepository } from "@/features/orders/repositories/order-repository";
+import type { AwaitingPayments, OrderRepository, ScheduledAppointment } from "@/features/orders/repositories/order-repository";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { metricDetail, type MetricDetail } from "./metric-detail";
@@ -51,6 +52,8 @@ export interface RecentOrder {
   status: ItemStatus;
   /** The Order's Deposit Payment, or null if it has none (e.g. a $0 estimate). */
   deposit: { method: PaymentMethod; status: Payment["status"] } | null;
+  /** The Deposit, else the Balance, still waiting on the owner (the row menu's Mark Paid); null when none is, or the Order is cancelled. */
+  pendingPayment: { id: string; kind: PaymentKind; method: PaymentMethod } | null;
   total: Money;
   totalIsMinimum: boolean;
 }
@@ -66,6 +69,9 @@ export interface ScheduledVisit {
   /** When it starts, shop time, e.g. "6:00 PM". */
   time: string;
 }
+
+/** The day an Order was booked, in shop time, e.g. "Sep 30, 2026" (Recent Orders, All orders, Needs Attention). */
+export const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
 
 /** A visit's clock time in shop time, e.g. "9:30 AM". */
 export const visitTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
@@ -159,7 +165,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
     recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
     todaysSchedule: appointments
-      .filter((appointment) => appointment.order.itemStatuses.some((status) => status !== "CANCELLED"))
+      .filter(isLiveVisit)
       .map((appointment) => ({
         appointmentId: appointment.id,
         orderId: appointment.order.id,
@@ -172,27 +178,53 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
 }
 
 async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl"]): Promise<RecentOrder> {
-  // The whole row describes the same pairs: the live ones, or, for a fully
-  // cancelled Order, every pair, so it still shows what was booked.
-  const live = livePairs(order);
-  const pairs = live.length > 0 ? live : order.items;
+  const pairs = shownPairs(order);
   const first = pairs[0];
   const photoKey = first?.photoKeys[0];
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
+  const figures = orderRowFigures(order);
+  const pending = figures.status === "CANCELLED" ? undefined : PENDING_ORDER.map((kind) => order.payments.find((payment) => payment.kind === kind && payment.status === "PENDING")).find(Boolean);
   return {
     orderId: order.id,
     reference: orderNumber(order.number),
     customerName: order.contactName,
     bookedAt: order.createdAt,
     photo: await pairPhoto(photoKey, photoUrl),
-    pairCount: pairs.length,
     firstPair: [first?.brand, first?.model].filter(Boolean).join(" ") || null,
+    ...figures,
+    deposit: deposit ? { method: deposit.method, status: deposit.status } : null,
+    pendingPayment: pending ? { id: pending.id, kind: pending.kind, method: pending.method } : null,
+  };
+}
+
+/** Which pending Payment the row menu's Mark Paid settles first: the Deposit comes due before the Balance (ADR-0002). */
+const PENDING_ORDER: PaymentKind[] = ["DEPOSIT", "BALANCE"];
+
+/**
+ * The pairs an Order row describes: the live ones, or, for a fully
+ * cancelled Order, every pair, so it still shows what was booked.
+ */
+export function shownPairs<T extends { status: ItemStatus }>(order: { items: T[] }): T[] {
+  const live = livePairs(order);
+  return live.length > 0 ? live : order.items;
+}
+
+/** What an Order row shows about its pairs and total (Recent Orders, All orders), from the same pairs (shownPairs). */
+export function orderRowFigures(order: { estimate: Money; estimateIsMinimum: boolean; items: { status: ItemStatus; serviceIds: string[]; estimate: Money }[] }) {
+  const pairs = shownPairs(order);
+  const anyLive = livePairs(order).length > 0;
+  return {
+    pairCount: pairs.length,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
     status: orderRollupStatus(order.items),
-    deposit: deposit ? { method: deposit.method, status: deposit.status } : null,
-    total: live.length > 0 ? liveEstimate(order) : order.estimate,
+    total: anyLive ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };
+}
+
+/** A visit worth showing on the schedule: its Order still has a pair that isn't cancelled (Today's Schedule, Upcoming visits). */
+export function isLiveVisit(appointment: Pick<ScheduledAppointment, "order">): boolean {
+  return appointment.order.itemStatuses.some((status) => status !== "CANCELLED");
 }
 
 /**
