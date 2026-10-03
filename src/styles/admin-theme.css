@@ -246,8 +246,17 @@ a.admin-nav-item:hover {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* The top-bar search form (#133) takes the label's place in the bar's
+   flex row, so it grows and, on phones, shrinks below its input's width. */
+.admin-search-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
 .admin-search {
   flex: 1;
+  min-width: 0;
   max-width: 580px;
   margin: 0 auto;
   display: flex;
@@ -1147,6 +1156,9 @@ a.admin-nav-item:hover {
 
 /* Recent Orders table. */
 .ov-table-scroll {
+  /* Contains absolutely positioned children (the "Actions" sr-only
+     header), which otherwise escape the scroll box and widen the page. */
+  position: relative;
   overflow-x: auto;
   margin: 0 -24px -8px;
   padding: 0 24px 8px;
