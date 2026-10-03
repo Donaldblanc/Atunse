@@ -1,5 +1,5 @@
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
-import { OWNER_DISPLAY_NAME } from "@/app/admin/admin-screens";
+import { OWNER_DISPLAY_NAME } from "@/features/accounts/owner-display-name";
 import type { AdminOverview } from "../get-admin-overview";
 import { greeting } from "../greeting";
 import { highlightDay } from "../highlight-day";

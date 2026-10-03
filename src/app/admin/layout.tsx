@@ -8,7 +8,7 @@ import { adminFromCookieValue } from "@/features/accounts/admin-check";
 import { SESSION_COOKIE_NAME } from "@/features/accounts/session";
 import { AccountMenu } from "./account-menu";
 import { AdminNav } from "./admin-nav";
-import { OWNER_DISPLAY_NAME } from "./admin-screens";
+import { OWNER_DISPLAY_NAME } from "@/features/accounts/owner-display-name";
 import { NotificationBell } from "./notification-bell";
 
 // Shared shell for every admin screen: the dark sidebar and the top bar

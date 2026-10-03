@@ -1,5 +1,7 @@
 # Plan: every panel on the admin Overview is actionable
 
+**Status: complete (2026-10-02).** Merged as #128, #129, #130, #131, #132, #133 and #134; the wrap-up is the PR that adds this line. Kept as the record of what was decided and why.
+
 Scope: `/admin` only. Decided with the owner on 2026-10-01:
 - The sample panels become real and actionable.
 - Messages can be replied to by email.
