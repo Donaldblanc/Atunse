@@ -203,6 +203,16 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
   - [ ] **Add the custom domain to the bucket CORS** once there is one (`docs/DEPLOYMENT.md`, "Adding an origin"), or uploads from it will fail.
   - [ ] **Clean up abandoned uploads** now and then: `STORAGE_CLEANUP_DATABASE_URL=<the database for this bucket> npm run storage:cleanup` (dry run), then add `-- --apply`. Uploads are throwaway once a booking copies them; this also removes uploads from bookings never submitted. It never reads `DATABASE_URL`, and refuses to delete if none of the database's photos are in the bucket. Could become a Vercel cron route later.
   - [ ] **Scope the storage keys** in Neon's console to this one bucket: read, write and **list**. `storage:cleanup` needs `s3:ListBucket`, and so does a clean "photo not uploaded" answer on AWS (without it, a missing object is a 403, which the app also handles).
+- [ ] **`npm audit` reports 5 "high" findings, all one dev-only advisory: accepted until a patch exists** (checked 2026-10-03).
+  - **The advisory:** `braces` ≤ 3.0.3 can exhaust the stack on deeply nested glob patterns ([GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)). The other four entries are the chain that pulls it in: `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` 3.3.1 (pinned) → `micromatch` → `braces`.
+  - **Why it's accepted:**
+    - No patched `braces` exists; 3.0.3 is the latest release.
+    - Even `@next/eslint-plugin-next` 16.3.8 pins the same `fast-glob`.
+    - It runs only inside ESLint, on glob patterns from our own config, so no user input reaches it, and it never ships to production.
+    - GitHub auto-dismissed it as Dependabot alert #39 (development scope).
+  - **Don't run `npm audit fix --force`.** It "fixes" this by downgrading `eslint-config-next` to 14.2.35, which breaks the lint setup on Next 16 and brings in a vulnerable `glob` (GHSA-5j98-mcp5-4vw2).
+  - **Re-check** when `braces` > 3.0.3 is published: `npm update braces` should then clear it with a lockfile-only change, no override needed.
+  - **Also due:** bump `next` and `eslint-config-next` to 16.3.8 once it's 7 days old (2026-10-07, the local `min-release-age`).
 - [ ] **Turn on GitHub's security settings** (repo admin only, Settings → Code security). Checked 2026-10-01: secret scanning is **on**; Dependabot security updates and push protection are still **off**. See `docs/DEPLOYMENT.md`.
 - [ ] **Content-Security-Policy: roll out to nonce-based enforcement.** `next.config.mjs` sends it as `Content-Security-Policy-Report-Only` (vulnerability scan, #88), so browsers only log what it would block. The target state isn't just "flip it to enforcing": it's **nonce- (or hash-) based scripts with no `'unsafe-inline'`**, which is transitional debt kept only because Next's inline bootstrap has no nonce yet. Rollout:
   1. Report-Only: browse a preview (landing, services, booking with a photo upload, admin) and collect violations.

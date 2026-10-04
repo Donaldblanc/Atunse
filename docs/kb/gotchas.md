@@ -22,6 +22,7 @@
 - The owner merges and switches branches between turns. Check `git branch --show-current` and the PR state before committing or pushing.
 
 ## Tooling
+- **Never run `npm audit fix --force`.** For the dev-only `braces` advisory it downgrades `eslint-config-next` to 14 (broken on Next 16, and it adds a vulnerable `glob`). Read `docs/TODO.md` (Housekeeping) first. Upgrades respect `~/.npmrc`'s `min-release-age=7`: install the newest version that's at least 7 days old.
 - macOS has no `timeout`. Use the tool's own timeouts (`PGCONNECT_TIMEOUT`, Bash `timeout`).
 - Playwright paths are relative to the cwd. Run scripts from the scratchpad so screenshots don't land in the repo.
 - The `grill-me` and `grill-with-docs` skills here are empty stubs. Run the interview by hand.
