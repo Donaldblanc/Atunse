@@ -58,6 +58,7 @@ Audited 2026-09-28 (axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice) on e
 Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (off). Deposits are paid by Zelle and confirmed manually by the owner (ADR-0002).
 - [x] **No double submission**: a per-booking idempotency key returns the same Order on retry (ADR-0012), and a changed retry is refused (#76).
 - [x] **Amount matches the displayed total**: the estimate and 50% Deposit are computed server-side from the catalog, and parity tests keep the page's total identical.
+- [ ] **Verify the Balance after admin status moves**: an admin can now move a pair to any status (#138), but the Balance Payment is only created when the last live pair reaches Ready (`planBalance`). Check what happens when a pair is moved back from Ready, or jumps straight to Completed or past Ready: a stale or missing Balance, or a received one that no longer matches. Decide whether to recompute, refund or leave it, and add a test.
 - [ ] **Successful / declined / abandoned payment, refunds, production keys, test-mode cleanup**: all wait on the Stripe integration. For Zelle launch: set `ZELLE_RECIPIENT` / `ZELLE_NAME` (above) and decide how refunds are handled (manually, per the Terms' section 13).
 
 ### Security & authentication
