@@ -2777,10 +2777,20 @@ a.visit-line:hover,
 
 .att-link {
   color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: text-decoration 0.15s ease;
 }
 
 .att-link:hover {
   text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.att-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .att-action {
