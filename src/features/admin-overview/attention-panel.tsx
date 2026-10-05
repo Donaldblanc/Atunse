@@ -16,9 +16,14 @@ export function AttentionPanel({ data, selection }: { data: AttentionPanelData; 
 
   if (data.panel === "pending-payments") {
     const { rows } = data;
+    const mappedRows = rows.map((row) => {
+      const href = linkTo(row.orderId);
+      console.log("[AttentionPanel] pending payment row:", { orderId: row.orderId, reference: row.reference, href });
+      return { ...row, href };
+    });
     return (
       <AdminDialog title={`Pending Payments (${rows.length})`} closeHref={closeHref} size="lg">
-        <PendingPaymentsTable rows={rows.map((row) => ({ ...row, href: linkTo(row.orderId) }))} />
+        <PendingPaymentsTable rows={mappedRows} />
       </AdminDialog>
     );
   }
