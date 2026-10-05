@@ -36,7 +36,6 @@ export interface PendingPaymentRow {
 export async function getPendingPayments(deps: AttentionPanelDeps, actingUser: ActingUser): Promise<PendingPaymentRow[]> {
   requireRole(actingUser, "ADMIN");
   const awaiting = await deps.orders.listAwaitingPayments();
-  console.log("[getPendingPayments] awaiting rows:", awaiting.map((r) => ({ orderId: r.orderId, number: r.number })));
   return awaiting.map((row) => ({
     paymentId: row.paymentId,
     kind: row.kind,

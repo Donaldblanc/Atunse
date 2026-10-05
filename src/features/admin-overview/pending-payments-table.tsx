@@ -88,7 +88,7 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
             </thead>
             <tbody>
               {visible.map((row) => (
-                <tr key={row.paymentId}>
+                <tr key={row.paymentId} className="ov-row-link">
                   <td className="ov-ref">
                     <Link className="att-link" href={row.href} scroll={false}>
                       {row.reference}
