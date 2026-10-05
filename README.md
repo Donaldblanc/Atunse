@@ -6,9 +6,9 @@ mail-in). Two sides in one app: a customer-facing quote/order funnel, and
 an admin panel the owner (and eventually staff) uses to run every job end
 to end.
 
-Full domain writeup, architecture decisions, and open questions live in
-[`docs/SPEC.md`](docs/SPEC.md) — read that first if you're picking this up
-after a break. `CONTEXT.md` is the domain glossary; `docs/adr/` holds the
+Picking this up after a break? Start at [`docs/kb/README.md`](docs/kb/README.md),
+a short index of task-sized notes. The full domain writeup, architecture
+decisions and open questions live in [`docs/SPEC.md`](docs/SPEC.md). `CONTEXT.md` is the domain glossary; `docs/adr/` holds the
 individual architecture decision records; `docs/TODO.md` tracks
 outstanding/deferred work.
 
@@ -56,89 +56,28 @@ npm run prisma:seed          # create/update the bootstrap admin account (needs 
 ```
 
 ## Project layout
+Feature-first (ADR-0011): each feature in `src/features/<name>/` holds its
+domain, use-cases, repositories and UI; `src/app/` only routes into them.
 
 ```
-src/
-  app/
-    admin/                    admin dashboard — lists the planned screens, placeholder stats (guarded by middleware.ts)
-    sign-in/                  interim admin sign-in page (ADR-0005 addendum)
-    api/v1/
-      orders/                 POST — customer order submission (not yet called by /booking)
-      admin/items/[itemId]/transitions/  POST — admin-only Item status transitions
-      auth/sign-in, sign-out/ POST — interim credential login/logout; sets/clears the signed session cookie
-    about/page.tsx           About page — DJ's story, principles, NYC skyline mark (design: scratch/landing-mock.html, not committed)
-    services/page.tsx        Services & Pricing — cleaning/restoration plans, each linking into /booking?service=...
-    booking/page.tsx         booking page — hosts BookingFlow (client-only; "Confirm Booking" doesn't submit yet)
-    coming-soon/page.tsx     placeholder destination for CTAs/nav items without a real page yet (Process, Contact, Terms, Privacy)
-    layout.tsx               root layout
-    page.tsx                 customer landing page — light default, dark toggle (design: scratch/landing-mock.html, not committed)
-  middleware.ts               admin route guard — fail-closed, protected from the first deploy; delegates to features/accounts/admin-check.ts
-  features/
-    landing/
-      gallery.ts                hero/services/before-after image keys + URL resolver (public/ now, S3/CDN once NEXT_PUBLIC_ASSETS_BASE_URL is set)
-      before-after-carousel.tsx client component: split before/after cards, scroll-snap + prev/next
-      brand-logos.ts             "trusted by" logo list + URL resolver (public/images/brand-logos/ now)
-      brand-marquee.tsx          client component: auto-scrolling logo row, black/white swapped by theme
-      site-nav.tsx               shared nav across /, /coming-soon, /about — accepts active="about" for the underlined nav state
-      site-footer.tsx            shared footer, same active-state prop as site-nav
-      nav-drawer.tsx             client component: mobile hamburger + slide-in drawer (hidden above 640px)
-      mobile-tabbar.tsx          client component: fixed bottom tab bar simulating a native app nav (hidden above 640px)
-      theme-toggle.tsx           client component: sliding light/dark switch — always defaults to light, only an explicit toggle (saved to localStorage) moves it to dark
-      booking-panel.tsx          home-page Local Drop-Off / Mail-In chooser that deep-links into /booking?method=...
-      book-restoration-cta.tsx   shared "Book Now" CTA; `topCta` marks the one the mobile book bar watches
-      mobile-book-bar.tsx        client component: sticky mobile "Book Now" bar, hidden while the page's top CTA is visible
-    booking/
-      booking-flow.tsx           client component: the 5-step booking flow (Service → Details → Schedule → Your Info → Review) and its pricing
-      *-step.tsx                 one component per step; pair-form.tsx and pickup-date-picker.tsx (the Local Drop-Off collection and Mail-In date picker) are shared pieces
-      services-data.ts           bookable Services and 3-pair Bundles, with display prices
-      booking-types.ts           shared types (Local Drop-Off / Mail-In schedule method, pair details, contact info)
-    orders/
-      domain.ts                Order/Item types, the Item status pipeline
-      deps.ts                  wires the real Prisma repository + notification adapter for use-cases
-      use-cases/                SubmitOrder, TransitionItemStatus, ...
-      repositories/             OrderRepository interface, Prisma + in-memory implementations
-    accounts/
-      authz.ts                 requireRole — per-use-case authorization (ADR-0012)
-      admin-check.ts            the admin-access decision (AdminCheck), unit-tested independently of the middleware runtime
-      auth-service.ts           AuthService interface + interim Prisma/password implementation (ADR-0005 addendum)
-      password.ts, session.ts   scrypt password hashing; HMAC-signed session cookie (Web Crypto, Edge-safe)
-    notifications/              NotificationService interface + adapters
-  shared/
-    money/                     Money value type (integer cents — never a float)
-    db/                        Prisma client singleton
-  styles/
-    landing-theme.css           customer landing page design tokens (light + dark)
-    admin-theme.css              admin panel design tokens
-
-public/
-  images/landing/              placeholder gallery photos (dev/local default — see gallery.ts)
-  images/brand-logos/          "trusted by" logo files (dev/local default — see brand-logos.ts)
-
-prisma/
-  schema.prisma              database schema
-  migrations/                 generated migrations
-  seed.ts                    creates/updates the bootstrap admin account (ADMIN_EMAIL/ADMIN_PASSWORD)
-
-docs/
-  SPEC.md                    consolidated project summary — start here
-  TODO.md                     outstanding/deferred work
-  LOCAL_SETUP.md               local Postgres + environment setup
-  DEPLOYMENT.md                Vercel + Neon setup and how deploys trigger
-  GIT_WORKFLOW.md              git-flow branching and release process
-  adr/                        architecture decision records, numbered
-
-CONTEXT.md                    domain glossary
+src/app/        routes: customer pages, /admin, /sign-in, /api/v1/*
+src/proxy.ts    request guard (Next 16's middleware): /admin and admin APIs fail closed
+src/features/   orders, admin-overview, booking, accounts, notifications, landing, contact
+src/shared/     money, db, storage, rate-limit, logging, ui, testing
+prisma/         schema, migrations, seed (bootstrap admin)
+docs/kb/        knowledge base: start here (code map, patterns, testing, gotchas)
+docs/           SPEC, TODO, ADRs, setup, deployment, git workflow
+CONTEXT.md      domain glossary
 ```
 
-What's built versus still planned (the booking UI isn't yet connected to
-the order API, admin working screens and S3 uploads don't exist yet, auth
-is an interim email/password login) is summarized in `docs/SPEC.md`'s
-"Where the build stands" section; the phase plan follows it.
+The file-level map is [`docs/kb/code-map.md`](docs/kb/code-map.md). What's
+built and what's next: [`docs/kb/status.md`](docs/kb/status.md) (summary) and
+`docs/SPEC.md`'s "Where the build stands" (detail).
 
 ## CI
 GitHub Actions (`.github/workflows/ci.yml`) runs typecheck, lint, unit
-tests, migrations, and integration tests against a real Postgres service
-container on every push/PR — see
+tests, and integration tests against a real Postgres service container
+(database `atunse_test`; the test run applies migrations) on every push/PR — see
 [ADR-0007](docs/adr/0007-postgres-and-ci.md).
 
 ## Branching & releases

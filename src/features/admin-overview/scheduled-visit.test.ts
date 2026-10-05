@@ -47,6 +47,7 @@ function booking(items: NewItemInput[] = [pair()]): NewOrderInput {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items,
   };
 }

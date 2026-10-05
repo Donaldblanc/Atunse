@@ -43,6 +43,7 @@ function order(estimateCents: number, items: NewItemInput[] = [item(["standard"]
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items,
   };
 }
@@ -150,7 +151,7 @@ describe("getAdminOverview", () => {
     expect(overview.orders.current).toBe(0);
     expect(overview.needsQuote).toBe(3); // old: submitted + under review; paid: under review
     expect(overview.readyForReturn).toBe(1);
-    expect(overview.awaitingDeposit).toEqual({ orders: 1, deposits: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0, APPLE_PAY: 0 } });
+    expect(overview.awaitingPayments).toEqual({ payments: 1, amount: Money.fromCents(3000), byMethod: { ZELLE: 1, CASH: 0, CARD: 0, APPLE_PAY: 0 } });
   });
 });
 
@@ -185,6 +186,23 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
     });
     expect(recentOrders[0]!.photo).toEqual({ kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) });
     expect(recentOrders[1]!.deposit).toEqual({ method: "ZELLE", status: "PENDING" });
+  });
+
+  it("offers the row menu the pending Deposit first, then the Balance, and nothing on a cancelled Order", async () => {
+    const d = deps();
+    const depositDue = await book(d.orders, "2026-09-25T15:00:00Z", order(6000));
+    const balanceDue = await book(d.orders, "2026-09-26T15:00:00Z", order(6000));
+    Object.assign(balanceDue.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
+    balanceDue.payments.push({ ...balanceDue.payments[0]!, id: "balance_1", kind: "BALANCE", status: "PENDING", receivedAt: null, method: "CASH" });
+    const cancelled = await book(d.orders, "2026-09-27T15:00:00Z", order(6000));
+    for (const pair of cancelled.items) pair.status = "CANCELLED";
+
+    const { recentOrders } = await getAdminOverview(d, ADMIN, "this-week");
+    const byId = (id: string) => recentOrders.find((row) => row.orderId === id)!.pendingPayment;
+
+    expect(byId(depositDue.id)).toEqual({ id: depositDue.payments[0]!.id, kind: "DEPOSIT", method: "ZELLE" });
+    expect(byId(balanceDue.id)).toEqual({ id: "balance_1", kind: "BALANCE", method: "CASH" });
+    expect(byId(cancelled.id)).toBeNull();
   });
 
   it("builds each row from the pairs still live, or every pair of a fully cancelled Order", async () => {

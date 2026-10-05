@@ -40,6 +40,7 @@ async function seed(fulfillment: Fulfillment = validBookingInput().fulfillment) 
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [{ brand: null, model: null, description: null, material: null, serviceIds: ["premium"], estimate: Money.fromCents(4000), photos: [] }],
   });
   return { orders, order, notifications, deps: { orders, notifications, now: () => FIXED_NOW } };

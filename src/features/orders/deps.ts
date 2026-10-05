@@ -1,6 +1,7 @@
 import { prisma } from "@/shared/db/prisma-client";
 import { PrismaAccountRepository } from "@/features/accounts/repositories/prisma-account-repository";
 import { notificationServiceFromEnv } from "@/features/notifications";
+import { contactInboxFromEnv } from "@/features/contact/contact-message";
 import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
 import { getFileStorage } from "@/shared/storage";
 import { paymentInstructionsFromEnv } from "./payment-instructions";
@@ -17,6 +18,8 @@ export function buildOrderUseCaseDeps() {
     notifications: notificationServiceFromEnv(),
     paymentInstructions: paymentInstructionsFromEnv(),
     customerSignInEnabled: isCustomerSignInEnabled(),
+    /** The same inbox the contact form uses (CONTACT_EMAIL). */
+    ownerInbox: contactInboxFromEnv(),
     /** Built on first use: it throws StorageNotConfiguredError when misconfigured. */
     get storage() {
       return getFileStorage();

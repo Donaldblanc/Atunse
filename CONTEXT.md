@@ -41,7 +41,7 @@ An optional faster turnaround a customer can request for a flat extra fee.
 A flat surcharge on a cleaning Service when the pair's material is suede. Waived in Bundles.
 
 ## Deposit
-A single payment equal to 50% of the sum of all Items' prices in an Order, charged once at submission — using each Item's published starting price where standard, and a rough estimate for Items pending a custom quote. The Balance (remaining 50%, plus any delta once custom-quoted Items are finalized) is reconciled and collected before completion/return.
+A single payment equal to 50% of the sum of all Items' prices in an Order, charged once at submission — using each Item's published starting price where standard, and a rough estimate for Items pending a custom quote. The **Balance** is the quoted total (every live pair's quote, plus the Rush fee) less the Deposit, so it carries any delta once custom-quoted Items are finalized. It becomes a Pending Payment when the Order's last live pair reaches Ready for Drop-Off/Shipping (none if the Deposit already covers the total), with the Deposit's method, which the owner can change when marking it received. While Pending it follows a cancelled pair, and is dropped if the whole Order is cancelled. The Balance does not hold the admin's Update Status: the owner can move a pair to Completed (or any other status) with money outstanding. Only a Return visit's completion still waits for the Balance to be received, or for the Deposit to cover the quoted total.
 
 ## Status Pipeline
 The sequence an **Item** (not the Order) moves through: Request Submitted → Under Review → Quote Sent → Approved → Awaiting Sneakers → In Progress → Quality Check → Ready for Drop-Off/Shipping → Completed. Cancelled is reachable from any state. The one step back: the owner can return an Item from Under Review to Request Submitted (e.g. a review started by mistake), since nothing has been quoted yet. ("Ready for Drop-Off/Shipping": DJ is ready to drop a Local Drop-Off pair back off, or a Mail-In pair is ready to ship back. Its code name is still `READY_FOR_PICKUP_SHIPPING`.)
@@ -68,7 +68,7 @@ For a mail-in Item, the app captures and validates the customer's shipping addre
 One amount an Order is owed or has received: the **Deposit**, the **Balance**, or a **Full** payment covering the whole Order at once. Each has a method (Zelle, Cash, Card or Apple Pay) and is Pending until received; a card or Apple Pay charge can also be Failed, and a received Payment can be Refunded. Booking creates the Deposit as Pending, by Zelle. _Avoid_: treating an Item's status as proof of payment.
 
 ## Appointment
-A booked time on the admin Calendar for a Local Drop-Off Order: **Collection** (DJ collects the pair from the customer) or **Return** (DJ drops it back off). At most one of each per Order; rescheduling moves it. The Order keeps the collection time the customer originally booked.
+A booked time on the admin Calendar for a Local Drop-Off Order: **Collection** (DJ collects the pair from the customer) or **Return** (DJ drops it back off). At most one of each per Order; rescheduling moves it. The Order keeps the collection time the customer originally booked. **Completing** a visit also moves the Order's pairs along: a Collection takes each pair in Awaiting Sneakers to In Progress, a Return each pair in Ready for Drop-Off/Shipping to Completed. Pairs that aren't there yet (not approved), or are held on the Deposit or the Balance (the Completed rule above), stay where they are.
 
 ## Conversation
 A message thread between the shop and a customer, usually about one of their Orders (an inquiry can come before any booking), shown in the admin Messages inbox. A customer message is **unread** until the shop reads it. Archiving hides a Conversation from the inbox without deleting it.
@@ -86,7 +86,7 @@ When Local Drop-Off collections can be booked, per weekday, in shop time. Set in
 A supply, material or care product the shop keeps on hand (e.g. cleaning solution, lace sets, brushes), with a stock count and a low-stock level; it's **Low Stock** at or below that level and **Out of Stock** at zero. Every change to its stock is recorded (restocked, used on an Order, adjusted). Each can name the **Supplier** it's restocked from. _Avoid_: "item" alone for these: an **Item** is a customer's pair.
 
 ## Manual Payment Confirmation
-For Zelle/Cash Deposits or Balances (methods the system cannot verify programmatically), the Order does not advance past the Approved status until the owner explicitly marks that payment as received in admin. Apple Pay/card payments, by contrast, confirm automatically through the payment processor. See [ADR-0002](docs/adr/0002-manual-payment-confirmation.md).
+For Zelle/Cash Deposits or Balances (methods the system cannot verify programmatically), the owner marks that payment as received in admin. The admin's Update Status never blocks on it (amended): the owner can move a pair to any status regardless. Apple Pay/card payments, by contrast, confirm automatically through the payment processor. See [ADR-0002](docs/adr/0002-manual-payment-confirmation.md).
 
 ## Open questions / not yet resolved
 - Do sales tax (the design shows 8.875%) and a Local Drop-Off fee apply, and are they part of the Deposit or only the Balance? Orders can store both; nothing computes them yet.

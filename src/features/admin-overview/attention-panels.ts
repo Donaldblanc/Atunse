@@ -3,7 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
-import { servicesSummary } from "./get-admin-overview";
+import { bookedDay, servicesSummary } from "./get-admin-overview";
 import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
 
 // The three lists behind the Overview's Needs Attention items (?attention=…).
@@ -17,32 +17,34 @@ export function parseAttentionPanel(value: string | string[] | undefined): Atten
   return ATTENTION_PANELS.find((id) => id === value) ?? null;
 }
 
-export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingDeposit" | "listWithItemsIn"> };
-
-const bookedDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
+export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingPayments" | "listWithItemsIn"> };
 
 export interface PendingPaymentRow {
+  paymentId: string;
+  kind: "DEPOSIT" | "BALANCE";
   orderId: string;
   reference: string;
   customerName: string;
   method: PaymentMethod;
   methodLabel: string;
-  /** The Deposit amount, e.g. "$120". */
+  /** The Deposit or Balance amount, e.g. "$120". */
   amount: string;
   bookedOn: string;
 }
 
-/** Orders whose Deposit is PENDING, oldest first: the same set the Overview counts (summarizeAwaitingDeposit). */
+/** Deposits and Balances that are PENDING, oldest booking first: the same set the Overview counts (summarizeAwaitingPayments). */
 export async function getPendingPayments(deps: AttentionPanelDeps, actingUser: ActingUser): Promise<PendingPaymentRow[]> {
   requireRole(actingUser, "ADMIN");
-  const awaiting = await deps.orders.listAwaitingDeposit();
+  const awaiting = await deps.orders.listAwaitingPayments();
   return awaiting.map((row) => ({
+    paymentId: row.paymentId,
+    kind: row.kind,
     orderId: row.orderId,
     reference: orderNumber(row.number),
     customerName: row.contactName,
-    method: row.deposit.method,
-    methodLabel: PAYMENT_METHOD_LABELS[row.deposit.method],
-    amount: row.deposit.amount.format(),
+    method: row.payment.method,
+    methodLabel: PAYMENT_METHOD_LABELS[row.payment.method],
+    amount: row.payment.amount.format(),
     bookedOn: bookedDay.format(row.createdAt),
   }));
 }

@@ -14,13 +14,24 @@ import {
   type OverviewPresetId,
   type OverviewSelection,
 } from "./overview-range";
+import { OPEN_RANGE_PICKER_EVENT } from "./range-picker-event";
 
 /** What's picked in the popover but not applied yet: a preset, or custom days (`to` null until the second click). */
 type Draft = { preset: OverviewPresetId } | { preset: null; from: CalendarDate | null; to: CalendarDate | null };
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-const monthTitle = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
-const fullDay = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+const monthTitle = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const fullDay = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
 function draftFrom(selection: OverviewSelection): Draft {
   return typeof selection === "object" ? { preset: null, ...selection } : { preset: selection };
@@ -76,6 +87,18 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
     gridRef.current?.querySelector<HTMLButtonElement>(`[data-date="${focusDate}"]`)?.focus();
   }, [focusDate, month]);
 
+  // A chart card's range chip asks this picker to open (it's the page's only one).
+  useEffect(() => {
+    function onOpenRequest() {
+      reset();
+      setOpen(true);
+      rootRef.current?.scrollIntoView({ block: "nearest" });
+      requestAnimationFrame(() => rootRef.current?.querySelector<HTMLElement>(".ov-range-preset[aria-pressed='true']")?.focus());
+    }
+    window.addEventListener(OPEN_RANGE_PICKER_EVENT, onOpenRequest);
+    return () => window.removeEventListener(OPEN_RANGE_PICKER_EVENT, onOpenRequest);
+  });
+
   function toggleOpen() {
     // Opening starts from what's applied, so a cancelled pick never lingers.
     if (!open) reset();
@@ -118,7 +141,10 @@ export function RangePicker({ selection, today, datesLabel }: { selection: Overv
 
   function apply() {
     if (!complete) return;
-    const chosen: OverviewSelection = draft.preset ?? { from: first!, to: last! };
+    const chosen: OverviewSelection = draft.preset ?? {
+      from: first!,
+      to: last!,
+    };
     setOpen(false);
     router.push(overviewHref(chosen), { scroll: false });
   }

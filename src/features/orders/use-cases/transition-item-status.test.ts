@@ -3,6 +3,7 @@ import { UnauthorizedError } from "@/features/accounts/authz";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order-repository";
+import { Money } from "@/shared/money/money";
 import type { ItemStatus } from "../domain";
 import { submitOrder } from "./submit-order";
 import { bookingDeps, RecordingNotificationService, validBookingInput } from "./test-fixtures";
@@ -28,16 +29,30 @@ describe("transitionItemStatus", () => {
     ).rejects.toThrow(UnauthorizedError);
   });
 
-  it("rejects skipping ahead in the pipeline", async () => {
+  it("rejects moving a finished pair, or to the status it already has", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
+    const deps = { orders, notifications: new ConsoleNotificationService() };
     await expect(
-      transitionItemStatus(
-        { orders, notifications: new ConsoleNotificationService() },
-        admin,
-        { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", action: "SKIP" },
-      ),
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "COMPLETED", toStatus: "UNDER_REVIEW", action: "REOPEN" }),
     ).rejects.toThrow(InvalidTransitionError);
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "CANCELLED", toStatus: "UNDER_REVIEW", action: "REOPEN" }),
+    ).rejects.toThrow(InvalidTransitionError);
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "REQUEST_SUBMITTED", action: "NOOP" }),
+    ).rejects.toThrow(InvalidTransitionError);
+  });
+
+  it("skips ahead in the pipeline", async () => {
+    const orders = new InMemoryOrderRepository();
+    const { item } = await seedOrder(orders);
+    const moved = await transitionItemStatus(
+      { orders, notifications: new ConsoleNotificationService() },
+      admin,
+      { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", action: "STATUS_TRANSITION" },
+    );
+    expect(moved?.status).toBe("APPROVED");
   });
 
   it("advances the pipeline step by step and records each transition", async () => {
@@ -156,23 +171,19 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     return { orders, notifications, order, item, deps: { orders, notifications } };
   }
 
-  it("refuses Quote Sent and Approved, which have their own steps", async () => {
+  it("allows Quote Sent and Approved, and moving backward", async () => {
     const underReview = await seedAt("UNDER_REVIEW");
-    await expect(
-      transitionItemStatus(underReview.deps, admin, { itemId: underReview.item.id, fromStatus: "UNDER_REVIEW", toStatus: "QUOTE_SENT", action: "QUOTE_SENT" }),
-    ).rejects.toThrow(MoveNotAllowedError);
-    const quoted = await seedAt("QUOTE_SENT");
-    await expect(
-      transitionItemStatus(quoted.deps, admin, { itemId: quoted.item.id, fromStatus: "QUOTE_SENT", toStatus: "APPROVED", action: "APPROVED" }),
-    ).rejects.toThrow(MoveNotAllowedError);
-    expect(quoted.orders.orders.get(quoted.order.id)!.items[0]!.status).toBe("QUOTE_SENT");
+    await transitionItemStatus(underReview.deps, admin, { itemId: underReview.item.id, fromStatus: "UNDER_REVIEW", toStatus: "QUOTE_SENT", action: "STATUS_TRANSITION" });
+    expect(underReview.orders.orders.get(underReview.order.id)!.items[0]!.status).toBe("QUOTE_SENT");
+    const inProgress = await seedAt("IN_PROGRESS");
+    await transitionItemStatus(inProgress.deps, admin, { itemId: inProgress.item.id, fromStatus: "IN_PROGRESS", toStatus: "UNDER_REVIEW", action: "STATUS_TRANSITION" });
+    expect(inProgress.orders.orders.get(inProgress.order.id)!.items[0]!.status).toBe("UNDER_REVIEW");
   });
 
-  it("holds a pair at Approved until the Deposit is paid, saying why", async () => {
+  it("moves a pair past Approved while the Deposit is pending", async () => {
     const { deps, item } = await seedAt("APPROVED");
-    await expect(
-      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", action: "STATUS_TRANSITION" }),
-    ).rejects.toThrow(/deposit/);
+    const moved = await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", action: "STATUS_TRANSITION" });
+    expect(moved?.status).toBe("AWAITING_SNEAKERS");
   });
 
   it("lets the payment confirmation itself move a pair past Approved, settling the Deposit", async () => {
@@ -215,5 +226,80 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     notifications.failing = true;
     await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "UNDER_REVIEW", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
     expect(orders.orders.get(order.id)!.items[0]!.status).toBe("CANCELLED");
+  });
+});
+
+describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
+  const ready = (itemId: string, from: ItemStatus = "QUALITY_CHECK") => ({ itemId, fromStatus: from, toStatus: "READY_FOR_PICKUP_SHIPPING" as const, action: "STATUS_TRANSITION" });
+
+  async function seedPairs(statuses: ItemStatus[], prices: number[]) {
+    const orders = new InMemoryOrderRepository();
+    const notifications = new RecordingNotificationService();
+    const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
+    const stored = orders.orders.get(order.id)!;
+    // Booking takes one pair (or a Bundle); further pairs are cloned in.
+    statuses.slice(1).forEach((_, index) => stored.items.push({ ...stored.items[0]!, id: `item_extra_${index}` }));
+    stored.items.forEach((item, index) => {
+      item.status = statuses[index]!;
+      item.price = Money.fromCents(prices[index]!);
+    });
+    stored.payments[0]!.status = "RECEIVED";
+    return { orders, stored, deps: { orders, notifications } };
+  }
+
+  it("is created PENDING, for the quoted total less the Deposit, when the last live pair is ready", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "QUALITY_CHECK"], [20000, 30000]);
+    const deposit = stored.payments[0]!;
+
+    await transitionItemStatus(deps, admin, ready(stored.items[1]!.id));
+
+    const balance = stored.payments.find((payment) => payment.kind === "BALANCE");
+    expect(balance).toMatchObject({ status: "PENDING", method: deposit.method, amount: Money.fromCents(50000).subtract(deposit.amount) });
+  });
+
+  it("isn't created while a live pair isn't ready, and isn't made twice", async () => {
+    const { deps, stored } = await seedPairs(["QUALITY_CHECK", "QUALITY_CHECK"], [20000, 30000]);
+    await transitionItemStatus(deps, admin, ready(stored.items[0]!.id));
+    expect(stored.payments.filter((payment) => payment.kind === "BALANCE")).toEqual([]);
+
+    await transitionItemStatus(deps, admin, ready(stored.items[1]!.id));
+    expect(stored.payments.filter((payment) => payment.kind === "BALANCE")).toHaveLength(1);
+  });
+
+  it("follows a cancelled pair while pending, and is dropped when the Order is fully cancelled", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "READY_FOR_PICKUP_SHIPPING", "QUALITY_CHECK"], [20000, 30000, 10000]);
+    await transitionItemStatus(deps, admin, { itemId: stored.items[2]!.id, fromStatus: "QUALITY_CHECK", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    const balance = () => stored.payments.find((payment) => payment.kind === "BALANCE")!;
+    const deposit = stored.payments[0]!;
+    // Cancelling the last unready pair makes the rest ready, so the Balance appears for the remaining total.
+    expect(balance()).toMatchObject({ status: "PENDING", amount: Money.fromCents(50000).subtract(deposit.amount) });
+
+    await transitionItemStatus(deps, admin, { itemId: stored.items[1]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    expect(balance().amount).toEqual(Money.fromCents(20000).subtract(deposit.amount));
+
+    await transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "CANCELLED", action: "STATUS_TRANSITION" });
+    expect(balance().status).toBe("FAILED");
+  });
+
+  it("allows Completed with the Balance still pending", async () => {
+    const { deps, stored } = await seedPairs(["QUALITY_CHECK"], [20000]);
+    const itemId = stored.items[0]!.id;
+    await transitionItemStatus(deps, admin, ready(itemId));
+    expect(stored.payments.find((payment) => payment.kind === "BALANCE")!.status).toBe("PENDING");
+    const done = await transitionItemStatus(deps, admin, { itemId, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
+    expect(done?.status).toBe("COMPLETED");
+  });
+
+  it("allows Completed from any non-final status", async () => {
+    const { deps, stored } = await seedPairs(["REQUEST_SUBMITTED", "IN_PROGRESS"], [20000, 30000]);
+    for (const [index, from] of (["REQUEST_SUBMITTED", "IN_PROGRESS"] as const).entries()) {
+      const done = await transitionItemStatus(deps, admin, { itemId: stored.items[index]!.id, fromStatus: from, toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
+      expect(done?.status).toBe("COMPLETED");
+    }
+  });
+
+  it("allows Completed when the Deposit already covers the quoted total", async () => {
+    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING"], [1000]);
+    expect((await transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" }))?.status).toBe("COMPLETED");
   });
 });

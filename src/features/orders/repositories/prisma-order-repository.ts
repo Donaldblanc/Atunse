@@ -2,25 +2,28 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
-import { MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
-  NoPendingDepositError,
+  NoPendingPaymentError,
   OrderChangedError,
   OrderNotFoundError,
   PhotoKeyInUseError,
   BundleNotFoundError,
+  CompletionHeldError,
   AppointmentCancelledError,
   AppointmentMovedError,
   AppointmentNotFoundError,
   AppointmentNotScheduledError,
   ReturnAlreadyBookedError,
+  type AdminNotification,
   type AppointmentWithOrder,
-  type AwaitingDepositOrder,
-  type AwaitingDeposits,
+  type AwaitingPaymentRow,
+  type AwaitingPayments,
   type BookedOrder,
+  type CompletedVisit,
   type NewOrderInput,
   type OrderNote,
   type StatusChange,
@@ -39,11 +42,16 @@ const ORDER_INCLUDE = {
 } satisfies Prisma.OrderInclude;
 
 /**
- * The Deposits Pending Payments is about: PENDING, on an Order with a live
- * pair. One where-clause behind the summary, the list and confirmDeposit,
- * so the count, the rows and what can be confirmed can't drift apart.
+ * The Payments Pending Payments is about: a Deposit or Balance, PENDING, on
+ * an Order with a live pair. One where-clause behind the summary, the list
+ * and confirmPayment, so the count, the rows and what can be confirmed
+ * can't drift apart.
  */
-const AWAITING_DEPOSIT = { kind: "DEPOSIT", status: "PENDING", order: { items: { some: { status: { not: "CANCELLED" } } } } } satisfies Prisma.PaymentWhereInput;
+const AWAITING_PAYMENT = {
+  kind: { in: ["DEPOSIT", "BALANCE"] },
+  status: "PENDING",
+  order: { items: { some: { status: { not: "CANCELLED" } } } },
+} satisfies Prisma.PaymentWhereInput;
 
 type ItemRow = Prisma.ItemGetPayload<{ include: typeof ITEM_INCLUDE }>;
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof ORDER_INCLUDE }>;
@@ -150,6 +158,16 @@ function isMissingBundle(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025" && /Bundle/.test(`${String(err.meta?.cause ?? "")} ${err.message}`);
 }
 
+/**
+ * Takes the Order's row lock for the rest of the transaction. Every write
+ * that depends on the Order's pairs and payments (a status change, a
+ * completed visit, a confirmed payment) starts here, so concurrent ones
+ * run one after another and each reads the other's result.
+ */
+async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
+}
+
 /** The fields of the unique constraint a Prisma P2002 violated, or null. */
 function uniqueViolationFields(err: unknown): string[] | null {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return null;
@@ -188,62 +206,95 @@ export class PrismaOrderRepository implements OrderRepository {
   // role, photo key) settle races inside that single transaction.
   private async insert(input: NewOrderInput): Promise<Order> {
     const { fulfillment, owner } = input;
-    const row = await this.prisma.order.create({
-      data: {
-        account:
-          "accountId" in owner
-            ? { connect: { id: owner.accountId } }
-            : { create: { role: "CUSTOMER" as const, email: owner.newCustomer.email, phone: owner.newCustomer.phone, name: input.contactName } },
-        contactName: input.contactName,
-        contactEmail: input.contactEmail,
-        contactPhone: input.contactPhone,
-        policyAcceptedAt: input.policyAcceptedAt,
-        termsVersion: input.terms.version,
-        termsUrl: input.terms.url,
-        termsSha256: input.terms.sha256,
-        termsAcknowledgments: input.terms.acknowledgments,
-        fulfillmentMethod: fulfillment.method,
-        addressLine1: fulfillment.address.line1,
-        addressLine2: fulfillment.address.line2,
-        city: fulfillment.address.city,
-        state: fulfillment.address.state,
-        zip: fulfillment.address.zip,
-        pickupDate: fulfillment.method === "PICKUP" ? calendarDateToUtcMidnight(fulfillment.date) : null,
-        pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
-        mailInDate:
-          fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
-            ? calendarDateToUtcMidnight(fulfillment.preferredDate)
-            : null,
-        rush: input.rush,
-        estimateCents: input.estimate.cents,
-        estimateIsMinimum: input.estimateIsMinimum,
-        depositCents: input.deposit.cents,
-        submissionKey: input.submissionKey,
-        submissionFingerprint: input.submissionFingerprint,
-        bundle: input.bundleId ? { connect: { id: input.bundleId } } : undefined,
-        items: {
-          create: input.items.map((item, position) => ({
-            position,
-            brand: item.brand,
-            model: item.model,
-            description: item.description,
-            material: item.material,
-            serviceIds: item.serviceIds,
-            estimateCents: item.estimate.cents,
-            photos: {
-              create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
-            },
-            status: "REQUEST_SUBMITTED" as const,
-          })),
+    // One transaction: the Order and its admin alert commit together or not at all.
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.order.create({
+        data: {
+          account:
+            "accountId" in owner
+              ? { connect: { id: owner.accountId } }
+              : { create: { role: "CUSTOMER" as const, email: owner.newCustomer.email, phone: owner.newCustomer.phone, name: input.contactName } },
+          contactName: input.contactName,
+          contactEmail: input.contactEmail,
+          contactPhone: input.contactPhone,
+          policyAcceptedAt: input.policyAcceptedAt,
+          termsVersion: input.terms.version,
+          termsUrl: input.terms.url,
+          termsSha256: input.terms.sha256,
+          termsAcknowledgments: input.terms.acknowledgments,
+          fulfillmentMethod: fulfillment.method,
+          addressLine1: fulfillment.address.line1,
+          addressLine2: fulfillment.address.line2,
+          city: fulfillment.address.city,
+          state: fulfillment.address.state,
+          zip: fulfillment.address.zip,
+          pickupDate: fulfillment.method === "PICKUP" ? calendarDateToUtcMidnight(fulfillment.date) : null,
+          pickupSlot: fulfillment.method === "PICKUP" ? fulfillment.slot : null,
+          mailInDate:
+            fulfillment.method === "MAIL_IN" && fulfillment.preferredDate
+              ? calendarDateToUtcMidnight(fulfillment.preferredDate)
+              : null,
+          rush: input.rush,
+          estimateCents: input.estimate.cents,
+          estimateIsMinimum: input.estimateIsMinimum,
+          depositCents: input.deposit.cents,
+          submissionKey: input.submissionKey,
+          submissionFingerprint: input.submissionFingerprint,
+          bundle: input.bundleId ? { connect: { id: input.bundleId } } : undefined,
+          items: {
+            create: input.items.map((item, position) => ({
+              position,
+              brand: item.brand,
+              model: item.model,
+              description: item.description,
+              material: item.material,
+              serviceIds: item.serviceIds,
+              estimateCents: item.estimate.cents,
+              photos: {
+                create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
+              },
+              status: "REQUEST_SUBMITTED" as const,
+            })),
+          },
+          payments: input.depositPayment
+            ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
+            : undefined,
+          appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
         },
-        payments: input.depositPayment
-          ? { create: { kind: "DEPOSIT" as const, method: input.depositPayment.method, amountCents: input.depositPayment.amount.cents } }
-          : undefined,
-        appointments: input.collection ? { create: { kind: "COLLECTION" as const, ...input.collection } } : undefined,
-      },
-      include: ORDER_INCLUDE,
+        include: ORDER_INCLUDE,
+      });
+      await tx.notification.create({
+        data: { kind: "NEW_BOOKING", recipientAccountId: null, orderId: row.id, title: `New booking ${orderNumber(row.number)}`, body: input.alertBody },
+      });
+      return toDomainOrder(row);
     });
-    return toDomainOrder(row);
+  }
+
+  async ensureBalance(orderId: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      if (!(await tx.order.findUnique({ where: { id: orderId }, select: { id: true } }))) throw new OrderNotFoundError(orderId);
+      await lockOrder(tx, orderId);
+      return this.settleBalance(tx, orderId, true);
+    });
+  }
+
+  async listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }> {
+    const where = { recipientAccountId: null };
+    const [rows, unreadCount] = await Promise.all([
+      this.prisma.notification.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: limit }),
+      this.prisma.notification.count({ where: { ...where, readAt: null } }),
+    ]);
+    return {
+      notifications: rows.map((row) => ({ id: row.id, kind: row.kind, title: row.title, body: row.body, orderId: row.orderId, readAt: row.readAt, createdAt: row.createdAt })),
+      unreadCount,
+    };
+  }
+
+  async markAdminNotificationsRead(ids: string[] | "all", at: Date): Promise<void> {
+    await this.prisma.notification.updateMany({
+      where: { recipientAccountId: null, readAt: null, ...(ids === "all" ? {} : { id: { in: ids } }) },
+      data: { readAt: at },
+    });
   }
 
   async findBySubmissionKey(submissionKey: string): Promise<Order | null> {
@@ -269,8 +320,13 @@ export class PrismaOrderRepository implements OrderRepository {
     entry: AuditEntry;
     receivesDeposit?: boolean;
     price?: Money;
+    enforceCompletionHold?: boolean;
   }): Promise<Item | null> {
     return this.prisma.$transaction(async (tx) => {
+      const owner = await tx.item.findUnique({ where: { id: params.itemId }, select: { orderId: true } });
+      if (!owner) throw new ItemNotFoundError(params.itemId);
+      await lockOrder(tx, owner.orderId);
+
       // Idempotency (ADR-0012): a repeat call with the same idempotencyKey
       // for this item is a no-op, not a double-transition.
       if (params.entry.idempotencyKey) {
@@ -283,6 +339,11 @@ export class PrismaOrderRepository implements OrderRepository {
           },
         });
         if (existing) return null;
+      }
+
+      if (params.enforceCompletionHold && params.toStatus === "COMPLETED") {
+        const reason = completionHold(toDomainOrder(await tx.order.findUniqueOrThrow({ where: { id: owner.orderId }, include: ORDER_INCLUDE })));
+        if (reason) throw new CompletionHeldError(reason);
       }
 
       // Conditional on the status the caller saw, so a stale or concurrent
@@ -324,8 +385,34 @@ export class PrismaOrderRepository implements OrderRepository {
         });
       }
 
+      await this.settleBalance(tx, updated.orderId);
+
       return toDomainItem(updated);
     });
+  }
+
+  /** Applies planBalance (domain.ts) to the Order as this transaction now sees it. */
+  private async settleBalance(tx: Prisma.TransactionClient, orderId: string, createOnly = false): Promise<boolean> {
+    const row = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: ORDER_INCLUDE });
+    const change = planBalance(toDomainOrder(row));
+    if (createOnly && change.type !== "create") return false;
+    switch (change.type) {
+      case "create":
+        // The fixed key makes this idempotent; a concurrent transition that got here first wins quietly.
+        const made = await tx.payment.createMany({
+          data: [{ orderId, kind: "BALANCE", method: change.method, amountCents: change.amount.cents, idempotencyKey: balanceKey(orderId) }],
+          skipDuplicates: true,
+        });
+        return made.count > 0;
+      case "update":
+        await tx.payment.updateMany({ where: { id: change.paymentId, status: "PENDING" }, data: { amountCents: change.amount.cents } });
+        return false;
+      case "cancel":
+        await tx.payment.updateMany({ where: { id: change.paymentId, status: "PENDING" }, data: { status: "FAILED", failureReason: change.reason } });
+        return false;
+      case "none":
+        return false;
+    }
   }
 
   async listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]> {
@@ -385,10 +472,10 @@ export class PrismaOrderRepository implements OrderRepository {
     return Object.fromEntries(groups.map((group) => [group.status, group._count._all]));
   }
 
-  async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
+  async summarizeAwaitingPayments(): Promise<AwaitingPayments> {
     const groups = await this.prisma.payment.groupBy({
       by: ["method"],
-      where: AWAITING_DEPOSIT,
+      where: AWAITING_PAYMENT,
       _count: { _all: true },
       _sum: { amountCents: true },
     });
@@ -398,8 +485,7 @@ export class PrismaOrderRepository implements OrderRepository {
       byMethod[group.method] = group._count._all;
       cents += group._sum.amountCents ?? 0;
     }
-    // One Deposit per Order, so counting Deposits counts Orders.
-    return { orders: groups.reduce((sum, g) => sum + g._count._all, 0), deposits: Money.fromCents(cents), byMethod };
+    return { payments: groups.reduce((sum, g) => sum + g._count._all, 0), amount: Money.fromCents(cents), byMethod };
   }
 
   async listOrderNotes(orderId: string): Promise<OrderNote[]> {
@@ -421,33 +507,62 @@ export class PrismaOrderRepository implements OrderRepository {
     return row ? { appointment: toDomainAppointment(row), order: toDomainOrder(row.order) } : null;
   }
 
-  async completeAppointment(appointmentId: string): Promise<Appointment> {
+  async completeAppointment(params: { appointmentId: string; actorAccountId: string | null }): Promise<CompletedVisit> {
+    const { appointmentId } = params;
     // The status is part of the WHERE, so a concurrent cancel can't be
     // overwritten. One transaction: the update holds the row's lock until
     // the re-read, so a cancel can't land between them and turn a write we
     // made into AppointmentCancelledError. The errors below only follow a
-    // write that matched nothing.
+    // write that matched nothing. Only the call that made the change moves
+    // pairs, so a replay finds count 0 and changes nothing.
     return this.prisma.$transaction(async (tx) => {
+      const owner = await tx.appointment.findUnique({ where: { id: appointmentId }, select: { orderId: true } });
+      if (!owner) throw new AppointmentNotFoundError(appointmentId);
+      await lockOrder(tx, owner.orderId);
       const { count } = await tx.appointment.updateMany({ where: { id: appointmentId, status: "SCHEDULED" }, data: { status: "COMPLETED" } });
       const row = await tx.appointment.findUnique({ where: { id: appointmentId } });
       if (!row) throw new AppointmentNotFoundError(appointmentId);
       if (count === 0 && row.status === "CANCELLED") throw new AppointmentCancelledError();
-      return toDomainAppointment(row);
+      const appointment = toDomainAppointment(row);
+      if (count === 0) return { appointment, moves: [], stays: [], alreadyCompleted: true };
+
+      const order = toDomainOrder(await tx.order.findUniqueOrThrow({ where: { id: row.orderId }, include: ORDER_INCLUDE }));
+      const plan = planVisitMoves(row.kind, order);
+      const reason = row.kind === "COLLECTION" ? COLLECTION_COMPLETED : RETURN_COMPLETED;
+      for (const move of plan.moves) {
+        // Conditional on the status planned from, like transitionItemStatus.
+        const moved = await tx.item.updateMany({ where: { id: move.itemId, status: move.from }, data: { status: move.to } });
+        if (moved.count === 0) continue;
+        await tx.itemAuditEntry.create({
+          data: {
+            itemId: move.itemId,
+            action: "STATUS_TRANSITION",
+            fromStatus: move.from,
+            toStatus: move.to,
+            actorAccountId: params.actorAccountId,
+            idempotencyKey: `visit:${appointmentId}`,
+            metadata: { reason },
+          },
+        });
+      }
+      return { appointment, ...plan, alreadyCompleted: false };
     });
   }
 
-  async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {
+  async listAwaitingPayments(): Promise<AwaitingPaymentRow[]> {
     const rows = await this.prisma.payment.findMany({
-      where: AWAITING_DEPOSIT,
-      select: { method: true, amountCents: true, order: { select: { id: true, number: true, contactName: true, createdAt: true } } },
+      where: AWAITING_PAYMENT,
+      select: { id: true, kind: true, method: true, amountCents: true, order: { select: { id: true, number: true, contactName: true, createdAt: true } } },
       orderBy: { order: { createdAt: "asc" } },
     });
     return rows.map((row) => ({
+      paymentId: row.id,
+      kind: row.kind as AwaitingPaymentRow["kind"],
       orderId: row.order.id,
       number: row.order.number,
       contactName: row.order.contactName,
       createdAt: row.order.createdAt,
-      deposit: { method: row.method, amount: Money.fromCents(row.amountCents) },
+      payment: { method: row.method, amount: Money.fromCents(row.amountCents) },
     }));
   }
 
@@ -460,23 +575,34 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
-  async confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
+  async confirmPayment(params: { paymentId: string; method: PaymentMethod; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.findUnique({ where: { id: params.paymentId }, select: { orderId: true, kind: true, idempotencyKey: true } });
+      if (!payment) throw new NoPendingPaymentError(params.paymentId);
+      await lockOrder(tx, payment.orderId);
+
       // Idempotency (ADR-0012): the key is recorded on the Order's audit entries, so a retry finds it.
       const applied = await tx.itemAuditEntry.findFirst({
-        where: { idempotencyKey: params.idempotencyKey, item: { orderId: params.orderId } },
+        where: { idempotencyKey: params.idempotencyKey, item: { orderId: payment.orderId } },
         select: { id: true },
       });
       if (applied) return false;
 
-      // Conditional on the Deposit still being PENDING, so two admins (or tabs) can't both settle it.
+      // Conditional on the Payment still being PENDING, so two admins (or tabs) can't both settle it.
+      // A Payment that already has a key (the Balance's fixed one) keeps it; the audit entries carry this one.
       const { count } = await tx.payment.updateMany({
-        where: { ...AWAITING_DEPOSIT, orderId: params.orderId },
-        data: { status: "RECEIVED", receivedAt: new Date(), confirmedByAccountId: params.actorAccountId, idempotencyKey: params.idempotencyKey },
+        where: { ...AWAITING_PAYMENT, id: params.paymentId },
+        data: {
+          status: "RECEIVED",
+          receivedAt: new Date(),
+          method: params.method,
+          confirmedByAccountId: params.actorAccountId,
+          ...(payment.idempotencyKey === null ? { idempotencyKey: params.idempotencyKey } : {}),
+        },
       });
-      if (count === 0) throw new NoPendingDepositError(params.orderId);
+      if (count === 0) throw new NoPendingPaymentError(params.paymentId);
 
-      const live = await tx.item.findMany({ where: { orderId: params.orderId, status: { not: "CANCELLED" } }, select: { id: true, status: true } });
+      const live = await tx.item.findMany({ where: { orderId: payment.orderId, status: { not: "CANCELLED" } }, select: { id: true, status: true } });
       await tx.itemAuditEntry.createMany({
         data: live.map((item) => ({
           itemId: item.id,
@@ -485,6 +611,7 @@ export class PrismaOrderRepository implements OrderRepository {
           toStatus: item.status,
           actorAccountId: params.actorAccountId,
           idempotencyKey: params.idempotencyKey,
+          metadata: { paymentId: params.paymentId, kind: payment.kind, method: params.method },
         })),
       });
       return true;

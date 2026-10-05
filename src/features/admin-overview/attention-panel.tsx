@@ -41,7 +41,7 @@ export function AttentionPanel({ data, selection }: { data: AttentionPanelData; 
                   <th scope="col">Pairs Ready</th>
                   <th scope="col">Return</th>
                   <th scope="col">Booked</th>
-                  <th scope="col">Return visit</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -59,17 +59,22 @@ export function AttentionPanel({ data, selection }: { data: AttentionPanelData; 
                     <td>{row.fulfillment}</td>
                     <td>{row.bookedOn}</td>
                     <td>
-                      {row.returnVisit.kind === "bookable" ? (
-                        <Link className="admin-btn att-book" data-variant="secondary" href={overviewHref(selection, { order: row.orderId, book: "return" })} scroll={false}>
-                          Book return visit
+                      <div className="att-actions-cell">
+                        <Link className="admin-btn att-action" data-variant="secondary" href={linkTo(row.orderId)} scroll={false}>
+                          View
                         </Link>
-                      ) : row.returnVisit.kind === "booked" ? (
-                        <Link className="att-link" href={overviewHref(selection, { visit: row.returnVisit.appointmentId })} scroll={false}>
-                          {row.returnVisit.when}
-                        </Link>
-                      ) : (
-                        <span className="ov-cell-sub">Ships back</span>
-                      )}
+                        {row.returnVisit.kind === "bookable" ? (
+                          <Link className="admin-btn att-action" data-variant="secondary" href={overviewHref(selection, { order: row.orderId, book: "return" })} scroll={false}>
+                            Book return
+                          </Link>
+                        ) : row.returnVisit.kind === "booked" ? (
+                          <Link className="admin-btn att-action" data-variant="secondary" href={overviewHref(selection, { visit: row.returnVisit.appointmentId })} scroll={false}>
+                            {row.returnVisit.when}
+                          </Link>
+                        ) : (
+                          <span className="ov-cell-sub">Ships back</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

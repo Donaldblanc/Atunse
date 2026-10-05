@@ -3,7 +3,7 @@ import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
 
 const eslintConfig = [
   ...nextCoreWebVitals,
-  { ignores: ["demo_mock/**", ".next/**", "node_modules/**", "next-env.d.ts"] },
+  { ignores: ["demo_mock/**", ".next/**", "node_modules/**", "next-env.d.ts", ".claude/**"] },
 ];
 
 export default eslintConfig;

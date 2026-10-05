@@ -1,8 +1,8 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { adminStatusMoves, canTransition, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
-import { ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
+import { adminStatusMoves, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
+import { CompletionHeldError, ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { redactForLog } from "@/shared/logging/redact";
 import { EMAILED_STATUSES, statusChangeEmail } from "../status-emails";
 
@@ -12,7 +12,7 @@ export class InvalidTransitionError extends Error {
   }
 }
 
-/** The step is a valid pipeline move but not a plain status change (it has its own step, or is held). */
+/** The move isn't one a plain status change may make from the pair's current status. */
 export class MoveNotAllowedError extends Error {
   constructor(from: ItemStatus, to: ItemStatus, held: string | null) {
     super(held ?? `A pair can't move from ${ITEM_STATUS_LABELS[from]} to ${ITEM_STATUS_LABELS[to]} this way.`);
@@ -28,15 +28,16 @@ export interface TransitionItemStatusInput {
   /** Required for actions with a real-world side effect the customer
    * could trigger twice (e.g. confirming a Zelle payment) — ADR-0012. */
   idempotencyKey?: string;
+  /** Email the customer at the moments that matter (default true). False only for a caller that sends its own summary, like cancelOrder. */
+  notifyCustomer?: boolean;
 }
 
 /**
- * The plain admin "Update Status": one pair to the pipeline's next step or
- * Cancelled, admin-only (ADR-0005, ADR-0001). It applies adminStatusMoves
- * itself, so the Order detail form and the admin API route can't force what
- * the screen holds back: Quote Sent and Approved (their own steps: sendQuote,
- * recordApproval) and anything past Approved while the Deposit is pending
- * (ADR-0002).
+ * The plain admin "Update Status": one pair to any other status (forward,
+ * back or skipping steps), admin-only (ADR-0005). Completed and Cancelled
+ * stay final. No payment holds: the owner decides (ADR-0002, amended). It
+ * applies adminStatusMoves itself, so the Order detail form and the admin API
+ * route share one rule.
  *
  * The customer is emailed only at the moments that matter to them (status-
  * emails.ts: Ready for Drop-Off/Shipping, Cancelled), after the write
@@ -50,7 +51,8 @@ export async function transitionItemStatus(
 ): Promise<Item | null> {
   requireRole(actingUser, "ADMIN");
 
-  if (!canTransition(input.fromStatus, input.toStatus)) {
+  const final = (status: ItemStatus) => status === "COMPLETED" || status === "CANCELLED";
+  if (input.fromStatus === input.toStatus || final(input.fromStatus)) {
     throw new InvalidTransitionError(input.fromStatus, input.toStatus);
   }
 
@@ -62,28 +64,36 @@ export async function transitionItemStatus(
   if (current.status === input.fromStatus) {
     // Confirming the payment settles the Deposit in the same write, so it can't be what holds the move (ADR-0002).
     const payments = receivesDeposit ? before.payments.map((payment) => (payment.kind === "DEPOSIT" ? { ...payment, status: "RECEIVED" as const } : payment)) : before.payments;
-    const { moves, held } = adminStatusMoves(current, { payments });
+    const { moves, held } = adminStatusMoves(current, { ...before, payments });
     if (!moves.includes(input.toStatus)) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, held);
   }
 
-  const updated = await deps.orders.transitionItemStatus({
-    itemId: input.itemId,
-    toStatus: input.toStatus,
-    entry: {
-      action: input.action,
-      fromStatus: input.fromStatus,
+  let updated: Item | null;
+  try {
+    updated = await deps.orders.transitionItemStatus({
+      itemId: input.itemId,
       toStatus: input.toStatus,
-      actorAccountId: actingUser.accountId,
-      idempotencyKey: input.idempotencyKey ?? null,
-    },
-    // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
-    receivesDeposit,
-  });
+      entry: {
+        action: input.action,
+        fromStatus: input.fromStatus,
+        toStatus: input.toStatus,
+        actorAccountId: actingUser.accountId,
+        idempotencyKey: input.idempotencyKey ?? null,
+      },
+      // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
+      receivesDeposit,
+      // An admin may complete a pair with money outstanding, so no hold is checked.
+      enforceCompletionHold: false,
+    });
+  } catch (err) {
+    if (err instanceof CompletionHeldError) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, err.reason);
+    throw err;
+  }
 
   // updated === null means this idempotency key was already applied
   // (ADR-0012: retry-safe) — treat as success, but don't re-notify.
   // Only the moves that email re-read the Order (for the email's figures, after the write).
-  if (updated && EMAILED_STATUSES.includes(updated.status)) await emailCustomer(deps, input.itemId);
+  if (updated && input.notifyCustomer !== false && EMAILED_STATUSES.includes(updated.status)) await emailCustomer(deps, input.itemId);
   return updated;
 }
 

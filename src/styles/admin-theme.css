@@ -246,8 +246,17 @@ a.admin-nav-item:hover {
   border-bottom: 1px solid var(--color-border);
 }
 
+/* The top-bar search form (#133) takes the label's place in the bar's
+   flex row, so it grows and, on phones, shrinks below its input's width. */
+.admin-search-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
 .admin-search {
   flex: 1;
+  min-width: 0;
   max-width: 580px;
   margin: 0 auto;
   display: flex;
@@ -392,6 +401,134 @@ a.admin-nav-item:hover {
 
 .admin-menu-item:hover {
   background: var(--color-muted);
+}
+
+/* The top bar's notification bell and its popover of the latest 10. */
+.admin-bell {
+  position: relative;
+}
+
+.admin-bell-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+}
+
+.admin-bell-button:hover {
+  background: var(--color-muted);
+}
+
+.admin-bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-bell-panel {
+  width: min(360px, calc(100vw - 32px));
+  padding: 0;
+}
+
+.admin-bell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.admin-bell-markall {
+  min-height: 44px;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  color: var(--color-accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-bell-empty {
+  padding: 24px 14px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-muted-foreground);
+}
+
+.admin-bell-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.admin-bell-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+}
+
+.admin-bell-item:hover {
+  background: var(--color-muted);
+}
+
+.admin-bell-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.admin-bell-item[data-unread="true"] .admin-bell-dot {
+  background: var(--color-accent);
+}
+
+.admin-bell-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-bell-text strong {
+  font-size: 14px;
+}
+
+.admin-bell-text span,
+.admin-bell-when {
+  color: var(--color-muted-foreground);
+}
+
+.admin-bell-when {
+  font-size: 12px;
 }
 
 .admin-main {
@@ -1019,6 +1156,9 @@ a.admin-nav-item:hover {
 
 /* Recent Orders table. */
 .ov-table-scroll {
+  /* Contains absolutely positioned children (the "Actions" sr-only
+     header), which otherwise escape the scroll box and widen the page. */
+  position: relative;
   overflow-x: auto;
   margin: 0 -24px -8px;
   padding: 0 24px 8px;
@@ -1371,18 +1511,6 @@ a.admin-nav-item:hover {
   color: var(--delta-down-ink);
 }
 
-/* Sample data (sample-data.ts): dashed, so it never reads as a real figure. */
-.ov-sample {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px dashed #c9a24a;
-  color: #8a6400;
-  white-space: nowrap;
-}
 
 /* Recent Reviews. */
 .ov-reviews {
@@ -2340,6 +2468,32 @@ a.admin-nav-item:hover {
   gap: 8px;
 }
 
+.od-status-select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  color: var(--color-foreground);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.od-status-select:hover:not(:disabled) {
+  background: var(--color-muted);
+}
+
+.od-status-select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.od-status-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .od-status-held {
   margin-top: 8px;
   font-size: 13px;
@@ -2581,7 +2735,8 @@ a.visit-line:hover,
   font-weight: 600;
 }
 
-.att-tab[aria-selected="true"] {
+.att-tab[aria-selected="true"],
+.att-tab[aria-current="page"] {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: #fff;
@@ -2622,10 +2777,20 @@ a.visit-line:hover,
 
 .att-link {
   color: var(--color-accent);
+  cursor: pointer;
+  text-decoration: none;
+  transition: text-decoration 0.15s ease;
 }
 
 .att-link:hover {
   text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.att-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .att-action {
@@ -2633,6 +2798,13 @@ a.visit-line:hover,
   padding: 8px 16px;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.att-actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .att-confirm {

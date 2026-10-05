@@ -1,0 +1,23 @@
+/* Pending Payments: the method picker beside Mark Paid (the owner can change
+   how a Deposit or Balance actually arrived). Prefixed like the rest of .att-. */
+.att-method {
+  min-height: 40px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-foreground);
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .att-table[data-kind="payments"] .att-method {
+    flex: 1 1 100%;
+  }
+}
+
+/* The Order dialog's Mark Received, under the Payment Information facts. */
+.od-balance-action {
+  margin-top: 12px;
+}

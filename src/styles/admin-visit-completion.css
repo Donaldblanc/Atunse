@@ -1,0 +1,22 @@
+/* Schedule Item dialog: what completing a visit does to the Order's pairs. */
+.vc-outcome {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 14px;
+}
+
+.vc-heading {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.vc-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.vc-stay {
+  color: var(--color-muted-foreground);
+}

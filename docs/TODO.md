@@ -4,7 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
-- [ ] **The shop is never told about a new booking.** The booking confirmation email goes only to the customer (`submitOrder`), and the admin Orders screen isn't built (`src/app/admin/admin-screens.ts`), so today a new booking only shows up as a count on the admin Overview. Add an owner notification email for new bookings and/or build the Orders queue before launch.
+- [ ] **Make sure the shop is told about a new booking in production.** Done in code: each booking writes a bell notification and emails the shop inbox (`CONTACT_EMAIL`, the contact form's inbox). What remains: set `CONTACT_EMAIL` and Resend in Vercel (unset means no email, quietly), and build the admin Orders screen (`src/app/admin/admin-screens.ts`).
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 
 ### Legal & policies
@@ -71,7 +71,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [x] **Server-side input validation**: zod request shapes plus the use-case rules on every public route.
 - [x] **CORS**: the photo bucket allows only the site's origins, POST only (#107); the API sends no CORS headers (same-origin only).
 - [x] **Cookie flags**: session cookies are `HttpOnly`, `Secure` in production and `SameSite=Lax`.
-- [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning and push protection are still off (entry above).
+- [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning is on; push protection is still off (Housekeeping).
 
 ### SEO & social
 - [ ] **Unique page titles**: every page has its own title except home, which uses the generic "Atunṣe".
@@ -100,7 +100,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
 - [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
 - [ ] **Database indexes, once the admin screens are ready for launch** (from the #118 review): the admin Overview filters and sorts `orders` by `createdAt` (both date ranges, Recent Orders) and `pickupDate` (Today's Schedule), and every Order load finds its pairs by `items.orderId`. Without indexes each of these reads the whole table. That's fine at today's size but grows with every booking.
-  - `Order` `@@index([createdAt])` and `@@index([pickupDate])`: already on #119's branch (`feature/admin-data-model`); confirm they landed.
+  - [x] `Order` `@@index([createdAt])` landed. The `pickupDate` index was added and then dropped, because Today's Schedule reads Appointments now.
   - `Item` `@@index([orderId])`: missing everywhere. Postgres doesn't index foreign keys on its own, and Prisma doesn't add one.
   - Then add indexes for whatever the finished admin screens (Orders queue, Calendar, Messages) filter or sort on that isn't covered, and check the busiest queries with `EXPLAIN ANALYZE` against production-sized data.
 
@@ -135,10 +135,10 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] Review and edit the order.
 - [ ] Accept the required agreements.
 - [ ] Complete checkout. *Today: the booking submits and shows Zelle deposit instructions; there's no online payment.*
-- [ ] Confirm payment. *Today: the owner marks the Zelle deposit received; that admin screen isn't built yet.*
+- [ ] Confirm payment. *Today: the owner marks the Zelle deposit received with Mark Paid (Overview → Needs Attention → Pending Payments).*
 - [ ] Confirm the booking appears in the customer's account. *Needs "My bookings".*
 - [ ] Confirm the customer receives the confirmation email. *Needs Resend.*
-- [ ] Confirm the booking appears in the admin dashboard. *Needs the Orders queue (blocker above).*
+- [ ] Confirm the booking appears in the admin dashboard. *It does on the Overview (Recent Orders), verified locally 2026-09-30; repeat on production.*
 - [ ] Test admin actions on the booking.
 - [ ] Test the cancellation and refund path.
 - [ ] Repeat the critical flow on mobile.
@@ -148,9 +148,9 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample data where nothing records the real thing yet. Sample figures live in `src/features/admin-overview/sample-data.ts`, are marked `TODO(sample-data)`, and carry a dashed "Sample" tag on the page. Delete each one as its real source lands.
 
 **Sample data (shown now, not real):**
-- [ ] **Unread Messages** count (`SAMPLE_UNREAD_MESSAGES`): count CUSTOMER Messages with `readAt` null in Conversations that aren't archived. Needs the Conversation/Message tables (#119), then the Messages screen to mark them read.
-- [ ] **Low Stock Items** count (`SAMPLE_LOW_STOCK_ITEMS`): count active Inventory Items with `stock <= lowStockAt`. Needs the InventoryItem table (#119), then the Inventory screen to enter stock.
-- [ ] **Recent Reviews** (`SAMPLE_REVIEWS`): the Review table exists (#119); decide how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram), then show the latest PUBLISHED ones.
+- [x] **Unread Messages** count: real count of CUSTOMER Messages with `readAt` null in unarchived Conversations; its dialog (`?attention=messages`) has Mark read and an email Reply.
+- [x] **Low Stock Items** count: real count of active Inventory Items with `stock <= lowStockAt`; `?attention=low-stock` lists them with Adjust stock. Follow-up: the Inventory screen to add items.
+- [x] **Recent Reviews**: the latest PUBLISHED ones, with `?reviews=all` (Publish, Hide, Reply). Follow-up: how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram); until then the panel shows an empty state.
 
 **Placeholders (real data exists, but the design shows more):**
 - [x] **Pending Payments: Zelle/Cash split**, from PENDING Deposit Payments (#119).
@@ -158,11 +158,13 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [x] **Today's Schedule: return drop-offs.** It reads SCHEDULED Appointments of both kinds (#119); a Return now appears once the owner books one from Order detail or Ready to Return ("Book return visit").
 - [x] **Schedule Item: Reschedule.** Done from the dialog (`?visit=<id>&reschedule=1`): any slot in the booking window, no customer lead time (only slots not yet started), two visits may share a slot (booking has no capacity rule), confirm step, customer emailed after a real change. Moves the Appointment only, never the Order's booked collection time. Idempotent on the time the owner saw (no key column; ADR-0012).
 - [ ] **Reschedule / Return polish.** A failed customer email after a saved change is only warned about on screen (no outbox, ADR-0006); a cancelled Return row is reused on rebooking, but nothing cancels Appointments yet; booking will read operating_hours (ADR-0016) instead of pickup-window.ts, and this picker with it; the Calendar should reuse VisitSlotPicker.
-- [ ] **Schedule Item: completing a Collection doesn't move the pairs.** "Mark as Completed" changes only the Appointment (no doc ties it to an Item status). Decide whether a completed Collection should also advance its pairs (e.g. Awaiting Sneakers to In Progress) and record it in CONTEXT.md; there's no `completedAt` column either, add one if the Calendar wants it.
+- [x] **Schedule Item: completing a visit moves the pairs.** "Mark as Completed" now also moves the Order's pairs in the same transaction: a Collection takes each Awaiting Sneakers pair to In Progress (audit `STATUS_TRANSITION`, reason `COLLECTION_COMPLETED`), a Return each Ready for Drop-Off/Shipping pair to Completed (reason `RETURN_COMPLETED`). Pairs not yet approved, or held on the Deposit or Balance, stay, and the dialog lists who moved and who didn't, and why. A replay changes nothing. There's still no `completedAt` column; add one if the Calendar wants it.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
-- [ ] **Links:** "View all orders", "View orders", "View calendar", "View all" (Needs Attention, Reviews) and the Recent Orders row "…" menu appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
-- [ ] **Needs Attention panels are read-only except Mark Paid:** Ready to Return and Needs a Quote list their Orders and link to the Order dialog (`?order=`), where the actions live. The Ready to Return stat card no longer links to `Orders?status=READY_FOR_PICKUP_SHIPPING`; it opens the panel. Pending Payments only handles the Deposit: the Balance (ADR-0002) is confirmed from the Payments screen once it exists.
-- [ ] **Notification bell** in the top bar: the Notification table exists (#119); write one on new bookings, customer messages, received payments, low stock and new reviews, then show unread ones.
+- [x] **Links "View all orders" and "View calendar"** open the All orders (`?orders=all`) and Upcoming visits (`?visits=upcoming`) dialogs. They can move to the Orders and Calendar screens once those exist.
+- [ ] **Links:** "View orders" and "View all" (Needs Attention, Reviews) appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
+- [x] **Recent Orders row "…" menu:** Open order, Mark Paid (the pending Deposit, else Balance, through `confirmPayment` by its own method; Pending Payments picks another) and Cancel order (`cancelOrder`, each live pair through `transitionItemStatus`).
+- [ ] **Needs Attention panels are read-only except Mark Paid:** Ready to Return and Needs a Quote list their Orders and link to the Order dialog (`?order=`), where the actions live. The Ready to Return stat card no longer links to `Orders?status=READY_FOR_PICKUP_SHIPPING`; it opens the panel. Pending Payments now lists Deposits and Balances (tabs, Mark Paid with a Zelle/Cash choice); the Order dialog's Payment Information also marks a Balance received.
+- [ ] **Notification bell** in the top bar: done for `NEW_BOOKING` (written with the Order, listed in the bell, owner emailed). Still to write: customer messages, received payments, low stock and new reviews.
 - [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
   - [x] **Edit Order** (`?order=<id>&edit=order`): contact, address and every pair's brand, model, size, colorway, material, condition and description, saved in one transaction (`updateOrderDetails`) with an optimistic check on the Order's `updatedAt`. Changes are audited as `DETAILS_EDITED` (per pair, with before/after) and `ORDER_CONTACT_EDITED` (on the Order's first pair, field names only: there is no Order-level audit table). Not editable here: fulfillment method, dates and slots (rescheduling), price, services, status, and the Account's own email (ADR-0014).
   - [ ] **The dialog's "…" menu** has no feature behind it yet, so it isn't drawn. The drop-off fee and tax are still editable only in the database (the quoted price is set by Send Quote).
@@ -170,12 +172,12 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
   - [x] **Add a note**: a textarea and Add note in the Notes section (`addOrderNote`, 1-2000 characters, admin-only), newest first. Notes are append-only: no edit or delete yet, and no idempotency key (a Note has no key column, so a deliberate second click adds a second note).
   - [x] **Quote a pair and record approval**: Send Quote (price in dollars, confirm step, one transaction sets `Item.priceCents` and moves Under Review to Quote Sent, audit action `QUOTE_SENT`, emails the customer) and "Customer approved" (Quote Sent to Approved, audit action `APPROVAL_RECORDED`, actor recorded). Update Status no longer offers Quote Sent or Approved; it still holds a pair at Approved until the Deposit is paid. The admin API route now applies the same rule (via `transitionItemStatus`).
   - [x] **Customer email on status change**: Quote Sent, Ready for Drop-Off/Shipping and Cancelled only (`src/features/orders/status-emails.ts`); internal steps stay silent.
-  - [ ] **Quote emails don't cover the Balance payment record**: the emails state the balance (quoted total less Deposit) but nothing creates or collects a Balance Payment yet. Drop-off fee and tax aren't in the quoted total until they're computed (see Open questions in CONTEXT.md).
+  - [x] **Balance payment record**: a PENDING `BALANCE` Payment (quoted total with Rush, less the Deposit, same formula as the quote email) is created in the transaction that readies the Order's last live pair, idempotent on `balance:<orderId>`. It follows a cancelled pair, is dropped (FAILED) when the Order is cancelled, and holds Completed until the owner marks it received (`confirmPayment`, audit `MANUAL_PAYMENT_CONFIRMED`). Still open: drop-off fee and tax aren't in the quoted total until they're computed (see Open questions in CONTEXT.md), and a dropped Balance shows as Failed because the schema has no Cancelled payment status.
   - [ ] **Email failures aren't retried**: a status/quote email that fails is logged (quote: the dialog tells the owner) and not resent; move to the outbox (ADR-0006) when it lands.
   - [ ] **Per-Service prices** on a pair are the catalog's base prices; the Suede Fee and a quoted minimum aren't broken out, and Bundle pairs show none.
-- [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges.
+- [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges. (The chips now open the shared range picker, still one range for the page.)
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
-- [ ] **Search** in the top bar: enable with the Orders screen, which it searches.
+- [x] **Search** in the top bar: submits to the All orders dialog (`?orders=all&q=`), which matches order number, name, email and phone.
 - [ ] **Booking reads Settings** (ADR-0016): the booking flow and `submitOrder` use `operating_hours` and `business_settings.allowLocalDropOff`/`allowMailIn` instead of `pickup-window.ts`, then drop `pickup-window.integration.test.ts`.
 - [ ] **Settings tabs not modeled yet:** Notifications, Payments, Shipping & Pickup, Email & Templates, Team (multi-admin, see "Still to grill") and Billing. Design each when its tab is designed.
 
@@ -201,7 +203,17 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
   - [ ] **Add the custom domain to the bucket CORS** once there is one (`docs/DEPLOYMENT.md`, "Adding an origin"), or uploads from it will fail.
   - [ ] **Clean up abandoned uploads** now and then: `STORAGE_CLEANUP_DATABASE_URL=<the database for this bucket> npm run storage:cleanup` (dry run), then add `-- --apply`. Uploads are throwaway once a booking copies them; this also removes uploads from bookings never submitted. It never reads `DATABASE_URL`, and refuses to delete if none of the database's photos are in the bucket. Could become a Vercel cron route later.
   - [ ] **Scope the storage keys** in Neon's console to this one bucket: read, write and **list**. `storage:cleanup` needs `s3:ListBucket`, and so does a clean "photo not uploaded" answer on AWS (without it, a missing object is a 403, which the app also handles).
-- [ ] **Turn on GitHub's security settings** (repo admin only): Dependabot security updates, secret scanning, and push protection, all under Settings → Code security. They were off at the vulnerability scan; see `docs/DEPLOYMENT.md`.
+- [ ] **`npm audit` reports 5 "high" findings, all one dev-only advisory: accepted until a patch exists** (checked 2026-10-03).
+  - **The advisory:** `braces` ≤ 3.0.3 can exhaust the stack on deeply nested glob patterns ([GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)). The other four entries are the chain that pulls it in: `eslint-config-next` → `@next/eslint-plugin-next` → `fast-glob` 3.3.1 (pinned) → `micromatch` → `braces`.
+  - **Why it's accepted:**
+    - No patched `braces` exists; 3.0.3 is the latest release.
+    - Even `@next/eslint-plugin-next` 16.3.8 pins the same `fast-glob`.
+    - It runs only inside ESLint, on glob patterns from our own config, so no user input reaches it, and it never ships to production.
+    - GitHub auto-dismissed it as Dependabot alert #39 (development scope).
+  - **Don't run `npm audit fix --force`.** It "fixes" this by downgrading `eslint-config-next` to 14.2.35, which breaks the lint setup on Next 16 and brings in a vulnerable `glob` (GHSA-5j98-mcp5-4vw2).
+  - **Re-check** when `braces` > 3.0.3 is published: `npm update braces` should then clear it with a lockfile-only change, no override needed.
+  - **Also due:** bump `next` and `eslint-config-next` to 16.3.8 once it's 7 days old (2026-10-07, the local `min-release-age`).
+- [ ] **Turn on GitHub's security settings** (repo admin only, Settings → Code security). Checked 2026-10-01: secret scanning is **on**; Dependabot security updates and push protection are still **off**. See `docs/DEPLOYMENT.md`.
 - [ ] **Content-Security-Policy: roll out to nonce-based enforcement.** `next.config.mjs` sends it as `Content-Security-Policy-Report-Only` (vulnerability scan, #88), so browsers only log what it would block. The target state isn't just "flip it to enforcing": it's **nonce- (or hash-) based scripts with no `'unsafe-inline'`**, which is transitional debt kept only because Next's inline bootstrap has no nonce yet. Rollout:
   1. Report-Only: browse a preview (landing, services, booking with a photo upload, admin) and collect violations.
   2. Tighten sources to what's actually used.
@@ -213,7 +225,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).
 - [ ] **Legacy orders with a blank `contactPhone`.** The ADR-0014 migration marked pre-booking-flow smoke-test orders that had no phone with `''`. Check production for any before launch.
 - [x] **Landing booking panel copy** now matches the catalog and ADR-0010 (#105): prices come from `SERVICE_CATALOG`, no prepaid-label promise, and the local tab is "Local Drop-Off".
-- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now: `chore/back-merge-ce98fe9` (0.2.2 `package.json` bump) needs a manual PR into `develop`.
+- [ ] **Release back-merge PR can't be opened automatically.** `release.yml`'s `back-merge-to-develop` job pushes `chore/back-merge-<sha>`, but `gh pr create` fails with "GitHub Actions is not permitted to create or approve pull requests" (repo setting is off). Turning the setting on isn't enough: PRs opened with `GITHUB_TOKEN` don't trigger CI, and `develop` requires the `test` check. Fix by giving the job a fine-grained PAT secret (Contents + Pull requests write) for `gh pr create`, or have the job print a compare link for a manual PR instead of failing. Pending now (checked 2026-10-01): five branches, `chore/back-merge-{ce98fe9,6ed92a8,78d9eba,a53335c,ca3b744}`, never reached `develop`, so `develop`'s `package.json` says 0.2.1 while `main` is 0.5.0. Only `package.json` and `package-lock.json` differ. One PR from `main` into `develop` would reconcile them, and then the stale branches can be deleted.
 
 ## Client feedback — landing page & booking flow (2026-09-26)
 Raw feedback checked against current code. Items already done or already

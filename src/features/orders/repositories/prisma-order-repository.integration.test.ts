@@ -16,7 +16,8 @@ import {
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
-  NoPendingDepositError,
+  NoPendingPaymentError,
+  CompletionHeldError,
   OrderChangedError,
   PhotoKeyInUseError,
   type NewItemInput,
@@ -82,6 +83,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [newItem()],
     ...overrides,
   };
@@ -275,6 +277,53 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(await prisma.order.count()).toBe(1);
   });
 
+  it("writes the admins' NEW_BOOKING notification with the Order, and none for a replay", async () => {
+    const { order } = await repo.create(newOrder({ submissionKey: "alert-1", alertBody: "Jordan · Standard Clean · Mail-In" }));
+    await repo.create(newOrder({ submissionKey: "alert-1" }));
+    const rows = await prisma.notification.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      kind: "NEW_BOOKING",
+      recipientAccountId: null,
+      orderId: order.id,
+      title: `New booking ATU-${order.number}`,
+      body: "Jordan · Standard Clean · Mail-In",
+      readAt: null,
+    });
+  });
+
+  it("writes no notification when the booking fails", async () => {
+    const dup = photos();
+    await repo.create(newOrder({ items: [newItem({ photos: dup })] }));
+    await prisma.notification.deleteMany();
+    await expect(repo.create(newOrder({ items: [newItem({ photos: dup })] }))).rejects.toThrow(PhotoKeyInUseError);
+    expect(await prisma.notification.count()).toBe(0);
+  });
+
+  it("lists the latest admin notifications newest first with the unread count, and marks them read", async () => {
+    for (let i = 0; i < 3; i++) await repo.create(newOrder({ alertBody: `booking ${i}` }));
+    // Another recipient's notification is neither listed nor counted nor marked.
+    const other = await prisma.account.create({ data: { role: "CUSTOMER", email: "someone@example.com", name: "S" } });
+    await prisma.notification.create({ data: { kind: "LOW_STOCK", title: "private", recipientAccountId: other.id } });
+
+    const first = await repo.listAdminNotifications(2);
+    expect(first.notifications.map((n) => n.body)).toEqual(["booking 2", "booking 1"]);
+    expect(first.unreadCount).toBe(3);
+
+    const at = new Date("2026-10-02T12:00:00Z");
+    await repo.markAdminNotificationsRead([first.notifications[0]!.id], at);
+    const afterOne = await repo.listAdminNotifications(10);
+    expect(afterOne.unreadCount).toBe(2);
+    expect(afterOne.notifications[0]!.readAt).toEqual(at);
+
+    await repo.markAdminNotificationsRead("all", new Date("2026-10-03T12:00:00Z"));
+    const afterAll = await repo.listAdminNotifications(10);
+    expect(afterAll.unreadCount).toBe(0);
+    expect(afterAll.notifications[0]!.readAt).toEqual(at); // already read: unchanged
+    expect(afterAll.notifications.some((n) => n.title === "private")).toBe(false);
+    expect((await prisma.notification.findFirst({ where: { title: "private" } }))?.readAt).toBeNull();
+  });
+
   it("records when the confirmation email was sent", async () => {
     const { order } = await repo.create(newOrder());
     expect(order.confirmationEmailSentAt).toBeNull();
@@ -435,10 +484,10 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     const cancelled = (await repo.create(newOrder({ deposit: Money.fromCents(8000) }))).order;
     await transition(cancelled.items[0]!.id, "CANCELLED", "REQUEST_SUBMITTED", "CANCELLED");
 
-    const summary = await repo.summarizeAwaitingDeposit();
+    const summary = await repo.summarizeAwaitingPayments();
 
-    expect(summary.orders).toBe(2);
-    expect(summary.deposits.cents).toBe(4000);
+    expect(summary.payments).toBe(2);
+    expect(summary.amount.cents).toBe(4000);
     expect(summary.byMethod).toEqual({ ZELLE: 1, CASH: 1, CARD: 0, APPLE_PAY: 0 });
   });
 });
@@ -543,7 +592,8 @@ describe("admin-screen data: reviews, notes, stock, payments (integration)", () 
     await prisma.notification.create({ data: { kind: "NEW_BOOKING", title: "New booking", orderId: order.id } });
 
     expect(await prisma.note.count({ where: { accountId: order.accountId } })).toBe(2);
-    expect(await prisma.notification.count({ where: { readAt: null } })).toBe(1);
+    // The booking's own NEW_BOOKING alert plus this one.
+    expect(await prisma.notification.count({ where: { readAt: null } })).toBe(2);
   });
 
   it("tracks stock changes, never a zero change, with unique SKUs", async () => {
@@ -585,7 +635,7 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
     expect(retry).toBeNull();
     expect(deposit).toMatchObject({ status: "RECEIVED", idempotencyKey: "confirm-1" });
     expect(deposit.receivedAt).toBeInstanceOf(Date);
-    expect((await repo.summarizeAwaitingDeposit()).orders).toBe(0);
+    expect((await repo.summarizeAwaitingPayments()).payments).toBe(0);
   });
 
   it("leaves the Deposit alone on other transitions", async () => {
@@ -633,17 +683,59 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
   it("completes a SCHEDULED Appointment, idempotently, and never a cancelled or missing one", async () => {
     const { order } = await repo.create(newOrder());
     const appointmentId = order.appointments[0]!.id;
+    const complete = (id: string) => repo.completeAppointment({ appointmentId: id, actorAccountId: null });
 
-    expect((await repo.completeAppointment(appointmentId)).status).toBe("COMPLETED");
-    expect((await repo.completeAppointment(appointmentId)).status).toBe("COMPLETED");
-    // Only the Appointment moves: the pair's status is transitionItemStatus's business.
+    expect((await complete(appointmentId)).appointment.status).toBe("COMPLETED");
+    expect((await complete(appointmentId)).appointment.status).toBe("COMPLETED");
+    // A pair that isn't approved yet stays where it is.
     expect((await repo.findById(order.id))!.items[0]!.status).toBe("REQUEST_SUBMITTED");
 
     const calledOff = (await repo.create(newOrder())).order.appointments[0]!.id;
     await prisma.appointment.update({ where: { id: calledOff }, data: { status: "CANCELLED" } });
-    await expect(repo.completeAppointment(calledOff)).rejects.toThrow(AppointmentCancelledError);
+    await expect(complete(calledOff)).rejects.toThrow(AppointmentCancelledError);
     expect((await repo.findAppointment(calledOff))!.appointment.status).toBe("CANCELLED");
-    await expect(repo.completeAppointment("no-such-appointment")).rejects.toThrow(AppointmentNotFoundError);
+    await expect(complete("no-such-appointment")).rejects.toThrow(AppointmentNotFoundError);
+  });
+
+  it("completing a Collection moves its Awaiting Sneakers pairs to In Progress, audited with the reason, and a replay moves nothing", async () => {
+    const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
+    await prisma.item.update({ where: { id: order.items[0]!.id }, data: { status: "AWAITING_SNEAKERS" } });
+    await prisma.item.update({ where: { id: order.items[1]!.id }, data: { status: "UNDER_REVIEW" } });
+    await prisma.item.update({ where: { id: order.items[2]!.id }, data: { status: "CANCELLED" } });
+    const appointmentId = order.appointments[0]!.id;
+
+    const done = await repo.completeAppointment({ appointmentId, actorAccountId: null });
+
+    expect(done.moves).toEqual([{ itemId: order.items[0]!.id, from: "AWAITING_SNEAKERS", to: "IN_PROGRESS" }]);
+    expect(done.stays).toEqual([{ itemId: order.items[1]!.id, status: "UNDER_REVIEW", reason: "Not approved yet." }]);
+    expect((await repo.findById(order.id))!.items.map((item) => item.status)).toEqual(["IN_PROGRESS", "UNDER_REVIEW", "CANCELLED"]);
+    const audit = await prisma.itemAuditEntry.findMany({ where: { item: { orderId: order.id } } });
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ itemId: order.items[0]!.id, action: "STATUS_TRANSITION", fromStatus: "AWAITING_SNEAKERS", toStatus: "IN_PROGRESS", metadata: { reason: "COLLECTION_COMPLETED" } });
+
+    await prisma.item.update({ where: { id: order.items[0]!.id }, data: { status: "AWAITING_SNEAKERS" } });
+    expect(await repo.completeAppointment({ appointmentId, actorAccountId: null })).toMatchObject({ moves: [], stays: [], alreadyCompleted: true });
+    expect((await repo.findById(order.id))!.items[0]!.status).toBe("AWAITING_SNEAKERS");
+    expect(await prisma.itemAuditEntry.count({ where: { item: { orderId: order.id } } })).toBe(1);
+  });
+
+  it("completing a Return moves Ready pairs to Completed unless the Balance is pending", async () => {
+    const { order } = await repo.create(newOrder());
+    await prisma.item.update({ where: { id: order.items[0]!.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } });
+    await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
+    await prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "ZELLE", amountCents: 1500, idempotencyKey: `balance:${order.id}` } });
+    const returnVisit = await prisma.appointment.create({ data: { orderId: order.id, kind: "RETURN", startsAt: new Date("2026-10-05T20:00:00Z"), endsAt: new Date("2026-10-05T20:30:00Z") } });
+
+    const held = await repo.completeAppointment({ appointmentId: returnVisit.id, actorAccountId: null });
+    expect(held.moves).toEqual([]);
+    expect(held.stays).toEqual([expect.objectContaining({ status: "READY_FOR_PICKUP_SHIPPING", reason: expect.stringContaining("Balance") })]);
+
+    await prisma.appointment.update({ where: { id: returnVisit.id }, data: { status: "SCHEDULED" } });
+    await prisma.payment.updateMany({ where: { orderId: order.id, kind: "BALANCE" }, data: { status: "RECEIVED", receivedAt: new Date() } });
+    const done = await repo.completeAppointment({ appointmentId: returnVisit.id, actorAccountId: null });
+
+    expect(done.moves).toEqual([{ itemId: order.items[0]!.id, from: "READY_FOR_PICKUP_SHIPPING", to: "COMPLETED" }]);
+    expect((await repo.findById(order.id))!.items[0]!.status).toBe("COMPLETED");
   });
 });
 
@@ -748,11 +840,11 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
     await prisma.order.update({ where: { id: newer.id }, data: { createdAt: new Date("2026-09-29T12:00:00Z") } });
     await prisma.order.update({ where: { id: older.id }, data: { createdAt: new Date("2026-09-28T12:00:00Z") } });
 
-    const rows = await repo.listAwaitingDeposit();
+    const rows = await repo.listAwaitingPayments();
 
     expect(rows.map((row) => row.orderId)).toEqual([older.id, newer.id]);
-    expect(rows[1]).toMatchObject({ number: newer.number, contactName: "Newer", deposit: { method: "CASH", amount: Money.fromCents(2500) } });
-    expect(rows.length).toBe((await repo.summarizeAwaitingDeposit()).orders);
+    expect(rows[1]).toMatchObject({ kind: "DEPOSIT", number: newer.number, contactName: "Newer", payment: { method: "CASH", amount: Money.fromCents(2500) } });
+    expect(rows.length).toBe((await repo.summarizeAwaitingPayments()).payments);
   });
 
   it("lists Orders with an Item in the given statuses, oldest first", async () => {
@@ -769,13 +861,14 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
   it("confirms a Deposit once: the Payment is RECEIVED and each live Item is audited, with no status change", async () => {
     const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
     await cancelItem(order.items[2]!.id);
-    const confirm = (key: string) => repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: key });
+    const depositId = order.payments[0]!.id;
+    const confirm = (key: string) => repo.confirmPayment({ paymentId: depositId, method: "CASH", actorAccountId: null, idempotencyKey: key });
 
     expect(await confirm("k1")).toBe(true);
     expect(await confirm("k1")).toBe(false); // a retry, not an error
 
     const deposit = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id, kind: "DEPOSIT" } });
-    expect(deposit).toMatchObject({ status: "RECEIVED", idempotencyKey: "k1" });
+    expect(deposit).toMatchObject({ status: "RECEIVED", method: "CASH", idempotencyKey: "k1" });
     expect(deposit.receivedAt).toBeInstanceOf(Date);
     const audits = await prisma.itemAuditEntry.findMany({ where: { action: "MANUAL_PAYMENT_CONFIRMED", item: { orderId: order.id } } });
     expect(audits.map((entry) => entry.itemId).sort()).toEqual([order.items[0]!.id, order.items[1]!.id].sort());
@@ -785,7 +878,7 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
       "REQUEST_SUBMITTED",
       "CANCELLED",
     ]);
-    expect(await repo.listAwaitingDeposit()).toEqual([]);
+    expect(await repo.listAwaitingPayments()).toEqual([]);
     // The Order detail timeline reads status changes: the confirmation isn't one.
     expect((await repo.listStatusChanges(order.id)).map((change) => change.toStatus)).toEqual(["CANCELLED"]);
   });
@@ -823,12 +916,14 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
 
   it("refuses a second confirmation with a new key, and a fully cancelled Order, having written nothing", async () => {
     const { order } = await repo.create(newOrder());
-    await repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: "k1" });
-    await expect(repo.confirmDeposit({ orderId: order.id, actorAccountId: null, idempotencyKey: "k2" })).rejects.toThrow(NoPendingDepositError);
+    const confirm = (paymentId: string, key: string) => repo.confirmPayment({ paymentId, method: "ZELLE", actorAccountId: null, idempotencyKey: key });
+    await confirm(order.payments[0]!.id, "k1");
+    await expect(confirm(order.payments[0]!.id, "k2")).rejects.toThrow(NoPendingPaymentError);
 
     const gone = (await repo.create(newOrder())).order;
     await cancelItem(gone.items[0]!.id);
-    await expect(repo.confirmDeposit({ orderId: gone.id, actorAccountId: null, idempotencyKey: "k3" })).rejects.toThrow(NoPendingDepositError);
+    await expect(confirm(gone.payments[0]!.id, "k3")).rejects.toThrow(NoPendingPaymentError);
+    await expect(confirm("no-such-payment", "k4")).rejects.toThrow(NoPendingPaymentError);
     expect((await prisma.payment.findFirstOrThrow({ where: { orderId: gone.id } })).status).toBe("PENDING");
     expect(await prisma.itemAuditEntry.count({ where: { idempotencyKey: { in: ["k2", "k3"] } } })).toBe(0);
   });
@@ -912,5 +1007,133 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
       expect((await repo.listOrderNotes(order.id)).map((n) => n.body)).toEqual(["Call first.", "Second."]);
       await expect(repo.addOrderNote({ orderId: "nope", authorAccountId: null, body: "x" })).rejects.toThrow(OrderNotFoundError);
     });
+  });
+});
+
+describe("PrismaOrderRepository Balance Payment (integration)", () => {
+  const move = (itemId: string, from: string, to: string) =>
+    repo.transitionItemStatus({
+      itemId,
+      toStatus: to as never,
+      entry: { action: "STATUS_TRANSITION", fromStatus: from as never, toStatus: to as never, actorAccountId: null, idempotencyKey: null },
+    });
+  const balanceOf = (orderId: string) => prisma.payment.findFirst({ where: { orderId, kind: "BALANCE" } });
+
+  /** An Order whose pairs are quoted and in Quality Check, its Deposit paid by Cash. */
+  async function quotedOrder(prices: number[]) {
+    const { order } = await repo.create(newOrder({ items: prices.map(() => newItem()), depositPayment: { method: "CASH", amount: Money.fromCents(1500) } }));
+    await prisma.payment.updateMany({ where: { orderId: order.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
+    for (const [index, item] of order.items.entries()) {
+      await prisma.item.update({ where: { id: item.id }, data: { status: "QUALITY_CHECK", priceCents: prices[index] } });
+    }
+    return order;
+  }
+
+  it("is created with the transition that readies the last live pair: PENDING, the quoted total less the Deposit, the Deposit's method", async () => {
+    const order = await quotedOrder([4000, 6000]);
+    await move(order.items[0]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    expect(await balanceOf(order.id)).toBeNull();
+
+    await move(order.items[1]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+
+    expect(await balanceOf(order.id)).toMatchObject({ status: "PENDING", method: "CASH", amountCents: 8500, idempotencyKey: `balance:${order.id}` });
+    expect((await repo.listAwaitingPayments()).map((row) => row.kind)).toEqual(["BALANCE"]);
+  });
+
+  it("follows a cancelled pair, is dropped when the Order is cancelled, and isn't made when the Deposit covers it", async () => {
+    const order = await quotedOrder([4000, 6000, 2000]);
+    await move(order.items[0]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    await move(order.items[1]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    await move(order.items[2]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    expect((await balanceOf(order.id))!.amountCents).toBe(10500);
+
+    await move(order.items[1]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED");
+    expect((await balanceOf(order.id))!.amountCents).toBe(4500);
+    await move(order.items[0]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED");
+    await move(order.items[2]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED");
+    expect(await balanceOf(order.id)).toMatchObject({ status: "FAILED", failureReason: "The order was cancelled." });
+    expect(await repo.listAwaitingPayments()).toEqual([]);
+
+    const covered = await quotedOrder([1500]);
+    await move(covered.items[0]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    expect(await balanceOf(covered.id)).toBeNull();
+  });
+
+  it("is confirmed once, by the method it arrived by, keeping its fixed key; a retry changes nothing", async () => {
+    const order = await quotedOrder([4000]);
+    await move(order.items[0]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    const balance = (await balanceOf(order.id))!;
+    const confirm = (key: string) => repo.confirmPayment({ paymentId: balance.id, method: "ZELLE", actorAccountId: null, idempotencyKey: key });
+
+    expect(await confirm("b1")).toBe(true);
+    expect(await confirm("b1")).toBe(false);
+
+    expect(await balanceOf(order.id)).toMatchObject({ status: "RECEIVED", method: "ZELLE", idempotencyKey: `balance:${order.id}` });
+    expect(await prisma.itemAuditEntry.count({ where: { idempotencyKey: "b1", action: "MANUAL_PAYMENT_CONFIRMED", item: { orderId: order.id } } })).toBe(1);
+    await expect(confirm("b2")).rejects.toThrow(NoPendingPaymentError);
+  });
+
+  it("two concurrent transitions readying the last two pairs create exactly one Balance", async () => {
+    for (let round = 0; round < 5; round++) {
+      const order = await quotedOrder([4000, 6000]);
+      await Promise.all(order.items.map((item) => move(item.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING")));
+
+      const balances = await prisma.payment.findMany({ where: { orderId: order.id, kind: "BALANCE" } });
+      expect(balances).toHaveLength(1);
+      expect(balances[0]).toMatchObject({ status: "PENDING", amountCents: 8500 });
+    }
+  });
+
+  it("two concurrent cancels leave the Balance right: the remaining amount, or FAILED when none are left", async () => {
+    for (let round = 0; round < 5; round++) {
+      const order = await quotedOrder([4000, 6000, 2000]);
+      for (const item of order.items) await move(item.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+
+      await Promise.all([move(order.items[1]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED"), move(order.items[2]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED")]);
+      expect(await balanceOf(order.id)).toMatchObject({ status: "PENDING", amountCents: 2500 });
+
+      await move(order.items[0]!.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED");
+      expect((await balanceOf(order.id))!.status).toBe("FAILED");
+    }
+  });
+
+  it("two concurrent cancels of every pair of a ready Order drop the Balance", async () => {
+    const order = await quotedOrder([4000, 6000]);
+    await Promise.all(order.items.map((item) => move(item.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING")));
+    await Promise.all(order.items.map((item) => move(item.id, "READY_FOR_PICKUP_SHIPPING", "CANCELLED")));
+    expect((await balanceOf(order.id))!.status).toBe("FAILED");
+  });
+
+  it("refuses Completed on the locked Order while the Balance is pending, when asked to enforce the hold", async () => {
+    const order = await quotedOrder([4000]);
+    await move(order.items[0]!.id, "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING");
+    await expect(
+      repo.transitionItemStatus({
+        itemId: order.items[0]!.id,
+        toStatus: "COMPLETED",
+        enforceCompletionHold: true,
+        entry: { action: "STATUS_TRANSITION", fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", actorAccountId: null, idempotencyKey: null },
+      }),
+    ).rejects.toThrow(CompletionHeldError);
+    expect((await prisma.item.findUniqueOrThrow({ where: { id: order.items[0]!.id } })).status).toBe("READY_FOR_PICKUP_SHIPPING");
+  });
+
+  it("ensureBalance creates a missing Balance once for an Order that was ready before Balances, and is a no-op otherwise", async () => {
+    const order = await quotedOrder([4000, 6000]);
+    await prisma.item.updateMany({ where: { orderId: order.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } }); // no transition, so no Balance
+    expect(await balanceOf(order.id)).toBeNull();
+
+    expect(await repo.ensureBalance(order.id)).toBe(true);
+    expect(await repo.ensureBalance(order.id)).toBe(false);
+    expect(await balanceOf(order.id)).toMatchObject({ status: "PENDING", method: "CASH", amountCents: 8500, idempotencyKey: `balance:${order.id}` });
+    expect(await prisma.payment.count({ where: { orderId: order.id, kind: "BALANCE" } })).toBe(1);
+
+    const notReady = await quotedOrder([4000]);
+    expect(await repo.ensureBalance(notReady.id)).toBe(false);
+    const covered = await quotedOrder([1500]);
+    await prisma.item.updateMany({ where: { orderId: covered.id }, data: { status: "READY_FOR_PICKUP_SHIPPING" } });
+    expect(await repo.ensureBalance(covered.id)).toBe(false);
+    expect(await balanceOf(covered.id)).toBeNull();
+    await expect(repo.ensureBalance("no-such-order")).rejects.toThrow(OrderNotFoundError);
   });
 });

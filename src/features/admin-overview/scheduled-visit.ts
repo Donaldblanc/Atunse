@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { calendarDateInShopTime, calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
-import { liveEstimate, livePairs, orderNumber, type Address, type Appointment } from "@/features/orders/domain";
+import { liveEstimate, livePairs, orderNumber, planVisitMoves, type Address, type Appointment, type VisitPlan } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import type { Money } from "@/shared/money/money";
 import { servicesSummary, visitTime, type AdminOverviewDeps } from "./get-admin-overview";
@@ -25,6 +25,10 @@ export interface ScheduledVisitDetail {
   date: string;
   /** The owner's note on the visit, or null. */
   notes: string | null;
+  /** Each pair's name in this Order (itemId to "Pair 2 (Nike Air Max 90)"), for the lists of who moved and who didn't. */
+  pairLabels: Record<string, string>;
+  /** What completing a SCHEDULED visit would do to the pairs (planVisitMoves); empty once it isn't scheduled. */
+  plan: VisitPlan;
   customer: {
     name: string;
     phone: string;
@@ -49,6 +53,13 @@ export interface ScheduledVisitDetail {
 }
 
 const visitDate = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** An admin's name for one pair: "Pair 2 (Nike Air Max 90)", or just "The pair" when the Order has one. */
+export function pairLabel(order: { items: { brand: string | null; model: string | null }[] }, index: number): string {
+  if (order.items.length === 1) return "The pair";
+  const title = [order.items[index]!.brand, order.items[index]!.model].filter(Boolean).join(" ");
+  return `Pair ${index + 1}${title ? ` (${title})` : ""}`;
+}
 
 export function formatAddress(address: Address): string {
   return [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter(Boolean).join(", ");
@@ -86,6 +97,8 @@ export async function getScheduledVisit(
     // Formatted from the shop-time day, so an evening visit never shows the next UTC day.
     date: visitDate.format(calendarDateToUtcMidnight(calendarDateInShopTime(appointment.startsAt))),
     notes: appointment.notes?.trim() || null,
+    pairLabels: Object.fromEntries(order.items.map((item, index) => [item.id, pairLabel(order, index)])),
+    plan: appointment.status === "SCHEDULED" ? planVisitMoves(appointment.kind, order) : { moves: [], stays: [] },
     customer: { name: order.contactName, phone: order.contactPhone, email: order.contactEmail, address: formatAddress(order.fulfillment.address) },
     order: {
       id: order.id,

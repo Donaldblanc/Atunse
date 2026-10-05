@@ -6,15 +6,16 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
   BundleNotFoundError,
+  CompletionHeldError,
   EmailTakenError,
   ItemNotFoundError,
   ItemStatusChangedError,
-  NoPendingDepositError,
+  NoPendingPaymentError,
   OrderChangedError,
   OrderNotFoundError,
   PhotoKeyInUseError,
@@ -23,10 +24,12 @@ import {
   AppointmentNotFoundError,
   AppointmentNotScheduledError,
   ReturnAlreadyBookedError,
+  type AdminNotification,
   type AppointmentWithOrder,
-  type AwaitingDepositOrder,
-  type AwaitingDeposits,
+  type AwaitingPaymentRow,
+  type AwaitingPayments,
   type BookedOrder,
+  type CompletedVisit,
   type NewOrderInput,
   type OrderNote,
   type OrderRepository,
@@ -46,6 +49,8 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly auditEntries: (AuditEntry & { itemId: string; at?: Date })[] = [];
   /** Notes about Orders; nothing writes them yet, so tests seed this directly. */
   readonly notes: (OrderNote & { orderId: string })[] = [];
+  /** Every Notification written, newest last; recipient null means every admin. */
+  readonly notifications: (AdminNotification & { recipientAccountId: string | null })[] = [];
   private lastNumber = 1000;
   private readonly orderIdsBySubmissionKey = new Map<string, string>();
   private readonly uploadKeysInUse = new Set<string>();
@@ -137,8 +142,34 @@ export class InMemoryOrderRepository implements OrderRepository {
     };
     for (const key of uploadKeys) this.uploadKeysInUse.add(key);
     this.orders.set(order.id, order);
+    this.notifications.push({
+      id: fakeId("notification"),
+      kind: "NEW_BOOKING",
+      recipientAccountId: null,
+      title: `New booking ${orderNumber(order.number)}`,
+      body: input.alertBody,
+      orderId: order.id,
+      readAt: null,
+      createdAt: new Date(),
+    });
     if (input.submissionKey) this.orderIdsBySubmissionKey.set(input.submissionKey, order.id);
     return { order, created: true };
+  }
+
+  async listAdminNotifications(limit: number): Promise<{ notifications: AdminNotification[]; unreadCount: number }> {
+    const mine = this.notifications.filter((n) => n.recipientAccountId === null);
+    // Newest first; ties (same millisecond) fall back to insertion order, newest last written first.
+    const newestFirst = mine.map((n, i) => ({ n, i })).sort((a, b) => b.n.createdAt.getTime() - a.n.createdAt.getTime() || b.i - a.i);
+    return {
+      notifications: newestFirst.slice(0, limit).map(({ n }) => ({ id: n.id, kind: n.kind, title: n.title, body: n.body, orderId: n.orderId, readAt: n.readAt, createdAt: n.createdAt })),
+      unreadCount: mine.filter((n) => n.readAt === null).length,
+    };
+  }
+
+  async markAdminNotificationsRead(ids: string[] | "all", at: Date): Promise<void> {
+    for (const n of this.notifications) {
+      if (n.recipientAccountId === null && n.readAt === null && (ids === "all" || ids.includes(n.id))) n.readAt = at;
+    }
   }
 
   async findById(orderId: string): Promise<Order | null> {
@@ -161,12 +192,17 @@ export class InMemoryOrderRepository implements OrderRepository {
     entry: AuditEntry;
     receivesDeposit?: boolean;
     price?: Money;
+    enforceCompletionHold?: boolean;
   }): Promise<Item | null> {
     const key = params.entry.idempotencyKey ? `${params.itemId}:${params.entry.idempotencyKey}` : null;
     if (key && this.appliedIdempotencyKeys.has(key)) return null;
 
     const item = [...this.orders.values()].flatMap((o) => o.items).find((i) => i.id === params.itemId);
     if (!item) throw new ItemNotFoundError(params.itemId);
+    if (params.enforceCompletionHold && params.toStatus === "COMPLETED") {
+      const reason = completionHold(this.orders.get(item.orderId)!);
+      if (reason) throw new CompletionHeldError(reason);
+    }
     if (params.entry.fromStatus && item.status !== params.entry.fromStatus) throw new ItemStatusChangedError(item.status);
 
     item.status = params.toStatus;
@@ -177,7 +213,34 @@ export class InMemoryOrderRepository implements OrderRepository {
       const deposit = this.orders.get(item.orderId)?.payments.find((p) => p.kind === "DEPOSIT" && p.status === "PENDING");
       if (deposit) Object.assign(deposit, { status: "RECEIVED", receivedAt: new Date() });
     }
+    this.settleBalance(item.orderId);
     return item;
+  }
+
+  async ensureBalance(orderId: string): Promise<boolean> {
+    if (!this.orders.has(orderId)) throw new OrderNotFoundError(orderId);
+    return this.settleBalance(orderId, true);
+  }
+
+  /** Applies planBalance (domain.ts) to the Order, like the Prisma repository does inside its transaction. */
+  private settleBalance(orderId: string, createOnly = false): boolean {
+    const order = this.orders.get(orderId);
+    if (!order) return false;
+    const change = planBalance(order);
+    if (createOnly && change.type !== "create") return false;
+    switch (change.type) {
+      case "create":
+        order.payments.push({ id: fakeId("payment"), kind: "BALANCE", method: change.method, amount: change.amount, status: "PENDING", receivedAt: null, createdAt: new Date() });
+        return true;
+      case "update":
+        Object.assign(order.payments.find((payment) => payment.id === change.paymentId)!, { amount: change.amount });
+        return false;
+      case "cancel":
+        Object.assign(order.payments.find((payment) => payment.id === change.paymentId)!, { status: "FAILED" });
+        return false;
+      case "none":
+        return false;
+    }
   }
 
   async listBookedBetween(from: Date, to: Date): Promise<BookedOrder[]> {
@@ -216,20 +279,22 @@ export class InMemoryOrderRepository implements OrderRepository {
     return counts;
   }
 
-  /** The Orders whose Deposit is PENDING and that still have a live pair: the one rule behind the summary, the list and confirmDeposit. */
-  private awaitingDeposits(): { order: Order; payment: Payment }[] {
+  /** The Deposits and Balances that are PENDING on an Order with a live pair: the one rule behind the summary, the list and confirmPayment. */
+  private awaitingPayments(): { order: Order; payment: Payment }[] {
     return [...this.orders.values()]
       .filter((order) => livePairs(order).length > 0)
-      .flatMap((order) => order.payments.filter((payment) => payment.kind === "DEPOSIT" && payment.status === "PENDING").map((payment) => ({ order, payment })));
+      .flatMap((order) =>
+        order.payments.filter((payment) => (payment.kind === "DEPOSIT" || payment.kind === "BALANCE") && payment.status === "PENDING").map((payment) => ({ order, payment })),
+      );
   }
 
-  async summarizeAwaitingDeposit(): Promise<AwaitingDeposits> {
-    const pending = this.awaitingDeposits().map(({ payment }) => payment);
+  async summarizeAwaitingPayments(): Promise<AwaitingPayments> {
+    const pending = this.awaitingPayments().map(({ payment }) => payment);
     const byMethod: Record<PaymentMethod, number> = { ZELLE: 0, CASH: 0, CARD: 0, APPLE_PAY: 0 };
     for (const payment of pending) byMethod[payment.method] += 1;
     return {
-      orders: pending.length,
-      deposits: pending.reduce((sum, payment) => sum.add(payment.amount), Money.zero()),
+      payments: pending.length,
+      amount: pending.reduce((sum, payment) => sum.add(payment.amount), Money.zero()),
       byMethod,
     };
   }
@@ -257,22 +322,44 @@ export class InMemoryOrderRepository implements OrderRepository {
     return null;
   }
 
-  async completeAppointment(appointmentId: string): Promise<Appointment> {
-    const found = await this.findAppointment(appointmentId);
-    if (!found) throw new AppointmentNotFoundError(appointmentId);
-    if (found.appointment.status === "CANCELLED") throw new AppointmentCancelledError();
-    found.appointment.status = "COMPLETED";
-    return found.appointment;
+  async completeAppointment(params: { appointmentId: string; actorAccountId: string | null }): Promise<CompletedVisit> {
+    const found = await this.findAppointment(params.appointmentId);
+    if (!found) throw new AppointmentNotFoundError(params.appointmentId);
+    const { appointment, order } = found;
+    if (appointment.status === "CANCELLED") throw new AppointmentCancelledError();
+    if (appointment.status === "COMPLETED") return { appointment, moves: [], stays: [], alreadyCompleted: true };
+    appointment.status = "COMPLETED";
+
+    const plan = planVisitMoves(appointment.kind, order);
+    const reason = appointment.kind === "COLLECTION" ? COLLECTION_COMPLETED : RETURN_COMPLETED;
+    for (const move of plan.moves) {
+      order.items.find((item) => item.id === move.itemId)!.status = move.to;
+      const key = `visit:${appointment.id}`;
+      this.appliedIdempotencyKeys.add(`${move.itemId}:${key}`);
+      this.auditEntries.push({
+        action: "STATUS_TRANSITION",
+        fromStatus: move.from,
+        toStatus: move.to,
+        actorAccountId: params.actorAccountId,
+        idempotencyKey: key,
+        metadata: { reason },
+        itemId: move.itemId,
+        at: new Date(),
+      });
+    }
+    return { appointment, ...plan, alreadyCompleted: false };
   }
 
-  async listAwaitingDeposit(): Promise<AwaitingDepositOrder[]> {
-    return this.awaitingDeposits()
+  async listAwaitingPayments(): Promise<AwaitingPaymentRow[]> {
+    return this.awaitingPayments()
       .map(({ order, payment }) => ({
+        paymentId: payment.id,
+        kind: payment.kind as AwaitingPaymentRow["kind"],
         orderId: order.id,
         number: order.number,
         contactName: order.contactName,
         createdAt: order.createdAt,
-        deposit: { method: payment.method, amount: payment.amount },
+        payment: { method: payment.method, amount: payment.amount },
       }))
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
@@ -283,15 +370,16 @@ export class InMemoryOrderRepository implements OrderRepository {
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
-  async confirmDeposit(params: { orderId: string; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
-    const order = this.orders.get(params.orderId);
+  async confirmPayment(params: { paymentId: string; method: PaymentMethod; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
+    const order = [...this.orders.values()].find((candidate) => candidate.payments.some((payment) => payment.id === params.paymentId));
+    if (!order) throw new NoPendingPaymentError(params.paymentId);
     const keyOf = (itemId: string) => `${itemId}:${params.idempotencyKey}`;
-    if (order?.items.some((item) => this.appliedIdempotencyKeys.has(keyOf(item.id)))) return false;
+    if (order.items.some((item) => this.appliedIdempotencyKeys.has(keyOf(item.id)))) return false;
 
-    const awaiting = this.awaitingDeposits().find((entry) => entry.order.id === params.orderId);
-    if (!order || !awaiting) throw new NoPendingDepositError(params.orderId);
+    const awaiting = this.awaitingPayments().find((entry) => entry.payment.id === params.paymentId);
+    if (!awaiting) throw new NoPendingPaymentError(params.paymentId);
 
-    Object.assign(awaiting.payment, { status: "RECEIVED", receivedAt: new Date() });
+    Object.assign(awaiting.payment, { status: "RECEIVED", receivedAt: new Date(), method: params.method });
     for (const item of livePairs(order)) {
       this.appliedIdempotencyKeys.add(keyOf(item.id));
       this.auditEntries.push({
@@ -300,6 +388,7 @@ export class InMemoryOrderRepository implements OrderRepository {
         toStatus: item.status,
         actorAccountId: params.actorAccountId,
         idempotencyKey: params.idempotencyKey,
+        metadata: { paymentId: params.paymentId, kind: awaiting.payment.kind, method: params.method },
         itemId: item.id,
       });
     }

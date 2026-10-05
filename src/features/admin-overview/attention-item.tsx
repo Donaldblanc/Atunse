@@ -9,7 +9,6 @@ export function AttentionItem({
   detail,
   count,
   href,
-  sampleTag,
 }: {
   tone: "red" | "orange" | "blue" | "violet" | "gray";
   icon: Icon;
@@ -18,8 +17,6 @@ export function AttentionItem({
   count: number;
   /** The panel it opens (`?attention=…`). Left out for sample data, which has nothing to open. */
   href?: string;
-  /** Shown beside the count when the count is sample data, not real. */
-  sampleTag?: React.ReactNode;
 }) {
   const content = (
     <>
@@ -30,7 +27,6 @@ export function AttentionItem({
         <strong>{title}</strong>
         <span>{detail}</span>
       </span>
-      {sampleTag}
       <span className="ov-attention-count" data-alert={tone === "red" && count > 0 ? "true" : undefined}>
         {count}
       </span>

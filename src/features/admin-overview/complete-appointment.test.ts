@@ -28,6 +28,7 @@ async function seed() {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [{ brand: null, model: null, description: null, material: null, serviceIds: ["premium"], estimate: Money.fromCents(4000), photos: [] }],
   });
   return { orders, order, appointmentId: order.appointments[0]!.id };
@@ -40,12 +41,12 @@ describe("completeAppointment", () => {
     expect((await orders.findAppointment(appointmentId))!.appointment.status).toBe("SCHEDULED");
   });
 
-  it("marks a SCHEDULED Appointment COMPLETED and leaves the pairs' statuses alone", async () => {
+  it("marks a SCHEDULED Appointment COMPLETED and leaves pairs that aren't approved where they are", async () => {
     const { orders, order, appointmentId } = await seed();
 
     const done = await completeAppointment({ orders }, ADMIN, { appointmentId });
 
-    expect(done.status).toBe("COMPLETED");
+    expect(done.appointment.status).toBe("COMPLETED");
     expect((await orders.findAppointment(appointmentId))!.appointment.status).toBe("COMPLETED");
     expect(order.items[0]!.status).toBe("REQUEST_SUBMITTED");
   });
@@ -53,7 +54,7 @@ describe("completeAppointment", () => {
   it("succeeds again when it is already COMPLETED", async () => {
     const { orders, appointmentId } = await seed();
     await completeAppointment({ orders }, ADMIN, { appointmentId });
-    expect((await completeAppointment({ orders }, ADMIN, { appointmentId })).status).toBe("COMPLETED");
+    expect((await completeAppointment({ orders }, ADMIN, { appointmentId })).appointment.status).toBe("COMPLETED");
   });
 
   it("refuses a CANCELLED Appointment and changes nothing", async () => {
@@ -66,5 +67,67 @@ describe("completeAppointment", () => {
   it("refuses an id no Appointment has", async () => {
     const { orders } = await seed();
     await expect(completeAppointment({ orders }, ADMIN, { appointmentId: "missing" })).rejects.toThrow(AppointmentNotFoundError);
+  });
+
+  describe("moving the pairs", () => {
+    it("takes each Awaiting Sneakers pair to In Progress, audited as COLLECTION_COMPLETED, and says who stayed and why", async () => {
+      const { orders, order, appointmentId } = await seed();
+      const second = { ...order.items[0]!, id: "item_second" };
+      const third = { ...order.items[0]!, id: "item_third" };
+      order.items.push(second, third);
+      order.items[0]!.status = "AWAITING_SNEAKERS";
+      second.status = "UNDER_REVIEW";
+      third.status = "CANCELLED";
+
+      const done = await completeAppointment({ orders }, ADMIN, { appointmentId });
+
+      expect(done.moves).toEqual([{ itemId: order.items[0]!.id, from: "AWAITING_SNEAKERS", to: "IN_PROGRESS" }]);
+      expect(done.stays).toEqual([{ itemId: "item_second", status: "UNDER_REVIEW", reason: "Not approved yet." }]);
+      expect(order.items.map((item) => item.status)).toEqual(["IN_PROGRESS", "UNDER_REVIEW", "CANCELLED"]);
+      expect(orders.auditEntries).toEqual([
+        expect.objectContaining({
+          itemId: order.items[0]!.id,
+          action: "STATUS_TRANSITION",
+          fromStatus: "AWAITING_SNEAKERS",
+          toStatus: "IN_PROGRESS",
+          actorAccountId: "acc_admin",
+          metadata: { reason: "COLLECTION_COMPLETED" },
+        }),
+      ]);
+    });
+
+    it("moves nothing on a replay", async () => {
+      const { orders, order, appointmentId } = await seed();
+      order.items[0]!.status = "AWAITING_SNEAKERS";
+      await completeAppointment({ orders }, ADMIN, { appointmentId });
+      order.items[0]!.status = "AWAITING_SNEAKERS"; // pretend it is back, to prove the replay doesn't act
+
+      const again = await completeAppointment({ orders }, ADMIN, { appointmentId });
+
+      expect(again).toMatchObject({ moves: [], stays: [], alreadyCompleted: true });
+      expect(order.items[0]!.status).toBe("AWAITING_SNEAKERS");
+      expect(orders.auditEntries).toHaveLength(1);
+    });
+
+    it("takes a Return's Ready pairs to Completed, unless a Balance is still pending", async () => {
+      const { orders, order } = await seed();
+      order.items[0]!.status = "READY_FOR_PICKUP_SHIPPING";
+      const returnVisit = { id: "appt_return", kind: "RETURN" as const, status: "SCHEDULED" as const, startsAt: new Date(), endsAt: new Date(), notes: null };
+      order.appointments.push(returnVisit);
+      order.payments.push({ id: "pay_balance", kind: "BALANCE", method: "ZELLE", amount: Money.fromCents(2000), status: "PENDING", receivedAt: null, createdAt: new Date() });
+
+      const held = await completeAppointment({ orders }, ADMIN, { appointmentId: "appt_return" });
+
+      expect(held.moves).toEqual([]);
+      expect(held.stays).toEqual([expect.objectContaining({ status: "READY_FOR_PICKUP_SHIPPING", reason: expect.stringContaining("Balance") })]);
+      expect(order.items[0]!.status).toBe("READY_FOR_PICKUP_SHIPPING");
+
+      returnVisit.status = "SCHEDULED";
+      order.payments[order.payments.length - 1]!.status = "RECEIVED";
+      const done = await completeAppointment({ orders }, ADMIN, { appointmentId: "appt_return" });
+
+      expect(done.moves).toEqual([{ itemId: order.items[0]!.id, from: "READY_FOR_PICKUP_SHIPPING", to: "COMPLETED" }]);
+      expect(orders.auditEntries.at(-1)).toMatchObject({ toStatus: "COMPLETED", metadata: { reason: "RETURN_COMPLETED" } });
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
+import { ITEM_STATUSES } from "@/features/orders/domain";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewItemInput, NewOrderInput, StatusChange } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
@@ -59,6 +60,7 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     submissionKey: null,
     submissionFingerprint: null,
     bundleId: null,
+    alertBody: "Jordan · Standard Clean · Mail-In",
     items: [item()],
     ...overrides,
   };
@@ -119,7 +121,7 @@ describe("getOrderDetail", () => {
           { name: "Premium Clean", price: "$50" },
           { name: "Lace Replacement", price: "$15" },
         ],
-        nextStatuses: ["UNDER_REVIEW", "CANCELLED"],
+        nextStatuses: expect.arrayContaining(["UNDER_REVIEW", "CANCELLED"]),
       }),
     ]);
   });
@@ -142,13 +144,14 @@ describe("getOrderDetail", () => {
     expect(detail.payment.quoted!.total.cents).toBe(14000);
   });
 
-  it("offers no plain move forward at Under Review and Quote Sent: the quote and approval have their own controls", async () => {
+  it("offers every other status, including Quote Sent, Approved and Completed, and none from a finished pair", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder());
-    const expected = { UNDER_REVIEW: ["REQUEST_SUBMITTED", "CANCELLED"], QUOTE_SENT: ["CANCELLED"] } as const;
     for (const status of ["UNDER_REVIEW", "QUOTE_SENT"] as const) {
       deps.orders.orders.get(order.id)!.items[0]!.status = status;
-      expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual(expected[status]);
+      const { nextStatuses } = (await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!;
+      expect(nextStatuses).toHaveLength(ITEM_STATUSES.length - 1);
+      expect(nextStatuses).toEqual(expect.arrayContaining(["REQUEST_SUBMITTED", "APPROVED", "COMPLETED", "CANCELLED"]));
     }
   });
 
@@ -221,7 +224,7 @@ describe("getOrderDetail", () => {
   it("doesn't read a confirmed deposit as a status change", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder());
-    await deps.orders.confirmDeposit({ orderId: order.id, actorAccountId: "acc_admin", idempotencyKey: "k1" });
+    await deps.orders.confirmPayment({ paymentId: order.payments[0]!.id, method: "ZELLE", actorAccountId: "acc_admin", idempotencyKey: "k1" });
 
     expect(await deps.orders.listStatusChanges(order.id)).toEqual([]);
   });

@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useMemo, useState, useTransition } from "react";
-import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
-import { confirmDepositAction } from "./confirm-deposit-action";
+import { useId, useMemo, useState } from "react";
+import { MarkReceived } from "./mark-received";
 import type { PendingPaymentRow } from "./attention-panels";
 
 export type PendingPaymentTableRow = PendingPaymentRow & {
@@ -11,11 +10,14 @@ export type PendingPaymentTableRow = PendingPaymentRow & {
   href: string;
 };
 
-type Tab = "ALL" | PaymentMethod;
+type Tab = "ALL" | PendingPaymentRow["kind"];
+
+const KIND_LABELS: Record<PendingPaymentRow["kind"], string> = { DEPOSIT: "Deposit", BALANCE: "Balance" };
+
 
 /**
- * Pending Payments (design: Needs Attention > Pending Payments): the Orders
- * whose Deposit is still waiting, filterable by method and searchable by
+ * Pending Payments (design: Needs Attention > Pending Payments): the
+ * Deposits and Balances still waiting, with a tab for each and a search by
  * order number or customer. The list is small, so it's all loaded and
  * filtered here rather than by another round trip.
  */
@@ -24,31 +26,31 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
   const [query, setQuery] = useState("");
   const searchId = useId();
 
-  // Only the methods with a Deposit waiting get a tab.
-  const methods = PAYMENT_METHODS.filter((method) => rows.some((row) => row.method === method));
-  const activeTab = tab === "ALL" || methods.includes(tab) ? tab : "ALL"; // the last row of a method was just marked paid
+  // Only the kinds with a payment waiting get a tab.
+  const kinds = (Object.keys(KIND_LABELS) as PendingPaymentRow["kind"][]).filter((kind) => rows.some((row) => row.kind === kind));
+  const activeTab = tab === "ALL" || kinds.includes(tab) ? tab : "ALL"; // the last row of a kind was just marked received
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return rows.filter(
       (row) =>
-        (activeTab === "ALL" || row.method === activeTab) &&
+        (activeTab === "ALL" || row.kind === activeTab) &&
         (needle === "" || row.reference.toLowerCase().includes(needle) || row.customerName.toLowerCase().includes(needle)),
     );
   }, [rows, activeTab, query]);
 
-  if (rows.length === 0) return <p className="ov-empty">Every deposit is confirmed.</p>;
+  if (rows.length === 0) return <p className="ov-empty">Every payment is confirmed.</p>;
 
   return (
     <div className="att">
       <div className="att-toolbar">
-        <div className="att-tabs" role="tablist" aria-label="Payment method">
+        <div className="att-tabs" role="tablist" aria-label="Payment type">
           <TabButton selected={activeTab === "ALL"} onSelect={() => setTab("ALL")}>
             All ({rows.length})
           </TabButton>
-          {methods.map((method) => (
-            <TabButton key={method} selected={activeTab === method} onSelect={() => setTab(method)}>
-              {PAYMENT_METHOD_LABELS[method]} ({rows.filter((row) => row.method === method).length})
+          {kinds.map((kind) => (
+            <TabButton key={kind} selected={activeTab === kind} onSelect={() => setTab(kind)}>
+              {KIND_LABELS[kind]} ({rows.filter((row) => row.kind === kind).length})
             </TabButton>
           ))}
         </div>
@@ -86,7 +88,7 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
             </thead>
             <tbody>
               {visible.map((row) => (
-                <tr key={row.orderId}>
+                <tr key={row.paymentId} className="ov-row-link">
                   <td className="ov-ref">
                     <Link className="att-link" href={row.href} scroll={false}>
                       {row.reference}
@@ -96,10 +98,12 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
                     <span className="ov-cell-main">{row.customerName}</span>
                   </td>
                   <td className="ov-total">{row.amount}</td>
-                  <td>{row.methodLabel}</td>
+                  <td>
+                    {row.methodLabel} · {KIND_LABELS[row.kind]}
+                  </td>
                   <td>{row.bookedOn}</td>
                   <td className="ov-num">
-                    <MarkPaid orderId={row.orderId} amount={row.amount} />
+                    <MarkReceived paymentId={row.paymentId} amount={row.amount} method={row.method} label="Mark Paid" />
                   </td>
                 </tr>
               ))}
@@ -116,49 +120,5 @@ function TabButton({ selected, onSelect, children }: { selected: boolean; onSele
     <button type="button" role="tab" aria-selected={selected} className="att-tab" onClick={onSelect}>
       {children}
     </button>
-  );
-}
-
-/**
- * Marking a Deposit received is money, so the first click only asks; the
- * second, "Confirm $120 received", does it. The key is made once per row,
- * so a double click or a retry after a dropped response settles it once
- * (ADR-0012). When it succeeds the page refreshes and the row is gone.
- */
-function MarkPaid({ orderId, amount }: { orderId: string; amount: string }) {
-  const [asking, setAsking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-
-  function confirm() {
-    setError(null);
-    startTransition(async () => {
-      const result = await confirmDepositAction(orderId, idempotencyKey);
-      if (!result.ok) setError(result.error);
-    });
-  }
-
-  if (!asking) {
-    return (
-      <button type="button" className="admin-btn att-action" data-variant="secondary" onClick={() => setAsking(true)}>
-        Mark Paid
-      </button>
-    );
-  }
-  return (
-    <span className="att-confirm">
-      <button type="button" className="admin-btn att-action" onClick={confirm} disabled={pending}>
-        {pending ? "Saving…" : `Confirm ${amount} received`}
-      </button>
-      <button type="button" className="admin-btn att-action" data-variant="secondary" onClick={() => setAsking(false)} disabled={pending}>
-        Cancel
-      </button>
-      {error && (
-        <span className="att-error" role="alert">
-          {error}
-        </span>
-      )}
-    </span>
   );
 }
