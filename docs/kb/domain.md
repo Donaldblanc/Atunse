@@ -7,11 +7,9 @@ Definitions live in `CONTEXT.md`; this is the working summary.
 IN_PROGRESS → QUALITY_CHECK → READY_FOR_PICKUP_SHIPPING → COMPLETED`, plus
 `CANCELLED` from any state. The only backward step: `UNDER_REVIEW → REQUEST_SUBMITTED` (#122).
 
-`adminStatusMoves` holds four moves, both in the dialogs and in the API:
-- **Quote Sent** is reached only through Send Quote.
-- **Approved** is reached only through Customer approved.
-- **Past Approved** is blocked while the Deposit is pending. A `MANUAL_PAYMENT_CONFIRMED` move is the exception.
-- **Completed** is allowed only when no money is outstanding (`completionHold`): the Order's Balance is RECEIVED, or every live pair is quoted and the quoted total less the Deposit is 0 or less. Otherwise it is held: "Balance not collected yet" (a PENDING Balance) or "Collected once every pair is ready; the Balance is due then" (pairs short of Ready). The dialogs, the API route and Return completion all follow it, and the repository re-checks it on the locked Order.
+`adminStatusMoves` (the admin's plain Update Status, in the dialogs and the API) offers **every other status**: forward, back, or skipping steps, including Quote Sent, Approved and Completed. Nothing is held for the Deposit or the Balance. `COMPLETED` and `CANCELLED` stay final (no moves out). The repository's `enforceCompletionHold` flag still exists but the use-case passes `false`.
+
+`completionHold` and the Deposit-pending rule still guard Return completion (`planVisitMoves` uses the private `visitStatusMoves`): a Return visit completes a pair only when no money is outstanding.
 
 Completing a visit (`completeAppointment`) moves pairs in the same transaction (`planVisitMoves`): a Collection takes Awaiting Sneakers to In Progress, a Return takes Ready for Drop-Off/Shipping to Completed. Held pairs stay and the dialog says why. A replay moves nothing.
 

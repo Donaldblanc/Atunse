@@ -13,9 +13,9 @@ import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/rep
 // POST /api/v1/admin/items/:itemId/transitions — every admin action on the
 // item pipeline's plain status moves goes through this one endpoint (ADR-0001:
 // every Item is reviewed). It applies the same rule as Order detail's Update
-// Status (adminStatusMoves): Quote Sent and Approved are refused here with
-// 409, since they have their own steps (sendQuote, recordApproval) that set
-// the price / record who approved. The customer is emailed at the key
+// Status (adminStatusMoves): any other status, forward, back or skipping
+// steps, with no payment holds; a Completed or Cancelled pair stays final
+// (400/409). The customer is emailed at the key
 // moments by the use-case, not by the caller.
 //
 // Reachable only past src/proxy.ts's admin guard (matcher includes

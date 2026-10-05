@@ -47,22 +47,7 @@ export function isStepBack(from: ItemStatus, to: ItemStatus): boolean {
   return to !== "CANCELLED" && ITEM_STATUSES.indexOf(to) < ITEM_STATUSES.indexOf(from);
 }
 
-/**
- * Where an admin's plain "Update Status" may move a pair: the pipeline's
- * next step and Cancel (canTransition), less the steps that are more than
- * a status change, each with the reason it's held:
- * - Quote Sent and Approved have their own steps. Sending the quote sets
- *   the price and emails the customer (ADR-0001); Approved is the owner
- *   recording the customer's yes. Order detail offers each as its own
- *   control (sendQuote, recordApproval), never as a bare move, so no pair
- *   is Quote Sent without a price or Approved without a recorded yes.
- * - Past Approved while the Order's Deposit is still PENDING: the Order is
- *   held until the owner marks it received (ADR-0002).
- * - Completed while money is outstanding (completionHold): allowed only
- *   once the Balance is RECEIVED, or when nothing is owed beyond the
- *   Deposit (ADR-0002).
- */
-/** What completionHold and adminStatusMoves read about an Order. */
+/** What completionHold and visitStatusMoves read about an Order. */
 export interface CompletionOrder {
   rush: boolean;
   items: { status: ItemStatus; price: Money | null }[];
@@ -85,7 +70,34 @@ export function completionHold(order: CompletionOrder): string | null {
   return allReady ? "No Balance recorded yet: create it in this order's Payment section." : "Collected once every pair is ready; the Balance is due then.";
 }
 
+/**
+ * Where an admin's plain "Update Status" may move a pair: any other status
+ * (forward, back, or skipping steps), as long as the pair isn't already
+ * Completed or Cancelled, which stay final. The owner is trusted to know what
+ * they're doing, so nothing is held: not the Deposit, not the Balance, and
+ * Quote Sent and Approved are offered too. Sending the quote and recording
+ * approval still have their own steps for setting the price and who said yes.
+ */
 export function adminStatusMoves(
+  item: { status: ItemStatus },
+  _order?: CompletionOrder,
+): { moves: ItemStatus[]; held: string | null } {
+  if (item.status === "COMPLETED" || item.status === "CANCELLED") return { moves: [], held: null };
+  return { moves: ITEM_STATUSES.filter((next) => next !== item.status), held: null };
+}
+
+/**
+ * The guarded moves a visit may make (planVisitMoves): the pipeline's next
+ * step and Cancel (canTransition), less the steps that are more than a
+ * status change, each with the reason it's held:
+ * - Quote Sent and Approved have their own steps (sendQuote, recordApproval).
+ * - Past Approved while the Order's Deposit is still PENDING: the Order is
+ *   held until the owner marks it received (ADR-0002).
+ * - Completed while money is outstanding (completionHold): allowed only
+ *   once the Balance is RECEIVED, or when nothing is owed beyond the
+ *   Deposit (ADR-0002).
+ */
+function visitStatusMoves(
   item: { status: ItemStatus },
   order: CompletionOrder,
 ): { moves: ItemStatus[]; held: string | null } {
@@ -409,7 +421,7 @@ export interface VisitPlan {
 /**
  * Completing a Collection moves each live pair in Awaiting Sneakers to In
  * Progress; completing a Return moves each pair in Ready for Drop-Off/Shipping
- * to Completed. A move that adminStatusMoves holds (the Deposit, the Balance)
+ * to Completed. A move that visitStatusMoves holds (the Deposit, the Balance)
  * stays put, as does a pair that hasn't reached the step the visit moves
  * from. Pairs already past it, or cancelled, are neither.
  */
@@ -423,7 +435,7 @@ export function planVisitMoves(
   for (const item of order.items) {
     if (item.status === "CANCELLED" || ITEM_STATUSES.indexOf(item.status) > ITEM_STATUSES.indexOf(from)) continue;
     if (item.status === from) {
-      const { moves, held } = adminStatusMoves(item, order);
+      const { moves, held } = visitStatusMoves(item, order);
       if (moves.includes(to)) plan.moves.push({ itemId: item.id, from, to });
       else plan.stays.push({ itemId: item.id, status: item.status, reason: held ?? "This step is on hold." });
       continue;
@@ -433,7 +445,7 @@ export function planVisitMoves(
         ? "Not ready to go back yet."
         : ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf("APPROVED")
           ? "Not approved yet."
-          : (adminStatusMoves(item, order).held ?? "Not moved to Awaiting Sneakers yet.");
+          : (visitStatusMoves(item, order).held ?? "Not moved to Awaiting Sneakers yet.");
     plan.stays.push({ itemId: item.id, status: item.status, reason });
   }
   return plan;

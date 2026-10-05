@@ -23,14 +23,13 @@ function staleStatusMessage(err: ItemStatusChangedError): string {
 }
 
 /**
- * Order detail's Update Status: moves one pair to the next step or cancels
- * it, through the same use-case the admin API route uses. `fromStatus` is
- * the status the screen showed, so a stale dialog is refused instead of
- * skipping a step; the idempotency key (made when the form rendered) makes
- * a double submit apply once (ADR-0012). The use-case checks the move
- * against adminStatusMoves again, not just the form, so a step with its own
- * control (the quote, the approval) or held on the deposit can't be forced.
- * Failures come back as a message for the form to show.
+ * Order detail's Update Status: moves one pair to any other status, through
+ * the same use-case the admin API route uses. `fromStatus` is the status the
+ * screen showed, so a stale dialog is refused; the idempotency key (made when
+ * the form rendered) makes a double submit apply once (ADR-0012). The
+ * use-case checks the move against adminStatusMoves again, not just the form
+ * (a Completed or Cancelled pair stays final). Failures come back as a
+ * message for the form to show.
  */
 export async function updateItemStatusAction(_previous: UpdateStatusState, formData: FormData): Promise<UpdateStatusState> {
   const itemId = formData.get("itemId");
@@ -45,8 +44,7 @@ export async function updateItemStatusAction(_previous: UpdateStatusState, formD
     const actingUser = await actingUserFromCookies(await cookies());
     // Before reading the Order, so a non-admin learns nothing about it (ADR-0012).
     requireRole(actingUser, "ADMIN");
-    // The use-case applies adminStatusMoves (a step held on the quote, the
-    // approval or the deposit can't be forced) and emails the customer at the
+    // The use-case applies adminStatusMoves and emails the customer at the
     // moments that matter (status-emails.ts).
     await transitionItemStatus(buildOrderUseCaseDeps(), actingUser, {
       itemId,
