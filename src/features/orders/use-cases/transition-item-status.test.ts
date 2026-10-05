@@ -29,16 +29,30 @@ describe("transitionItemStatus", () => {
     ).rejects.toThrow(UnauthorizedError);
   });
 
-  it("rejects skipping ahead in the pipeline", async () => {
+  it("rejects moving a finished pair, or to the status it already has", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
+    const deps = { orders, notifications: new ConsoleNotificationService() };
     await expect(
-      transitionItemStatus(
-        { orders, notifications: new ConsoleNotificationService() },
-        admin,
-        { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", action: "SKIP" },
-      ),
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "COMPLETED", toStatus: "UNDER_REVIEW", action: "REOPEN" }),
     ).rejects.toThrow(InvalidTransitionError);
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "CANCELLED", toStatus: "UNDER_REVIEW", action: "REOPEN" }),
+    ).rejects.toThrow(InvalidTransitionError);
+    await expect(
+      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "REQUEST_SUBMITTED", action: "NOOP" }),
+    ).rejects.toThrow(InvalidTransitionError);
+  });
+
+  it("skips ahead in the pipeline", async () => {
+    const orders = new InMemoryOrderRepository();
+    const { item } = await seedOrder(orders);
+    const moved = await transitionItemStatus(
+      { orders, notifications: new ConsoleNotificationService() },
+      admin,
+      { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", action: "STATUS_TRANSITION" },
+    );
+    expect(moved?.status).toBe("APPROVED");
   });
 
   it("advances the pipeline step by step and records each transition", async () => {
@@ -157,23 +171,19 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     return { orders, notifications, order, item, deps: { orders, notifications } };
   }
 
-  it("refuses Quote Sent and Approved, which have their own steps", async () => {
+  it("allows Quote Sent and Approved, and moving backward", async () => {
     const underReview = await seedAt("UNDER_REVIEW");
-    await expect(
-      transitionItemStatus(underReview.deps, admin, { itemId: underReview.item.id, fromStatus: "UNDER_REVIEW", toStatus: "QUOTE_SENT", action: "QUOTE_SENT" }),
-    ).rejects.toThrow(MoveNotAllowedError);
-    const quoted = await seedAt("QUOTE_SENT");
-    await expect(
-      transitionItemStatus(quoted.deps, admin, { itemId: quoted.item.id, fromStatus: "QUOTE_SENT", toStatus: "APPROVED", action: "APPROVED" }),
-    ).rejects.toThrow(MoveNotAllowedError);
-    expect(quoted.orders.orders.get(quoted.order.id)!.items[0]!.status).toBe("QUOTE_SENT");
+    await transitionItemStatus(underReview.deps, admin, { itemId: underReview.item.id, fromStatus: "UNDER_REVIEW", toStatus: "QUOTE_SENT", action: "STATUS_TRANSITION" });
+    expect(underReview.orders.orders.get(underReview.order.id)!.items[0]!.status).toBe("QUOTE_SENT");
+    const inProgress = await seedAt("IN_PROGRESS");
+    await transitionItemStatus(inProgress.deps, admin, { itemId: inProgress.item.id, fromStatus: "IN_PROGRESS", toStatus: "UNDER_REVIEW", action: "STATUS_TRANSITION" });
+    expect(inProgress.orders.orders.get(inProgress.order.id)!.items[0]!.status).toBe("UNDER_REVIEW");
   });
 
-  it("holds a pair at Approved until the Deposit is paid, saying why", async () => {
+  it("moves a pair past Approved while the Deposit is pending", async () => {
     const { deps, item } = await seedAt("APPROVED");
-    await expect(
-      transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", action: "STATUS_TRANSITION" }),
-    ).rejects.toThrow(/deposit/);
+    const moved = await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "APPROVED", toStatus: "AWAITING_SNEAKERS", action: "STATUS_TRANSITION" });
+    expect(moved?.status).toBe("AWAITING_SNEAKERS");
   });
 
   it("lets the payment confirmation itself move a pair past Approved, settling the Deposit", async () => {
@@ -271,24 +281,21 @@ describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
     expect(balance().status).toBe("FAILED");
   });
 
-  it("holds Completed until it is received, saying why", async () => {
-    const { deps, orders, stored } = await seedPairs(["QUALITY_CHECK"], [20000]);
+  it("allows Completed with the Balance still pending", async () => {
+    const { deps, stored } = await seedPairs(["QUALITY_CHECK"], [20000]);
     const itemId = stored.items[0]!.id;
     await transitionItemStatus(deps, admin, ready(itemId));
-    const complete = () => transitionItemStatus(deps, admin, { itemId, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
-
-    await expect(complete()).rejects.toThrow(/Balance not collected/);
-
-    await orders.confirmPayment({ paymentId: stored.payments.find((payment) => payment.kind === "BALANCE")!.id, method: "CASH", actorAccountId: "acc_admin", idempotencyKey: "k" });
-    expect((await complete())?.status).toBe("COMPLETED");
+    expect(stored.payments.find((payment) => payment.kind === "BALANCE")!.status).toBe("PENDING");
+    const done = await transitionItemStatus(deps, admin, { itemId, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
+    expect(done?.status).toBe("COMPLETED");
   });
 
-  it("holds a pair readied early while another pair isn't ready, even with no Balance yet", async () => {
-    const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING", "IN_PROGRESS"], [20000, 30000]);
-    await expect(
-      transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" }),
-    ).rejects.toThrow(/every pair is ready/);
-    expect(stored.items[0]!.status).toBe("READY_FOR_PICKUP_SHIPPING");
+  it("allows Completed from any non-final status", async () => {
+    const { deps, stored } = await seedPairs(["REQUEST_SUBMITTED", "IN_PROGRESS"], [20000, 30000]);
+    for (const [index, from] of (["REQUEST_SUBMITTED", "IN_PROGRESS"] as const).entries()) {
+      const done = await transitionItemStatus(deps, admin, { itemId: stored.items[index]!.id, fromStatus: from, toStatus: "COMPLETED", action: "STATUS_TRANSITION" });
+      expect(done?.status).toBe("COMPLETED");
+    }
   });
 
   it("allows Completed when the Deposit already covers the quoted total", async () => {

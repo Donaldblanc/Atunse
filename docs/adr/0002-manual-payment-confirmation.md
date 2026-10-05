@@ -21,3 +21,7 @@ the owner's own action.
 - Creates a manual step the owner must remember to do, and a real failure mode: an Order stalls invisibly if the owner forgets to mark it, even though the customer already paid.
 - Admin UI must make outstanding manual-payment Orders highly visible (e.g. a dedicated "awaiting payment confirmation" queue) to offset that risk.
 - If the business scales past one owner, this step needs either a self-report-then-verify flow or dropping Zelle/Cash as options — revisit then.
+
+## Amendment
+
+The admin's Update Status no longer blocks on the Deposit or Balance: the owner may move a pair to any status, including Completed, regardless of payment. Return-visit completion still follows the holds.

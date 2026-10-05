@@ -1,15 +1,14 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { isStepBack, ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
+import { ITEM_STATUS_LABELS, type ItemStatus } from "@/features/orders/domain";
 import { updateItemStatusAction, type UpdateStatusState } from "./order-actions";
 
 /**
- * Update Status for one pair: offers only where the owner may move it (the
- * next step, a step back where the pipeline allows one, and Cancel, per
- * adminStatusMoves), submitted to a server action.
- * A step that's held (on the quote or the deposit) says why instead.
- * Cancelling can't be undone, so it takes a second, explicit click.
+ * Update Status for one pair: a dropdown of every status the owner may move
+ * it to (adminStatusMoves: forward, back or skipping steps), submitted to a
+ * server action. Cancel is its own button: it can't be undone, so it takes a
+ * second, explicit click.
  */
 export function UpdateStatusForm({
   itemId,
@@ -30,11 +29,11 @@ export function UpdateStatusForm({
 }) {
   const [state, formAction, pending] = useActionState<UpdateStatusState, FormData>(updateItemStatusAction, { error: null });
   const [confirmingCancel, setConfirmingCancel] = useState(false);
-  // A step back (Under Review to Request Submitted) is never the main "Move to" action: it isn't progress.
-  const forward = nextStatuses.find((status) => status !== "CANCELLED" && !isStepBack(fromStatus, status));
-  const back = nextStatuses.find((status) => isStepBack(fromStatus, status));
+  const choices: ItemStatus[] = nextStatuses.filter((status) => status !== "CANCELLED");
+  const [chosen, setChosen] = useState<ItemStatus | "">("");
+  const selected = choices.includes(chosen as ItemStatus) ? (chosen as ItemStatus) : "";
   const canCancel = nextStatuses.includes("CANCELLED");
-  if (!forward && !back && !canCancel && !held) return null;
+  if (choices.length === 0 && !canCancel && !held) return null;
 
   return (
     <form action={formAction} className="od-status-form">
@@ -43,15 +42,28 @@ export function UpdateStatusForm({
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {pairLabel && <p className="od-status-pair">{pairLabel}</p>}
       <div className="od-status-actions">
-        {forward && (
-          <button type="submit" name="toStatus" value={forward} className="admin-btn" disabled={pending}>
-            Move to {ITEM_STATUS_LABELS[forward]}
-          </button>
-        )}
-        {back && (
-          <button type="submit" name="toStatus" value={back} className="admin-btn" data-variant="secondary" disabled={pending}>
-            Back to {ITEM_STATUS_LABELS[back]}
-          </button>
+        {choices.length > 0 && (
+          <>
+            <select
+              aria-label={pairLabel ? `Status for ${pairLabel}` : "New status"}
+              className="od-status-select"
+              value={selected}
+              onChange={(event) => setChosen(event.target.value as ItemStatus)}
+              disabled={pending}
+            >
+              <option value="" disabled>
+                Move to...
+              </option>
+              {choices.map((status) => (
+                <option key={status} value={status}>
+                  {ITEM_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+            <button type="submit" name="toStatus" value={selected} className="admin-btn" disabled={pending || !selected}>
+              Update status
+            </button>
+          </>
         )}
         {canCancel &&
           (confirmingCancel ? (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { adminStatusMoves, balanceDue, canTransition, isStepBack, liveEstimate, orderRollupStatus, planBalance, planVisitMoves, type ItemStatus, type Payment } from "./domain";
+import { adminStatusMoves, balanceDue, ITEM_STATUSES, canTransition, isStepBack, liveEstimate, orderRollupStatus, planBalance, planVisitMoves, type ItemStatus, type Payment } from "./domain";
 import { RUSH_FEE_CENTS } from "./service-catalog";
 
 describe("Item status pipeline", () => {
@@ -42,13 +42,12 @@ const orderOf = (payments: ReturnType<typeof pay>[], items: ReturnType<typeof qu
 describe("adminStatusMoves", () => {
   const deposit = (status: "PENDING" | "RECEIVED") => orderOf([pay("DEPOSIT", status)]);
 
-  it("offers the next step and Cancel", () => {
-    expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({ moves: ["QUALITY_CHECK", "CANCELLED"], held: null });
-  });
-
-  it("never offers Quote Sent or Approved as a plain move: each has its own step (ADR-0001); the step back stays", () => {
-    expect(adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED"))).toEqual({ moves: ["REQUEST_SUBMITTED", "CANCELLED"], held: null });
-    expect(adminStatusMoves({ status: "QUOTE_SENT" }, deposit("RECEIVED"))).toEqual({ moves: ["CANCELLED"], held: null });
+  it("offers every other status, forward, back or skipping, with nothing held", () => {
+    expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({
+      moves: ITEM_STATUSES.filter((status) => status !== "IN_PROGRESS"),
+      held: null,
+    });
+    expect(adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED")).moves).toEqual(expect.arrayContaining(["QUOTE_SENT", "APPROVED", "COMPLETED"]));
   });
 
   it("tells a step back from progress", () => {
@@ -57,48 +56,17 @@ describe("adminStatusMoves", () => {
     expect(isStepBack("UNDER_REVIEW", "CANCELLED")).toBe(false);
   });
 
-  it("holds a pair at Approved while the Deposit is pending (ADR-0002)", () => {
-    const { moves, held } = adminStatusMoves({ status: "APPROVED" }, deposit("PENDING"));
-    expect(moves).toEqual(["CANCELLED"]);
-    expect(held).toMatch(/deposit/);
-    expect(adminStatusMoves({ status: "APPROVED" }, deposit("RECEIVED")).moves).toEqual(["AWAITING_SNEAKERS", "CANCELLED"]);
-    expect(adminStatusMoves({ status: "APPROVED" }, orderOf([])).moves).toEqual(["AWAITING_SNEAKERS", "CANCELLED"]);
-  });
-
-  describe("Completed hold (ADR-0002)", () => {
-    const ready = quoted("READY_FOR_PICKUP_SHIPPING");
-    const completed = (order: ReturnType<typeof orderOf>) => adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING" }, order);
-
-    it("holds a pair readied early while another pair isn't ready, since the Balance isn't due yet", () => {
-      const result = completed(orderOf([pay("DEPOSIT", "RECEIVED")], [ready, quoted("IN_PROGRESS")]));
-      expect(result.moves).toEqual(["CANCELLED"]);
-      expect(result.held).toBe("Collected once every pair is ready; the Balance is due then.");
-    });
-
-    it("holds Completed while the Balance is PENDING", () => {
-      const result = completed(orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "PENDING", 4000)], [ready]));
-      expect(result.moves).toEqual(["CANCELLED"]);
-      expect(result.held).toMatch(/^Balance not collected yet/);
-    });
-
-    it("says so when every pair is ready and a Balance is owed but none was recorded", () => {
-      const result = completed(orderOf([pay("DEPOSIT", "RECEIVED")], [ready]));
-      expect(result.moves).toEqual(["CANCELLED"]);
-      expect(result.held).toBe("No Balance recorded yet: create it in this order's Payment section.");
-    });
-
-    it("allows Completed once the Balance is RECEIVED", () => {
-      expect(completed(orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "RECEIVED", 4000)], [ready]))).toEqual({ moves: ["COMPLETED", "CANCELLED"], held: null });
-    });
-
-    it("allows Completed when every live pair is quoted and the Deposit covers the total", () => {
-      expect(completed(orderOf([pay("DEPOSIT", "RECEIVED", 5000)], [ready, quoted("CANCELLED", null)])).moves).toEqual(["COMPLETED", "CANCELLED"]);
-      expect(completed(orderOf([pay("DEPOSIT", "RECEIVED", 5000)], [ready, quoted("IN_PROGRESS", 100)])).held).toMatch(/every pair is ready/);
-    });
+  it("holds nothing for a pending Deposit or an unpaid Balance", () => {
+    expect(adminStatusMoves({ status: "APPROVED" }, deposit("PENDING"))).toMatchObject({ held: null });
+    expect(adminStatusMoves({ status: "APPROVED" }, deposit("PENDING")).moves).toContain("AWAITING_SNEAKERS");
+    const owing = orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "PENDING", 4000)], [quoted("READY_FOR_PICKUP_SHIPPING")]);
+    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING" }, owing)).toMatchObject({ held: null });
+    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING" }, owing).moves).toContain("COMPLETED");
   });
 
   it("offers nothing from a finished pair", () => {
     expect(adminStatusMoves({ status: "COMPLETED" }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+    expect(adminStatusMoves({ status: "CANCELLED" }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
   });
 });
 

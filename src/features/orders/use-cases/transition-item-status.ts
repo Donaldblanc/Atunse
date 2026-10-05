@@ -1,7 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
-import { adminStatusMoves, canTransition, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
+import { adminStatusMoves, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
 import { CompletionHeldError, ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { redactForLog } from "@/shared/logging/redact";
 import { EMAILED_STATUSES, statusChangeEmail } from "../status-emails";
@@ -12,7 +12,7 @@ export class InvalidTransitionError extends Error {
   }
 }
 
-/** The step is a valid pipeline move but not a plain status change (it has its own step, or is held). */
+/** The move isn't one a plain status change may make from the pair's current status. */
 export class MoveNotAllowedError extends Error {
   constructor(from: ItemStatus, to: ItemStatus, held: string | null) {
     super(held ?? `A pair can't move from ${ITEM_STATUS_LABELS[from]} to ${ITEM_STATUS_LABELS[to]} this way.`);
@@ -33,12 +33,11 @@ export interface TransitionItemStatusInput {
 }
 
 /**
- * The plain admin "Update Status": one pair to the pipeline's next step or
- * Cancelled, admin-only (ADR-0005, ADR-0001). It applies adminStatusMoves
- * itself, so the Order detail form and the admin API route can't force what
- * the screen holds back: Quote Sent and Approved (their own steps: sendQuote,
- * recordApproval) and anything past Approved while the Deposit is pending
- * (ADR-0002).
+ * The plain admin "Update Status": one pair to any other status (forward,
+ * back or skipping steps), admin-only (ADR-0005). Completed and Cancelled
+ * stay final. No payment holds: the owner decides (ADR-0002, amended). It
+ * applies adminStatusMoves itself, so the Order detail form and the admin API
+ * route share one rule.
  *
  * The customer is emailed only at the moments that matter to them (status-
  * emails.ts: Ready for Drop-Off/Shipping, Cancelled), after the write
@@ -52,7 +51,8 @@ export async function transitionItemStatus(
 ): Promise<Item | null> {
   requireRole(actingUser, "ADMIN");
 
-  if (!canTransition(input.fromStatus, input.toStatus)) {
+  const final = (status: ItemStatus) => status === "COMPLETED" || status === "CANCELLED";
+  if (input.fromStatus === input.toStatus || final(input.fromStatus)) {
     throw new InvalidTransitionError(input.fromStatus, input.toStatus);
   }
 
@@ -82,8 +82,8 @@ export async function transitionItemStatus(
       },
       // Confirming a Zelle/Cash payment settles the Order's Deposit Payment too (ADR-0002).
       receivesDeposit,
-      // The hold is checked again on the locked Order, in case a payment or pair changed since it was read here.
-      enforceCompletionHold: true,
+      // An admin may complete a pair with money outstanding, so no hold is checked.
+      enforceCompletionHold: false,
     });
   } catch (err) {
     if (err instanceof CompletionHeldError) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, err.reason);
