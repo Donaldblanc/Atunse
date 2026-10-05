@@ -30,10 +30,18 @@ Merged into a base branch that has already landed, its commits never reach
 git checkout develop
 git pull
 git checkout -b release/1.2.0
-# bump "version" in package.json to 1.2.0
+git merge origin/main   # always: develop's package.json can lag main (see below)
+# set "version" in package.json and package-lock.json to the next number
+# above the latest tag: git describe --tags --abbrev=0 origin/main
 git commit -am "chore: bump version to 1.2.0"
 git push -u origin release/1.2.0
 ```
+
+**Never bump from `develop`'s `package.json`.** The back-merge PR after a
+release can fail to land, leaving `develop` on an old version. Releasing from
+that without merging `main` first sets `main` backwards (0.2.2 over 0.5.0,
+PR #140): the tag already exists, so the Release workflow tags nothing.
+Check that the new version is greater than the latest tag before opening the PR.
 
 Open a PR `release/1.2.0` → `main`. `Branch guard` (a required check) fails
 the PR if it's opened from anything other than `release/*`/`hotfix/*` — you
