@@ -53,8 +53,8 @@ const contentSecurityPolicy = [
   // bootstrap scripts carry no nonce yet. The target state is nonce- (or
   // hash-) based scripts with no 'unsafe-inline'; see docs/TODO.md for the
   // rollout. Dev mode also evaluates code for hot reloading.
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
   "font-src 'self' https://fonts.gstatic.com",
   // blob: for the photo thumbnails picked in the booking form; the storage
   // origin for stored photos' view links (the admin Overview's thumbnails).

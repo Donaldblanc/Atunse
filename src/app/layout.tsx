@@ -1,3 +1,5 @@
+import { CookieConsent } from "@/features/consent/cookie-consent";
+
 export const metadata = {
   title: "Atunṣe",
   description: "Sneaker cleaning and restoration — RestoredByDJ",
@@ -6,7 +8,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieConsent />
+      </body>
     </html>
   );
 }
