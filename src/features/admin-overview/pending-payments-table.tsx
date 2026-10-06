@@ -103,7 +103,7 @@ export function PendingPaymentsTable({ rows }: { rows: PendingPaymentTableRow[] 
                   </td>
                   <td>{row.bookedOn}</td>
                   <td className="ov-num">
-                    <MarkReceived paymentId={row.paymentId} amount={row.amount} method={row.method} label="Mark Paid" />
+                    <MarkReceived paymentId={row.paymentId} amount={row.amount} method={row.method} label={row.kind === "BALANCE" ? "Confirm Balance" : "Confirm Deposit"} />
                   </td>
                 </tr>
               ))}
