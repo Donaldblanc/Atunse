@@ -67,7 +67,7 @@ export interface OrderListRow {
   /** Pairs not cancelled (every pair for a fully cancelled Order). */
   pairCount: number;
   services: string;
-  /** The derived Order status (orderRollupStatus), the same one Recent Orders shows. */
+  /** The derived Order status (orderDisplayStatus), the same one Recent Orders shows. */
   status: ItemStatus;
   deposit: OrderSearchRow["deposit"];
   total: Money;

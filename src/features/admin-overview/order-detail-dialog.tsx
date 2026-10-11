@@ -406,8 +406,8 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
         )}
         {pair.autoApproved && <p className="od-muted">Set price — no quote needed</p>}
         {label && (
-          <span className="ov-pill" data-tone={STATUS_TONE[pair.status]}>
-            {ITEM_STATUS_LABELS[pair.status]}
+          <span className="ov-pill" data-tone={STATUS_TONE[pair.displayStatus]}>
+            {ITEM_STATUS_LABELS[pair.displayStatus]}
           </span>
         )}
       </div>
@@ -425,7 +425,7 @@ function quoteDifference(price: Money, estimate: Money): string {
 /** The Approval Gate steps: Send Quote for a pair Under Review, "Customer approved" once it's Quote Sent. */
 function QuoteSteps({ detail }: { detail: OrderDetail }) {
   const multiple = detail.pairs.length > 1;
-  const steps = detail.pairs.flatMap((pair, index) => (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT" ? [{ pair, index, status: pair.status }] : []));
+  const steps = detail.pairs.flatMap((pair, index) => (pair.requiresQuote && (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT") ? [{ pair, index, status: pair.status }] : []));
   // Rendered even with no steps left, so the frame keeps "Approval recorded." after the last pair moves on.
   return (
     <QuoteStepsFrame key={detail.orderId} hasSteps={steps.length > 0}>

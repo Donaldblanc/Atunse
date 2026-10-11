@@ -2,6 +2,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
+import { itemRequiresQuote } from "@/features/orders/service-catalog";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { bookedDay, servicesSummary } from "./get-admin-overview";
 import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
@@ -93,7 +94,7 @@ export async function getNeedsQuote(deps: AttentionPanelDeps, actingUser: Acting
   const orders = await deps.orders.listWithItemsIn(["REQUEST_SUBMITTED", "UNDER_REVIEW"]);
   return orders.flatMap((order) =>
     order.items
-      .filter((item) => item.status === "REQUEST_SUBMITTED" || item.status === "UNDER_REVIEW")
+      .filter((item) => (item.status === "REQUEST_SUBMITTED" || item.status === "UNDER_REVIEW") && itemRequiresQuote(item.serviceIds))
       .map((item) => ({
         itemId: item.id,
         orderId: order.id,

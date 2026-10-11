@@ -7,7 +7,7 @@ Definitions live in `CONTEXT.md`; this is the working summary.
 IN_PROGRESS → QUALITY_CHECK → READY_FOR_PICKUP_SHIPPING → COMPLETED`, plus
 `CANCELLED` from any state. The only backward step: `UNDER_REVIEW → REQUEST_SUBMITTED` (#122).
 
-`adminStatusMoves` (the admin's plain Update Status, in the dialogs and the API) offers **every other status**: forward, back, or skipping steps, including Quote Sent, Approved and Completed. Nothing is held for the Deposit or the Balance. `COMPLETED` and `CANCELLED` stay final (no moves out). The repository's `enforceCompletionHold` flag still exists but the use-case passes `false`.
+`adminStatusMoves` (the admin's plain Update Status, in the dialogs and the API) offers **every other status**: forward, back, or skipping steps, including Quote Sent, Approved and Completed. Nothing is held for the Deposit or the Balance. A pair that needs no Quote (ADR-0017) is never offered `REQUEST_SUBMITTED`, `UNDER_REVIEW`, `QUOTE_SENT` or `APPROVED`, and the server refuses those moves too. `COMPLETED` and `CANCELLED` stay final (no moves out). The repository's `enforceCompletionHold` flag still exists but the use-case passes `false`.
 
 `completionHold` and the Deposit-pending rule still guard Return completion (`planVisitMoves` uses the private `visitStatusMoves`): a Return visit completes a pair only when no money is outstanding.
 
@@ -15,7 +15,7 @@ Completing a visit (`completeAppointment`) moves pairs in the same transaction (
 
 The Order has no status of its own; it is rolled up from its Items for display.
 
-**Quote gate (ADR-0017, supersedes ADR-0001):** an Item created with only Cleaning/Add-on Services (`itemRequiresQuote` false, `service-catalog.ts`) starts `APPROVED` with `price` set to its estimate, skipping `REQUEST_SUBMITTED`/`UNDER_REVIEW`/`QUOTE_SENT`; the repository logs a system `AUTO_APPROVED_SET_PRICE` audit entry (no actor). Only an Item with a Restoration/Custom-Work Service goes through the full pipeline above.
+**Quote gate (ADR-0017, supersedes ADR-0001):** an Item created with only Cleaning/Add-on Services (`itemRequiresQuote` false, `service-catalog.ts`) starts `APPROVED` with `price` set to its estimate, skipping `REQUEST_SUBMITTED`/`UNDER_REVIEW`/`QUOTE_SENT`; the repository logs a system `AUTO_APPROVED_SET_PRICE` audit entry (no actor). Only an Item with a Restoration/Custom-Work Service goes through the full pipeline above. Admin display for a no-quote pair (old Orders included): the four early statuses all show as "Request Submitted" (`displayStatus`, `orderDisplayStatus`), and its timeline is `statusPipeline(false)` (no Under Review/Quote Sent/Approved). An Order uses the full pipeline if any live pair needs a Quote. Admin status filters match the displayed status.
 
 ## Customer emails (`status-emails.ts`, `visit-emails.ts`)
 - Emails go out at Quote Sent, Ready for Drop-Off/Shipping and Cancelled, plus when a visit is rescheduled or a return is booked. Other steps are silent.

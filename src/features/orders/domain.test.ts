@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
-import { adminStatusMoves, balanceDue, ITEM_STATUSES, canTransition, isStepBack, liveEstimate, orderRollupStatus, planBalance, planVisitMoves, type ItemStatus, type Payment } from "./domain";
+import { adminStatusMoves, balanceDue, displayStatus, orderDisplayStatus, orderRequiresQuote, statusPipeline, ITEM_STATUSES, canTransition, isStepBack, liveEstimate, orderRollupStatus, planBalance, planVisitMoves, type ItemStatus, type Payment } from "./domain";
 import { RUSH_FEE_CENTS } from "./service-catalog";
 
 describe("Item status pipeline", () => {
@@ -43,11 +43,11 @@ describe("adminStatusMoves", () => {
   const deposit = (status: "PENDING" | "RECEIVED") => orderOf([pay("DEPOSIT", status)]);
 
   it("offers every other status, forward, back or skipping, with nothing held", () => {
-    expect(adminStatusMoves({ status: "IN_PROGRESS" }, deposit("RECEIVED"))).toEqual({
+    expect(adminStatusMoves({ status: "IN_PROGRESS", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({
       moves: ITEM_STATUSES.filter((status) => status !== "IN_PROGRESS"),
       held: null,
     });
-    expect(adminStatusMoves({ status: "UNDER_REVIEW" }, deposit("RECEIVED")).moves).toEqual(expect.arrayContaining(["QUOTE_SENT", "APPROVED", "COMPLETED"]));
+    expect(adminStatusMoves({ status: "UNDER_REVIEW", serviceIds: ["reglue"] }, deposit("RECEIVED")).moves).toEqual(expect.arrayContaining(["QUOTE_SENT", "APPROVED", "COMPLETED"]));
   });
 
   it("tells a step back from progress", () => {
@@ -57,16 +57,59 @@ describe("adminStatusMoves", () => {
   });
 
   it("holds nothing for a pending Deposit or an unpaid Balance", () => {
-    expect(adminStatusMoves({ status: "APPROVED" }, deposit("PENDING"))).toMatchObject({ held: null });
-    expect(adminStatusMoves({ status: "APPROVED" }, deposit("PENDING")).moves).toContain("AWAITING_SNEAKERS");
+    expect(adminStatusMoves({ status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING"))).toMatchObject({ held: null });
+    expect(adminStatusMoves({ status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING")).moves).toContain("AWAITING_SNEAKERS");
     const owing = orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "PENDING", 4000)], [quoted("READY_FOR_PICKUP_SHIPPING")]);
-    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING" }, owing)).toMatchObject({ held: null });
-    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING" }, owing).moves).toContain("COMPLETED");
+    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing)).toMatchObject({ held: null });
+    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing).moves).toContain("COMPLETED");
   });
 
   it("offers nothing from a finished pair", () => {
-    expect(adminStatusMoves({ status: "COMPLETED" }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
-    expect(adminStatusMoves({ status: "CANCELLED" }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+    expect(adminStatusMoves({ status: "COMPLETED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+    expect(adminStatusMoves({ status: "CANCELLED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+  });
+});
+
+describe("adminStatusMoves for a pair that needs no Quote (ADR-0017)", () => {
+  const QUOTE_STEPS: ItemStatus[] = ["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT", "APPROVED"];
+
+  it.each(QUOTE_STEPS)("never offers a quote-step status from %s, but can go on or cancel", (status) => {
+    const { moves } = adminStatusMoves({ status, serviceIds: ["standard", "laces"] });
+    for (const hidden of QUOTE_STEPS) expect(moves).not.toContain(hidden);
+    expect(moves).toEqual(expect.arrayContaining(["AWAITING_SNEAKERS", "IN_PROGRESS", "COMPLETED", "CANCELLED"]));
+  });
+
+  it("still offers the quote steps to a Restoration or Custom Work pair", () => {
+    expect(adminStatusMoves({ status: "REQUEST_SUBMITTED", serviceIds: ["standard", "reglue"] }).moves).toEqual(expect.arrayContaining(["UNDER_REVIEW", "QUOTE_SENT", "APPROVED"]));
+    expect(adminStatusMoves({ status: "REQUEST_SUBMITTED", serviceIds: ["painting"] }).moves).toContain("APPROVED");
+  });
+});
+
+describe("displayStatus and statusPipeline", () => {
+  it("shows the four early statuses as Request Submitted when no Quote is needed", () => {
+    for (const status of ["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT", "APPROVED"] as const) {
+      expect(displayStatus(status, false)).toBe("REQUEST_SUBMITTED");
+      expect(displayStatus(status, true)).toBe(status);
+    }
+    expect(displayStatus("AWAITING_SNEAKERS", false)).toBe("AWAITING_SNEAKERS");
+    expect(displayStatus("CANCELLED", false)).toBe("CANCELLED");
+  });
+
+  it("drops Under Review, Quote Sent and Approved from the quote-free pipeline", () => {
+    expect(statusPipeline(false)).toEqual(["REQUEST_SUBMITTED", "AWAITING_SNEAKERS", "IN_PROGRESS", "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING", "COMPLETED"]);
+    expect(statusPipeline(true)).toHaveLength(9);
+  });
+
+  it("uses the full pipeline for an Order when any live pair needs a Quote", () => {
+    const clean = { status: "APPROVED" as const, serviceIds: ["standard"] };
+    const reglue = { status: "UNDER_REVIEW" as const, serviceIds: ["reglue"] };
+    expect(orderRequiresQuote({ items: [clean] })).toBe(false);
+    expect(orderRequiresQuote({ items: [clean, reglue] })).toBe(true);
+    expect(orderRequiresQuote({ items: [clean, { ...reglue, status: "CANCELLED" }] })).toBe(false);
+    expect(orderDisplayStatus([clean])).toBe("REQUEST_SUBMITTED");
+    expect(orderDisplayStatus([{ ...clean, status: "QUOTE_SENT" }, { ...clean, status: "IN_PROGRESS" }])).toBe("REQUEST_SUBMITTED");
+    expect(orderDisplayStatus([clean, reglue])).toBe("UNDER_REVIEW");
+    expect(orderDisplayStatus([{ ...clean, status: "CANCELLED" }])).toBe("CANCELLED");
   });
 });
 
@@ -138,7 +181,15 @@ describe("balanceDue and planBalance", () => {
 describe("planVisitMoves", () => {
   const item = (id: string, status: ItemStatus) => ({ id, status, price: cents(5000) });
   const received = pay("DEPOSIT", "RECEIVED");
-  const visitOrder = (payments: ReturnType<typeof pay>[], items: ReturnType<typeof item>[]) => ({ rush: false, payments, items });
+  const visitOrder = (payments: ReturnType<typeof pay>[], items: (ReturnType<typeof item> & { serviceIds?: string[] })[]) => ({ rush: false, payments, items });
+
+  it("a Collection names a cleaning-only pair that hasn't reached Awaiting Sneakers as Request Submitted, not 'Not approved yet'", () => {
+    const plan = planVisitMoves("COLLECTION", visitOrder([received], [{ ...item("a", "QUOTE_SENT"), serviceIds: ["standard"] }, { ...item("b", "QUOTE_SENT"), serviceIds: ["reglue"] }]));
+    expect(plan.stays).toEqual([
+      { itemId: "a", status: "REQUEST_SUBMITTED", reason: "Not moved to Awaiting Sneakers yet." },
+      { itemId: "b", status: "QUOTE_SENT", reason: "Not approved yet." },
+    ]);
+  });
 
   it("a Collection moves Awaiting Sneakers pairs, and names those that haven't got there", () => {
     const plan = planVisitMoves("COLLECTION", visitOrder([received], [item("a", "AWAITING_SNEAKERS"), item("b", "UNDER_REVIEW"), item("c", "APPROVED"), item("d", "IN_PROGRESS"), item("e", "CANCELLED")]));

@@ -3,6 +3,7 @@ import { requireRole } from "@/features/accounts/authz";
 import type { CalendarDate } from "@/features/orders/calendar-date";
 import {
   adminStatusMoves,
+  displayStatus,
   planBalance,
   canTransition,
   FULFILLMENT_LABELS,
@@ -10,14 +11,16 @@ import {
   liveEstimate,
   livePairs,
   orderNumber,
-  orderRollupStatus,
+  orderDisplayStatus,
+  orderRequiresQuote,
+  statusPipeline,
   type Item,
   type ItemStatus,
   type Order,
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { addOnsCents, findBundle, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
+import { addOnsCents, findBundle, itemRequiresQuote, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -47,7 +50,12 @@ export interface OrderDetailPair {
   estimate: Money;
   /** The owner's quote (Item.price); null until sent. */
   price: Money | null;
+  /** The stored status: what Update Status and the quote steps act on. */
   status: ItemStatus;
+  /** What to show (displayStatus): a pair that needs no Quote reads Request Submitted until it moves past Approved. */
+  displayStatus: ItemStatus;
+  /** False for a Cleaning/Add-on-only pair (ADR-0017): no Send Quote or approval steps, and no quote-step statuses. */
+  requiresQuote: boolean;
   /** The Services booked; a price is left off inside a Bundle, whose fixed price covers them. */
   services: { name: string; price: string | null; /** A "from" price: the real one depends on condition. */ isMinimum: boolean }[];
   /** The Suede Fee the catalog adds for this pair, or null (not Suede, nothing it applies to, or inside a Bundle, which waives it). */
@@ -71,7 +79,7 @@ export interface OrderDetail {
   orderId: string;
   reference: string;
   bookedAt: Date;
-  /** The Order's one status (orderRollupStatus). */
+  /** The Order's one status as shown (orderDisplayStatus). */
   status: ItemStatus;
   customer: {
     name: string;
@@ -138,7 +146,8 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
 
   const bundle = findBundle(order.bundleId);
   const live = livePairs(order);
-  const status = orderRollupStatus(order.items);
+  const status = orderDisplayStatus(order.items);
+  const requiresQuote = live.length > 0 ? orderRequiresQuote(order) : order.items.some((item) => itemRequiresQuote(item.serviceIds));
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
   const balance = order.payments.find((payment) => payment.kind === "BALANCE");
   const { fulfillment } = order;
@@ -178,7 +187,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
         )
       : null,
     pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl, changes))),
-    timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
+    timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt, requiresQuote),
     payment: {
       deposit: deposit
         ? {
@@ -261,6 +270,8 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     estimate: item.estimate,
     price: item.price,
     status: item.status,
+    displayStatus: displayStatus(item.status, itemRequiresQuote(item.serviceIds)),
+    requiresQuote: itemRequiresQuote(item.serviceIds),
     services: services.map((service) => ({
       name: service.name,
       // A Bundle's price covers its own Services; Add-ons are charged on top.
@@ -281,9 +292,10 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
  * latest time if it stepped back and reached it again); it stays
  * untimed when the log has nothing, rather than guessing. The first step is
  * the booking itself. A cancelled Order stops where it was: the steps it
- * reached, then Cancelled.
+ * reached, then Cancelled. `status` is the displayed one; an Order with no pair
+ * needing a Quote skips Under Review, Quote Sent and Approved (statusPipeline).
  */
-export function buildTimeline(status: ItemStatus, pairs: { id: string }[], changes: StatusChange[], bookedAt: Date): TimelineStep[] {
+export function buildTimeline(status: ItemStatus, pairs: { id: string }[], changes: StatusChange[], bookedAt: Date, requiresQuote = true): TimelineStep[] {
   /** When every pair had reached `step`, or null if any didn't or the log doesn't say. */
   const reachedAt = (step: ItemStatus): Date | null => {
     if (step === "REQUEST_SUBMITTED") return bookedAt;
@@ -292,7 +304,7 @@ export function buildTimeline(status: ItemStatus, pairs: { id: string }[], chang
     return times.every((time): time is Date => time !== undefined) ? new Date(Math.max(...times.map((time) => time.getTime()))) : null;
   };
 
-  const pipeline = ITEM_STATUSES.filter((step) => step !== "CANCELLED");
+  const pipeline = statusPipeline(requiresQuote);
   if (status === "CANCELLED") {
     // Only what was reached, so a pair cancelled at review doesn't list "Completed".
     const reached = pipeline.flatMap((step): TimelineStep[] => {

@@ -15,7 +15,7 @@ function pair(overrides: Partial<NewItemInput> = {}): NewItemInput {
     model: "Air Max 90",
     description: null,
     material: null,
-    serviceIds: ["standard"],
+    serviceIds: ["reglue"],
     estimate: Money.fromCents(3000),
     requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
@@ -136,8 +136,9 @@ describe("getReadyToReturn", () => {
 describe("getNeedsQuote", () => {
   it("lists each pair awaiting review or a quote, matching the status count", async () => {
     const orders = new InMemoryOrderRepository();
-    const booked = await book(orders, "2026-09-28T14:00:00Z", order({ items: [pair(), pair({ brand: null, model: null, serviceIds: ["standard", "premium"] }), pair()] }));
+    const booked = await book(orders, "2026-09-28T14:00:00Z", order({ items: [pair(), pair({ brand: null, model: null, serviceIds: ["reglue", "laces"] }), pair(), pair({ serviceIds: ["standard"] })] }));
     booked.items[0]!.status = "UNDER_REVIEW";
+    booked.items[3]!.status = "UNDER_REVIEW"; // a cleaning-only pair needs no quote: not listed, not counted
     booked.items[2]!.status = "QUOTE_SENT"; // already quoted: not listed
 
     const rows = await getNeedsQuote({ orders }, ADMIN);
@@ -148,6 +149,6 @@ describe("getNeedsQuote", () => {
     ]);
     expect(rows[0]).toMatchObject({ orderId: booked.id, reference: `ATU-${booked.number}`, customerName: "Jordan Smith", bookedOn: "Sep 28, 2026" });
     const counts = await orders.countItemsByStatus();
-    expect(rows.length).toBe((counts.REQUEST_SUBMITTED ?? 0) + (counts.UNDER_REVIEW ?? 0));
+    expect(rows.length).toBe((counts.REQUEST_SUBMITTED ?? 0) + (counts.UNDER_REVIEW ?? 0) - 1);
   });
 });

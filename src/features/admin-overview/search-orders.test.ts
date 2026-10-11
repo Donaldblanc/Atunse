@@ -16,7 +16,7 @@ function pair(overrides: Partial<NewItemInput> = {}): NewItemInput {
     model: "Air Max 90",
     description: null,
     material: null,
-    serviceIds: ["standard"],
+    serviceIds: ["reglue"],
     estimate: Money.fromCents(3000),
     requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
@@ -224,6 +224,23 @@ describe("searchOrders", () => {
     expect(await names("IN_PROGRESS")).toEqual([]);
     expect(await names("COMPLETED")).toEqual(["Done"]);
     expect(await names("CANCELLED")).toEqual(["Gone"]);
+  });
+
+  it("lists a cleaning-only Order under Request Submitted, never under Approved or Quote Sent", async () => {
+    const { book, deps } = await setup();
+    const clean = await book("2026-09-28T14:00:00Z", order({ contactName: "Clean", items: [pair({ serviceIds: ["standard"] })] }));
+    clean.items[0]!.status = "APPROVED";
+    const legacy = await book("2026-09-29T14:00:00Z", order({ contactName: "Legacy", items: [pair({ serviceIds: ["standard"] })] }));
+    legacy.items[0]!.status = "QUOTE_SENT";
+    const restoration = await book("2026-09-30T14:00:00Z", order({ contactName: "Restoration", items: [pair({ serviceIds: ["reglue"] })] }));
+    restoration.items[0]!.status = "APPROVED";
+    const names = async (status: "REQUEST_SUBMITTED" | "QUOTE_SENT" | "APPROVED") =>
+      (await searchOrders(deps, ADMIN, query({ status }))).rows.map((row) => row.customerName);
+
+    expect(await names("REQUEST_SUBMITTED")).toEqual(["Legacy", "Clean"]);
+    expect(await names("APPROVED")).toEqual(["Restoration"]);
+    expect(await names("QUOTE_SENT")).toEqual([]);
+    expect((await searchOrders(deps, ADMIN, query())).rows.find((row) => row.customerName === "Clean")!.status).toBe("REQUEST_SUBMITTED");
   });
 
   it("pages, and shows the last page for one past the end", async () => {
