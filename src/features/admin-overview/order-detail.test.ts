@@ -118,9 +118,10 @@ describe("getOrderDetail", () => {
         details: ["Leather", "Yellowed midsole"],
         photo: { kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) },
         services: [
-          { name: "Premium Clean", price: "$50" },
-          { name: "Lace Replacement", price: "$15" },
+          { name: "Premium Clean", price: "$50", isMinimum: false },
+          { name: "Lace Replacement", price: "$15", isMinimum: false },
         ],
+        suedeFee: null,
         nextStatuses: expect.arrayContaining(["UNDER_REVIEW", "CANCELLED"]),
       }),
     ]);
@@ -184,6 +185,37 @@ describe("getOrderDetail", () => {
     });
     expect(detail.bundleName).toBe("The Revival Pack");
     expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, null, null, null, null, null]);
+  });
+
+  it("breaks out the Suede fee, a minimum price and a quote beside the catalog estimate", async () => {
+    const deps = setup();
+    const suede = await deps.orders.create(newOrder({ items: [item({ material: "Suede", serviceIds: ["standard"], estimate: Money.fromCents(4000) })] }));
+    let pair = (await getOrderDetail(deps, ADMIN, suede.order.id))!.pairs[0]!;
+    expect(pair.suedeFee?.format()).toBe("$10");
+    expect(pair.services).toEqual([{ name: "Standard Clean", price: "$30", isMinimum: false }]);
+
+    const minimum = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["reglue"], estimate: Money.fromCents(5000) })] }));
+    deps.orders.orders.get(minimum.order.id)!.items[0]!.price = Money.fromCents(6500);
+    pair = (await getOrderDetail(deps, ADMIN, minimum.order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([{ name: "Reglue", price: "$50+", isMinimum: true }]);
+    expect(pair.suedeFee).toBeNull();
+    expect(pair.price?.format()).toBe("$65");
+    expect(pair.estimate.format()).toBe("$50");
+  });
+
+  it("shows one Bundle price and no per-pair prices or Suede fee", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ material: "Suede" }), item(), item()] }));
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.bundlePrice?.format()).toBe("$150");
+    expect(detail.pairs.map((pair) => pair.suedeFee)).toEqual([null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.isMinimum))).not.toContain(true);
+  });
+
+  it("has no Bundle price for a plain Order", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.bundlePrice).toBeNull();
   });
 
   it("shows the Order's notes, oldest first", async () => {

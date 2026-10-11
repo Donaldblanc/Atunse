@@ -190,6 +190,12 @@ export function OrderDetailDialog({
                 <Pair key={pair.itemId} pair={pair} label={multiple ? `Pair ${index + 1}` : null} />
               ))}
             </ul>
+            {detail.bundleName && detail.bundlePrice && (
+              <p className="od-pair-quote">
+                <strong>Bundle price {detail.bundlePrice.format()}</strong>
+                <span className="od-muted"> covers every pair&apos;s Services; the Suede fee is waived</span>
+              </p>
+            )}
           </section>
         </div>
 
@@ -355,7 +361,16 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
               {service.price && <span className="od-muted">{service.price}</span>}
             </li>
           ))}
+          {pair.suedeFee && (
+            <li>
+              <span>Suede fee</span>
+              <span className="od-muted">{pair.suedeFee.format()}</span>
+            </li>
+          )}
         </ul>
+        {pair.services.some((service) => service.isMinimum) && (
+          <p className="od-muted">Quoted minimum: the final price depends on the pair&apos;s condition.</p>
+        )}
         {label && (
           <span className="ov-pill" data-tone={STATUS_TONE[pair.status]}>
             {ITEM_STATUS_LABELS[pair.status]}
