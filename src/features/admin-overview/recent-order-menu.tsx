@@ -11,9 +11,9 @@ import "./find-orders.css";
 type Asking = "paid" | "cancel" | null;
 
 /**
- * The "..." menu on a Recent Orders row: Open order, Mark Paid (a Deposit or
+ * The "..." menu on a Recent Orders row: Open order, Confirm Deposit/Balance (a Deposit or
  * Balance is waiting; confirmed by its own method, and Pending Payments is
- * where the owner picks another) and Cancel order. Mark Paid and Cancel are money or customer
+ * where the owner picks another) and Cancel order. Confirm and Cancel are money or customer
  * emails, so the first click only asks; the confirm button is a different
  * element (keyed apart), or the click that swaps them would also submit.
  * Each key is made once per row, so a double click settles once (ADR-0012).
@@ -85,7 +85,7 @@ export function RecentOrderMenu({
               </button>
             ) : (
               <button key="ask-paid" type="button" className="admin-menu-item ro-menu-item" onClick={() => setAsking("paid")} disabled={pending}>
-                Mark Paid
+                {pendingPayment.kind === "BALANCE" ? "Confirm Balance" : "Confirm Deposit"}
               </button>
             ))}
           {canCancel &&

@@ -1,4 +1,4 @@
-import { Crown, Droplet, Palette, Ribbon, ShieldCheck, Sparkles, SportShoe, Wind, type LucideIcon } from "lucide-react";
+import { Crown, Droplet, Palette, Ribbon, ShieldCheck, Snowflake, Sparkles, SportShoe, Wind, type LucideIcon } from "lucide-react";
 import type { ServiceCategoryId } from "@/features/landing/services";
 import { ADD_ON_SERVICES, BUNDLE_CATALOG, type CatalogBundle } from "@/features/orders/service-catalog";
 import type { PricedLine } from "./pricing";
@@ -89,7 +89,12 @@ export type BookingBundle = CatalogBundle & { icon: LucideIcon };
 // customers booking three pairs at once. Name, price and perks come from
 // BUNDLE_CATALOG in service-catalog.ts, which the server prices Bundles
 // from too; only the icon lives here.
-const BUNDLE_ICONS: Record<string, LucideIcon> = { revival: Crown, restoration: Sparkles, collector: Palette };
+const BUNDLE_ICONS: Record<string, LucideIcon> = {
+  revival: Crown,
+  restoration: Sparkles,
+  collector: Palette,
+  "fall-boots": Snowflake,
+};
 
 export const BOOKING_BUNDLES: BookingBundle[] = BUNDLE_CATALOG.map((bundle) => ({
   ...bundle,

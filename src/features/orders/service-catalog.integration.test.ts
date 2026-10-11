@@ -55,6 +55,8 @@ describe("service catalog parity (integration)", () => {
   it("has every Bundle in the bundles table, same price and perks", async () => {
     const rows = await prisma.bundle.findMany({ orderBy: { position: "asc" } });
 
-    expect(rows.map(({ id, name, priceCents, perks }) => ({ id, name, priceCents, perks }))).toEqual(BUNDLE_CATALOG);
+    expect(rows.map(({ id, name, priceCents, perks }) => ({ id, name, priceCents, perks }))).toEqual(
+      BUNDLE_CATALOG.map(({ id, name, priceCents, perks }) => ({ id, name, priceCents, perks })),
+    );
   });
 });

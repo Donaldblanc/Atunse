@@ -23,7 +23,9 @@ import {
   type OrderRepository,
 } from "../repositories/order-repository";
 import {
-  BUNDLE_PAIR_SERVICE_IDS,
+  bundlePairServiceIds,
+  catalogBundle,
+  isBundleAvailable,
   BUNDLE_PAIRS,
   estimateBundleItems,
   estimateItem,
@@ -196,7 +198,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
 
   const contact = validateContact(input.contact);
   const fulfillment = validateFulfillment(input.fulfillment, now);
-  const pairs = pricePairs(input);
+  const pairs = pricePairs(input, now);
   const orderEstimate = estimateOrder({ items: pairs.map((pair) => pair.estimate), rush: input.rush });
   const photos = await keepVerifiedPhotos(deps, input.items.map((item) => item.photoKeys));
 
@@ -474,7 +476,7 @@ function validateMaterial(material: string | null): Material | null {
  * each get the Bundle's Services and an even share of its fixed price, with
  * the Suede Fee waived (CONTEXT.md: Bundle), plus their own Add-ons.
  */
-function pricePairs(input: SubmitOrderInput): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
+function pricePairs(input: SubmitOrderInput, now: Date): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
   const pairLabel = (i: number) => (input.bundleId === null ? "your pair" : `pair ${i + 1}`);
   const materials = input.items.map((item) => validateMaterial(item.material));
   input.items.forEach((item, i) => validatePhotoKeys(item.photoKeys, pairLabel(i)));
@@ -490,11 +492,13 @@ function pricePairs(input: SubmitOrderInput): { material: Material | null; servi
     if (input.items.length !== BUNDLE_PAIRS) {
       throw new BookingValidationError(`A Bundle covers exactly ${BUNDLE_PAIRS} pairs.`);
     }
+    const bundle = catalogBundle(input.bundleId);
+    if (!isBundleAvailable(bundle, now)) throw new BookingValidationError("This promotion has ended.");
     // Add-ons only: estimateBundleItems refuses any other Service per pair.
     const addOnIdsByPair = input.items.map((item) => item.serviceIds);
     return estimateBundleItems(input.bundleId, addOnIdsByPair).map((estimate, i) => ({
       material: materials[i]!,
-      serviceIds: [...BUNDLE_PAIR_SERVICE_IDS, ...addOnIdsByPair[i]!], // each Item its own array, never the catalog's
+      serviceIds: [...bundlePairServiceIds(bundle), ...addOnIdsByPair[i]!], // each Item its own array, never the catalog's
       estimate,
     }));
   } catch (err) {

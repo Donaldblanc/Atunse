@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Clock, MapPin, Truck } from "lucide-react";
+import { CalendarDays, Clock, Hand, MapPin, Truck } from "lucide-react";
 import "@/styles/landing-theme.css";
 import { BEFORE_AFTER_IMAGES, HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
 import { SERVICES } from "@/features/landing/services";
@@ -14,6 +14,7 @@ import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
+import { catalogBundle, isBundleAvailable } from "@/features/orders/service-catalog";
 
 // Customer-facing landing page. Light (default) + dark theme via
 // data-theme on #landing-root (src/styles/landing-theme.css), toggled by
@@ -89,7 +90,13 @@ const REVIEWS = [
   },
 ];
 
+// The page is static, so it's re-rendered hourly: that's how the Fall
+// Special banner disappears after its end date (the server also refuses
+// the booking, so a stale page can't sell an expired promotion).
+export const revalidate = 3600;
+
 export default function HomePage() {
+  const fallPromoOpen = isBundleAvailable(catalogBundle("fall-boots"), new Date());
   return (
     <div className="landing" id="landing-root">
       <SiteNav />
@@ -158,6 +165,61 @@ export default function HomePage() {
           <BrandMarquee />
         </div>
       </div>
+
+      {fallPromoOpen && (
+        <section className="landing-promo" aria-labelledby="fall-promo-title">
+          <div className="landing-promo-card">
+            <div className="landing-promo-copy">
+              <p className="landing-eyebrow">START OF FALL SPECIAL</p>
+              <h2 id="fall-promo-title">Premium Boot Care</h2>
+              <p className="landing-promo-price">
+                3 BOOTS
+                <br />
+                FOR $120
+              </p>
+              <p className="landing-promo-sub">UGGs. Timberlands. Any boot type. Any condition.</p>
+              <p className="landing-promo-tiers">
+                <strong>BASIC CLEAN</strong> <span aria-hidden="true">|</span> <strong>BOOT RESTORATION</strong>{" "}
+                <span aria-hidden="true">|</span> <strong>FALL FINISH</strong>
+                <small>DEEP CLEAN · STAIN LIFT · SCUFF REPAIR · SUEDE REVIVAL</small>
+              </p>
+              <Link className="landing-btn-primary" href="/booking?bundle=fall-boots">
+                Book Fall Special
+                <ArrowIcon />
+              </Link>
+            </div>
+            <div className="landing-promo-figure">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static promo art, decorative */}
+              <img src="/images/landing/fall-boots.png" alt="Tan Timberland, UGG and black leather boots among fall leaves" />
+            </div>
+          </div>
+          <ul className="landing-promo-facts">
+            <li>
+              <CalendarDays size={28} aria-hidden="true" />
+              <span>
+                <strong>Promotion Ends</strong>
+                <b>December 21st</b>
+                Lock in your deal before the deadline.
+              </span>
+            </li>
+            <li>
+              <Clock size={28} aria-hidden="true" />
+              <span>
+                <strong>Typical Turnaround</strong>
+                <b>3 – 7 Business Days</b>
+                Estimated; we confirm after inspection.
+              </span>
+            </li>
+            <li>
+              <Hand size={28} aria-hidden="true" />
+              <span>
+                <strong>All Work Done By Hand</strong>
+                Quality care. Every time.
+              </span>
+            </li>
+          </ul>
+        </section>
+      )}
 
       <div className="landing-section-head" id="services">
         <div>

@@ -32,7 +32,7 @@ An optional extra Service on one pair, on top of its main Service: Lace Replacem
 
 ## Bundle
 A fixed-price package of Services covering three pairs booked together. Each pair in a Bundle is still its own Item.
-Every pair gets Premium Clean; the Bundle's perks that cover only some pairs (e.g. "Oxidation touch-up on 1 pair") are assigned by the shop after inspection, so the Order records which Bundle was bought. The Bundle price is split evenly across its three Items (any leftover cent on the first), and each Item adds its own **Add-ons** on top, so the Items always sum to the Bundle price plus its Add-ons.
+Every pair gets Premium Clean (a promotional Bundle names its own pair Service, e.g. the Start of Fall Special's Standard Clean); a promotion has an end date after which it can't be booked. The Bundle's perks that cover only some pairs (e.g. "Oxidation touch-up on 1 pair") are assigned by the shop after inspection, so the Order records which Bundle was bought. The Bundle price is split evenly across its three Items (any leftover cent on the first), and each Item adds its own **Add-ons** on top, so the Items always sum to the Bundle price plus its Add-ons.
 
 ## Rush
 An optional faster turnaround a customer can request for a flat extra fee.

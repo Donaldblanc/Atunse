@@ -27,6 +27,7 @@ import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export function ReviewStep({
   isBundle,
+  bundlePairServices,
   name,
   price,
   priceNote,
@@ -42,6 +43,8 @@ export function ReviewStep({
   onConfirm,
 }: {
   isBundle: boolean;
+  /** The Services every pair of the chosen Bundle gets, e.g. "Premium Clean". */
+  bundlePairServices: string;
   name: string;
   price: string;
   priceNote: string | undefined;
@@ -122,7 +125,7 @@ export function ReviewStep({
         {isBundle && (
           <div className="booking-page-details-row">
             <Info size={16} aria-hidden="true" />
-            <span>Every pair gets Premium Clean. We&rsquo;ll decide which pairs get the Bundle&rsquo;s other extras once we&rsquo;ve inspected them.</span>
+            <span>Every pair gets {bundlePairServices}. We&rsquo;ll decide which pairs get the Bundle&rsquo;s other extras once we&rsquo;ve inspected them.</span>
           </div>
         )}
       </div>
