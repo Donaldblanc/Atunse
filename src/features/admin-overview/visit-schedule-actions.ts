@@ -59,7 +59,11 @@ export async function rescheduleVisitAction(_previous: ScheduleVisitState, formD
   const selection = selectionFrom(formData);
   if (!appointmentId || Number.isNaN(expectedStartsAt.getTime())) return { error: "That request wasn't valid. Reload and try again." };
 
-  const doneHref = overviewHref(selection, { visit: appointmentId });
+  // Carried from the Calendar's visit link, so the reschedule form's own
+  // redirect lands back on the visit dialog with the Calendar as its close
+  // target, not the Overview (see visit-slot.tsx).
+  const calendarMonth = field(formData, "calendarMonth");
+  const doneHref = overviewHref(selection, { visit: appointmentId, ...(calendarMonth ? { calendarMonth } : {}) });
   let warning: string | null = null;
   try {
     const actingUser = await actingUserFromCookies(await cookies());

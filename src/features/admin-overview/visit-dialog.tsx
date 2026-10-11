@@ -26,9 +26,21 @@ function initials(name: string): string {
  * The Overview's Schedule Item dialog (`?visit=`): who the visit is with and
  * where, the Order it belongs to, and the visit's own status. `visit` is null
  * when the link points at an Appointment that no longer exists.
+ *
+ * `calendarMonth` is set when the visit was opened from the Calendar screen
+ * (`?calendarMonth=YYYY-MM`), so closing the dialog or opening Reschedule
+ * returns there instead of the Overview.
  */
-export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail | null; selection: OverviewSelection }) {
-  const closeHref = overviewHref(selection);
+export function VisitDialog({
+  visit,
+  selection,
+  calendarMonth,
+}: {
+  visit: ScheduledVisitDetail | null;
+  selection: OverviewSelection;
+  calendarMonth?: string | null;
+}) {
+  const closeHref = calendarMonth ? `/admin/calendar?month=${calendarMonth}` : overviewHref(selection);
   const title = (
     <span className="visit-title">
       <ClockIcon size={22} aria-hidden="true" /> Schedule Item
@@ -152,7 +164,12 @@ export function VisitDialog({ visit, selection }: { visit: ScheduledVisitDetail 
           <PhoneIcon size={18} aria-hidden="true" /> Contact Customer
         </a>
         {visit.status === "SCHEDULED" && (
-          <Link className="admin-btn" data-variant="secondary" href={overviewHref(selection, { visit: visit.appointmentId, reschedule: "1" })} scroll={false}>
+          <Link
+            className="admin-btn"
+            data-variant="secondary"
+            href={overviewHref(selection, { visit: visit.appointmentId, reschedule: "1", ...(calendarMonth ? { calendarMonth } : {}) })}
+            scroll={false}
+          >
             Reschedule
           </Link>
         )}
