@@ -37,6 +37,15 @@ describe("PrismaAccountRepository (integration)", () => {
     expect(await accounts.findCustomerById(adminId)).toBeNull();
     expect(await accounts.findCustomerByEmail("nobody@example.com")).toBeNull();
   });
+
+  it("lists only Customer Accounts, and returns a Customer's detail", async () => {
+    const customers = await accounts.listCustomers();
+    expect(customers.some((c) => c.id === adminId)).toBe(false);
+    expect(customers.find((c) => c.id === customerId)).toMatchObject({ email: "codes@example.com", phone: "2125550142" });
+
+    expect(await accounts.findCustomerDetail(customerId)).toMatchObject({ id: customerId, email: "codes@example.com", phone: "2125550142" });
+    expect(await accounts.findCustomerDetail(adminId)).toBeNull();
+  });
 });
 
 describe("PrismaSignInCodes (integration)", () => {
