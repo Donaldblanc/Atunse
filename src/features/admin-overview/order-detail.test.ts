@@ -118,9 +118,10 @@ describe("getOrderDetail", () => {
         details: ["Leather", "Yellowed midsole"],
         photo: { kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) },
         services: [
-          { name: "Premium Clean", price: "$50" },
-          { name: "Lace Replacement", price: "$15" },
+          { name: "Premium Clean", price: "$50", isMinimum: false },
+          { name: "Lace Replacement", price: "$15", isMinimum: false },
         ],
+        suedeFee: null,
         nextStatuses: expect.arrayContaining(["UNDER_REVIEW", "CANCELLED"]),
       }),
     ]);
@@ -183,7 +184,75 @@ describe("getOrderDetail", () => {
       address: ["1 Main St", "Austin, TX 73301"],
     });
     expect(detail.bundleName).toBe("The Revival Pack");
-    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, null, null, null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, "$15", null, "$15", null, "$15"]);
+  });
+
+  it("breaks out the Suede fee, a minimum price and a quote beside the catalog estimate", async () => {
+    const deps = setup();
+    const suede = await deps.orders.create(newOrder({ items: [item({ material: "Suede", serviceIds: ["standard"], estimate: Money.fromCents(4000) })] }));
+    let pair = (await getOrderDetail(deps, ADMIN, suede.order.id))!.pairs[0]!;
+    expect(pair.suedeFee?.format()).toBe("$10");
+    expect(pair.services).toEqual([{ name: "Standard Clean", price: "$30", isMinimum: false }]);
+
+    const minimum = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["reglue"], estimate: Money.fromCents(5000) })] }));
+    deps.orders.orders.get(minimum.order.id)!.items[0]!.price = Money.fromCents(6500);
+    pair = (await getOrderDetail(deps, ADMIN, minimum.order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([{ name: "Reglue", price: "$50+", isMinimum: true }]);
+    expect(pair.suedeFee).toBeNull();
+    expect(pair.price?.format()).toBe("$65");
+    expect(pair.estimate.format()).toBe("$50");
+  });
+
+  it("shows one Bundle price and no per-pair prices or Suede fee", async () => {
+    const deps = setup();
+    const est = { estimate: Money.fromCents(5000), serviceIds: ["premium"] };
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ material: "Suede", ...est }), item(est), item(est)] }));
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.bundlePrice?.format()).toBe("$150");
+    expect(detail.pairs.map((pair) => pair.suedeFee)).toEqual([null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.isMinimum))).not.toContain(true);
+  });
+
+  it("prices a Bundle pair's Add-ons but not its Bundle Service", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ serviceIds: ["premium", "laces"] }), item(), item()] }));
+    const pair = (await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([
+      { name: "Premium Clean", price: null, isMinimum: false },
+      { name: "Lace Replacement", price: "$15", isMinimum: false },
+    ]);
+  });
+
+  it("takes the Bundle price from the stored estimates: a cancelled pair lowers it, the catalog price doesn't matter", async () => {
+    const deps = setup();
+    const est = { estimate: Money.fromCents(5000), serviceIds: ["premium"] };
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item(est), item(est), item(est)] }));
+    const stored = deps.orders.orders.get(order.id)!;
+    stored.items[0]!.status = "CANCELLED";
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.bundlePrice?.format()).toBe("$100");
+    const other = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] }), item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] }), item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] })] }));
+    expect((await getOrderDetail(deps, ADMIN, other.order.id))!.bundlePrice?.format()).toBe("$120");
+  });
+
+  it("fall-boots Suede pair with Standard Clean and laces: Add-on priced, no Suede fee, Bundle price $120", async () => {
+    const deps = setup();
+    const pairs = [4000, 4000, 4000].map((cents, i) =>
+      item({ material: "Suede", serviceIds: i === 0 ? ["standard", "laces"] : ["standard"], estimate: Money.fromCents(i === 0 ? cents + 1500 : cents) }),
+    );
+    const { order } = await deps.orders.create(newOrder({ bundleId: "fall-boots", items: pairs }));
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.pairs[0]!.services).toEqual([
+      { name: "Standard Clean", price: null, isMinimum: false },
+      { name: "Lace Replacement", price: "$15", isMinimum: false },
+    ]);
+    expect(detail.pairs[0]!.suedeFee).toBeNull();
+    expect(detail.bundlePrice?.format()).toBe("$120");
+  });
+
+  it("has no Bundle price for a plain Order", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.bundlePrice).toBeNull();
   });
 
   it("shows the Order's notes, oldest first", async () => {
