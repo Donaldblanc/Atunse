@@ -6,7 +6,7 @@ import { buildReviewDeps } from "@/features/reviews/deps";
 import { getLatestReviews } from "@/features/reviews/use-cases/review-use-cases";
 import type { AdminReview } from "@/features/reviews/repositories/review-repository";
 import { overviewHref, type OverviewSelection } from "../overview-range";
-import { Stars } from "../reviews-dialog";
+import { Stars } from "../review-list";
 
 const reviewDay = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: SHOP_TIMEZONE });
 

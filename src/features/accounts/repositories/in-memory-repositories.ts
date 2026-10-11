@@ -40,7 +40,7 @@ export class InMemoryAccounts implements AccountRepository {
       email,
       name: account.name ?? null,
       phone: account.phone ?? null,
-      createdAt: account.createdAt ?? new Date(),
+      createdAt: account.createdAt ?? new Date(Date.now() + nextAccountId),
     };
     this.accounts.push(stored);
     return stored;

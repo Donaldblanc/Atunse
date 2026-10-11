@@ -46,7 +46,7 @@ export const ADMIN_SCREENS: AdminScreen[] = [
   { id: "inventory", label: "Inventory", href: "/admin/inventory", icon: PackageIcon, built: false },
   { id: "payments", label: "Payments", href: "/admin/payments", icon: CreditCardIcon, built: false },
   { id: "messages", label: "Messages", href: "/admin/messages", icon: ChatCenteredTextIcon, built: false },
-  { id: "reviews", label: "Reviews", href: "/admin/reviews", icon: StarIcon, built: false },
+  { id: "reviews", label: "Reviews", href: "/admin/reviews", icon: StarIcon, built: true },
   { id: "settings", label: "Settings", href: "/admin/settings", icon: GearSixIcon, built: false },
 ];
 
