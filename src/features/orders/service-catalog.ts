@@ -54,7 +54,8 @@ export const ADD_ON_SERVICES: CatalogService[] = SERVICE_CATALOG.filter((s) => s
 
 /**
  * CONTEXT.md: Bundle. A fixed-price package covering three pairs, each its
- * own Item. Every pair gets BUNDLE_PAIR_SERVICE_IDS; the perks that cover
+ * own Item. Every pair gets the Bundle's pairServiceIds (Premium Clean
+ * unless it says otherwise); the perks that cover
  * only some pairs ("Oxidation touch-up on 1 pair") are assigned by the shop
  * after inspection, so the Order records which Bundle was bought.
  */
@@ -63,6 +64,10 @@ export interface CatalogBundle {
   name: string;
   priceCents: number;
   perks: string[];
+  /** The Services every pair gets. Defaults to BUNDLE_PAIR_SERVICE_IDS. */
+  pairServiceIds?: readonly string[];
+  /** A promotion's last instant (ISO, exclusive): it can't be booked at or after it. Absent for always-on Bundles. */
+  endsAt?: string;
 }
 
 export const BUNDLE_PAIRS = 3;
@@ -100,6 +105,21 @@ export const BUNDLE_CATALOG: CatalogBundle[] = [
       "Paint/dye touch-up on 1 pair",
       "VIP turnaround (typically 48–72 hours)",
     ],
+  },
+  {
+    id: "fall-boots",
+    name: "Start of Fall Special: 3 Boots",
+    priceCents: 12000,
+    perks: [
+      "Basic Clean, Boot Restoration or Fall Finish, chosen after inspection",
+      "Deep clean, stain lift, scuff repair, suede revival",
+      "UGGs, Timberlands, any boot type",
+      "Suede fee waived",
+      "Typical turnaround 3–7 business days",
+    ],
+    pairServiceIds: ["standard"],
+    // End of December 21st 2026, New York time (EST, UTC-5).
+    endsAt: "2026-12-22T05:00:00Z",
   },
 ];
 
@@ -166,6 +186,16 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
 /** The Bundle with this id, or null (e.g. a single-pair Order's null bundleId). */
 export function findBundle(id: string | null): CatalogBundle | null {
   return id === null ? null : (BUNDLE_CATALOG.find((b) => b.id === id) ?? null);
+}
+
+/** False once a promotional Bundle's endsAt has passed. */
+export function isBundleAvailable(bundle: CatalogBundle, now: Date): boolean {
+  return bundle.endsAt === undefined || now.getTime() < Date.parse(bundle.endsAt);
+}
+
+/** The Services every pair of this Bundle gets. */
+export function bundlePairServiceIds(bundle: CatalogBundle): string[] {
+  return [...(bundle.pairServiceIds ?? BUNDLE_PAIR_SERVICE_IDS)];
 }
 
 export function catalogBundle(id: string): CatalogBundle {

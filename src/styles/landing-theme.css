@@ -4922,3 +4922,153 @@
     scroll-padding-bottom: 150px;
   }
 }
+
+/* ---------- fall promo banner ---------- */
+
+.landing-promo {
+  max-width: 1180px;
+  margin: 32px auto 0;
+  padding: 0 32px;
+}
+
+.landing-promo-card {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  align-items: center;
+  background: var(--bg-panel);
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.landing-promo-copy {
+  padding: 40px 0 40px 40px;
+}
+
+.landing-promo-copy h2 {
+  font-size: clamp(30px, 3.4vw, 40px);
+  font-weight: 800;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.landing-promo-price {
+  font-size: clamp(48px, 7vw, 84px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--blue-text);
+  margin: 0 0 16px;
+}
+
+.landing-promo-sub {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.landing-promo-tiers {
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  margin: 0 0 22px;
+}
+
+.landing-promo-tiers span {
+  margin: 0 6px;
+  color: var(--ink-soft);
+}
+
+.landing-promo-tiers small {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+}
+
+.landing-promo-figure {
+  align-self: stretch;
+  position: relative;
+}
+
+.landing-promo-figure img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28%);
+  mask-image: linear-gradient(to right, transparent, #000 28%);
+}
+
+.landing-promo-facts {
+  list-style: none;
+  margin: 0;
+  padding: 18px 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 20px 20px;
+}
+
+.landing-promo-facts li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 20px;
+  color: var(--blue-text);
+  font-size: 12px;
+}
+
+.landing-promo-facts li + li {
+  border-left: 1px solid var(--line);
+}
+
+.landing-promo-facts li > svg {
+  flex: none;
+}
+
+.landing-promo-facts span {
+  display: flex;
+  flex-direction: column;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+.landing-promo-facts strong,
+.landing-promo-facts b {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .landing-promo {
+    padding: 0 20px;
+  }
+  .landing-promo-card {
+    grid-template-columns: 1fr;
+  }
+  .landing-promo-copy {
+    padding: 28px 24px 8px;
+  }
+  .landing-promo-figure img {
+    -webkit-mask-image: linear-gradient(to bottom, transparent, #000 22%);
+    mask-image: linear-gradient(to bottom, transparent, #000 22%);
+  }
+  .landing-promo-facts {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px 20px;
+  }
+  .landing-promo-facts li {
+    padding: 0;
+  }
+  .landing-promo-facts li + li {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+}

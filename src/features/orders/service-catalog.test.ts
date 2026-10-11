@@ -5,6 +5,8 @@ import { BOOKING_ADD_ONS, BOOKING_SERVICES } from "@/features/booking/services-d
 import {
   BUNDLE_CATALOG,
   BUNDLE_PAIRS,
+  bundlePairServiceIds,
+  catalogBundle,
   catalogService,
   estimateBundleItems,
   formatServicePrice,
@@ -12,6 +14,7 @@ import {
   estimateItem,
   estimateOrder,
   InvalidServiceSelectionError,
+  isBundleAvailable,
   RUSH_FEE_CENTS,
   SERVICE_CATALOG,
   SUEDE_FEE_CENTS,
@@ -78,6 +81,11 @@ describe("estimateBundleItems", () => {
     }
   });
 
+  it("prices the Start of Fall Special at $120, split $40 a pair", () => {
+    const shares = estimateBundleItems("fall-boots");
+    expect(shares.map((s) => s.estimate.cents)).toEqual([4000, 4000, 4000]);
+  });
+
   it("rejects an unknown Bundle", () => {
     expect(() => estimateBundleItems("mystery")).toThrow(InvalidServiceSelectionError);
   });
@@ -142,5 +150,21 @@ describe("catalog display prices", () => {
 describe("upload rate limit vs Bundles (#85)", () => {
   it("allows ~20 Bundle attempts: one uploads request per pair per attempt", () => {
     expect(RATE_LIMITS.uploads.limit).toBeGreaterThanOrEqual(20 * BUNDLE_PAIRS);
+  });
+});
+
+describe("isBundleAvailable", () => {
+  const promo = catalogBundle("fall-boots");
+
+  it("is open until the promotion's end instant, then closed", () => {
+    expect(isBundleAvailable(promo, new Date("2026-12-22T04:59:59Z"))).toBe(true);
+    expect(isBundleAvailable(promo, new Date("2026-12-22T05:00:00Z"))).toBe(false);
+  });
+
+  it("never closes a Bundle without an end date, and gives it Premium Clean", () => {
+    const revival = catalogBundle("revival");
+    expect(isBundleAvailable(revival, new Date("2099-01-01T00:00:00Z"))).toBe(true);
+    expect(bundlePairServiceIds(revival)).toEqual(["premium"]);
+    expect(bundlePairServiceIds(promo)).toEqual(["standard"]);
   });
 });

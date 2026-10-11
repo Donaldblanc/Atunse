@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowRight, TriangleAlert } from "lucide-react";
-import { catalogService, formatPrice, formatServicePrice, serviceNotes } from "@/features/orders/service-catalog";
+import { catalogService, formatPrice, formatServicePrice, isBundleAvailable, serviceNotes } from "@/features/orders/service-catalog";
 import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
 import { SERVICES } from "@/features/landing/services";
 import { ServiceRow } from "./service-row";
@@ -32,7 +32,7 @@ export function ServiceStep({
         <h2>{isBundle ? "Choose a bundle." : "Choose your service(s)."}</h2>
         <p>
           {isBundle
-            ? "All bundles include 3 pairs, Premium Clean, and Suede fee waived."
+            ? "Every bundle covers 3 pairs. Suede fee waived."
             : "Pick one cleaning tier, then add any restoration or custom work you need — those stack freely."}{" "}
           Optional add-ons, like Lace Replacement, come next with your pair{isBundle ? "s'" : "'s"} details.
         </p>
@@ -40,7 +40,7 @@ export function ServiceStep({
 
       <div className="booking-page-service-list">
         {isBundle
-          ? BOOKING_BUNDLES.map((bundle) => (
+          ? BOOKING_BUNDLES.filter((bundle) => isBundleAvailable(bundle, new Date())).map((bundle) => (
               <ServiceRow
                 key={bundle.id}
                 Icon={bundle.icon}
