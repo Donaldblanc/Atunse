@@ -1,4 +1,4 @@
-import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PencilSimpleIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, CheckIcon, EnvelopeSimpleIcon, PackageIcon, PencilSimpleIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
@@ -76,6 +76,7 @@ export function OrderDetailDialog({
   editHref,
   editing = false,
   returnAction,
+  fullPageHref,
 }: {
   detail: OrderDetail;
   closeHref: string;
@@ -86,25 +87,25 @@ export function OrderDetailDialog({
   editing?: boolean;
   /** Book return visit, or the booked Return (return-booking.ts); left out where it doesn't apply. */
   returnAction?: React.ReactNode;
+  /** This Order's standalone page (/admin/orders/[id]), for "View full order". */
+  fullPageHref?: string;
 }) {
-  const { customer, payment } = detail;
-  const multiple = detail.pairs.length > 1;
-  const initials = customer.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
-
   return (
     <AdminDialog
       size="lg"
       closeHref={closeHref}
       actions={
         editing ? null : (
-          <Link href={editHref} replace scroll={false} className="admin-btn" data-variant="secondary">
-            <PencilSimpleIcon size={16} aria-hidden="true" /> Edit Order
-          </Link>
+          <>
+            {fullPageHref && (
+              <Link href={fullPageHref} className="admin-btn" data-variant="secondary">
+                <ArrowSquareOutIcon size={16} aria-hidden="true" /> View full order
+              </Link>
+            )}
+            <Link href={editHref} replace scroll={false} className="admin-btn" data-variant="secondary">
+              <PencilSimpleIcon size={16} aria-hidden="true" /> Edit Order
+            </Link>
+          </>
         )
       }
       title={
@@ -125,10 +126,43 @@ export function OrderDetailDialog({
         </span>
       }
     >
-      {editing ? (
-        // Keyed by the Order's stamp, so a reload after a stale-edit refusal starts a fresh form (and a fresh key).
-        <OrderEditForm key={detail.edit.updatedAt} orderId={detail.orderId} values={detail.edit} viewHref={viewHref} idempotencyKey={randomUUID()} />
-      ) : (
+      <OrderDetailBody detail={detail} viewHref={viewHref} editing={editing} returnAction={returnAction} />
+    </AdminDialog>
+  );
+}
+
+/**
+ * The Order detail's body: Edit Order's form in place of the read-only
+ * view when `editing`. Shared by the Overview's dialog (OrderDetailDialog)
+ * and the standalone page (`/admin/orders/[id]`), so neither duplicates
+ * the price breakdown or the pipeline timeline.
+ */
+export function OrderDetailBody({
+  detail,
+  viewHref,
+  editing = false,
+  returnAction,
+}: {
+  detail: OrderDetail;
+  /** This Order's plain view: where Cancel and a saved edit return to. */
+  viewHref: string;
+  editing?: boolean;
+  /** Book return visit, or the booked Return (return-booking.ts); left out where it doesn't apply. */
+  returnAction?: React.ReactNode;
+}) {
+  const { customer, payment } = detail;
+  const multiple = detail.pairs.length > 1;
+  const initials = customer.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]!.toUpperCase())
+    .join("");
+
+  return editing ? (
+    // Keyed by the Order's stamp, so a reload after a stale-edit refusal starts a fresh form (and a fresh key).
+    <OrderEditForm key={detail.edit.updatedAt} orderId={detail.orderId} values={detail.edit} viewHref={viewHref} idempotencyKey={randomUUID()} />
+  ) : (
       <div className="od-grid">
         <div className="od-column">
           <section className="ov-card od-card" aria-labelledby="od-customer-title">
@@ -330,8 +364,6 @@ export function OrderDetailDialog({
           </section>
         </div>
       </div>
-      )}
-    </AdminDialog>
   );
 }
 

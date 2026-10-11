@@ -12,6 +12,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
   - Order detail with Update Status, Edit Order, Add note
   - Schedule Item with Reschedule and Mark as Completed
   - Needs Attention with Mark Paid
+- **Standalone Order detail** (`/admin/orders/[id]`): the Overview's `?order=` dialog content, promoted to its own page and URL. Reuses `getOrderDetail` and the dialog's action forms.
 - **Order flows** (#123/#125):
   - Send Quote, Customer approved
   - status emails at Quote Sent, Ready for Drop-Off/Shipping and Cancelled
@@ -36,7 +37,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Admin Calendar** (`/admin/calendar`): a month grid of scheduled visits, built on `getAdminCalendar` (same `listAppointmentsBetween` query and live-visit filter as Today's Schedule). A visit opens the Overview's Schedule Item dialog (`/admin?visit=`) for its details, Reschedule and Mark as Completed.
 
 ## Not built (admin screens in SPEC's inventory)
-Orders list, standalone Order detail page, Customers, Services &
+Orders list, Customers, Services &
 Pricing, Inventory, Payments, Messages, Settings. Unbuilt screens
 show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`). Until they
 exist, the Overview's dialogs cover the day-to-day actions.

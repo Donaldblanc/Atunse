@@ -20,6 +20,7 @@ export async function OrderSlot({ params, selection, actingUser, closeHref }: Ov
       editHref={overviewHref(selection, { order: orderId, edit: "order" })}
       editing={params.edit === "order"}
       returnAction={<BookReturnAction orderId={orderId} returnVisit={orderDetail.returnVisit} selection={selection} />}
+      fullPageHref={`/admin/orders/${orderId}`}
     />
   ) : (
     <OrderNotFoundDialog closeHref={closeHref} />
