@@ -8,6 +8,7 @@ use-cases, repositories and UI; `src/app/` only routes into them.
 |---|---|
 | `/`, `/services`, `/process`, `/about`, `/contact`, `/booking`, `/coming-soon` | customer pages (`page.tsx` each) |
 | `/admin` | admin Overview; dialogs via URL params (`?order=`, `?visit=`, `?metric=`, `?attention=`, `?range=`) |
+| `/admin/customers`, `/admin/customers/[id]` | Customers list and detail (contact info + order history) |
 | `/sign-in` | interim admin password sign-in (ADR-0005 addendum) |
 | `api/v1/orders` (+ `[orderId]/photos`) | booking submit · 5-minute photo view links |
 | `api/v1/uploads` (+ `local`) | presigned upload targets · dev-only local upload sink |
@@ -23,6 +24,7 @@ use-cases, repositories and UI; `src/app/` only routes into them.
 | `admin-overview` | `get-admin-overview.ts` (page data) · `panels/` (one component per Overview panel) · `dialogs/` (one slot per dialog + `registry.tsx`) · `*-dialog.tsx` · `*-actions.ts` (server actions) · `overview-range.ts` (`overviewHref`) · `sample-data.ts` |
 | `booking` | `booking-flow.tsx` (steps + client pricing) · `*-step.tsx` · `services-data.ts` (display prices, parity-tested against `service-catalog.ts`) · `submit-booking.ts` |
 | `accounts` | `authz.ts` (`requireRole`) · `admin-check.ts` · `session.ts`, `password.ts` · sign-in code use-cases |
+| `admin-customers` | `list-customers.ts`, `customer-detail.ts` (Customers list/detail use-cases) · `deps.ts` |
 | `notifications` | `notification-service.ts` (interface + console logger) · `resend-notification-service.ts` · `index.ts` picks one from env |
 | `landing`, `contact` | marketing components; contact form use-case |
 

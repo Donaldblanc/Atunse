@@ -319,6 +319,12 @@ export interface OrderRepository {
   /** The most recently booked Orders, newest first. */
   listRecent(limit: number): Promise<Order[]>;
 
+  /** An Account's Orders (the Customers detail screen's order history), newest first. */
+  listByAccountId(accountId: string): Promise<Order[]>;
+
+  /** How many Orders an Account has (the Customers list's count), without loading them. */
+  countByAccountId(accountId: string): Promise<number>;
+
   /** SCHEDULED Appointments starting in [from, to), earliest first, with their Order's summary. */
   listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]>;
 

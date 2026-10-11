@@ -450,6 +450,19 @@ describe("PrismaOrderRepository admin Overview reads (integration)", () => {
     expect(recent.map((order) => order.id)).toEqual([orders[1]!.id, orders[2]!.id]);
   });
 
+  it("lists an Account's Orders, newest first, and none of another Account's", async () => {
+    const { order: first } = await repo.create(newOrder({ owner: newCustomer("history@example.com") }));
+    await prisma.order.update({ where: { id: first.id }, data: { createdAt: new Date("2026-09-20T15:00:00Z") } });
+    const { order: second } = await repo.create(newOrder({ owner: { accountId: first.accountId } }));
+    await prisma.order.update({ where: { id: second.id }, data: { createdAt: new Date("2026-09-22T15:00:00Z") } });
+    await repo.create(newOrder({ owner: newCustomer("other@example.com") }));
+
+    const history = await repo.listByAccountId(first.accountId);
+
+    expect(history.map((order) => order.id)).toEqual([second.id, first.id]);
+    await expect(repo.countByAccountId(first.accountId)).resolves.toBe(2);
+  });
+
   it("finds the SCHEDULED Appointments starting in [from, to), earliest first, with their Order", async () => {
     const collected = (await repo.create(newOrder({ contactName: "John Doe" }))).order; // collection Oct 3, 4:30 PM EDT
     const nextDay = (await repo.create(newOrder({ collection: { startsAt: new Date("2026-10-04T20:30:00Z"), endsAt: new Date("2026-10-04T21:00:00Z") } }))).order;

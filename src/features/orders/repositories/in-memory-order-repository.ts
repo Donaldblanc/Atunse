@@ -79,7 +79,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       accountId = input.owner.accountId;
     } else {
       try {
-        accountId = this.accounts.add({ role: "CUSTOMER", ...input.owner.newCustomer }).id;
+        accountId = this.accounts.add({ role: "CUSTOMER", name: input.contactName, ...input.owner.newCustomer }).id;
       } catch (err) {
         if (err instanceof InMemoryEmailTakenError) throw new EmailTakenError();
         throw err;
@@ -256,6 +256,16 @@ export class InMemoryOrderRepository implements OrderRepository {
 
   async listRecent(limit: number): Promise<Order[]> {
     return [...this.orders.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
+  }
+
+  async listByAccountId(accountId: string): Promise<Order[]> {
+    return [...this.orders.values()]
+      .filter((order) => order.accountId === accountId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async countByAccountId(accountId: string): Promise<number> {
+    return [...this.orders.values()].filter((order) => order.accountId === accountId).length;
   }
 
   async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {

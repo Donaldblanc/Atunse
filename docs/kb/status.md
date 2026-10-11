@@ -31,9 +31,10 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
   - Structure (#129): one file per panel in `admin-overview/panels/`, one slot per dialog in `admin-overview/dialogs/` plus its lookup-table line.
 - **Data model** for every admin screen (ADR-0016, #119).
 - **Tests:** integration tests use only a `*_test` database (#124).
+- **Customers** (`/admin/customers`, `/admin/customers/[id]`): list of Customer Accounts with order counts; detail shows contact info and order history, each Order opening the Overview order dialog (`/admin?order=<id>`) until feature/admin-order-detail's standalone page merges.
 
-## Not built (admin screens 2–11 in SPEC's inventory)
-Orders list, standalone Order detail page, Calendar, Customers, Services &
+## Not built (admin screens in SPEC's inventory)
+Orders list, standalone Order detail page, Calendar, Services &
 Pricing, Inventory, Payments, Messages, Reviews, Settings. Unbuilt screens
 show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`). Until they
 exist, the Overview's dialogs cover the day-to-day actions.

@@ -453,6 +453,15 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
+  async listByAccountId(accountId: string): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({ where: { accountId }, include: ORDER_INCLUDE, orderBy: { createdAt: "desc" } });
+    return rows.map(toDomainOrder);
+  }
+
+  async countByAccountId(accountId: string): Promise<number> {
+    return this.prisma.order.count({ where: { accountId } });
+  }
+
   async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
     const rows = await this.prisma.appointment.findMany({
       where: { status: "SCHEDULED", startsAt: { gte: from, lt: to } },

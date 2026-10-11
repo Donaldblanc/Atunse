@@ -16,9 +16,9 @@ import {
   type RedeemResult,
   type SignInCodes,
 } from "../sign-in-codes";
-import type { AccountRepository, CustomerAccount } from "./account-repository";
+import type { AccountRepository, CustomerAccount, CustomerDetail, CustomerListRow } from "./account-repository";
 
-type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; phone: string | null };
+type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; createdAt: Date };
 
 let nextAccountId = 0;
 
@@ -28,11 +28,20 @@ export class InMemoryEmailTakenError extends Error {}
 export class InMemoryAccounts implements AccountRepository {
   readonly accounts: StoredAccount[] = [];
 
-  add(account: Omit<StoredAccount, "id" | "phone"> & { id?: string; phone?: string | null }): StoredAccount {
+  add(
+    account: Omit<StoredAccount, "id" | "phone" | "name" | "createdAt"> & { id?: string; phone?: string | null; name?: string | null; createdAt?: Date },
+  ): StoredAccount {
     const email = account.email.trim().toLowerCase();
     if (this.accounts.some((a) => a.email === email && a.role === account.role)) throw new InMemoryEmailTakenError();
     nextAccountId += 1;
-    const stored = { id: account.id ?? `account_${nextAccountId}`, role: account.role, email, phone: account.phone ?? null };
+    const stored = {
+      id: account.id ?? `account_${nextAccountId}`,
+      role: account.role,
+      email,
+      name: account.name ?? null,
+      phone: account.phone ?? null,
+      createdAt: account.createdAt ?? new Date(),
+    };
     this.accounts.push(stored);
     return stored;
   }
@@ -45,6 +54,21 @@ export class InMemoryAccounts implements AccountRepository {
   async findCustomerById(accountId: string): Promise<CustomerAccount | null> {
     const found = this.accounts.find((a) => a.role === "CUSTOMER" && a.id === accountId);
     return found ? { id: found.id, email: found.email } : null;
+  }
+
+  async listCustomers(params?: { limit?: number; offset?: number }): Promise<CustomerListRow[]> {
+    const rows = this.accounts
+      .filter((a) => a.role === "CUSTOMER")
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map((a) => ({ id: a.id, name: a.name, email: a.email, phone: a.phone, createdAt: a.createdAt }));
+    const offset = params?.offset ?? 0;
+    const limit = params?.limit;
+    return limit === undefined ? rows.slice(offset) : rows.slice(offset, offset + limit);
+  }
+
+  async findCustomerDetail(accountId: string): Promise<CustomerDetail | null> {
+    const found = this.accounts.find((a) => a.role === "CUSTOMER" && a.id === accountId);
+    return found ? { id: found.id, name: found.name, email: found.email, phone: found.phone, createdAt: found.createdAt } : null;
   }
 }
 
