@@ -36,6 +36,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Customers** (`/admin/customers`, `/admin/customers/[id]`): list of Customer Accounts with order counts; detail shows contact info and order history, each Order linking to `/admin/orders/[id]`.
 - **Admin Calendar** (`/admin/calendar`): a month grid of scheduled visits, built on `getAdminCalendar` (same `listAppointmentsBetween` query and live-visit filter as Today's Schedule). A visit opens the Overview's Schedule Item dialog (`/admin?visit=`) for its details, Reschedule and Mark as Completed.
 - **Orders list** (`/admin/orders`): search, status tabs, day/service filters and paging, reusing the Overview's All-orders logic. Rows link to `/admin/orders/[id]`.
+- **Quote gate scoped to Restoration/Custom-Work** (ADR-0017, supersedes ADR-0001): a Cleaning/Add-on-only Item is created already Approved at its estimate (no Under Review, no Quote). Only a Restoration/Custom-Work Item goes through Send Quote/Customer approved.
 
 ## Not built (admin screens in SPEC's inventory)
 Services & Pricing, Inventory, Payments, Messages, Settings. Unbuilt screens

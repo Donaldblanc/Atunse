@@ -142,6 +142,12 @@ export interface NewItemInput {
   material: string | null;
   serviceIds: string[];
   estimate: Money;
+  /**
+   * ADR-0017: false when every Service is Cleaning/Add-on-only (set
+   * price) — the repository creates the Item already APPROVED, priced at
+   * its estimate, instead of REQUEST_SUBMITTED awaiting a Quote.
+   */
+  requiresQuote: boolean;
   /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
   photos: { key: string; uploadKey: string }[];
 }

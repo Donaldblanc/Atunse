@@ -36,7 +36,51 @@ function detail(overrides: Partial<OrderDetail> = {}): OrderDetail {
   };
 }
 
+function pair(overrides: Partial<OrderDetail["pairs"][number]> = {}): OrderDetail["pairs"][number] {
+  return {
+    itemId: "item_1",
+    photo: { kind: "none" } as OrderDetail["pairs"][number]["photo"],
+    title: "Nike Air Max 90",
+    details: [],
+    estimate: Money.fromCents(3000),
+    price: null,
+    status: "APPROVED",
+    services: [],
+    suedeFee: null,
+    nextStatuses: [],
+    held: null,
+    autoApproved: false,
+    ...overrides,
+  };
+}
+
 describe("OrderDetailDialog", () => {
+  it("shows a 'Set price — no quote needed' note for an auto-approved pair (ADR-0017)", () => {
+    const html = renderToStaticMarkup(
+      <OrderDetailDialog
+        detail={detail({ pairs: [pair({ autoApproved: true })] })}
+        closeHref="/admin"
+        viewHref="/admin?order=ord_1"
+        editHref="/admin?order=ord_1&edit=order"
+        fullPageHref="/admin/orders/ord_1"
+      />,
+    );
+    expect(html).toContain("Set price — no quote needed");
+  });
+
+  it("doesn't show the auto-approved note for a pair that went through a Quote", () => {
+    const html = renderToStaticMarkup(
+      <OrderDetailDialog
+        detail={detail({ pairs: [pair({ autoApproved: false })] })}
+        closeHref="/admin"
+        viewHref="/admin?order=ord_1"
+        editHref="/admin?order=ord_1&edit=order"
+        fullPageHref="/admin/orders/ord_1"
+      />,
+    );
+    expect(html).not.toContain("Set price — no quote needed");
+  });
+
   it("shows 'View full order' and 'Edit Order' in the read-only view", () => {
     const html = renderToStaticMarkup(
       <OrderDetailDialog detail={detail()} closeHref="/admin" viewHref="/admin?order=ord_1" editHref="/admin?order=ord_1&edit=order" fullPageHref="/admin/orders/ord_1" />,

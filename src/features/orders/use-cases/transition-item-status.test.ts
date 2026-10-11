@@ -6,11 +6,17 @@ import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order
 import { Money } from "@/shared/money/money";
 import type { ItemStatus } from "../domain";
 import { submitOrder } from "./submit-order";
-import { bookingDeps, RecordingNotificationService, validBookingInput } from "./test-fixtures";
+import { bookingDeps, RecordingNotificationService, validBookingInput, validPair } from "./test-fixtures";
 import { InvalidTransitionError, MoveNotAllowedError, transitionItemStatus } from "./transition-item-status";
 
+// A restoration Service (requires a Quote, per ADR-0017), so the seeded Item starts REQUEST_SUBMITTED
+// instead of auto-approving — this file exercises the full Approval Gate pipeline.
 async function seedOrder(orders: InMemoryOrderRepository) {
-  const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
+  const order = await submitOrder(
+    bookingDeps({ orders }),
+    { accountId: null, role: "GUEST" },
+    validBookingInput({ items: [validPair({ serviceIds: ["oxidation"] })] }),
+  );
   return { order, item: order.items[0]! };
 }
 

@@ -318,6 +318,14 @@ export function liveEstimate(order: { estimate: Money; items: { status: ItemStat
  */
 export const MANUAL_PAYMENT_CONFIRMED = "MANUAL_PAYMENT_CONFIRMED";
 
+/**
+ * ADR-0017: the audit action a repository writes when an Item with no
+ * Restoration/Custom Work Service is created already APPROVED at its
+ * published price, skipping the Quote/Approval steps. System action: no
+ * actorAccountId.
+ */
+export const AUTO_APPROVED_SET_PRICE = "AUTO_APPROVED_SET_PRICE";
+
 export interface AuditEntry {
   action: string;
   fromStatus: ItemStatus | null;

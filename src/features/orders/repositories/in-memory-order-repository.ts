@@ -6,7 +6,7 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { AUTO_APPROVED_SET_PRICE, COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
@@ -111,22 +111,37 @@ export class InMemoryOrderRepository implements OrderRepository {
       confirmationEmailSentAt: null,
       submissionFingerprint: input.submissionFingerprint,
       bundleId: input.bundleId,
-      items: input.items.map((item) => ({
-        id: fakeId("item"),
-        orderId,
-        brand: item.brand,
-        model: item.model,
-        description: item.description,
-        material: item.material,
-        size: null,
-        colorway: null,
-        condition: null,
-        serviceIds: item.serviceIds,
-        estimate: item.estimate,
-        status: "REQUEST_SUBMITTED",
-        price: null,
-        photoKeys: item.photos.map((photo) => photo.key),
-      })),
+      items: input.items.map((item) => {
+        const itemId = fakeId("item");
+        if (!item.requiresQuote) {
+          this.auditEntries.push({
+            itemId,
+            action: AUTO_APPROVED_SET_PRICE,
+            fromStatus: "REQUEST_SUBMITTED",
+            toStatus: "APPROVED",
+            actorAccountId: null,
+            idempotencyKey: null,
+            metadata: { priceCents: item.estimate.cents },
+            at: new Date(),
+          });
+        }
+        return {
+          id: itemId,
+          orderId,
+          brand: item.brand,
+          model: item.model,
+          description: item.description,
+          material: item.material,
+          size: null,
+          colorway: null,
+          condition: null,
+          serviceIds: item.serviceIds,
+          estimate: item.estimate,
+          status: item.requiresQuote ? "REQUEST_SUBMITTED" : "APPROVED",
+          price: item.requiresQuote ? null : item.estimate,
+          photoKeys: item.photos.map((photo) => photo.key),
+        };
+      }),
       payments: input.depositPayment
         ? [
             {

@@ -97,6 +97,7 @@ function newItem(overrides: Partial<NewItemInput> = {}): NewItemInput {
     material: null,
     serviceIds: ["standard"],
     estimate: Money.fromCents(3000),
+    requiresQuote: true,
     photos: photos(),
     ...overrides,
   };
@@ -117,6 +118,7 @@ describe("PrismaOrderRepository (integration)", () => {
             material: "Suede",
             serviceIds: ["standard"],
             estimate: Money.fromCents(4000),
+            requiresQuote: true,
             photos: [
               { key: "photos/k/1.jpg", uploadKey: "bookings/k/1.jpg" },
               { key: "photos/k/2.jpg", uploadKey: "bookings/k/2.jpg" },
@@ -140,6 +142,28 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(reloaded?.rush).toBe(true);
     expect(reloaded?.estimate.cents).toBe(5000);
     expect(reloaded?.deposit.cents).toBe(2500);
+  });
+
+  it("auto-approves a set-price Item (requiresQuote: false) at its estimate, with an AUTO_APPROVED_SET_PRICE audit entry (ADR-0017)", async () => {
+    const { order } = await repo.create(
+      newOrder({
+        items: [newItem({ serviceIds: ["standard"], estimate: Money.fromCents(3000), requiresQuote: false })],
+      }),
+    );
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.status).toBe("APPROVED");
+    expect(order.items[0]?.price?.cents).toBe(3000);
+
+    const reloaded = await repo.findById(order.id);
+    expect(reloaded?.items[0]?.status).toBe("APPROVED");
+    expect(reloaded?.items[0]?.price?.cents).toBe(3000);
+
+    const itemId = order.items[0]!.id;
+    const audit = await prisma.itemAuditEntry.findFirstOrThrow({ where: { itemId, action: "AUTO_APPROVED_SET_PRICE" } });
+    expect(audit.fromStatus).toBe("REQUEST_SUBMITTED");
+    expect(audit.toStatus).toBe("APPROVED");
+    expect(audit.actorAccountId).toBeNull();
   });
 
   it("keeps the terms acceptance with the Order: version, URL, SHA-256, acknowledgments and when (ADR-0015)", async () => {

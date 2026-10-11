@@ -15,6 +15,7 @@ import {
   estimateOrder,
   InvalidServiceSelectionError,
   isBundleAvailable,
+  itemRequiresQuote,
   RUSH_FEE_CENTS,
   SERVICE_CATALOG,
   SUEDE_FEE_CENTS,
@@ -150,6 +151,21 @@ describe("catalog display prices", () => {
 describe("upload rate limit vs Bundles (#85)", () => {
   it("allows ~20 Bundle attempts: one uploads request per pair per attempt", () => {
     expect(RATE_LIMITS.uploads.limit).toBeGreaterThanOrEqual(20 * BUNDLE_PAIRS);
+  });
+});
+
+describe("itemRequiresQuote (ADR-0017)", () => {
+  it("doesn't need a Quote for cleaning-only, add-on-only, or cleaning + add-on", () => {
+    expect(itemRequiresQuote(["standard"])).toBe(false);
+    expect(itemRequiresQuote(["premium", "laces"])).toBe(false);
+    expect(itemRequiresQuote(["standard", "laces", "deodorizing"])).toBe(false);
+  });
+
+  it("needs a Quote for any restoration or custom-work Service, even mixed with cleaning", () => {
+    expect(itemRequiresQuote(["oxidation"])).toBe(true);
+    expect(itemRequiresQuote(["reglue"])).toBe(true);
+    expect(itemRequiresQuote(["painting"])).toBe(true);
+    expect(itemRequiresQuote(["standard", "oxidation"])).toBe(true);
   });
 });
 

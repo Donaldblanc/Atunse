@@ -56,6 +56,8 @@ export interface OrderDetailPair {
   nextStatuses: ItemStatus[];
   /** Why the next step isn't offered yet (awaiting the quote or the deposit), or null. */
   held: string | null;
+  /** True when every Service was cleaning/add-on, so this pair skipped the Quote step straight to Approved at its estimate (ADR-0017). */
+  autoApproved: boolean;
 }
 
 export interface TimelineStep {
@@ -175,7 +177,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
           ),
         )
       : null,
-    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl))),
+    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl, changes))),
     timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
     payment: {
       deposit: deposit
@@ -234,11 +236,22 @@ function quotedSummary(order: Order): OrderDetail["payment"]["quoted"] {
   };
 }
 
-async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"]): Promise<OrderDetailPair> {
+async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"], changes: StatusChange[]): Promise<OrderDetailPair> {
   const inBundle = order.bundleId !== null;
   const { moves, held } = adminStatusMoves(item, order);
   const photoKey = item.photoKeys[0];
   const services = SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id));
+  // No Restoration/Custom-Work Service, so it was created already Approved at its estimate
+  // (ADR-0017), never through Under Review / Quote Sent. Keyed off the Service category, not
+  // status history: a plain Update Status move (adminStatusMoves) can jump a Restoration pair
+  // straight to Approved too, with no Quote Sent in its history, and that pair still needs one.
+  const autoApproved =
+    item.status !== "REQUEST_SUBMITTED" &&
+    item.status !== "UNDER_REVIEW" &&
+    item.status !== "QUOTE_SENT" &&
+    item.status !== "CANCELLED" &&
+    !services.some((service) => service.category === "restoration" || service.category === "custom-work") &&
+    !changes.some((change) => change.itemId === item.id && change.toStatus === "QUOTE_SENT");
   const suedeApplies = !inBundle && suedeFeeApplies(item.material, services);
   return {
     itemId: item.id,
@@ -257,6 +270,7 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     suedeFee: suedeApplies ? Money.fromCents(SUEDE_FEE_CENTS) : null,
     nextStatuses: moves,
     held,
+    autoApproved,
   };
 }
 

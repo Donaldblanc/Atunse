@@ -15,13 +15,15 @@ Completing a visit (`completeAppointment`) moves pairs in the same transaction (
 
 The Order has no status of its own; it is rolled up from its Items for display.
 
+**Quote gate (ADR-0017, supersedes ADR-0001):** an Item created with only Cleaning/Add-on Services (`itemRequiresQuote` false, `service-catalog.ts`) starts `APPROVED` with `price` set to its estimate, skipping `REQUEST_SUBMITTED`/`UNDER_REVIEW`/`QUOTE_SENT`; the repository logs a system `AUTO_APPROVED_SET_PRICE` audit entry (no actor). Only an Item with a Restoration/Custom-Work Service goes through the full pipeline above.
+
 ## Customer emails (`status-emails.ts`, `visit-emails.ts`)
 - Emails go out at Quote Sent, Ready for Drop-Off/Shipping and Cancelled, plus when a visit is rescheduled or a return is booked. Other steps are silent.
 - They are sent after the DB write, and never on an idempotent replay.
 
 ## Audit actions (`ItemAuditEntry`)
 `STATUS_TRANSITION` (from/to in metadata, the step back included; a move made by completing a visit also carries `metadata.reason`, `COLLECTION_COMPLETED` or `RETURN_COMPLETED`), `QUOTE_SENT`,
-`APPROVAL_RECORDED`, `MANUAL_PAYMENT_CONFIRMED` (a Deposit or Balance; metadata has the payment id, kind and method), `DETAILS_EDITED`.
+`APPROVAL_RECORDED`, `MANUAL_PAYMENT_CONFIRMED` (a Deposit or Balance; metadata has the payment id, kind and method), `DETAILS_EDITED`, `AUTO_APPROVED_SET_PRICE` (system action, no actor: a Cleaning/Add-on-only Item created straight to Approved, metadata has `priceCents`).
 
 Order-level actions (`OrderAuditEntry`, keyed by order): `ORDER_CONTACT_EDITED` (field names only), `ORDER_NOTE_ADDED` (note id and length, never the text), `ORDER_RESCHEDULED` (appointment id and kind, from/to times). Contact edits before this table existed stay on the first pair's `ItemAuditEntry`.
 

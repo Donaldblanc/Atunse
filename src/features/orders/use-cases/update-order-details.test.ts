@@ -38,6 +38,7 @@ async function bookOrder(pairs = 1) {
       material: null,
       serviceIds: ["standard"],
       estimate: Money.fromCents(3000),
+      requiresQuote: true,
       photos: [{ key: `photos/${counter}-${i}.jpg`, uploadKey: `bookings/${counter}-${i}.jpg` }],
     })),
   };
