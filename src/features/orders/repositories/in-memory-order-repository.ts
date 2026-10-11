@@ -456,7 +456,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     this.recordOrderAudit(found.order.id, ORDER_RESCHEDULED, params.actorAccountId, {
       appointmentId: appointment.id,
       kind: appointment.kind,
-      from: { startsAt: params.expectedStartsAt.toISOString() },
+      from: { startsAt: appointment.startsAt.toISOString(), endsAt: appointment.endsAt.toISOString() },
       to: { startsAt: params.startsAt.toISOString(), endsAt: params.endsAt.toISOString() },
     });
     appointment.startsAt = params.startsAt;

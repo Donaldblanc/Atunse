@@ -89,7 +89,7 @@ describe("rescheduleVisit", () => {
       orderId: order.id,
       action: "ORDER_RESCHEDULED",
       actorAccountId: "acc_admin",
-      metadata: { appointmentId: input.appointmentId, kind: "COLLECTION", from: { startsAt: FIRST.startsAt.toISOString() }, to: { startsAt: want.startsAt.toISOString(), endsAt: want.endsAt.toISOString() } },
+      metadata: { appointmentId: input.appointmentId, kind: "COLLECTION", from: { startsAt: FIRST.startsAt.toISOString(), endsAt: FIRST.endsAt.toISOString() }, to: { startsAt: want.startsAt.toISOString(), endsAt: want.endsAt.toISOString() } },
     });
   });
 

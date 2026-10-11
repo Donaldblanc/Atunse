@@ -714,6 +714,7 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date; actorAccountId: string | null }) {
     return this.prisma.$transaction(async (tx) => {
+      const before = await tx.appointment.findUnique({ where: { id: params.appointmentId } });
       // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
       const moved = await tx.appointment.updateMany({
         where: { id: params.appointmentId, status: "SCHEDULED", startsAt: params.expectedStartsAt },
@@ -721,7 +722,7 @@ export class PrismaOrderRepository implements OrderRepository {
       });
       const row = await tx.appointment.findUnique({ where: { id: params.appointmentId } });
       if (!row) throw new AppointmentNotFoundError(params.appointmentId);
-      if (moved.count === 1) {
+      if (moved.count === 1 && before) {
         await tx.orderAuditEntry.create({
           data: {
             orderId: row.orderId,
@@ -730,7 +731,7 @@ export class PrismaOrderRepository implements OrderRepository {
             metadata: {
               appointmentId: row.id,
               kind: row.kind,
-              from: { startsAt: params.expectedStartsAt.toISOString() },
+              from: { startsAt: before.startsAt.toISOString(), endsAt: before.endsAt.toISOString() },
               to: { startsAt: params.startsAt.toISOString(), endsAt: params.endsAt.toISOString() },
             },
           },
