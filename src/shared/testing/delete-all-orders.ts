@@ -18,6 +18,7 @@ export async function deleteAllOrders(prisma: PrismaClient): Promise<void> {
   await prisma.appointment.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.itemAuditEntry.deleteMany();
+  await prisma.orderAuditEntry.deleteMany();
   await prisma.itemPhoto.deleteMany();
   await prisma.item.deleteMany();
   await prisma.order.deleteMany();
