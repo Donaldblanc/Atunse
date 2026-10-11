@@ -1,6 +1,5 @@
 // A Customer Account's detail (ADR-0014): contact info and Order history.
-// Each Order opens the Overview order dialog (/admin?order=<id>) until
-// feature/admin-order-detail's standalone page merges.
+// Each Order links to the standalone /admin/orders/[id] page.
 
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -9,7 +8,6 @@ import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { getCustomerDetail } from "@/features/admin-customers/customer-detail";
 import { buildAdminCustomersDeps } from "@/features/admin-customers/deps";
 import { bookedDay } from "@/features/admin-overview/get-admin-overview";
-import { DEFAULT_OVERVIEW_RANGE, overviewHref } from "@/features/admin-overview/overview-range";
 import { STATUS_TONE } from "@/features/admin-overview/status-tone";
 import { ITEM_STATUS_LABELS } from "@/features/orders/domain";
 
@@ -60,7 +58,7 @@ export default async function AdminCustomerDetailPage({ params }: { params: Prom
                 {customer.orders.map((order) => (
                   <tr key={order.orderId} className="ov-row-link">
                     <td>
-                      <Link href={overviewHref(DEFAULT_OVERVIEW_RANGE, { order: order.orderId })} className="ov-cell-main">
+                      <Link href={`/admin/orders/${order.orderId}`} className="ov-cell-main">
                         {order.reference}
                       </Link>
                     </td>
