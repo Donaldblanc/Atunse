@@ -118,7 +118,23 @@ export async function ReturnBookingDialog({ orderId, selection, actingUser, now 
  * visit) when one exists, and nothing for Mail-In or an Order with no pair
  * ready. From the Order the dialog already loaded (OrderDetail.returnVisit).
  */
-export function BookReturnAction({ orderId, returnVisit, selection }: { orderId: string; returnVisit: ReturnVisitSummary; selection: OverviewSelection }) {
+export function BookReturnAction({
+  orderId,
+  returnVisit,
+  selection,
+  replaceHistory = true,
+}: {
+  orderId: string;
+  returnVisit: ReturnVisitSummary;
+  selection: OverviewSelection;
+  /**
+   * Whether the "Book return visit" link replaces the current history entry.
+   * True for the Overview's dialog (it's replacing another dialog state on
+   * the same `/admin` URL); false on the standalone Order page so Back
+   * still returns there instead of landing on `/admin`.
+   */
+  replaceHistory?: boolean;
+}) {
   if (returnVisit.kind === "booked") {
     return (
       <p className="od-return">
@@ -132,7 +148,7 @@ export function BookReturnAction({ orderId, returnVisit, selection }: { orderId:
   if (returnVisit.kind !== "bookable") return null;
   return (
     <div className="od-return">
-      <Link className="admin-btn" data-variant="secondary" href={overviewHref(selection, { order: orderId, book: "return" })} replace scroll={false}>
+      <Link className="admin-btn" data-variant="secondary" href={overviewHref(selection, { order: orderId, book: "return" })} replace={replaceHistory} scroll={false}>
         <CalendarPlusIcon size={18} aria-hidden="true" /> Book return visit
       </Link>
     </div>
