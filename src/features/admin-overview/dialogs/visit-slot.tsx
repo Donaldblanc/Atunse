@@ -1,3 +1,4 @@
+import { calendarMonthParam } from "../calendar-month";
 import { getScheduledVisit } from "../scheduled-visit";
 import { buildVisitDeps } from "../visit-deps";
 import { VisitDialog } from "../visit-dialog";
@@ -11,5 +12,10 @@ export async function VisitSlot({ params, selection, actingUser, now }: Overview
   const visitId = visitIdFromParams(params);
   if (!visitId) return null;
   const visit = await getScheduledVisit(buildVisitDeps(), actingUser, visitId);
-  return params.reschedule === "1" && visit ? <RescheduleDialog visit={visit} selection={selection} now={now} /> : <VisitDialog visit={visit} selection={selection} />;
+  const calendarMonth = calendarMonthParam(params.calendarMonth);
+  return params.reschedule === "1" && visit ? (
+    <RescheduleDialog visit={visit} selection={selection} now={now} calendarMonth={calendarMonth} />
+  ) : (
+    <VisitDialog visit={visit} selection={selection} calendarMonth={calendarMonth} />
+  );
 }

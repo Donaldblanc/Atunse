@@ -16,13 +16,29 @@ function rangeFields(selection: OverviewSelection): Record<string, string> {
   return Object.fromEntries(rangeSearchParams(selection));
 }
 
-/** `?visit=<id>&reschedule=1`: pick a new date and slot for a SCHEDULED visit. */
-export function RescheduleDialog({ visit, selection, now }: { visit: ScheduledVisitDetail; selection: OverviewSelection; now: Date }) {
-  const backHref = overviewHref(selection, { visit: visit.appointmentId });
+/**
+ * `?visit=<id>&reschedule=1`: pick a new date and slot for a SCHEDULED
+ * visit. `calendarMonth` is set when the visit was opened from the Calendar
+ * screen, so "Back"/close and the saved redirect return there.
+ */
+export function RescheduleDialog({
+  visit,
+  selection,
+  now,
+  calendarMonth,
+}: {
+  visit: ScheduledVisitDetail;
+  selection: OverviewSelection;
+  now: Date;
+  calendarMonth?: string | null;
+}) {
+  const extra: Record<string, string> = calendarMonth ? { calendarMonth } : {};
+  const backHref = overviewHref(selection, { visit: visit.appointmentId, ...extra });
+  const closeHref = calendarMonth ? `/admin/calendar?month=${calendarMonth}` : overviewHref(selection);
   const title = `Reschedule ${KIND_LABELS[visit.kind]}`;
   if (visit.status !== "SCHEDULED") {
     return (
-      <AdminDialog title={title} closeHref={overviewHref(selection)} size="sm">
+      <AdminDialog title={title} closeHref={closeHref} size="sm">
         <p className="ov-empty">This visit is {visit.status === "COMPLETED" ? "already completed" : "cancelled"}, so it can&apos;t be moved.</p>
         <div className="vsf-actions">
           <Link className="admin-btn" data-variant="secondary" href={backHref} replace scroll={false}>
@@ -35,13 +51,13 @@ export function RescheduleDialog({ visit, selection, now }: { visit: ScheduledVi
   const today = calendarDateInShopTime(now);
   const visitDay = calendarDateInShopTime(visit.startsAt);
   return (
-    <AdminDialog title={title} closeHref={overviewHref(selection)} size="sm">
+    <AdminDialog title={title} closeHref={closeHref} size="sm">
       <p className="vsf-current">
         {visit.customer.name} · currently {visit.date}, {visit.window}
       </p>
       <VisitScheduleForm
         mode="reschedule"
-        hidden={{ appointmentId: visit.appointmentId, expectedStartsAt: visit.startsAt.toISOString(), ...rangeFields(selection) }}
+        hidden={{ appointmentId: visit.appointmentId, expectedStartsAt: visit.startsAt.toISOString(), ...rangeFields(selection), ...extra }}
         customer={visit.customer}
         now={now.toISOString()}
         initialDate={visitDay < today ? today : visitDay}
