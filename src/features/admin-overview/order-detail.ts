@@ -17,7 +17,7 @@ import {
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { findBundle, RUSH_FEE_CENTS, SERVICE_CATALOG, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
+import { findBundle, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -229,7 +229,7 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
   const { moves, held } = adminStatusMoves(item, order);
   const photoKey = item.photoKeys[0];
   const services = SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id));
-  const suedeApplies = !inBundle && item.material === "Suede" && services.some((service) => service.suedeFee);
+  const suedeApplies = !inBundle && suedeFeeApplies(item.material, services);
   return {
     itemId: item.id,
     photo: await pairPhoto(photoKey, photoUrl),
@@ -240,8 +240,9 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     status: item.status,
     services: services.map((service) => ({
       name: service.name,
-      price: inBundle ? null : `${Money.fromCents(service.baseCents).format()}${service.isMinimum ? "+" : ""}`,
-      isMinimum: !inBundle && service.isMinimum,
+      // A Bundle's price covers its own Services; Add-ons are charged on top.
+      price: inBundle && !service.isAddOn ? null : formatPrice(service.baseCents, service.isMinimum),
+      isMinimum: !(inBundle && !service.isAddOn) && service.isMinimum,
     })),
     suedeFee: suedeApplies ? Money.fromCents(SUEDE_FEE_CENTS) : null,
     nextStatuses: moves,

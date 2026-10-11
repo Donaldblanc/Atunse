@@ -193,7 +193,7 @@ export function OrderDetailDialog({
             {detail.bundleName && detail.bundlePrice && (
               <p className="od-pair-quote">
                 <strong>Bundle price {detail.bundlePrice.format()}</strong>
-                <span className="od-muted"> covers every pair&apos;s Services; the Suede fee is waived</span>
+                <span className="od-muted"> covers each pair&apos;s Bundle Services; Add-ons extra; the Suede fee is waived</span>
               </p>
             )}
           </section>
@@ -368,8 +368,8 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
             </li>
           )}
         </ul>
-        {pair.services.some((service) => service.isMinimum) && (
-          <p className="od-muted">Quoted minimum: the final price depends on the pair&apos;s condition.</p>
+        {!pair.price && pair.services.some((service) => service.isMinimum) && (
+          <p className="od-muted">Minimum estimate: the final price depends on the pair&apos;s condition.</p>
         )}
         {label && (
           <span className="ov-pill" data-tone={STATUS_TONE[pair.status]}>

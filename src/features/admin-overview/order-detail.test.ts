@@ -184,7 +184,7 @@ describe("getOrderDetail", () => {
       address: ["1 Main St", "Austin, TX 73301"],
     });
     expect(detail.bundleName).toBe("The Revival Pack");
-    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, null, null, null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, "$15", null, "$15", null, "$15"]);
   });
 
   it("breaks out the Suede fee, a minimum price and a quote beside the catalog estimate", async () => {
@@ -210,6 +210,16 @@ describe("getOrderDetail", () => {
     expect(detail.bundlePrice?.format()).toBe("$150");
     expect(detail.pairs.map((pair) => pair.suedeFee)).toEqual([null, null, null]);
     expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.isMinimum))).not.toContain(true);
+  });
+
+  it("prices a Bundle pair's Add-ons but not its Bundle Service", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ serviceIds: ["premium", "laces"] }), item(), item()] }));
+    const pair = (await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([
+      { name: "Premium Clean", price: null, isMinimum: false },
+      { name: "Lace Replacement", price: "$15", isMinimum: false },
+    ]);
   });
 
   it("has no Bundle price for a plain Order", async () => {
