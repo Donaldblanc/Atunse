@@ -17,7 +17,7 @@ import {
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { BUNDLE_CATALOG, RUSH_FEE_CENTS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { addOnsCents, findBundle, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -49,7 +49,9 @@ export interface OrderDetailPair {
   price: Money | null;
   status: ItemStatus;
   /** The Services booked; a price is left off inside a Bundle, whose fixed price covers them. */
-  services: { name: string; price: string | null }[];
+  services: { name: string; price: string | null; /** A "from" price: the real one depends on condition. */ isMinimum: boolean }[];
+  /** The Suede Fee the catalog adds for this pair, or null (not Suede, nothing it applies to, or inside a Bundle, which waives it). */
+  suedeFee: Money | null;
   /** Where Update Status can take this pair (adminStatusMoves in domain.ts). */
   nextStatuses: ItemStatus[];
   /** Why the next step isn't offered yet (awaiting the quote or the deposit), or null. */
@@ -79,6 +81,8 @@ export interface OrderDetail {
     address: string[];
   };
   bundleName: string | null;
+  /** The Bundle's one fixed price as the Order stored it: live pairs' estimates less their Add-ons; null for an Order without a Bundle. */
+  bundlePrice: Money | null;
   pairs: OrderDetailPair[];
   /** The pipeline of a single-pair Order's pair, or of the Order's rollup with several. */
   timeline: TimelineStep[];
@@ -130,6 +134,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   if (!order) return null;
   const [notes, changes] = await Promise.all([deps.orders.listOrderNotes(order.id), deps.orders.listStatusChanges(order.id)]);
 
+  const bundle = findBundle(order.bundleId);
   const live = livePairs(order);
   const status = orderRollupStatus(order.items);
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
@@ -158,7 +163,18 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       schedule,
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
     },
-    bundleName: BUNDLE_CATALOG.find((bundle) => bundle.id === order.bundleId)?.name ?? null,
+    bundleName: bundle?.name ?? null,
+    bundlePrice: bundle
+      ? Money.fromCents(
+          live.reduce(
+            (sum, item) =>
+              sum +
+              item.estimate.cents -
+              addOnsCents(item.serviceIds.filter((id) => SERVICE_CATALOG.find((service) => service.id === id)?.isAddOn)),
+            0,
+          ),
+        )
+      : null,
     pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl))),
     timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
     payment: {
@@ -222,6 +238,8 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
   const inBundle = order.bundleId !== null;
   const { moves, held } = adminStatusMoves(item, order);
   const photoKey = item.photoKeys[0];
+  const services = SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id));
+  const suedeApplies = !inBundle && suedeFeeApplies(item.material, services);
   return {
     itemId: item.id,
     photo: await pairPhoto(photoKey, photoUrl),
@@ -230,10 +248,13 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     estimate: item.estimate,
     price: item.price,
     status: item.status,
-    services: SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id)).map((service) => ({
+    services: services.map((service) => ({
       name: service.name,
-      price: inBundle ? null : `${Money.fromCents(service.baseCents).format()}${service.isMinimum ? "+" : ""}`,
+      // A Bundle's price covers its own Services; Add-ons are charged on top.
+      price: inBundle && !service.isAddOn ? null : formatPrice(service.baseCents, service.isMinimum),
+      isMinimum: !(inBundle && !service.isAddOn) && service.isMinimum,
     })),
+    suedeFee: suedeApplies ? Money.fromCents(SUEDE_FEE_CENTS) : null,
     nextStatuses: moves,
     held,
   };

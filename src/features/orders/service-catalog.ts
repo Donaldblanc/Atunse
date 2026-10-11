@@ -157,11 +157,16 @@ function lookUpServices(serviceIds: string[]): CatalogService[] {
 }
 
 /** The price of a pair's Add-ons; rejects anything that isn't one. */
-function addOnsCents(addOnIds: string[]): number {
+export function addOnsCents(addOnIds: string[]): number {
   const addOns = lookUpServices(addOnIds);
   const notAddOn = addOns.find((s) => !s.isAddOn);
   if (notAddOn) throw new InvalidServiceSelectionError("A Bundle's Services come with it: only add-ons can be chosen per pair.");
   return addOns.reduce((sum, s) => sum + s.baseCents, 0);
+}
+
+/** True when the Suede Fee is charged: a Suede pair with a Service that carries it. */
+export function suedeFeeApplies(material: string | null, services: CatalogService[]): boolean {
+  return material === "Suede" && services.some((s) => s.suedeFee);
 }
 
 export function estimateItem(params: { serviceIds: string[]; material: Material | null }): ItemEstimate {
@@ -178,8 +183,7 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
     throw new InvalidServiceSelectionError("Choose Standard or Premium Clean, not both.");
   }
 
-  const suedeApplies = material === "Suede" && services.some((s) => s.suedeFee);
-  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeApplies ? SUEDE_FEE_CENTS : 0);
+  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeFeeApplies(material, services) ? SUEDE_FEE_CENTS : 0);
   return { estimate: Money.fromCents(cents), isMinimum: services.some((s) => s.isMinimum) };
 }
 
