@@ -18,6 +18,7 @@ function pair(overrides: Partial<NewItemInput> = {}): NewItemInput {
     material: null,
     serviceIds: ["premium"],
     estimate: Money.fromCents(4000),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
     ...overrides,
   };

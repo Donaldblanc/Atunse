@@ -21,20 +21,9 @@ export default async function AdminCustomerDetailPage({ params }: { params: Prom
 
   return (
     <div className="ov">
-      <div className="ov-card">
-        <div className="ov-card-head">
-          <h2 className="ov-card-title">{customer.name ?? customer.email}</h2>
-        </div>
-        <dl>
-          <dt>Email</dt>
-          <dd>{customer.email}</dd>
-          <dt>Phone</dt>
-          <dd>{customer.phone ?? "—"}</dd>
-          <dt>Customer since</dt>
-          <dd>{bookedDay.format(customer.createdAt)}</dd>
-        </dl>
-      </div>
-
+      {/* .ov's grid is 1fr main column + 380px sidebar: history needs the
+          width, so it goes first (main column) and the compact contact
+          card second (sidebar), not JSX declaration order. */}
       <div className="ov-card">
         <div className="ov-card-head">
           <h2 className="ov-card-title">Order history</h2>
@@ -75,6 +64,20 @@ export default async function AdminCustomerDetailPage({ params }: { params: Prom
             </table>
           </div>
         )}
+      </div>
+
+      <div className="ov-card">
+        <div className="ov-card-head">
+          <h2 className="ov-card-title">{customer.name ?? customer.email}</h2>
+        </div>
+        <dl>
+          <dt>Email</dt>
+          <dd>{customer.email}</dd>
+          <dt>Phone</dt>
+          <dd>{customer.phone ?? "—"}</dd>
+          <dt>Customer since</dt>
+          <dd>{bookedDay.format(customer.createdAt)}</dd>
+        </dl>
       </div>
     </div>
   );

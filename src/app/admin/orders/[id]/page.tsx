@@ -52,8 +52,7 @@ export default async function OrderDetailPage({ params, searchParams }: { params
 
   return (
     <div className="od-page">
-      {/* TODO: repoint to /admin/orders once the Orders list (#orders-list) merges. */}
-      <Link href="/admin" className="od-back-link">
+      <Link href="/admin/orders" className="od-back-link">
         <ArrowLeftIcon size={16} aria-hidden="true" /> Back to Orders
       </Link>
       <div className="od-page-head">

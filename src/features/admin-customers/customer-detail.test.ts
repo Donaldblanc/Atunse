@@ -38,6 +38,7 @@ function newOrderInput(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
         material: null,
         serviceIds: ["standard"],
         estimate: Money.fromCents(3000),
+        requiresQuote: true,
         photos: [{ key: `photos/${photoCounter}.jpg`, uploadKey: `bookings/${photoCounter}.jpg` }],
       },
     ],

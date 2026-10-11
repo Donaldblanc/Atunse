@@ -18,12 +18,37 @@ const mailInAddress = { line1: "1 Elm St", line2: null, city: "Austin", state: "
 
 describe("submitOrder", () => {
   it("creates an order with one REQUEST_SUBMITTED item as a guest", async () => {
-    const order = await submitOrder(bookingDeps(), guest, validBookingInput());
+    const order = await submitOrder(
+      bookingDeps(),
+      guest,
+      validBookingInput({ items: [validPair({ serviceIds: ["oxidation"] })] }),
+    );
     expect(order.items).toHaveLength(1);
     expect(order.items[0]?.status).toBe("REQUEST_SUBMITTED");
     expect(order.items[0]?.brand).toBe("Nike Air Force 1");
     expect(order.items[0]?.description).toBe("scuffed toe box");
     expect(order.contactName).toBe("Jordan Smith");
+  });
+
+  it("auto-approves at the published estimate when every Service is cleaning/add-on (ADR-0017)", async () => {
+    const deps = bookingDeps();
+    const order = await submitOrder(deps, guest, validBookingInput({ items: [validPair({ serviceIds: ["standard"] })] }));
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.status).toBe("APPROVED");
+    expect(order.items[0]?.price?.cents).toBe(order.items[0]?.estimate.cents);
+    expect(deps.orders.auditEntries).toContainEqual(
+      expect.objectContaining({ itemId: order.items[0]!.id, action: "AUTO_APPROVED_SET_PRICE", fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", actorAccountId: null }),
+    );
+  });
+
+  it("still requires a Quote when a restoration Service is mixed with a cleaning Service (ADR-0017)", async () => {
+    const order = await submitOrder(
+      bookingDeps(),
+      guest,
+      validBookingInput({ items: [validPair({ serviceIds: ["standard", "oxidation"] })] }),
+    );
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.status).toBe("REQUEST_SUBMITTED");
   });
 
   it("rejects submission without policy acceptance", async () => {

@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
-import { balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { AUTO_APPROVED_SET_PRICE, balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -253,7 +253,21 @@ export class PrismaOrderRepository implements OrderRepository {
               photos: {
                 create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
               },
-              status: "REQUEST_SUBMITTED" as const,
+              ...(item.requiresQuote
+                ? { status: "REQUEST_SUBMITTED" as const }
+                : {
+                    status: "APPROVED" as const,
+                    priceCents: item.estimate.cents,
+                    auditEntries: {
+                      create: {
+                        action: AUTO_APPROVED_SET_PRICE,
+                        fromStatus: "REQUEST_SUBMITTED" as const,
+                        toStatus: "APPROVED" as const,
+                        actorAccountId: null,
+                        metadata: { priceCents: item.estimate.cents },
+                      },
+                    },
+                  }),
             })),
           },
           payments: input.depositPayment

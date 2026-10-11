@@ -7,7 +7,7 @@ import { MAX_QUOTE_CENTS, MIN_QUOTE_CENTS } from "../domain";
 import type { OrderRepository } from "../repositories/order-repository";
 import { quoteSentEmail } from "../status-emails";
 
-/** The audit action for the owner sending a pair's quote (ADR-0001, ADR-0012). */
+/** The audit action for the owner sending a pair's quote (ADR-0001, ADR-0012). Only Restoration/Custom-Work pairs reach this; a Cleaning/Add-on-only pair auto-approves instead (ADR-0017). */
 export const QUOTE_SENT = "QUOTE_SENT";
 
 export class InvalidQuoteError extends Error {

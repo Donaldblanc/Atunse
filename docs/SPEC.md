@@ -23,7 +23,7 @@ basis for this build.
 ## Domain model (see CONTEXT.md for full detail)
 - **Order** = billing/shipping container, holds one or more **Items**, no single status field of its own — customer-facing view always shows a **per-Item breakdown**, never a collapsed order-level status.
 - **Item** = one sneaker **pair** (not an individual shoe), carries its own Services, price, and moves independently through the **Status Pipeline**: Request Submitted → Under Review → Quote Sent → Approved → Awaiting Sneakers → In Progress → Quality Check → Ready for Drop-Off/Shipping → Completed (Cancelled reachable from any state).
-- **Approval Gate**: every Item, no exceptions, is manually priced/reviewed by the owner before the customer can pay on it (ADR-0001) — no auto-priced "standard" tier in MVP.
+- **Approval Gate**: an Item is manually priced/reviewed by the owner, with a Quote and customer approval, only if it has a Restoration or Custom-Work Service (ADR-0017, superseding ADR-0001). A Cleaning/Add-on-only Item auto-approves at its published estimate.
 - **Deposit**: one 50% payment per Order at submission, based on published/estimated prices.
 - **Balance Delta**: if a custom-quoted Item's final price exceeds its deposit estimate, the delta is folded into the Balance due at completion (deposit never re-charged/refunded) and the customer is notified as soon as the Quote is sent — no surprise when the pair comes back.
 - **Customer Account** (ADR-0014): every booking belongs to an Account, created automatically by the first booking from its email and phone. There are no guest orders and no Account Linking. A signed-out booking whose email already has an Account must sign in with an emailed **Sign-in Code** (the booking flow's own login screen), behind the `FEATURE_CUSTOMER_SIGN_IN_ENABLED` toggle. Customers can only ever see their own photos, through short-lived links.
@@ -37,7 +37,7 @@ basis for this build.
 ## Architecture decisions (full text in docs/adr/)
 | # | Decision |
 |---|---|
-| 0001 | Every Item requires manual owner review before pricing — no auto-pricing tier in MVP |
+| 0001 | Every Item requires manual owner review before pricing — no auto-pricing tier in MVP (superseded by 0017) |
 | 0002 | Zelle/Cash payments confirmed manually by the owner in admin, not system-verified |
 | 0003 | Single full-stack app, strictly layered: use-cases → repositories → DB; auth checked server-side only; third-party services behind adapters; API versioned at `/api/v1/` from day one |
 | 0004 | File storage behind a swappable `FileStorage` adapter; S3 is the initial implementation |
@@ -52,6 +52,7 @@ basis for this build.
 | 0013 | Prisma for the ORM/migrations; Vitest for both unit and integration tests. `PrismaClient` is only imported inside repositories |
 | 0014 | Every booking belongs to a Customer Account (created at first booking; no guest orders), separate from Admin Accounts even for the same email, with separate logins. Customers sign in with emailed codes, only when a booking's email already has an Account; photos are viewable only by their Account's owner or an admin, through 5-minute presigned links. Customer login is behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED` |
 | 0016 | The data model mirrors the admin screens (Payments, Appointments, Services/Bundles, Inventory, Conversations); Order status stays derived; the service catalog moves into the database in two steps, parity-tested until booking reads it |
+| 0017 | The Quote/approval gate applies only to Items with a Restoration or Custom-Work Service; a Cleaning/Add-on-only Item auto-approves at its published estimate (supersedes 0001) |
 
 ## Guiding build principle
 **Establish architectural boundaries early; implement the domain

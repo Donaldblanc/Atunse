@@ -5,7 +5,7 @@ import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order
 import { recordApproval } from "./record-approval";
 import { InvalidQuoteError, sendQuote } from "./send-quote";
 import { submitOrder } from "./submit-order";
-import { bookingDeps, RecordingNotificationService, validBookingInput, validBundleInput } from "./test-fixtures";
+import { bookingDeps, RecordingNotificationService, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
 
 const admin = { accountId: "acc_admin", role: "ADMIN" as const };
 
@@ -15,9 +15,18 @@ async function seed(pairs = 1) {
   const order = await submitOrder(
     bookingDeps({ orders }),
     { accountId: null, role: "GUEST" },
-    // Only a Bundle books several pairs (three).
-    pairs === 3 ? validBundleInput() : validBookingInput(),
+    // Only a Bundle books several pairs (three). A restoration Service (ADR-0017) so the
+    // single-pair case starts REQUEST_SUBMITTED instead of auto-approving.
+    pairs === 3 ? validBundleInput() : validBookingInput({ items: [validPair({ serviceIds: ["oxidation"] })] }),
   );
+  // A Bundle is cleaning-tier only, so it auto-approves (ADR-0017); this suite is about
+  // sendQuote's mechanics across several pairs, not the auto-approval rule, so reset to
+  // REQUEST_SUBMITTED before exercising the Approval Gate.
+  for (const item of order.items) {
+    const stored = orders.orders.get(order.id)!.items.find((candidate) => candidate.id === item.id)!;
+    stored.status = "REQUEST_SUBMITTED";
+    stored.price = null;
+  }
   for (const item of order.items) {
     await orders.transitionItemStatus({
       itemId: item.id,

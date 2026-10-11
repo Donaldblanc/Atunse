@@ -1,7 +1,7 @@
 # 0001. Every Item requires manual owner review before pricing
 
 ## Status
-Accepted
+Superseded by ADR-0017, which scopes the Quote gate to Items with a Restoration or Custom-Work Service; a Cleaning/Add-on-only Item now auto-approves at its published estimate.
 
 ## Context
 Restoration pricing depends on physical condition the photos don't fully capture

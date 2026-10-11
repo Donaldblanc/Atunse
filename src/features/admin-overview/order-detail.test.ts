@@ -18,6 +18,7 @@ function item(overrides: Partial<NewItemInput> = {}): NewItemInput {
     material: "Leather",
     serviceIds: ["premium", "laces"],
     estimate: Money.fromCents(6500),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
     ...overrides,
   };
@@ -336,6 +337,21 @@ describe("getOrderDetail", () => {
     const { order } = await deps.orders.create(newOrder());
     order.items[0]!.status = "COMPLETED";
     expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual([]);
+  });
+
+  it("flags a Cleaning/Add-on-only pair created already Approved as autoApproved (ADR-0017)", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false })] }));
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.autoApproved).toBe(true);
+  });
+
+  it("never flags a Restoration pair as autoApproved, even moved straight to Approved with no Quote Sent (ADR-0017)", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["oxidation"] })] }));
+    // A plain admin Update Status move (adminStatusMoves) can skip straight to Approved
+    // without ever recording a QUOTE_SENT status change — this pair still needs its quote.
+    order.items[0]!.status = "APPROVED";
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.autoApproved).toBe(false);
   });
 });
 

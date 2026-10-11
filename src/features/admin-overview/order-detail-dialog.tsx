@@ -404,6 +404,7 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
         {!pair.price && pair.services.some((service) => service.isMinimum) && (
           <p className="od-muted">Minimum estimate: the final price depends on the pair&apos;s condition.</p>
         )}
+        {pair.autoApproved && <p className="od-muted">Set price — no quote needed</p>}
         {label && (
           <span className="ov-pill" data-tone={STATUS_TONE[pair.status]}>
             {ITEM_STATUS_LABELS[pair.status]}

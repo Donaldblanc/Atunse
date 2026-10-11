@@ -4,7 +4,7 @@ import type { Order } from "./domain";
 import { InMemoryOrderRepository } from "./repositories/in-memory-order-repository";
 import { cancelledEmail, quotedTotal, quoteSentEmail, readyEmail, statusChangeEmail } from "./status-emails";
 import { submitOrder } from "./use-cases/submit-order";
-import { bookingDeps, validBookingInput, validBundleInput } from "./use-cases/test-fixtures";
+import { bookingDeps, validBookingInput, validBundleInput, validPair } from "./use-cases/test-fixtures";
 
 async function book(overrides: Parameters<typeof validBookingInput>[0] = {}): Promise<Order> {
   return submitOrder(bookingDeps({ orders: new InMemoryOrderRepository() }), { accountId: null, role: "GUEST" }, validBookingInput(overrides));
@@ -16,6 +16,10 @@ const twoPairs = async () => {
   const order = await book(validBundleInput());
   order.items[0]!.brand = "Nike Air Force 1";
   order.items[1]!.brand = "Adidas Samba";
+  // A Bundle is cleaning-tier only, so it auto-approves at the estimate (ADR-0017); this test
+  // is about a partly-quoted Order, so undo that for the still-unquoted second pair.
+  order.items[1]!.status = "UNDER_REVIEW";
+  order.items[1]!.price = null;
   order.items[2]!.status = "CANCELLED";
   return order;
 };
@@ -86,7 +90,8 @@ describe("quoteSentEmail", () => {
   });
 
   it("refuses a pair with no price", async () => {
-    const order = await book();
+    // A restoration Service (ADR-0017), so this pair isn't auto-approved with a price already set.
+    const order = await book({ items: [validPair({ serviceIds: ["oxidation"] })] });
     expect(() => quoteSentEmail(order, order.items[0]!)).toThrow();
   });
 });

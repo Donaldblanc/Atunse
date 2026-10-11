@@ -2,7 +2,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { OrderRepository } from "../repositories/order-repository";
 
-/** The audit action for the owner recording that the customer approved a quote; actorAccountId says who. */
+/** The audit action for the owner recording that the customer approved a quote; actorAccountId says who. Only applies to Restoration/Custom-Work pairs (ADR-0017); a Cleaning/Add-on-only pair never has a Quote to approve. */
 export const APPROVAL_RECORDED = "APPROVAL_RECORDED";
 
 /**

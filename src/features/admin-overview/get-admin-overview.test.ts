@@ -20,6 +20,7 @@ function item(serviceIds: string[]): NewItemInput {
     material: null,
     serviceIds,
     estimate: Money.fromCents(3000),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
   };
 }
