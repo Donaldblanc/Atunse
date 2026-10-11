@@ -7,6 +7,9 @@
 .fo {
   display: grid;
   gap: 12px;
+  /* On /admin/orders, .fo is .ov's second grid child: without this it lands
+     in .ov's 380px sidebar column instead of spanning full width. */
+  grid-column: 1 / -1;
 }
 
 .fo-search {
