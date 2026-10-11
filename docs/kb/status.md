@@ -31,11 +31,12 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
   - **Messages** (#131): real unread count, thread view, Mark read, reply by email (idempotent).
   - Structure (#129): one file per panel in `admin-overview/panels/`, one slot per dialog in `admin-overview/dialogs/` plus its lookup-table line.
 - **Data model** for every admin screen (ADR-0016, #119).
+- **Reviews** (`/admin/reviews`): the full-list version of the Overview's Recent Reviews panel — PENDING/PUBLISHED/HIDDEN tabs, Publish, Hide, Reply.
 - **Tests:** integration tests use only a `*_test` database (#124).
 
-## Not built (admin screens 2–11 in SPEC's inventory)
+## Not built (admin screens in SPEC's inventory)
 Orders list, Calendar, Customers, Services &
-Pricing, Inventory, Payments, Messages, Reviews, Settings. Unbuilt screens
+Pricing, Inventory, Payments, Messages, Settings. Unbuilt screens
 show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`). Until they
 exist, the Overview's dialogs cover the day-to-day actions.
 
