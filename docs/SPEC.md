@@ -117,7 +117,7 @@ prove it against.
   - Booking still prices from `service-catalog.ts`; switching it (and the Services page) to the `services`/`bundles` tables is step 2 of ADR-0016.
   - No Balance Payment is created or collected yet. The quote email only states the balance.
   - The owner isn't told about new bookings: no email, and no Orders screen.
-  - The other admin working screens (Orders, Calendar, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
+  - The other admin working screens (Orders, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
 
 **Customer site (marketing + booking UI).**
 - Pages: `/`, `/services`, `/process`, `/about`, `/contact` (the form emails the shop's inbox), `/booking`.
@@ -173,7 +173,7 @@ The admin follows the approved design images (`scratch/01-09`); the data model a
 1. **Overview** (built) — booked orders and revenue for a date range, and the work queues right now. Its dialogs cover Order detail, quoting, Mark Paid, visits and Edit Order until the screens below exist.
 2. **Orders** — every Order, with status tabs derived from its Items and Payments, filters by Service, payment method and date.
 3. **Order detail** — progress, customer, Items and Services (photos, size, colorway, quote), Payments (manual Zelle/Cash confirmation per ADR-0002), totals.
-4. **Calendar** — Local Drop-Off collection and return Appointments, plus pairs in progress and ready.
+4. **Calendar** (built) — a month grid of Local Drop-Off collection and return Appointments; a visit opens the Overview's Schedule Item dialog for its details, Reschedule and Mark as Completed.
 5. **Customers** — list and detail: contact info, bookings, last booking.
 6. **Services & Pricing** — Services and Bundles: prices, descriptions, active or not.
 7. **Inventory** — supplies with stock and low-stock alerts, and their Suppliers.
