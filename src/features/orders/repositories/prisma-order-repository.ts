@@ -712,7 +712,7 @@ export class PrismaOrderRepository implements OrderRepository {
     return row ? toDomainOrder(row) : null;
   }
 
-  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date; actorAccountId: string | null }) {
     return this.prisma.$transaction(async (tx) => {
       // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
       const moved = await tx.appointment.updateMany({
@@ -726,7 +726,7 @@ export class PrismaOrderRepository implements OrderRepository {
           data: {
             orderId: row.orderId,
             action: ORDER_RESCHEDULED,
-            actorAccountId: null,
+            actorAccountId: params.actorAccountId,
             metadata: {
               appointmentId: row.id,
               kind: row.kind,

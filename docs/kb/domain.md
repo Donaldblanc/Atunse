@@ -21,7 +21,7 @@ The Order has no status of its own; it is rolled up from its Items for display.
 
 ## Audit actions (`ItemAuditEntry`)
 `STATUS_TRANSITION` (from/to in metadata, the step back included; a move made by completing a visit also carries `metadata.reason`, `COLLECTION_COMPLETED` or `RETURN_COMPLETED`), `QUOTE_SENT`,
-`APPROVAL_RECORDED`, `MANUAL_PAYMENT_CONFIRMED` (a Deposit or Balance; metadata has the payment id, kind and method), `DETAILS_EDITED`,
+`APPROVAL_RECORDED`, `MANUAL_PAYMENT_CONFIRMED` (a Deposit or Balance; metadata has the payment id, kind and method), `DETAILS_EDITED`.
 
 Order-level actions (`OrderAuditEntry`, keyed by order): `ORDER_CONTACT_EDITED` (field names only), `ORDER_NOTE_ADDED` (note id and length, never the text), `ORDER_RESCHEDULED` (appointment id and kind, from/to times). Contact edits before this table existed stay on the first pair's `ItemAuditEntry`.
 

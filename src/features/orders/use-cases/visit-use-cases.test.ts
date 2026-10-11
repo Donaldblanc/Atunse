@@ -13,6 +13,7 @@ import {
 } from "../repositories/order-repository";
 import { VisitSlotError } from "../visit-slot";
 import { bookReturnVisit, ReturnNotAvailableError } from "./book-return-visit";
+import { addOrderNote } from "./add-order-note";
 import { rescheduleVisit } from "./reschedule-visit";
 import { FIXED_NOW, RecordingNotificationService, validBookingInput } from "./test-fixtures";
 
@@ -46,6 +47,18 @@ async function seed(fulfillment: Fulfillment = validBookingInput().fulfillment) 
   return { orders, order, notifications, deps: { orders, notifications, now: () => FIXED_NOW } };
 }
 
+describe("addOrderNote audit", () => {
+  it("records ORDER_NOTE_ADDED with the note id and length, never the text", async () => {
+    const { orders, order } = await seed();
+    const result = await addOrderNote({ orders }, ADMIN, { orderId: order.id, body: "  Call first.  " });
+
+    expect(result.ok).toBe(true);
+    expect(orders.orderAuditEntries).toHaveLength(1);
+    expect(orders.orderAuditEntries[0]).toMatchObject({ orderId: order.id, action: "ORDER_NOTE_ADDED", actorAccountId: "acc_admin", metadata: { noteId: orders.notes[0]!.id, length: 11 } });
+    expect(JSON.stringify(orders.orderAuditEntries[0]!.metadata)).not.toContain("Call first");
+  });
+});
+
 describe("rescheduleVisit", () => {
   it("moves the Appointment, not the Order's booked collection time, and emails the customer once", async () => {
     const { order, deps, notifications } = await seed();
@@ -62,6 +75,22 @@ describe("rescheduleVisit", () => {
     expect(notifications.sent[0]!.body).toContain("Sunday, October 4, 9:00 AM – 9:30 AM");
     expect(notifications.sent[0]!.body).toContain("Saturday, October 3, 4:30 PM – 5:00 PM");
     expect(notifications.sent[0]!.body).not.toMatch(/pickup/i);
+  });
+
+  it("audits the move at Order level with the acting admin, and a replay writes nothing", async () => {
+    const { order, deps, orders } = await seed();
+    const input = { appointmentId: order.appointments[0]!.id, expectedStartsAt: FIRST.startsAt, date: "2026-10-04", slot: "9:00 AM – 9:30 AM" };
+    await rescheduleVisit(deps, ADMIN, input);
+    await rescheduleVisit(deps, ADMIN, input);
+
+    const want = collectionTimes("2026-10-04", "9:00 AM – 9:30 AM");
+    expect(orders.orderAuditEntries).toHaveLength(1);
+    expect(orders.orderAuditEntries[0]).toMatchObject({
+      orderId: order.id,
+      action: "ORDER_RESCHEDULED",
+      actorAccountId: "acc_admin",
+      metadata: { appointmentId: input.appointmentId, kind: "COLLECTION", from: { startsAt: FIRST.startsAt.toISOString() }, to: { startsAt: want.startsAt.toISOString(), endsAt: want.endsAt.toISOString() } },
+    });
   });
 
   it("is a no-op on replay: same input changes and sends nothing more", async () => {

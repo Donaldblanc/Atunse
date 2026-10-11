@@ -446,14 +446,14 @@ export class InMemoryOrderRepository implements OrderRepository {
     return [...this.orders.values()].find((order) => order.items.some((item) => item.id === itemId)) ?? null;
   }
 
-  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date; actorAccountId: string | null }) {
     const found = await this.findAppointment(params.appointmentId);
     if (!found) throw new AppointmentNotFoundError(params.appointmentId);
     const { appointment } = found;
     if (appointment.status !== "SCHEDULED") throw new AppointmentNotScheduledError(appointment.status);
     if (appointment.startsAt.getTime() === params.startsAt.getTime()) return { appointment, changed: false };
     if (appointment.startsAt.getTime() !== params.expectedStartsAt.getTime()) throw new AppointmentMovedError();
-    this.recordOrderAudit(found.order.id, ORDER_RESCHEDULED, null, {
+    this.recordOrderAudit(found.order.id, ORDER_RESCHEDULED, params.actorAccountId, {
       appointmentId: appointment.id,
       kind: appointment.kind,
       from: { startsAt: params.expectedStartsAt.toISOString() },

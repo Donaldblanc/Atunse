@@ -747,25 +747,25 @@ describe("PrismaOrderRepository reschedule and Return booking (integration)", ()
     const { order } = await repo.create(newOrder());
     const appointmentId = order.appointments[0]!.id;
 
-    const moved = await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW });
+    const moved = await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW, actorAccountId: null });
     expect(moved.changed).toBe(true);
     expect(moved.appointment.startsAt).toEqual(NEW.startsAt);
     // The Order keeps the collection time the customer booked.
     expect((await repo.findById(order.id))!.fulfillment).toMatchObject({ date: "2026-10-03", slot: "4:30 PM – 5:00 PM" });
 
-    expect((await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW })).changed).toBe(false);
+    expect((await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW, actorAccountId: null })).changed).toBe(false);
     // One audit entry for the move; the replay wrote nothing.
     const audits = await prisma.orderAuditEntry.findMany({ where: { orderId: order.id } });
     expect(audits).toHaveLength(1);
-    expect(audits[0]).toMatchObject({ action: "ORDER_RESCHEDULED", metadata: { appointmentId, kind: "COLLECTION", from: { startsAt: OLD.toISOString() }, to: { startsAt: NEW.startsAt.toISOString(), endsAt: NEW.endsAt.toISOString() } } });
+    expect(audits[0]).toMatchObject({ action: "ORDER_RESCHEDULED", actorAccountId: null, metadata: { appointmentId, kind: "COLLECTION", from: { startsAt: OLD.toISOString() }, to: { startsAt: NEW.startsAt.toISOString(), endsAt: NEW.endsAt.toISOString() } } });
     await expect(
-      repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, startsAt: new Date("2026-10-05T13:00:00Z"), endsAt: new Date("2026-10-05T13:30:00Z") }),
+      repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, startsAt: new Date("2026-10-05T13:00:00Z"), endsAt: new Date("2026-10-05T13:30:00Z"), actorAccountId: null }),
     ).rejects.toThrow(AppointmentMovedError);
-    await expect(repo.rescheduleAppointment({ appointmentId: "nope", expectedStartsAt: OLD, ...NEW })).rejects.toThrow(AppointmentNotFoundError);
+    await expect(repo.rescheduleAppointment({ appointmentId: "nope", expectedStartsAt: OLD, ...NEW, actorAccountId: null })).rejects.toThrow(AppointmentNotFoundError);
 
     for (const status of ["COMPLETED", "CANCELLED"] as const) {
       await prisma.appointment.update({ where: { id: appointmentId }, data: { status } });
-      await expect(repo.rescheduleAppointment({ appointmentId, expectedStartsAt: NEW.startsAt, ...OLDWINDOW() })).rejects.toThrow(AppointmentNotScheduledError);
+      await expect(repo.rescheduleAppointment({ appointmentId, expectedStartsAt: NEW.startsAt, ...OLDWINDOW(), actorAccountId: null })).rejects.toThrow(AppointmentNotScheduledError);
     }
   });
 

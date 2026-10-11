@@ -401,7 +401,8 @@ export interface OrderRepository {
   /**
    * Adds an admin's note to the Order (filed under the Order's customer
    * Account; customers never see Notes). Append-only: nothing edits or
-   * removes one yet. Throws OrderNotFoundError.
+   * removes one yet. Also writes an ORDER_NOTE_ADDED OrderAuditEntry
+   * (id and length, never the text). Throws OrderNotFoundError.
    */
   addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
 
@@ -417,13 +418,15 @@ export interface OrderRepository {
    * returns `changed: false` (a replay); at some third time throws
    * AppointmentMovedError. Throws AppointmentNotFoundError, or
    * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
-   * written nothing.
+   * written nothing. A real move also writes an ORDER_RESCHEDULED
+   * OrderAuditEntry (by `actorAccountId`) in the same transaction.
    */
   rescheduleAppointment(params: {
     appointmentId: string;
     expectedStartsAt: Date;
     startsAt: Date;
     endsAt: Date;
+    actorAccountId: string | null;
   }): Promise<{ appointment: Appointment; changed: boolean }>;
 
   /**
