@@ -36,6 +36,7 @@ export async function moderateReviewAction(_previous: ModerateState, formData: F
 
   const result = await moderateReview(buildReviewDeps(), actingUser, { reviewId, status });
   revalidatePath("/admin");
+  revalidatePath("/admin/reviews");
   return { error: result.ok ? null : result.error };
 }
 
@@ -51,5 +52,6 @@ export async function replyToReviewAction(previous: ReplyState, formData: FormDa
   if (!result.ok) return { ...previous, error: result.error };
 
   revalidatePath("/admin");
+  revalidatePath("/admin/reviews");
   return { error: null, done: previous.done + 1 };
 }
