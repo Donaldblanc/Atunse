@@ -17,7 +17,7 @@ import {
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { findBundle, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
+import { addOnsCents, findBundle, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -81,7 +81,7 @@ export interface OrderDetail {
     address: string[];
   };
   bundleName: string | null;
-  /** The Bundle's one fixed price, covering every pair's Services; null for an Order without a Bundle. */
+  /** The Bundle's one fixed price as the Order stored it: live pairs' estimates less their Add-ons; null for an Order without a Bundle. */
   bundlePrice: Money | null;
   pairs: OrderDetailPair[];
   /** The pipeline of a single-pair Order's pair, or of the Order's rollup with several. */
@@ -164,7 +164,17 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
     },
     bundleName: bundle?.name ?? null,
-    bundlePrice: bundle ? Money.fromCents(bundle.priceCents) : null,
+    bundlePrice: bundle
+      ? Money.fromCents(
+          live.reduce(
+            (sum, item) =>
+              sum +
+              item.estimate.cents -
+              addOnsCents(item.serviceIds.filter((id) => SERVICE_CATALOG.find((service) => service.id === id)?.isAddOn)),
+            0,
+          ),
+        )
+      : null,
     pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl))),
     timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
     payment: {

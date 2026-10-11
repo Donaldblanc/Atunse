@@ -354,6 +354,7 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
           </p>
         )}
         {pair.details.length > 0 && <p className="od-muted">{pair.details.join(" · ")}</p>}
+        <p className="od-muted">Catalog prices</p>
         <ul className="od-services">
           {pair.services.map((service) => (
             <li key={service.name}>

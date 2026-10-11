@@ -157,7 +157,7 @@ function lookUpServices(serviceIds: string[]): CatalogService[] {
 }
 
 /** The price of a pair's Add-ons; rejects anything that isn't one. */
-function addOnsCents(addOnIds: string[]): number {
+export function addOnsCents(addOnIds: string[]): number {
   const addOns = lookUpServices(addOnIds);
   const notAddOn = addOns.find((s) => !s.isAddOn);
   if (notAddOn) throw new InvalidServiceSelectionError("A Bundle's Services come with it: only add-ons can be chosen per pair.");
