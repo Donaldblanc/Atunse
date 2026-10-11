@@ -60,6 +60,9 @@ export function isNoop(diff: OrderDetailsDiff): boolean {
   return diff.contact.length === 0 && diff.pairs.length === 0;
 }
 
-/** Audit actions Edit Order writes to an Item's log (ItemAuditEntry.action). */
+/** Audit action Edit Order writes to an Item's log (ItemAuditEntry.action). */
 export const DETAILS_EDITED = "DETAILS_EDITED";
+/** Audit actions on the Order itself (OrderAuditEntry.action). */
 export const ORDER_CONTACT_EDITED = "ORDER_CONTACT_EDITED";
+export const ORDER_NOTE_ADDED = "ORDER_NOTE_ADDED";
+export const ORDER_RESCHEDULED = "ORDER_RESCHEDULED";

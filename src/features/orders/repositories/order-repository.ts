@@ -390,8 +390,8 @@ export interface OrderRepository {
    * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
    * (else OrderChangedError, nothing written). Records what changed
    * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
-   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
-   * address changes (there is no Order-level audit table). Returns
+   * one Order-level ORDER_CONTACT_EDITED entry (OrderAuditEntry) for contact or
+   * address changes. Returns
    * "unchanged" when nothing differs (nothing written), "already-applied"
    * when `idempotencyKey` was recorded by an earlier call (a retry).
    * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
@@ -407,7 +407,8 @@ export interface OrderRepository {
   /**
    * Adds an admin's note to the Order (filed under the Order's customer
    * Account; customers never see Notes). Append-only: nothing edits or
-   * removes one yet. Throws OrderNotFoundError.
+   * removes one yet. Also writes an ORDER_NOTE_ADDED OrderAuditEntry
+   * (id and length, never the text). Throws OrderNotFoundError.
    */
   addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
 
@@ -423,13 +424,15 @@ export interface OrderRepository {
    * returns `changed: false` (a replay); at some third time throws
    * AppointmentMovedError. Throws AppointmentNotFoundError, or
    * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
-   * written nothing.
+   * written nothing. A real move also writes an ORDER_RESCHEDULED
+   * OrderAuditEntry (by `actorAccountId`) in the same transaction.
    */
   rescheduleAppointment(params: {
     appointmentId: string;
     expectedStartsAt: Date;
     startsAt: Date;
     endsAt: Date;
+    actorAccountId: string | null;
   }): Promise<{ appointment: Appointment; changed: boolean }>;
 
   /**
