@@ -25,7 +25,7 @@ import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
-import { formatPrice } from "@/features/orders/service-catalog";
+import { formatPrice, isBundleAvailable } from "@/features/orders/service-catalog";
 import { CustomerSignIn } from "./customer-sign-in";
 import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
@@ -58,7 +58,9 @@ export function BookingFlow() {
   const requestedServiceId = searchParams.get("service");
   const requestedService = BOOKING_SERVICES.find((service) => service.id === requestedServiceId);
   const requestedMethod = searchParams.get("method");
-  const [flow, setFlow] = useState<FlowType>(requestedService ? "single" : "bundle");
+  // ?bundle=<id> opens that Bundle, unless it's unknown or its promotion has ended.
+  const requestedBundle = BOOKING_BUNDLES.find((b) => b.id === searchParams.get("bundle") && isBundleAvailable(b, new Date()));
+  const [flow, setFlow] = useState<FlowType>(requestedService && !requestedBundle ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   // Cleaning is single-select (Standard vs Premium — never both on one
   // pair); restoration/custom-work services stack, so they're tracked
@@ -70,7 +72,7 @@ export function BookingFlow() {
   const [selectedStackableIds, setSelectedStackableIds] = useState<string[]>(() =>
     requestedService && requestedService.category !== "cleaning" ? [requestedService.id] : [],
   );
-  const [selectedBundleId, setSelectedBundleId] = useState(BOOKING_BUNDLES[0]!.id);
+  const [selectedBundleId, setSelectedBundleId] = useState(() => requestedBundle?.id ?? BOOKING_BUNDLES[0]!.id);
   const [activePair, setActivePair] = useState(0);
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
   const [pairs, setPairs] = useState<PairDetails[]>([EMPTY_PAIR, EMPTY_PAIR, EMPTY_PAIR]);

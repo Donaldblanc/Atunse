@@ -482,6 +482,40 @@ describe("submitOrder", () => {
       expect(order.deposit.cents).toBe(7500);
     });
 
+    describe("Start of Fall Special", () => {
+      it("books 3 boots for $120 flat, each pair a Standard Clean, with add-ons on top", async () => {
+        const input = validBundleInput("fall-boots");
+        input.items = input.items.map((pair, i) => ({ ...pair, serviceIds: i === 1 ? ["laces"] : [] }));
+        const order = await submitOrder(bookingDeps(), guest, input);
+        expect(order.items.map((item) => item.serviceIds)).toEqual([["standard"], ["standard", "laces"], ["standard"]]);
+        expect(order.items.map((item) => item.estimate.cents)).toEqual([4000, 5500, 4000]);
+        expect(order.estimate.cents).toBe(12000 + 1500);
+        expect(order.deposit.cents).toBe(6750);
+      });
+
+      it("has a $60 deposit on the bare $120", async () => {
+        const order = await submitOrder(bookingDeps(), guest, validBundleInput("fall-boots"));
+        expect(order.items.map((item) => item.estimate.cents)).toEqual([4000, 4000, 4000]);
+        expect(order.deposit.cents).toBe(6000);
+      });
+
+      it("is accepted before its end date and rejected after", async () => {
+        const at = (iso: string) => bookingDeps({ now: () => new Date(iso) });
+        const mailIn = (id: string) =>
+          validBundleInput(id, { fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate: null } });
+        await expect(submitOrder(at("2026-12-22T04:59:00Z"), guest, mailIn("fall-boots"))).resolves.toBeDefined();
+        await expect(submitOrder(at("2026-12-22T05:00:00Z"), guest, mailIn("fall-boots"))).rejects.toThrow(
+          "This promotion has ended.",
+        );
+      });
+
+      it("leaves the standing Bundles bookable after that date", async () => {
+        const late = bookingDeps({ now: () => new Date("2027-01-05T15:00:00Z") });
+        const input = validBundleInput("revival", { fulfillment: { method: "MAIL_IN", address: mailInAddress, preferredDate: null } });
+        await expect(submitOrder(late, guest, input)).resolves.toBeDefined();
+      });
+    });
+
     it("splits a price that doesn't divide by three with the leftover cent on the first pair", async () => {
       const order = await submitOrder(bookingDeps(), guest, validBundleInput("restoration"));
       expect(order.items.map((item) => item.estimate.cents)).toEqual([5834, 5833, 5833]);

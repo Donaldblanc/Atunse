@@ -5,6 +5,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 ## Built
 - **Customer site:** `/`, `/services`, `/process`, `/about`, `/contact`, `/booking`.
 - **Booking:** five steps (Service → Details → Schedule → Your Info → Review). It submits to `POST /api/v1/orders`, with presigned photo uploads, single pairs and 3-pair Bundles, and server-side prices. Verified end to end locally on 2026-09-30: a booking appears on the admin Overview.
+- **Start of Fall Special:** homepage banner links to `/booking?bundle=fall-boots`, a catalog Bundle ($120 for 3 boots, Standard Clean per pair) the server refuses after Dec 21 2026 (New York); the banner hides then (page revalidates hourly).
 - **Customer Accounts** (ADR-0014): created at first booking. Email-code sign-in sits behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED`.
 - **Admin Overview** (`/admin`): live metrics, Recent Orders, Today's Schedule, Needs Attention. Its dialogs open from URL params (#121):
   - date range, metric details
