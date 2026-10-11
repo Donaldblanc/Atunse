@@ -45,6 +45,8 @@ function pair(overrides: Partial<OrderDetail["pairs"][number]> = {}): OrderDetai
     estimate: Money.fromCents(3000),
     price: null,
     status: "APPROVED",
+    displayStatus: "APPROVED",
+    requiresQuote: true,
     services: [],
     suedeFee: null,
     nextStatuses: [],

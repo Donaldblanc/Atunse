@@ -735,7 +735,7 @@ describe("PrismaOrderRepository review fixes (integration)", () => {
   });
 
   it("completing a Collection moves its Awaiting Sneakers pairs to In Progress, audited with the reason, and a replay moves nothing", async () => {
-    const { order } = await repo.create(newOrder({ items: [newItem(), newItem(), newItem()] }));
+    const { order } = await repo.create(newOrder({ items: [newItem(), newItem({ serviceIds: ["reglue"] }), newItem()] }));
     await prisma.item.update({ where: { id: order.items[0]!.id }, data: { status: "AWAITING_SNEAKERS" } });
     await prisma.item.update({ where: { id: order.items[1]!.id }, data: { status: "UNDER_REVIEW" } });
     await prisma.item.update({ where: { id: order.items[2]!.id }, data: { status: "CANCELLED" } });

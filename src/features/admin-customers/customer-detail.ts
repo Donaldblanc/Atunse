@@ -5,7 +5,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
-import { orderNumber, orderRollupStatus, type ItemStatus } from "@/features/orders/domain";
+import { orderDisplayStatus, orderNumber, type ItemStatus } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
 
@@ -45,7 +45,7 @@ export async function getCustomerDetail(deps: CustomerDetailDeps, actingUser: Ac
       orderId: order.id,
       reference: orderNumber(order.number),
       createdAt: order.createdAt,
-      status: orderRollupStatus(order.items),
+      status: orderDisplayStatus(order.items),
       estimate: order.estimate,
     })),
   };

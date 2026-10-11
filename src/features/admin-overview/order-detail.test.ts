@@ -16,7 +16,7 @@ function item(overrides: Partial<NewItemInput> = {}): NewItemInput {
     model: "Air Max 90",
     description: "Yellowed midsole",
     material: "Leather",
-    serviceIds: ["premium", "laces"],
+    serviceIds: ["reglue", "laces"],
     estimate: Money.fromCents(6500),
     requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
@@ -119,7 +119,7 @@ describe("getOrderDetail", () => {
         details: ["Leather", "Yellowed midsole"],
         photo: { kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) },
         services: [
-          { name: "Premium Clean", price: "$50", isMinimum: false },
+          { name: "Reglue", price: "$50+", isMinimum: true },
           { name: "Lace Replacement", price: "$15", isMinimum: false },
         ],
         suedeFee: null,
@@ -345,6 +345,45 @@ describe("getOrderDetail", () => {
     expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.autoApproved).toBe(true);
   });
 
+  it("shows a Cleaning-only Order as Request Submitted on the quote-free timeline, whether stored Approved or Quote Sent", async () => {
+    for (const stored of ["APPROVED", "QUOTE_SENT"] as const) {
+      const deps = setup();
+      const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false })] }));
+      order.items[0]!.status = stored;
+      const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+      expect(detail.status).toBe("REQUEST_SUBMITTED");
+      expect(detail.pairs[0]).toMatchObject({ status: stored, displayStatus: "REQUEST_SUBMITTED", requiresQuote: false });
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("UNDER_REVIEW");
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("APPROVED");
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("QUOTE_SENT");
+      expect(detail.timeline.map((step) => [step.status, step.state])).toEqual([
+        ["REQUEST_SUBMITTED", "current"],
+        ["AWAITING_SNEAKERS", "upcoming"],
+        ["IN_PROGRESS", "upcoming"],
+        ["QUALITY_CHECK", "upcoming"],
+        ["READY_FOR_PICKUP_SHIPPING", "upcoming"],
+        ["COMPLETED", "upcoming"],
+      ]);
+      expect(detail.timeline[0]!.at).toEqual(order.createdAt);
+    }
+  });
+
+  it("keeps the full pipeline and each pair's own behaviour on a mixed Order", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(
+      newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false }), item({ serviceIds: ["oxidation"] })] }),
+    );
+    order.items[0]!.status = "APPROVED";
+    order.items[1]!.status = "UNDER_REVIEW";
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.status).toBe("UNDER_REVIEW");
+    expect(detail.timeline).toHaveLength(9);
+    expect(detail.pairs.map((pair) => [pair.displayStatus, pair.requiresQuote])).toEqual([
+      ["REQUEST_SUBMITTED", false],
+      ["UNDER_REVIEW", true],
+    ]);
+  });
+
   it("never flags a Restoration pair as autoApproved, even moved straight to Approved with no Quote Sent (ADR-0017)", async () => {
     const deps = setup();
     const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["oxidation"] })] }));
@@ -386,6 +425,13 @@ describe("buildTimeline", () => {
       ["REQUEST_SUBMITTED", booked],
       ["UNDER_REVIEW", null],
     ]);
+  });
+
+  it("uses the quote-free pipeline when no pair needs a Quote: a stored Approved or Quote Sent reads Request Submitted", () => {
+    const timeline = buildTimeline("REQUEST_SUBMITTED", [{ id: "a" }], changes, booked, false);
+    expect(timeline.map((step) => step.status)).toEqual(["REQUEST_SUBMITTED", "AWAITING_SNEAKERS", "IN_PROGRESS", "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING", "COMPLETED"]);
+    expect(timeline[0]).toMatchObject({ state: "current", at: booked });
+    expect(timeline.slice(1).every((step) => step.state === "upcoming")).toBe(true);
   });
 
   it("marks every step done once Completed", () => {

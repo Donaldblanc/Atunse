@@ -4,7 +4,7 @@
 // so opening the dialog costs no second query.
 
 import { calendarDateInShopTime, type CalendarDate } from "@/features/orders/calendar-date";
-import { ITEM_STATUSES, liveEstimate, livePairs, orderRollupStatus, type ItemStatus } from "@/features/orders/domain";
+import { ITEM_STATUSES, liveEstimate, livePairs, orderDisplayStatus, type ItemStatus } from "@/features/orders/domain";
 import type { BookedOrder } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
 
@@ -27,7 +27,7 @@ export interface MetricDetail {
   /** Live Orders booked on each day of the range, oldest first. */
   ordersByDay: { date: CalendarDate; orders: number }[];
   /**
-   * Live Orders by their rollup status (orderRollupStatus), in pipeline
+   * Live Orders by their displayed rollup status (orderDisplayStatus), in pipeline
    * order, statuses with no Orders left out. Adds up to the headline
    * Total Orders / Booked Revenue exactly, because fully cancelled Orders
    * (the only ones with a CANCELLED rollup) are not in it.
@@ -56,7 +56,7 @@ export function metricDetail(booked: BookedOrder[], days: CalendarDate[]): Metri
     const date = calendarDateInShopTime(order.createdAt);
     if (perDay.has(date)) perDay.set(date, perDay.get(date)! + 1);
 
-    const status = orderRollupStatus(order.items);
+    const status = orderDisplayStatus(order.items);
     const share = perStatus.get(status) ?? { status, orders: 0, revenue: Money.zero() };
     share.orders += 1;
     share.revenue = share.revenue.add(liveEstimate(order));

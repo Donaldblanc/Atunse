@@ -2,7 +2,7 @@
 // import here (ADR-0003/0011: Prisma stays inside repositories).
 
 import { Money } from "@/shared/money/money";
-import { RUSH_FEE_CENTS } from "./service-catalog";
+import { itemRequiresQuote, RUSH_FEE_CENTS } from "./service-catalog";
 
 export const ITEM_STATUSES = [
   "REQUEST_SUBMITTED",
@@ -71,19 +71,44 @@ export function completionHold(order: CompletionOrder): string | null {
 }
 
 /**
+ * The statuses a pair with no Quote step (ADR-0017: no Restoration or Custom
+ * Work Service) never shows or offers in admin: they all read as Request
+ * Submitted. The stored status is untouched.
+ */
+export const QUOTE_STEP_STATUSES: readonly ItemStatus[] = ["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT", "APPROVED"];
+
+/** The status admin screens show for a pair: Request Submitted in place of Under Review, Quote Sent and Approved when it needs no Quote. */
+export function displayStatus(status: ItemStatus, requiresQuote: boolean): ItemStatus {
+  return !requiresQuote && QUOTE_STEP_STATUSES.includes(status) ? "REQUEST_SUBMITTED" : status;
+}
+
+/** The timeline steps for a pair or Order, in order (Cancelled is not a step): the quote-free pipeline skips Under Review, Quote Sent and Approved. */
+export function statusPipeline(requiresQuote: boolean): ItemStatus[] {
+  return ITEM_STATUSES.filter((step) => step !== "CANCELLED" && (requiresQuote || step === "REQUEST_SUBMITTED" || !QUOTE_STEP_STATUSES.includes(step)));
+}
+
+/** An Order uses the full pipeline when any live pair needs a Quote; a fully cancelled Order has none to need it. */
+export function orderRequiresQuote(order: { items: { status: ItemStatus; serviceIds: string[] }[] }): boolean {
+  return livePairs(order).some((item) => itemRequiresQuote(item.serviceIds));
+}
+
+/**
  * Where an admin's plain "Update Status" may move a pair: any other status
  * (forward, back, or skipping steps), as long as the pair isn't already
  * Completed or Cancelled, which stay final. The owner is trusted to know what
  * they're doing, so nothing is held: not the Deposit, not the Balance, and
  * Quote Sent and Approved are offered too. Sending the quote and recording
  * approval still have their own steps for setting the price and who said yes.
+ * A pair that needs no Quote is never offered Request Submitted, Under
+ * Review, Quote Sent or Approved (it can't be moved into the quote steps).
  */
 export function adminStatusMoves(
-  item: { status: ItemStatus },
+  item: { status: ItemStatus; serviceIds: string[] },
   _order?: CompletionOrder,
 ): { moves: ItemStatus[]; held: string | null } {
   if (item.status === "COMPLETED" || item.status === "CANCELLED") return { moves: [], held: null };
-  return { moves: ITEM_STATUSES.filter((next) => next !== item.status), held: null };
+  const requiresQuote = itemRequiresQuote(item.serviceIds);
+  return { moves: ITEM_STATUSES.filter((next) => next !== item.status && (requiresQuote || !QUOTE_STEP_STATUSES.includes(next))), held: null };
 }
 
 /**
@@ -150,6 +175,15 @@ export function orderRollupStatus(items: { status: ItemStatus }[]): ItemStatus {
   const live = items.filter((item) => item.status !== "CANCELLED");
   if (live.length === 0) return "CANCELLED";
   return live.reduce((least, item) => (ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf(least) ? item.status : least), live[0]!.status);
+}
+
+/**
+ * An Order's status as admin screens show and filter it: the rollup, except
+ * that an Order with no live pair needing a Quote reads Request Submitted
+ * for its quote-step statuses (displayStatus).
+ */
+export function orderDisplayStatus(items: { status: ItemStatus; serviceIds: string[] }[]): ItemStatus {
+  return displayStatus(orderRollupStatus(items), orderRequiresQuote({ items }));
 }
 
 /**
@@ -435,13 +469,15 @@ export interface VisitPlan {
  */
 export function planVisitMoves(
   kind: Appointment["kind"],
-  order: CompletionOrder & { items: { id: string }[] },
+  order: CompletionOrder & { items: { id: string; serviceIds?: string[] }[] },
 ): VisitPlan {
   const from: ItemStatus = kind === "COLLECTION" ? "AWAITING_SNEAKERS" : "READY_FOR_PICKUP_SHIPPING";
   const to: ItemStatus = kind === "COLLECTION" ? "IN_PROGRESS" : "COMPLETED";
   const plan: VisitPlan = { moves: [], stays: [] };
   for (const item of order.items) {
     if (item.status === "CANCELLED" || ITEM_STATUSES.indexOf(item.status) > ITEM_STATUSES.indexOf(from)) continue;
+    // A pair that needs no Quote reads Request Submitted before Awaiting Sneakers, never "approved".
+    const requiresQuote = item.serviceIds ? itemRequiresQuote(item.serviceIds) : true;
     if (item.status === from) {
       const { moves, held } = visitStatusMoves(item, order);
       if (moves.includes(to)) plan.moves.push({ itemId: item.id, from, to });
@@ -451,10 +487,10 @@ export function planVisitMoves(
     const reason =
       kind === "RETURN"
         ? "Not ready to go back yet."
-        : ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf("APPROVED")
+        : requiresQuote && ITEM_STATUSES.indexOf(item.status) < ITEM_STATUSES.indexOf("APPROVED")
           ? "Not approved yet."
           : (visitStatusMoves(item, order).held ?? "Not moved to Awaiting Sneakers yet.");
-    plan.stays.push({ itemId: item.id, status: item.status, reason });
+    plan.stays.push({ itemId: item.id, status: displayStatus(item.status, requiresQuote), reason });
   }
   return plan;
 }
