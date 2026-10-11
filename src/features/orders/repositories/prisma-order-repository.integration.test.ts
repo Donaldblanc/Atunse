@@ -754,6 +754,10 @@ describe("PrismaOrderRepository reschedule and Return booking (integration)", ()
     expect((await repo.findById(order.id))!.fulfillment).toMatchObject({ date: "2026-10-03", slot: "4:30 PM – 5:00 PM" });
 
     expect((await repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, ...NEW })).changed).toBe(false);
+    // One audit entry for the move; the replay wrote nothing.
+    const audits = await prisma.orderAuditEntry.findMany({ where: { orderId: order.id } });
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({ action: "ORDER_RESCHEDULED", metadata: { appointmentId, kind: "COLLECTION", from: { startsAt: OLD.toISOString() }, to: { startsAt: NEW.startsAt.toISOString(), endsAt: NEW.endsAt.toISOString() } } });
     await expect(
       repo.rescheduleAppointment({ appointmentId, expectedStartsAt: OLD, startsAt: new Date("2026-10-05T13:00:00Z"), endsAt: new Date("2026-10-05T13:30:00Z") }),
     ).rejects.toThrow(AppointmentMovedError);
@@ -965,12 +969,12 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
         [
           ["DETAILS_EDITED", order.items[0]!.id, "k1"],
           ["DETAILS_EDITED", order.items[1]!.id, "k1"],
-          ["ORDER_CONTACT_EDITED", order.items[0]!.id, "k1:contact"],
         ].sort(),
       );
-      const contact = audits.find((entry) => entry.action === "ORDER_CONTACT_EDITED")!;
+      const orderAudits = await prisma.orderAuditEntry.findMany({ where: { orderId: order.id } });
+      expect(orderAudits.map((entry) => [entry.action, entry.idempotencyKey])).toEqual([["ORDER_CONTACT_EDITED", "k1:contact"]]);
+      const contact = orderAudits[0]!;
       expect(contact.metadata).toEqual({ fields: ["contactName", "contactEmail", "contactPhone", "address.line1", "address.line2", "address.city", "address.state", "address.zip"] });
-      expect(contact).toMatchObject({ fromStatus: null, toStatus: null });
       // Not a status change, so the timeline doesn't see it.
       expect(await repo.listStatusChanges(order.id)).toEqual([]);
     });
@@ -1005,6 +1009,11 @@ describe("PrismaOrderRepository Needs Attention lists (integration)", () => {
       const row = await prisma.note.findUniqueOrThrow({ where: { id: note.id } });
       expect(row).toMatchObject({ accountId: order.accountId, orderId: order.id, authorAccountId: admin.id });
       expect((await repo.listOrderNotes(order.id)).map((n) => n.body)).toEqual(["Call first.", "Second."]);
+      const audits = await prisma.orderAuditEntry.findMany({ where: { orderId: order.id }, orderBy: { createdAt: "asc" } });
+      expect(audits.map((a) => [a.action, a.actorAccountId, a.metadata])).toEqual([
+        ["ORDER_NOTE_ADDED", admin.id, { noteId: note.id, length: 11 }],
+        ["ORDER_NOTE_ADDED", admin.id, expect.objectContaining({ length: 7 })],
+      ]);
       await expect(repo.addOrderNote({ orderId: "nope", authorAccountId: null, body: "x" })).rejects.toThrow(OrderNotFoundError);
     });
   });

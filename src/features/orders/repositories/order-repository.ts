@@ -384,8 +384,8 @@ export interface OrderRepository {
    * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
    * (else OrderChangedError, nothing written). Records what changed
    * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
-   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
-   * address changes (there is no Order-level audit table). Returns
+   * one Order-level ORDER_CONTACT_EDITED entry (OrderAuditEntry) for contact or
+   * address changes. Returns
    * "unchanged" when nothing differs (nothing written), "already-applied"
    * when `idempotencyKey` was recorded by an earlier call (a retry).
    * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
