@@ -49,7 +49,7 @@ export async function rescheduleVisit(
   if (!found) throw new AppointmentNotFoundError(input.appointmentId);
   const was = { startsAt: found.appointment.startsAt, endsAt: found.appointment.endsAt };
 
-  const { appointment, changed } = await deps.orders.rescheduleAppointment({ appointmentId: input.appointmentId, expectedStartsAt: input.expectedStartsAt, ...target });
+  const { appointment, changed } = await deps.orders.rescheduleAppointment({ appointmentId: input.appointmentId, expectedStartsAt: input.expectedStartsAt, ...target, actorAccountId: actingUser.accountId });
   if (!changed) return { appointment, changed, emailed: false };
 
   try {
