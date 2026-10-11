@@ -115,7 +115,7 @@ export const BUNDLE_CATALOG: CatalogBundle[] = [
       "Deep clean, stain lift, scuff repair, suede revival",
       "UGGs, Timberlands, any boot type",
       "Suede fee waived",
-      "Turnaround 3–7 business days",
+      "Typical turnaround 3–7 business days",
     ],
     pairServiceIds: ["standard"],
     // End of December 21st 2026, New York time (EST, UTC-5).

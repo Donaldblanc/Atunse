@@ -205,9 +205,9 @@ export default function HomePage() {
             <li>
               <Clock size={28} aria-hidden="true" />
               <span>
-                <strong>Turnaround Time</strong>
+                <strong>Typical Turnaround</strong>
                 <b>3 – 7 Business Days</b>
-                Fast and reliable.
+                Estimated; we confirm after inspection.
               </span>
             </li>
             <li>

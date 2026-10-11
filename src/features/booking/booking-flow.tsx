@@ -25,7 +25,7 @@ import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
-import { formatPrice, isBundleAvailable } from "@/features/orders/service-catalog";
+import { bundlePairServiceIds, catalogService, formatPrice, isBundleAvailable } from "@/features/orders/service-catalog";
 import { CustomerSignIn } from "./customer-sign-in";
 import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
@@ -100,6 +100,7 @@ export function BookingFlow() {
   const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
   const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
   const isBundle = flow === "bundle";
+  const bundlePairServices = bundlePairServiceIds(selectedBundle).map((id) => catalogService(id).name).join(" + ");
   const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
   const selectedAddOns = addOnLines((isBundle ? pairs : [singlePair]).map((pair) => pair.addOnIds));
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
@@ -294,6 +295,7 @@ export function BookingFlow() {
         {step === "review" && !confirmation && !signInEmail && !conflict && (
           <ReviewStep
             isBundle={isBundle}
+            bundlePairServices={bundlePairServices}
             name={selectedName}
             price={selectedPrice}
             priceNote={selectedPriceNote}
