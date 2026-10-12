@@ -30,6 +30,14 @@ export interface CustomerDetail {
   createdAt: Date;
 }
 
+/** Settings' Account Settings panel: the signed-in admin's own Account (ADR-0014). */
+export interface AdminAccount {
+  id: string;
+  name: string | null;
+  email: string;
+  passwordHash: string | null;
+}
+
 export interface AccountRepository {
   /** `email` is matched case-insensitively (emails are stored lowercased). */
   findCustomerByEmail(email: string): Promise<CustomerAccount | null>;
@@ -40,4 +48,11 @@ export interface AccountRepository {
 
   /** A Customer Account's contact details, or null for an id no Customer Account has. */
   findCustomerDetail(accountId: string): Promise<CustomerDetail | null>;
+
+  /** An Admin Account by id, or null for an id no Admin Account has. */
+  findAdminById(accountId: string): Promise<AdminAccount | null>;
+  /** Settings' Account Settings "Save": the admin's own name and email. */
+  updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void>;
+  /** Settings' Account Settings "Change Password": replaces the stored hash. */
+  updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void>;
 }
