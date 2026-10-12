@@ -109,3 +109,88 @@ describe("storeAdminReply", () => {
     expect(await prisma.message.count()).toBe(0);
   });
 });
+
+describe("listConversations", () => {
+  it("defaults to the inbox (not archived), newest activity first", async () => {
+    const newer = await conversation({ lastMessageAt: T1 });
+    const older = await conversation({ lastMessageAt: T0 });
+    const archived = await conversation({ archivedAt: T0, lastMessageAt: T1 });
+    await message(newer.id, { createdAt: T1 });
+    await message(older.id, { createdAt: T0 });
+    await message(archived.id);
+    const list = await repo.listConversations({});
+    expect(list.map((c) => c.conversationId)).toEqual([newer.id, older.id]);
+    expect(list[0]).toMatchObject({ accountId, lastMessagePreview: "Hi", unreadCount: 1 });
+  });
+
+  it("status=unread narrows to Conversations with an unread customer message; status=archived to archived ones", async () => {
+    const unread = await conversation();
+    const read = await conversation();
+    const archived = await conversation({ archivedAt: T0 });
+    await message(unread.id);
+    await message(read.id, { readAt: T0 });
+    await message(archived.id);
+    expect((await repo.listConversations({ status: "unread" })).map((c) => c.conversationId)).toEqual([unread.id]);
+    expect((await repo.listConversations({ status: "archived" })).map((c) => c.conversationId)).toEqual([archived.id]);
+  });
+
+  it("search matches the customer's name, email or the Conversation's subject", async () => {
+    const c = await conversation();
+    await message(c.id);
+    expect((await repo.listConversations({ search: "jordan" })).map((x) => x.conversationId)).toEqual([c.id]);
+    expect(await repo.listConversations({ search: "nobody-here" })).toEqual([]);
+  });
+});
+
+describe("getConversationThread", () => {
+  it("returns the whole thread for an existing Conversation, oldest first", async () => {
+    const c = await conversation();
+    await message(c.id, { createdAt: T0 });
+    await message(c.id, { createdAt: T1 });
+    const thread = await repo.getConversationThread(c.id);
+    expect(thread?.messages).toHaveLength(2);
+    expect(thread).toMatchObject({ accountId, customerEmail: EMAIL });
+  });
+
+  it("returns null for an id no Conversation has", async () => {
+    expect(await repo.getConversationThread("nope")).toBeNull();
+  });
+});
+
+describe("setConversationArchived", () => {
+  it("sets and clears archivedAt", async () => {
+    const c = await conversation();
+    await repo.setConversationArchived(c.id, true, T1);
+    expect((await prisma.conversation.findUniqueOrThrow({ where: { id: c.id } })).archivedAt).toEqual(T1);
+    await repo.setConversationArchived(c.id, false, T1);
+    expect((await prisma.conversation.findUniqueOrThrow({ where: { id: c.id } })).archivedAt).toBeNull();
+  });
+});
+
+describe("startConversation", () => {
+  const start = (idempotencyKey = "start-key") => ({
+    accountId,
+    accountEmail: EMAIL,
+    accountName: "Jordan",
+    subject: "A new thread",
+    authorAccountId: null,
+    body: "Hello!",
+    idempotencyKey,
+    at: T1,
+  });
+
+  it("creates a Conversation and its first ADMIN message", async () => {
+    const result = await repo.startConversation(start());
+    const created = await prisma.conversation.findUniqueOrThrow({ where: { id: result.conversationId } });
+    expect(created).toMatchObject({ accountId, subject: "A new thread", lastMessageAt: T1 });
+    const stored = await prisma.message.findFirstOrThrow({ where: { conversationId: result.conversationId } });
+    expect(stored).toMatchObject({ author: "ADMIN", channel: "EMAIL", body: "Hello!" });
+  });
+
+  it("a replay, even racing, creates only one Conversation", async () => {
+    const results = await Promise.all([repo.startConversation(start()), repo.startConversation(start())]);
+    expect(new Set(results.map((r) => r.conversationId)).size).toBe(1);
+    expect(await prisma.conversation.count()).toBe(1);
+    expect(await repo.startConversation(start())).toEqual(results[0]);
+  });
+});

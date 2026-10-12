@@ -39,7 +39,9 @@ export async function replyToConversationAction(previous: ReplyState, formData: 
     requireRole(actingUser, "ADMIN");
     if (!ID_PATTERN.test(conversationId) || !KEY_PATTERN.test(idempotencyKey)) return { ...previous, error: INVALID, notice: null };
     const result = await replyToConversation(buildMessageDeps(), actingUser, { conversationId, body, idempotencyKey });
+    // Reused by the Messages screen's thread view too (/admin/messages), not only the Overview dialog.
     revalidatePath("/admin");
+    revalidatePath("/admin/messages");
     const sent = previous.sent + 1;
     if (result.status === "sent" && result.emailFailed) {
       return { error: null, notice: "Your reply is saved, but the email didn't go out. Contact the customer yourself.", sent };
@@ -62,4 +64,5 @@ export async function markConversationReadAction(formData: FormData): Promise<vo
   if (!ID_PATTERN.test(conversationId)) return;
   await markConversationRead(buildMessageDeps(), actingUser, { conversationId });
   revalidatePath("/admin");
+  revalidatePath("/admin/messages");
 }

@@ -1,11 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
+import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
 import { RecordingNotificationService } from "@/features/orders/use-cases/test-fixtures";
 import { IdempotencyKeyReusedError } from "../repositories/message-repository";
 import { InMemoryMessageRepository } from "../repositories/in-memory-message-repository";
+import { getConversationThread } from "./get-conversation-thread";
 import { countUnreadMessages, listUnreadConversations } from "./get-unread-messages";
+import { listConversations } from "./list-conversations";
 import { markConversationRead } from "./mark-conversation-read";
 import { InvalidReplyError, replyToConversation, REPLY_MAX_LENGTH } from "./reply-to-conversation";
+import { setConversationArchived } from "./set-conversation-archived";
+import { CustomerNotFoundError, InvalidMessageError, startConversation } from "./start-conversation";
 
 const ADMIN: ActingUser = { accountId: "acc_admin", role: "ADMIN" };
 const CUSTOMER: ActingUser = { accountId: "acc_c", role: "CUSTOMER" };
@@ -132,5 +137,124 @@ describe("replyToConversation", () => {
     const { deps } = setup();
     await expect(replyToConversation(deps, ADMIN, { ...input, idempotencyKey: "" })).rejects.toThrow(InvalidReplyError);
     await expect(replyToConversation(deps, ADMIN, { ...input, conversationId: "nope" })).rejects.toThrow("Conversation not found");
+  });
+});
+
+describe("listConversations", () => {
+  it("defaults to the inbox (not archived), newest first", async () => {
+    const { deps } = setup();
+    const list = await listConversations(deps, ADMIN, {});
+    expect(list.map((c) => c.conversationId)).toEqual(["c1", "c3"]);
+    expect(list[0]).toMatchObject({ lastMessagePreview: "Hello?", unreadCount: 2 });
+  });
+
+  it("status=unread narrows to Conversations with an unread customer message", async () => {
+    const { deps } = setup();
+    expect((await listConversations(deps, ADMIN, { status: "unread" })).map((c) => c.conversationId)).toEqual(["c1"]);
+  });
+
+  it("status=archived shows only archived Conversations", async () => {
+    const { deps } = setup();
+    expect((await listConversations(deps, ADMIN, { status: "archived" })).map((c) => c.conversationId)).toEqual(["c2"]);
+  });
+
+  it("search matches the customer's name, email or the Conversation's subject", async () => {
+    const { deps } = setup();
+    expect((await listConversations(deps, ADMIN, { search: "jordan" })).map((c) => c.conversationId)).toEqual(["c1"]);
+    expect(await listConversations(deps, ADMIN, { search: "nobody" })).toEqual([]);
+  });
+
+  it("refuses a non-admin", async () => {
+    const { deps } = setup();
+    await expect(listConversations(deps, CUSTOMER, {})).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe("getConversationThread", () => {
+  it("returns the whole thread, oldest first, for an existing Conversation", async () => {
+    const { deps } = setup();
+    const thread = await getConversationThread(deps, ADMIN, "c1");
+    expect(thread?.messages.map((m) => m.body)).toEqual(["Where are my sneakers?", "Hello?"]);
+  });
+
+  it("returns null for an id no Conversation has", async () => {
+    const { deps } = setup();
+    expect(await getConversationThread(deps, ADMIN, "nope")).toBeNull();
+  });
+
+  it("refuses a non-admin", async () => {
+    const { deps } = setup();
+    await expect(getConversationThread(deps, CUSTOMER, "c1")).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe("setConversationArchived", () => {
+  it("archives and unarchives, a repeat staying a no-op", async () => {
+    const { messages, deps } = setup();
+    await setConversationArchived(deps, ADMIN, { conversationId: "c1", archived: true });
+    expect(messages.conversations[0]!.archivedAt).toEqual(NOW);
+    await setConversationArchived(deps, ADMIN, { conversationId: "c1", archived: false });
+    expect(messages.conversations[0]!.archivedAt).toBeNull();
+  });
+
+  it("refuses a non-admin", async () => {
+    const { deps } = setup();
+    await expect(setConversationArchived(deps, CUSTOMER, { conversationId: "c1", archived: true })).rejects.toThrow(UnauthorizedError);
+  });
+});
+
+describe("startConversation", () => {
+  function setupWithAccounts() {
+    const base = setup();
+    const accounts = new InMemoryAccounts();
+    accounts.add({ id: "acc_new", role: "CUSTOMER", email: "new@example.com" });
+    return { ...base, accounts, deps: { ...base.deps, accounts } };
+  }
+
+  it("creates a Conversation and its first ADMIN message for an existing Customer Account", async () => {
+    const { messages, deps } = setupWithAccounts();
+    const result = await startConversation(deps, ADMIN, { customerEmail: "New@Example.com", subject: "Hi", body: "  Welcome!  ", idempotencyKey: "start-1" });
+    const conversation = messages.conversations.find((c) => c.id === result.conversationId);
+    expect(conversation).toMatchObject({ accountId: "acc_new", accountEmail: "new@example.com", subject: "Hi" });
+    const stored = messages.messages.find((m) => m.conversationId === result.conversationId);
+    expect(stored).toMatchObject({ author: "ADMIN", channel: "EMAIL", body: "Welcome!", authorAccountId: "acc_admin" });
+  });
+
+  it("a replay returns the first call's Conversation and writes nothing new", async () => {
+    const { messages, deps } = setupWithAccounts();
+    const input = { customerEmail: "new@example.com", subject: null, body: "Hi", idempotencyKey: "start-2" };
+    const first = await startConversation(deps, ADMIN, input);
+    const before = messages.conversations.length;
+    const second = await startConversation(deps, ADMIN, input);
+    expect(second).toEqual(first);
+    expect(messages.conversations).toHaveLength(before);
+  });
+
+  it("refuses an email with no Customer Account", async () => {
+    const { deps } = setupWithAccounts();
+    await expect(startConversation(deps, ADMIN, { customerEmail: "nobody@example.com", subject: null, body: "Hi", idempotencyKey: "k" })).rejects.toThrow(
+      CustomerNotFoundError,
+    );
+  });
+
+  it.each([["empty", "   "], ["too long", "x".repeat(REPLY_MAX_LENGTH + 1)]])("refuses a %s body", async (_label, body) => {
+    const { deps } = setupWithAccounts();
+    await expect(startConversation(deps, ADMIN, { customerEmail: "new@example.com", subject: null, body, idempotencyKey: "k" })).rejects.toThrow(
+      InvalidMessageError,
+    );
+  });
+
+  it("refuses a missing idempotency key", async () => {
+    const { deps } = setupWithAccounts();
+    await expect(startConversation(deps, ADMIN, { customerEmail: "new@example.com", subject: null, body: "Hi", idempotencyKey: "" })).rejects.toThrow(
+      InvalidMessageError,
+    );
+  });
+
+  it("refuses a non-admin", async () => {
+    const { deps } = setupWithAccounts();
+    await expect(
+      startConversation(deps, CUSTOMER, { customerEmail: "new@example.com", subject: null, body: "Hi", idempotencyKey: "k" }),
+    ).rejects.toThrow(UnauthorizedError);
   });
 });

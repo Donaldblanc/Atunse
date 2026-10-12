@@ -1,0 +1,53 @@
+import type { ActingUser } from "@/features/accounts/authz";
+import { requireRole } from "@/features/accounts/authz";
+import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
+import { REPLY_MAX_LENGTH } from "../reply-limits";
+import type { MessageRepository } from "../repositories/message-repository";
+
+export class InvalidMessageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidMessageError";
+  }
+}
+
+export class CustomerNotFoundError extends Error {
+  constructor() {
+    super("No customer account has that email");
+    this.name = "CustomerNotFoundError";
+  }
+}
+
+/**
+ * The Messages screen's New Message: starts a Conversation with an existing
+ * Customer Account and stores its first (ADMIN-authored) Message. Admin-only.
+ * Idempotent on `idempotencyKey` (ADR-0012): a replay creates nothing and
+ * returns the Conversation the first call made.
+ */
+export async function startConversation(
+  deps: { messages: Pick<MessageRepository, "startConversation">; accounts: Pick<AccountRepository, "findCustomerByEmail">; now: () => Date },
+  actingUser: ActingUser,
+  input: { customerEmail: string; subject: string | null; body: string; idempotencyKey: string },
+): Promise<{ conversationId: string }> {
+  requireRole(actingUser, "ADMIN");
+  if (!input.idempotencyKey) throw new InvalidMessageError("Reload and try again.");
+  const body = input.body.trim();
+  if (body === "") throw new InvalidMessageError("Write a message first.");
+  if (body.length > REPLY_MAX_LENGTH) throw new InvalidMessageError(`Keep the message to ${REPLY_MAX_LENGTH} characters or fewer.`);
+  const email = input.customerEmail.trim().toLowerCase();
+  if (email === "") throw new InvalidMessageError("Enter the customer's email.");
+
+  const account = await deps.accounts.findCustomerByEmail(email);
+  if (!account) throw new CustomerNotFoundError();
+
+  return deps.messages.startConversation({
+    accountId: account.id,
+    accountEmail: account.email,
+    accountName: null,
+    subject: input.subject?.trim() || null,
+    authorAccountId: actingUser.accountId,
+    body,
+    idempotencyKey: input.idempotencyKey,
+    at: deps.now(),
+  });
+}
