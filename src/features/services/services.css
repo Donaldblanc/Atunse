@@ -1,0 +1,222 @@
+/* Services & Pricing (/admin/services). Classes prefixed sv- per
+   docs/kb/patterns.md so this stays separate from admin-theme.css. */
+
+.sv-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--admin-border, #e5e5e5);
+  margin: 1.5rem 0 1rem;
+}
+
+.sv-tab {
+  padding: 0.6rem 0.1rem;
+  color: var(--admin-muted, #6b6b6b);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.sv-tab[aria-current="page"] {
+  color: var(--admin-fg, #111);
+  border-bottom-color: #2563eb;
+}
+
+.sv-tab-soon {
+  color: var(--admin-muted, #a3a3a3);
+  cursor: default;
+}
+
+.sv-search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sv-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--admin-border, #d4d4d4);
+  border-radius: 0.5rem;
+  background: #fff;
+}
+
+.sv-pill {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: #ede9fe;
+  color: #5b21b6;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.sv-pill-active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sv-pill-inactive {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+/* Edit Service / Edit Bundle / Add Bundle forms */
+.sv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sv-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.sv-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.sv-input,
+.sv-textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--admin-border, #d4d4d4);
+  border-radius: 0.5rem;
+  font: inherit;
+}
+
+.sv-textarea {
+  resize: vertical;
+}
+
+.sv-counter {
+  align-self: flex-end;
+  font-size: 0.75rem;
+  color: var(--admin-muted, #9ca3af);
+}
+
+.sv-hint,
+.sv-muted {
+  font-size: 0.8rem;
+  color: var(--admin-muted, #6b7280);
+}
+
+.sv-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sv-images {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sv-images-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.sv-images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.sv-image-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+
+.sv-image-placeholder {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(45deg, #e5e7eb, #e5e7eb 6px, #f3f4f6 6px, #f3f4f6 12px);
+}
+
+.sv-image-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #111;
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sv-image-add {
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--admin-border, #d4d4d4);
+  border-radius: 0.5rem;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  color: var(--admin-muted, #6b7280);
+  cursor: pointer;
+}
+
+.sv-error {
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+.sv-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--admin-border, #e5e5e5);
+}
+
+.sv-actions-right {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.sv-btn-danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.sv-confirm {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  background: #fef2f2;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sv-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
