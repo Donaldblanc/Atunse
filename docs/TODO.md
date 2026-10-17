@@ -15,6 +15,7 @@ The owner's pre-launch list, checked against the code and the live site (`atunse
 - [x] **Cookie consent banner**: Silktide Consent Manager (pinned v2.0.1, SRI) mounted in the root layout (`src/features/consent`). It's a UI only for now: no analytics or ad scripts exist to gate, so wire `onAccept`/`onReject` when adding any. Still open: a Cookie Policy page and a Privacy Policy update (section 3).
 - [x] **Consent checkboxes**: booking (four risk acknowledgments plus the Terms Agreement: none pre-checked, Confirm Booking disabled until all are ticked, enforced again by `submitOrder`) and the contact form (consent required client- and server-side). Covered by tests.
 - [x] **Terms / Privacy links where customers submit**: the booking Review step links the Terms PDF (from its checkbox) and the Privacy Policy; the contact form links the Privacy Policy; the footer links both on every page. There are no online payments yet (see Payments).
+- [ ] **Register the DMCA Designated Agent at copyright.gov** (owner; $6, renew every 3 years), then set `DMCA_AGENT_*` in Vercel; `/copyright` and the footer link appear once set (code is in; see `src/shared/dmca-agent.ts`). The Terms PDF should reference the Copyright Policy in its next version (owner/lawyer; ADR-0015 versioning).
 - [ ] **Business details**: the footer shows only "RestoredByDJ · New York, NY". Add the legal business name and a public contact method (email and/or phone); the Contact page shows no email address yet.
 
 ### Content & claims

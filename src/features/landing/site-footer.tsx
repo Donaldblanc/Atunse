@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { LEGAL_DOCUMENTS } from "@/shared/legal-documents";
+import { dmcaAgent } from "@/shared/dmca-agent";
 
 export function SiteFooter({ active }: { active?: NavActive } = {}) {
   return (
@@ -72,6 +73,8 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
               <span className="landing-visually-hidden"> (PDF, opens in a new tab)</span>
             </a>
           ))}
+          {/* Only once a DMCA Designated Agent is configured (shared/dmca-agent.ts). */}
+          {dmcaAgent() && <Link href="/copyright">Copyright</Link>}
         </nav>
         <span>RestoredByDJ &middot; New York, NY</span>
       </div>
