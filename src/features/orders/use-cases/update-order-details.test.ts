@@ -38,6 +38,7 @@ async function bookOrder(pairs = 1) {
       material: null,
       serviceIds: ["standard"],
       estimate: Money.fromCents(3000),
+      requiresQuote: true,
       photos: [{ key: `photos/${counter}-${i}.jpg`, uploadKey: `bookings/${counter}-${i}.jpg` }],
     })),
   };
@@ -148,7 +149,9 @@ describe("updateOrderDetails", () => {
     expect(order.updatedAt.getTime()).toBeGreaterThan(before.getTime());
     expect(orders.auditEntries.map(({ action, itemId, actorAccountId, metadata }) => ({ action, itemId, actorAccountId, metadata }))).toEqual([
       { action: "DETAILS_EDITED", itemId: order.items[0]!.id, actorAccountId: "acc_admin", metadata: { changes: { size: { from: null, to: "10" }, condition: { from: null, to: "Good" } } } },
-      { action: "ORDER_CONTACT_EDITED", itemId: order.items[0]!.id, actorAccountId: "acc_admin", metadata: { fields: ["contactName", "address.line2"] } },
+    ]);
+    expect(orders.orderAuditEntries.map(({ orderId, action, actorAccountId, metadata }) => ({ orderId, action, actorAccountId, metadata }))).toEqual([
+      { orderId: order.id, action: "ORDER_CONTACT_EDITED", actorAccountId: "acc_admin", metadata: { fields: ["contactName", "address.line2"] } },
     ]);
   });
 
@@ -167,7 +170,7 @@ describe("updateOrderDetails", () => {
     expect(await save(orders, { id: order.id, updatedAt: stale }, raw)).toEqual({ ok: true, outcome: "updated" });
     // The retry carries the old stamp too; the key is what says it already applied.
     expect(await save(orders, { id: order.id, updatedAt: stale }, raw)).toEqual({ ok: true, outcome: "already-applied" });
-    expect(orders.auditEntries).toHaveLength(1);
+    expect(orders.orderAuditEntries).toHaveLength(1);
   });
 
   it("refuses a form rendered before another edit landed", async () => {

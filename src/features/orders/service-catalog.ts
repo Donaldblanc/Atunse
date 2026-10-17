@@ -6,9 +6,13 @@
 
 import { Money } from "@/shared/money/money";
 
+/** ADR-0017: only "restoration" and "custom-work" Services require a Quote. */
+export type ServiceCategory = "cleaning" | "restoration" | "custom-work" | "additional";
+
 export interface CatalogService {
   id: string;
   name: string;
+  category: ServiceCategory;
   /** Standard and Premium Clean. At most one per Item. */
   isCleaningTier: boolean;
   /**
@@ -28,11 +32,12 @@ export interface CatalogService {
 }
 
 export const SERVICE_CATALOG: CatalogService[] = [
-  { id: "standard", name: "Standard Clean", isCleaningTier: true, isAddOn: false, baseCents: 3000, isMinimum: false, suedeFee: true },
-  { id: "premium", name: "Premium Clean", isCleaningTier: true, isAddOn: false, baseCents: 5000, isMinimum: false, suedeFee: true },
+  { id: "standard", name: "Standard Clean", category: "cleaning", isCleaningTier: true, isAddOn: false, baseCents: 3000, isMinimum: false, suedeFee: true },
+  { id: "premium", name: "Premium Clean", category: "cleaning", isCleaningTier: true, isAddOn: false, baseCents: 5000, isMinimum: false, suedeFee: true },
   {
     id: "oxidation",
     name: "Oxidation Restoration",
+    category: "restoration",
     isCleaningTier: false,
     isAddOn: false,
     baseCents: 2500,
@@ -41,12 +46,12 @@ export const SERVICE_CATALOG: CatalogService[] = [
     minimumLabel: "Midsole",
     alsoFrom: [{ label: "Sole", cents: 4000 }],
   },
-  { id: "painting", name: "Sneaker Painting & Dyeing", isCleaningTier: false, isAddOn: false, baseCents: 4000, isMinimum: true, suedeFee: false },
-  { id: "reglue", name: "Reglue", isCleaningTier: false, isAddOn: false, baseCents: 5000, isMinimum: true, suedeFee: false },
+  { id: "painting", name: "Sneaker Painting & Dyeing", category: "custom-work", isCleaningTier: false, isAddOn: false, baseCents: 4000, isMinimum: true, suedeFee: false },
+  { id: "reglue", name: "Reglue", category: "restoration", isCleaningTier: false, isAddOn: false, baseCents: 5000, isMinimum: true, suedeFee: false },
   // Add-ons: flat-priced, no Suede Fee.
-  { id: "laces", name: "Lace Replacement", isCleaningTier: false, isAddOn: true, baseCents: 1500, isMinimum: false, suedeFee: false },
-  { id: "deodorizing", name: "Premium Deodorizing Treatment", isCleaningTier: false, isAddOn: true, baseCents: 1000, isMinimum: false, suedeFee: false },
-  { id: "waterproofing", name: "Waterproof Seal", isCleaningTier: false, isAddOn: true, baseCents: 500, isMinimum: false, suedeFee: false },
+  { id: "laces", name: "Lace Replacement", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 1500, isMinimum: false, suedeFee: false },
+  { id: "deodorizing", name: "Premium Deodorizing Treatment", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 1000, isMinimum: false, suedeFee: false },
+  { id: "waterproofing", name: "Waterproof Seal", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 500, isMinimum: false, suedeFee: false },
 ];
 
 /** The Add-ons, in the order the booking flow offers them. */
@@ -157,11 +162,16 @@ function lookUpServices(serviceIds: string[]): CatalogService[] {
 }
 
 /** The price of a pair's Add-ons; rejects anything that isn't one. */
-function addOnsCents(addOnIds: string[]): number {
+export function addOnsCents(addOnIds: string[]): number {
   const addOns = lookUpServices(addOnIds);
   const notAddOn = addOns.find((s) => !s.isAddOn);
   if (notAddOn) throw new InvalidServiceSelectionError("A Bundle's Services come with it: only add-ons can be chosen per pair.");
   return addOns.reduce((sum, s) => sum + s.baseCents, 0);
+}
+
+/** True when the Suede Fee is charged: a Suede pair with a Service that carries it. */
+export function suedeFeeApplies(material: string | null, services: CatalogService[]): boolean {
+  return material === "Suede" && services.some((s) => s.suedeFee);
 }
 
 export function estimateItem(params: { serviceIds: string[]; material: Material | null }): ItemEstimate {
@@ -178,8 +188,7 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
     throw new InvalidServiceSelectionError("Choose Standard or Premium Clean, not both.");
   }
 
-  const suedeApplies = material === "Suede" && services.some((s) => s.suedeFee);
-  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeApplies ? SUEDE_FEE_CENTS : 0);
+  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeFeeApplies(material, services) ? SUEDE_FEE_CENTS : 0);
   return { estimate: Money.fromCents(cents), isMinimum: services.some((s) => s.isMinimum) };
 }
 
@@ -243,6 +252,19 @@ export function catalogService(id: string): CatalogService {
   const service = SERVICE_CATALOG.find((s) => s.id === id);
   if (!service) throw new InvalidServiceSelectionError(`Unknown service: ${id}`);
   return service;
+}
+
+/**
+ * ADR-0017: an Item needs a Quote (and the customer's approval) only if one
+ * of its Services is Restoration or Custom Work. Cleaning and Add-on
+ * Services are flat-priced, so an Item with only those gets its published
+ * price straight away.
+ */
+export function itemRequiresQuote(serviceIds: string[]): boolean {
+  return serviceIds.some((id) => {
+    const category = catalogService(id).category;
+    return category === "restoration" || category === "custom-work";
+  });
 }
 
 /** A price as the site shows it: "$30" when flat, "$25+" when it's a minimum. */

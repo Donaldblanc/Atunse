@@ -8,7 +8,7 @@ const DAYS = ["2026-09-28", "2026-09-29", "2026-09-30"];
 
 function booked(createdAt: string, cents: number, ...statuses: ItemStatus[]): BookedOrder {
   const each = Money.fromCents(cents / statuses.length);
-  return { id: createdAt + cents, createdAt: new Date(createdAt), estimate: Money.fromCents(cents), items: statuses.map((status) => ({ status, serviceIds: [], estimate: each })) };
+  return { id: createdAt + cents, createdAt: new Date(createdAt), estimate: Money.fromCents(cents), items: statuses.map((status) => ({ status, serviceIds: ["reglue"], estimate: each })) };
 }
 
 describe("metricDetail", () => {
@@ -75,5 +75,11 @@ describe("parseOverviewMetric", () => {
     expect(parseOverviewMetric("revenue")).toBe("revenue");
     expect(parseOverviewMetric("x")).toBeNull();
     expect(parseOverviewMetric(undefined)).toBeNull();
+  });
+
+  it("counts a cleaning-only Order under Request Submitted, whatever status it is stored at", () => {
+    const clean = { ...booked("2026-09-28T13:00:00Z", 3000, "APPROVED"), items: [{ status: "APPROVED" as const, serviceIds: ["standard"], estimate: Money.fromCents(3000) }] };
+    const detail = metricDetail([clean], ["2026-09-28"] as Parameters<typeof metricDetail>[1]);
+    expect(detail.byStatus.map((share) => share.status)).toEqual(["REQUEST_SUBMITTED"]);
   });
 });

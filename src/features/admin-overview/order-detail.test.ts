@@ -16,8 +16,9 @@ function item(overrides: Partial<NewItemInput> = {}): NewItemInput {
     model: "Air Max 90",
     description: "Yellowed midsole",
     material: "Leather",
-    serviceIds: ["premium", "laces"],
+    serviceIds: ["reglue", "laces"],
     estimate: Money.fromCents(6500),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
     ...overrides,
   };
@@ -32,6 +33,8 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     contactName: "Jordan Smith",
     contactEmail: "jordan@example.com",
     contactPhone: "(212) 555-0142",
+    birthMonth: 3,
+    birthYear: 1990,
     policyAcceptedAt: new Date(),
     terms: {
       version: "v1",
@@ -100,6 +103,7 @@ describe("getOrderDetail", () => {
         name: "Jordan Smith",
         email: "jordan@example.com",
         phone: "(212) 555-0142",
+        born: "Mar 1990",
         fulfillment: "Local Drop-Off",
         schedule: { date: "2026-10-03", slot: "4:30 PM – 5:00 PM" },
         address: ["12 Elm St", "Apt 4", "Brooklyn, NY 11201"],
@@ -118,9 +122,10 @@ describe("getOrderDetail", () => {
         details: ["Leather", "Yellowed midsole"],
         photo: { kind: "stored", url: expect.stringMatching(/^https:\/\/photos\.test\/photos\//) },
         services: [
-          { name: "Premium Clean", price: "$50" },
-          { name: "Lace Replacement", price: "$15" },
+          { name: "Reglue", price: "$50+", isMinimum: true },
+          { name: "Lace Replacement", price: "$15", isMinimum: false },
         ],
+        suedeFee: null,
         nextStatuses: expect.arrayContaining(["UNDER_REVIEW", "CANCELLED"]),
       }),
     ]);
@@ -183,7 +188,75 @@ describe("getOrderDetail", () => {
       address: ["1 Main St", "Austin, TX 73301"],
     });
     expect(detail.bundleName).toBe("The Revival Pack");
-    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, null, null, null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.price))).toEqual([null, "$15", null, "$15", null, "$15"]);
+  });
+
+  it("breaks out the Suede fee, a minimum price and a quote beside the catalog estimate", async () => {
+    const deps = setup();
+    const suede = await deps.orders.create(newOrder({ items: [item({ material: "Suede", serviceIds: ["standard"], estimate: Money.fromCents(4000) })] }));
+    let pair = (await getOrderDetail(deps, ADMIN, suede.order.id))!.pairs[0]!;
+    expect(pair.suedeFee?.format()).toBe("$10");
+    expect(pair.services).toEqual([{ name: "Standard Clean", price: "$30", isMinimum: false }]);
+
+    const minimum = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["reglue"], estimate: Money.fromCents(5000) })] }));
+    deps.orders.orders.get(minimum.order.id)!.items[0]!.price = Money.fromCents(6500);
+    pair = (await getOrderDetail(deps, ADMIN, minimum.order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([{ name: "Reglue", price: "$50+", isMinimum: true }]);
+    expect(pair.suedeFee).toBeNull();
+    expect(pair.price?.format()).toBe("$65");
+    expect(pair.estimate.format()).toBe("$50");
+  });
+
+  it("shows one Bundle price and no per-pair prices or Suede fee", async () => {
+    const deps = setup();
+    const est = { estimate: Money.fromCents(5000), serviceIds: ["premium"] };
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ material: "Suede", ...est }), item(est), item(est)] }));
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.bundlePrice?.format()).toBe("$150");
+    expect(detail.pairs.map((pair) => pair.suedeFee)).toEqual([null, null, null]);
+    expect(detail.pairs.flatMap((pair) => pair.services.map((service) => service.isMinimum))).not.toContain(true);
+  });
+
+  it("prices a Bundle pair's Add-ons but not its Bundle Service", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ serviceIds: ["premium", "laces"] }), item(), item()] }));
+    const pair = (await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!;
+    expect(pair.services).toEqual([
+      { name: "Premium Clean", price: null, isMinimum: false },
+      { name: "Lace Replacement", price: "$15", isMinimum: false },
+    ]);
+  });
+
+  it("takes the Bundle price from the stored estimates: a cancelled pair lowers it, the catalog price doesn't matter", async () => {
+    const deps = setup();
+    const est = { estimate: Money.fromCents(5000), serviceIds: ["premium"] };
+    const { order } = await deps.orders.create(newOrder({ bundleId: "revival", items: [item(est), item(est), item(est)] }));
+    const stored = deps.orders.orders.get(order.id)!;
+    stored.items[0]!.status = "CANCELLED";
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.bundlePrice?.format()).toBe("$100");
+    const other = await deps.orders.create(newOrder({ bundleId: "revival", items: [item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] }), item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] }), item({ estimate: Money.fromCents(4000), serviceIds: ["premium"] })] }));
+    expect((await getOrderDetail(deps, ADMIN, other.order.id))!.bundlePrice?.format()).toBe("$120");
+  });
+
+  it("fall-boots Suede pair with Standard Clean and laces: Add-on priced, no Suede fee, Bundle price $120", async () => {
+    const deps = setup();
+    const pairs = [4000, 4000, 4000].map((cents, i) =>
+      item({ material: "Suede", serviceIds: i === 0 ? ["standard", "laces"] : ["standard"], estimate: Money.fromCents(i === 0 ? cents + 1500 : cents) }),
+    );
+    const { order } = await deps.orders.create(newOrder({ bundleId: "fall-boots", items: pairs }));
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.pairs[0]!.services).toEqual([
+      { name: "Standard Clean", price: null, isMinimum: false },
+      { name: "Lace Replacement", price: "$15", isMinimum: false },
+    ]);
+    expect(detail.pairs[0]!.suedeFee).toBeNull();
+    expect(detail.bundlePrice?.format()).toBe("$120");
+  });
+
+  it("has no Bundle price for a plain Order", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder());
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.bundlePrice).toBeNull();
   });
 
   it("shows the Order's notes, oldest first", async () => {
@@ -268,6 +341,60 @@ describe("getOrderDetail", () => {
     order.items[0]!.status = "COMPLETED";
     expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.nextStatuses).toEqual([]);
   });
+
+  it("flags a Cleaning/Add-on-only pair created already Approved as autoApproved (ADR-0017)", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false })] }));
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.autoApproved).toBe(true);
+  });
+
+  it("shows a Cleaning-only Order as Request Submitted on the quote-free timeline, whether stored Approved or Quote Sent", async () => {
+    for (const stored of ["APPROVED", "QUOTE_SENT"] as const) {
+      const deps = setup();
+      const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false })] }));
+      order.items[0]!.status = stored;
+      const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+      expect(detail.status).toBe("REQUEST_SUBMITTED");
+      expect(detail.pairs[0]).toMatchObject({ status: stored, displayStatus: "REQUEST_SUBMITTED", requiresQuote: false });
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("UNDER_REVIEW");
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("APPROVED");
+      expect(detail.pairs[0]!.nextStatuses).not.toContain("QUOTE_SENT");
+      expect(detail.timeline.map((step) => [step.status, step.state])).toEqual([
+        ["REQUEST_SUBMITTED", "current"],
+        ["AWAITING_SNEAKERS", "upcoming"],
+        ["IN_PROGRESS", "upcoming"],
+        ["QUALITY_CHECK", "upcoming"],
+        ["READY_FOR_PICKUP_SHIPPING", "upcoming"],
+        ["COMPLETED", "upcoming"],
+      ]);
+      expect(detail.timeline[0]!.at).toEqual(order.createdAt);
+    }
+  });
+
+  it("keeps the full pipeline and each pair's own behaviour on a mixed Order", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(
+      newOrder({ items: [item({ serviceIds: ["standard"], requiresQuote: false }), item({ serviceIds: ["oxidation"] })] }),
+    );
+    order.items[0]!.status = "APPROVED";
+    order.items[1]!.status = "UNDER_REVIEW";
+    const detail = (await getOrderDetail(deps, ADMIN, order.id))!;
+    expect(detail.status).toBe("UNDER_REVIEW");
+    expect(detail.timeline).toHaveLength(9);
+    expect(detail.pairs.map((pair) => [pair.displayStatus, pair.requiresQuote])).toEqual([
+      ["REQUEST_SUBMITTED", false],
+      ["UNDER_REVIEW", true],
+    ]);
+  });
+
+  it("never flags a Restoration pair as autoApproved, even moved straight to Approved with no Quote Sent (ADR-0017)", async () => {
+    const deps = setup();
+    const { order } = await deps.orders.create(newOrder({ items: [item({ serviceIds: ["oxidation"] })] }));
+    // A plain admin Update Status move (adminStatusMoves) can skip straight to Approved
+    // without ever recording a QUOTE_SENT status change — this pair still needs its quote.
+    order.items[0]!.status = "APPROVED";
+    expect((await getOrderDetail(deps, ADMIN, order.id))!.pairs[0]!.autoApproved).toBe(false);
+  });
 });
 
 describe("buildTimeline", () => {
@@ -301,6 +428,13 @@ describe("buildTimeline", () => {
       ["REQUEST_SUBMITTED", booked],
       ["UNDER_REVIEW", null],
     ]);
+  });
+
+  it("uses the quote-free pipeline when no pair needs a Quote: a stored Approved or Quote Sent reads Request Submitted", () => {
+    const timeline = buildTimeline("REQUEST_SUBMITTED", [{ id: "a" }], changes, booked, false);
+    expect(timeline.map((step) => step.status)).toEqual(["REQUEST_SUBMITTED", "AWAITING_SNEAKERS", "IN_PROGRESS", "QUALITY_CHECK", "READY_FOR_PICKUP_SHIPPING", "COMPLETED"]);
+    expect(timeline[0]).toMatchObject({ state: "current", at: booked });
+    expect(timeline.slice(1).every((step) => step.state === "upcoming")).toBe(true);
   });
 
   it("marks every step done once Completed", () => {

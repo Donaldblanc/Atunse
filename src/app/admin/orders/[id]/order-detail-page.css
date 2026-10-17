@@ -1,0 +1,28 @@
+/* The standalone Order detail page's own shell; od-title/od-grid etc.
+   (admin-theme.css) are shared with the Overview's ?order= dialog. */
+
+.od-page {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+.od-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.od-back-link:hover {
+  color: var(--color-foreground);
+}
+
+.od-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}

@@ -34,6 +34,7 @@ function pair(overrides: Partial<NewItemInput> = {}): NewItemInput {
     material: null,
     serviceIds: ["standard"],
     estimate: Money.fromCents(3000),
+    requiresQuote: true,
     photos: [{ key: `photos/search-${counter}.jpg`, uploadKey: `bookings/search-${counter}.jpg` }],
     ...overrides,
   };
@@ -122,7 +123,7 @@ describe("PrismaOrderSearchRepository (integration)", () => {
   });
 
   it("filters by the derived Order status", async () => {
-    await book("Mixed", { createdAt: "2026-09-28T14:00:00Z", statuses: ["IN_PROGRESS", "APPROVED"] });
+    await book("Mixed", { createdAt: "2026-09-28T14:00:00Z", statuses: ["IN_PROGRESS", "APPROVED"], serviceIds: ["reglue"] });
     await book("Done", { createdAt: "2026-09-29T14:00:00Z", statuses: ["COMPLETED"] });
     await book("Gone", { createdAt: "2026-09-30T14:00:00Z", statuses: ["CANCELLED", "CANCELLED"] });
     await book("Rest", { createdAt: "2026-10-01T14:00:00Z", statuses: ["CANCELLED", "COMPLETED"] }); // live pairs: only Completed
@@ -131,6 +132,16 @@ describe("PrismaOrderSearchRepository (integration)", () => {
     expect(await names({ status: "IN_PROGRESS" })).toEqual([]);
     expect(await names({ status: "COMPLETED" })).toEqual(["Rest", "Done"]);
     expect(await names({ status: "CANCELLED" })).toEqual(["Gone"]);
+  });
+
+  it("shows a cleaning-only Order as Request Submitted, not at its stored Approved or Quote Sent", async () => {
+    await book("Clean", { createdAt: "2026-09-28T14:00:00Z", statuses: ["APPROVED"] });
+    await book("Legacy", { createdAt: "2026-09-29T14:00:00Z", statuses: ["QUOTE_SENT"] });
+    await book("Reglue", { createdAt: "2026-09-30T14:00:00Z", statuses: ["APPROVED"], serviceIds: ["reglue"] });
+
+    expect(await names({ status: "REQUEST_SUBMITTED" })).toEqual(["Legacy", "Clean"]);
+    expect(await names({ status: "APPROVED" })).toEqual(["Reglue"]);
+    expect(await names({ status: "QUOTE_SENT" })).toEqual([]);
   });
 
   it("filters by booking time [from, to) and by Service, and combines filters", async () => {

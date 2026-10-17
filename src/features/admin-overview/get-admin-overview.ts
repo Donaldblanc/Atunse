@@ -5,7 +5,7 @@ import {
   liveEstimate,
   livePairs,
   orderNumber,
-  orderRollupStatus,
+  orderDisplayStatus,
   type Appointment,
   type ItemStatus,
   type Order,
@@ -14,7 +14,7 @@ import {
   type PaymentMethod,
 } from "@/features/orders/domain";
 import type { AwaitingPayments, OrderRepository, ScheduledAppointment } from "@/features/orders/repositories/order-repository";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { itemRequiresQuote, SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { metricDetail, type MetricDetail } from "./metric-detail";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
@@ -26,6 +26,7 @@ export interface AdminOverviewDeps {
     | "listBookedBetween"
     | "summarizeBookedBetween"
     | "countItemsByStatus"
+    | "listWithItemsIn"
     | "summarizeAwaitingPayments"
     | "listRecent"
     | "listAppointmentsBetween"
@@ -124,11 +125,12 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   const now = deps.now();
   const range = overviewRange(selection, now);
   const today = calendarDateInShopTime(now);
-  const [booked, previous, statusCounts, awaitingPayments, recent, appointments] = await Promise.all([
+  const [booked, previous, statusCounts, needingReview, awaitingPayments, recent, appointments] = await Promise.all([
     deps.orders.listBookedBetween(range.start, range.end),
     // Only totals are needed for the stretch before, so it's aggregated, not loaded.
     deps.orders.summarizeBookedBetween(range.previous.start, range.previous.end),
     deps.orders.countItemsByStatus(),
+    deps.orders.listWithItemsIn(NEEDS_QUOTE),
     deps.orders.summarizeAwaitingPayments(),
     deps.orders.listRecent(RECENT_ORDERS),
     deps.orders.listAppointmentsBetween(shopMidnight(today), shopMidnight(addDays(today, 1))),
@@ -160,7 +162,8 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
     revenueByDay,
     metricDetail: metricDetail(booked, range.days),
     servicesBooked,
-    needsQuote: NEEDS_QUOTE.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0),
+    // Only pairs that need a Quote (ADR-0017); a quote-free pair reading Request Submitted is not waiting on one.
+    needsQuote: needingReview.flatMap((order) => order.items).filter((item) => NEEDS_QUOTE.includes(item.status) && itemRequiresQuote(item.serviceIds)).length,
     awaitingPayments,
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
     recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
@@ -216,7 +219,7 @@ export function orderRowFigures(order: { estimate: Money; estimateIsMinimum: boo
   return {
     pairCount: pairs.length,
     services: servicesSummary(pairs.map((item) => item.serviceIds)),
-    status: orderRollupStatus(order.items),
+    status: orderDisplayStatus(order.items),
     total: anyLive ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };

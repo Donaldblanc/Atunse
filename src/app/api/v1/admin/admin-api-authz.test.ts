@@ -18,7 +18,7 @@ const call = (cookie?: string) =>
     new NextRequest("http://localhost/api/v1/admin/items/item_1/transitions", {
       method: "POST",
       headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
-      body: JSON.stringify({ toStatus: "UNDER_REVIEW", fromStatus: "REQUEST_SUBMITTED", action: "REVIEW_STARTED" }),
+      body: JSON.stringify({ toStatus: "UNDER_REVIEW", fromStatus: "REQUEST_SUBMITTED", action: "STATUS_TRANSITION" }),
     }),
     { params: Promise.resolve({ itemId: "item_1" }) },
   );

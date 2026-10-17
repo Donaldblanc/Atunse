@@ -11,19 +11,45 @@ import {
 } from "./submit-order";
 import { JPEG_BYTES } from "@/shared/storage/in-memory-file-storage";
 import { TERMS_AGREEMENT } from "@/shared/legal-documents";
-import { bookingDeps, FIXED_NOW, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
+import { AGE_REQUIREMENT_MESSAGE } from "../age";
+import { ADULT_BIRTH, bookingDeps, FIXED_NOW, validBookingInput, validBundleInput, validPair } from "./test-fixtures";
 
 const guest = { accountId: null, role: "GUEST" as const };
 const mailInAddress = { line1: "1 Elm St", line2: null, city: "Austin", state: "TX", zip: "73301" };
 
 describe("submitOrder", () => {
   it("creates an order with one REQUEST_SUBMITTED item as a guest", async () => {
-    const order = await submitOrder(bookingDeps(), guest, validBookingInput());
+    const order = await submitOrder(
+      bookingDeps(),
+      guest,
+      validBookingInput({ items: [validPair({ serviceIds: ["oxidation"] })] }),
+    );
     expect(order.items).toHaveLength(1);
     expect(order.items[0]?.status).toBe("REQUEST_SUBMITTED");
     expect(order.items[0]?.brand).toBe("Nike Air Force 1");
     expect(order.items[0]?.description).toBe("scuffed toe box");
     expect(order.contactName).toBe("Jordan Smith");
+  });
+
+  it("auto-approves at the published estimate when every Service is cleaning/add-on (ADR-0017)", async () => {
+    const deps = bookingDeps();
+    const order = await submitOrder(deps, guest, validBookingInput({ items: [validPair({ serviceIds: ["standard"] })] }));
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.status).toBe("APPROVED");
+    expect(order.items[0]?.price?.cents).toBe(order.items[0]?.estimate.cents);
+    expect(deps.orders.auditEntries).toContainEqual(
+      expect.objectContaining({ itemId: order.items[0]!.id, action: "AUTO_APPROVED_SET_PRICE", fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", actorAccountId: null }),
+    );
+  });
+
+  it("still requires a Quote when a restoration Service is mixed with a cleaning Service (ADR-0017)", async () => {
+    const order = await submitOrder(
+      bookingDeps(),
+      guest,
+      validBookingInput({ items: [validPair({ serviceIds: ["standard", "oxidation"] })] }),
+    );
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0]?.status).toBe("REQUEST_SUBMITTED");
   });
 
   it("rejects submission without policy acceptance", async () => {
@@ -67,6 +93,18 @@ describe("submitOrder", () => {
     expect(deps.notifications.sent[0]!.body).toContain(`${TERMS_AGREEMENT.title} (version ${TERMS_AGREEMENT.version})`);
   });
 
+  it("tells the customer in the confirmation email how to cancel", async () => {
+    const withInbox = bookingDeps({ ownerInbox: "shop@example.com" });
+    await submitOrder(withInbox, guest, validBookingInput());
+    expect(withInbox.notifications.sent.find((m) => m.to === "customer@example.com")!.body).toContain(
+      "Need to cancel your booking or close your account? Email us at shop@example.com.",
+    );
+
+    const noInbox = bookingDeps();
+    await submitOrder(noInbox, guest, validBookingInput());
+    expect(noInbox.notifications.sent[0]!.body).toContain("Need to cancel your booking or close your account? Reply to this email.");
+  });
+
   it("rejects an admin trying to submit an order as themselves", async () => {
     await expect(submitOrder(bookingDeps(), { accountId: "acc_1", role: "ADMIN" }, validBookingInput())).rejects.toThrow(
       UnauthorizedError,
@@ -81,7 +119,7 @@ describe("submitOrder", () => {
 
     it("creates a Customer Account for a new email, stored lowercased", async () => {
       const deps = bookingDeps();
-      const input = validBookingInput({ contact: { name: "Jordan", email: "Jordan@Example.com", phone: "2125550142" } });
+      const input = validBookingInput({ contact: { ...ADULT_BIRTH, name: "Jordan", email: "Jordan@Example.com", phone: "2125550142" } });
       const order = await submitOrder(deps, guest, input);
 
       expect(await deps.accounts.findCustomerByEmail("jordan@example.com")).toEqual({
@@ -95,7 +133,7 @@ describe("submitOrder", () => {
       const deps = bookingDeps({ customerSignInEnabled: true });
       await submitOrder(deps, guest, validBookingInput());
 
-      const again = secondPhoto(validBookingInput({ contact: { name: "Other", email: "CUSTOMER@example.com", phone: "2125550199" } }));
+      const again = secondPhoto(validBookingInput({ contact: { ...ADULT_BIRTH, name: "Other", email: "CUSTOMER@example.com", phone: "2125550199" } }));
       await expect(submitOrder(deps, guest, again)).rejects.toThrow(SignInRequiredError);
       expect(deps.orders.orders.size).toBe(1);
     });
@@ -117,7 +155,7 @@ describe("submitOrder", () => {
         const order = await submitOrder(
           deps,
           guest,
-          validBookingInput({ contact: { name: "DJ", email: "Owner@RestoredByDJ.com", phone: "2125550100" } }),
+          validBookingInput({ contact: { ...ADULT_BIRTH, name: "DJ", email: "Owner@RestoredByDJ.com", phone: "2125550100" } }),
         );
         expect(order.accountId).not.toBe(admin.id);
         expect(deps.accounts.accounts.find((a) => a.id === order.accountId)).toMatchObject({
@@ -141,7 +179,7 @@ describe("submitOrder", () => {
       const first = await submitOrder(deps, guest, validBookingInput());
       const customer = { accountId: first.accountId, role: "CUSTOMER" as const };
 
-      const friend = secondPhoto(validBookingInput({ contact: { name: "Friend", email: "friend@example.com", phone: "2125550177" } }));
+      const friend = secondPhoto(validBookingInput({ contact: { ...ADULT_BIRTH, name: "Friend", email: "friend@example.com", phone: "2125550177" } }));
       const second = await submitOrder(deps, customer, friend);
       expect(second.accountId).not.toBe(first.accountId);
       expect((await deps.accounts.findCustomerByEmail("friend@example.com"))?.id).toBe(second.accountId);
@@ -170,7 +208,7 @@ describe("submitOrder", () => {
       const deps = bookingDeps();
       await submitOrder(deps, guest, validBookingInput());
 
-      const stolen = validBookingInput({ contact: { name: "Eve", email: "eve@example.com", phone: "2125550100" } });
+      const stolen = validBookingInput({ contact: { ...ADULT_BIRTH, name: "Eve", email: "eve@example.com", phone: "2125550100" } });
       await expect(submitOrder(deps, guest, stolen)).rejects.toThrow(/already attached to another booking/);
       await expect(submitOrder(deps, guest, stolen)).rejects.toMatchObject({ code: "PHOTOS_IN_USE" });
     });
@@ -350,13 +388,46 @@ describe("submitOrder", () => {
 
   describe("contact", () => {
     it.each([
-      ["a blank name", { name: "  ", email: "a@b.co", phone: "2125550142" }],
-      ["a malformed email", { name: "J", email: "not-an-email", phone: "2125550142" }],
-      ["a short phone", { name: "J", email: "a@b.co", phone: "555-0142" }],
-    ])("rejects %s", async (_label, contact) => {
+      ["a blank name", { ...ADULT_BIRTH, name: "  ", email: "a@b.co", phone: "2125550142" }],
+      ["a malformed email", { ...ADULT_BIRTH, name: "J", email: "not-an-email", phone: "2125550142" }],
+      ["a short phone", { ...ADULT_BIRTH, name: "J", email: "a@b.co", phone: "555-0142" }],
+        ])("rejects %s", async (_label, contact) => {
       await expect(submitOrder(bookingDeps(), guest, validBookingInput({ contact }))).rejects.toThrow(
         BookingValidationError,
       );
+    });
+  });
+
+  describe("age check (18+)", () => {
+    const withBirth = (birthMonth: number, birthYear: number) =>
+      validBookingInput({ contact: { name: "Jordan", email: "customer@example.com", phone: "2125550142", birthMonth, birthYear } });
+
+    it("stores the birth month and year on the Order", async () => {
+      const order = await submitOrder(bookingDeps(), guest, withBirth(9, 2008));
+      expect([order.birthMonth, order.birthYear]).toEqual([9, 2008]);
+    });
+
+    it("refuses someone turning 18 this month, with the guardian message, and writes nothing", async () => {
+      const deps = bookingDeps();
+      await expect(submitOrder(deps, guest, withBirth(10, 2008))).rejects.toThrow(AGE_REQUIREMENT_MESSAGE);
+      await expect(submitOrder(deps, guest, withBirth(1, 2015))).rejects.toThrow(BookingValidationError);
+      expect(deps.orders.orders.size).toBe(0);
+    });
+
+    it.each([
+      ["a month of 0", 0, 1990],
+      ["a month of 13", 13, 1990],
+      ["a fractional month", 3.5, 1990],
+      ["a future year", 3, 2027],
+      ["an impossible year", 3, 1800],
+    ])("refuses %s", async (_label, month, year) => {
+      await expect(submitOrder(bookingDeps(), guest, withBirth(month, year))).rejects.toThrow("Choose your birth month and year.");
+    });
+
+    it("refuses a request that left the birth month and year out", async () => {
+      const input = validBookingInput();
+      input.contact = { name: "Jordan", email: "customer@example.com", phone: "2125550142" } as typeof input.contact;
+      await expect(submitOrder(bookingDeps(), guest, input)).rejects.toThrow(BookingValidationError);
     });
   });
 
@@ -412,7 +483,7 @@ describe("submitOrder", () => {
 
       deps.notifications.failing = false;
       const edited = (phone: string) =>
-        submitOrder(deps, guest, validBookingInput({ submissionKey: key, contact: { name: "Jordan", email: "customer@example.com", phone } }));
+        submitOrder(deps, guest, validBookingInput({ submissionKey: key, contact: { ...ADULT_BIRTH, name: "Jordan", email: "customer@example.com", phone } }));
       for (const phone of ["2125550100", "2125550101", "2125550102"]) {
         await expect(edited(phone)).rejects.toThrow(SubmissionConflictError);
       }

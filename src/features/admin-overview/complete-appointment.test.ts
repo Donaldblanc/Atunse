@@ -29,7 +29,7 @@ async function seed() {
     submissionFingerprint: null,
     bundleId: null,
     alertBody: "Jordan · Standard Clean · Mail-In",
-    items: [{ brand: null, model: null, description: null, material: null, serviceIds: ["premium"], estimate: Money.fromCents(4000), photos: [] }],
+    items: [{ brand: null, model: null, description: null, material: null, serviceIds: ["reglue"], estimate: Money.fromCents(4000), requiresQuote: true, photos: [] }],
   });
   return { orders, order, appointmentId: order.appointments[0]!.id };
 }

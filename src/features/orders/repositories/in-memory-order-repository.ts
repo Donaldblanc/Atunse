@@ -6,8 +6,8 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
-import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
+import { AUTO_APPROVED_SET_PRICE, COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
 import { BUNDLE_CATALOG } from "../service-catalog";
 import {
   BundleNotFoundError,
@@ -47,6 +47,8 @@ export class InMemoryOrderRepository implements OrderRepository {
   readonly orders = new Map<string, Order>();
   readonly appliedIdempotencyKeys = new Set<string>(); // `${itemId}:${key}`
   readonly auditEntries: (AuditEntry & { itemId: string; at?: Date })[] = [];
+  /** Order-level audit entries (contact edits, notes, reschedules), newest last. */
+  readonly orderAuditEntries: { orderId: string; action: string; actorAccountId: string | null; idempotencyKey: string | null; metadata: Record<string, unknown>; at: Date }[] = [];
   /** Notes about Orders; nothing writes them yet, so tests seed this directly. */
   readonly notes: (OrderNote & { orderId: string })[] = [];
   /** Every Notification written, newest last; recipient null means every admin. */
@@ -79,7 +81,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       accountId = input.owner.accountId;
     } else {
       try {
-        accountId = this.accounts.add({ role: "CUSTOMER", ...input.owner.newCustomer }).id;
+        accountId = this.accounts.add({ role: "CUSTOMER", name: input.contactName, ...input.owner.newCustomer }).id;
       } catch (err) {
         if (err instanceof InMemoryEmailTakenError) throw new EmailTakenError();
         throw err;
@@ -95,6 +97,8 @@ export class InMemoryOrderRepository implements OrderRepository {
       contactName: input.contactName,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
+      birthMonth: input.birthMonth ?? null,
+      birthYear: input.birthYear ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,
@@ -109,22 +113,37 @@ export class InMemoryOrderRepository implements OrderRepository {
       confirmationEmailSentAt: null,
       submissionFingerprint: input.submissionFingerprint,
       bundleId: input.bundleId,
-      items: input.items.map((item) => ({
-        id: fakeId("item"),
-        orderId,
-        brand: item.brand,
-        model: item.model,
-        description: item.description,
-        material: item.material,
-        size: null,
-        colorway: null,
-        condition: null,
-        serviceIds: item.serviceIds,
-        estimate: item.estimate,
-        status: "REQUEST_SUBMITTED",
-        price: null,
-        photoKeys: item.photos.map((photo) => photo.key),
-      })),
+      items: input.items.map((item) => {
+        const itemId = fakeId("item");
+        if (!item.requiresQuote) {
+          this.auditEntries.push({
+            itemId,
+            action: AUTO_APPROVED_SET_PRICE,
+            fromStatus: "REQUEST_SUBMITTED",
+            toStatus: "APPROVED",
+            actorAccountId: null,
+            idempotencyKey: null,
+            metadata: { priceCents: item.estimate.cents },
+            at: new Date(),
+          });
+        }
+        return {
+          id: itemId,
+          orderId,
+          brand: item.brand,
+          model: item.model,
+          description: item.description,
+          material: item.material,
+          size: null,
+          colorway: null,
+          condition: null,
+          serviceIds: item.serviceIds,
+          estimate: item.estimate,
+          status: item.requiresQuote ? "REQUEST_SUBMITTED" : "APPROVED",
+          price: item.requiresQuote ? null : item.estimate,
+          photoKeys: item.photos.map((photo) => photo.key),
+        };
+      }),
       payments: input.depositPayment
         ? [
             {
@@ -256,6 +275,16 @@ export class InMemoryOrderRepository implements OrderRepository {
 
   async listRecent(limit: number): Promise<Order[]> {
     return [...this.orders.values()].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit);
+  }
+
+  async listByAccountId(accountId: string): Promise<Order[]> {
+    return [...this.orders.values()]
+      .filter((order) => order.accountId === accountId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async countByAccountId(accountId: string): Promise<number> {
+    return [...this.orders.values()].filter((order) => order.accountId === accountId).length;
   }
 
   async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
@@ -404,8 +433,9 @@ export class InMemoryOrderRepository implements OrderRepository {
   }): Promise<"updated" | "unchanged" | "already-applied"> {
     const order = this.orders.get(params.orderId);
     if (!order) throw new OrderNotFoundError(params.orderId);
-    const keys = [params.idempotencyKey, `${params.idempotencyKey}:contact`];
-    if (order.items.some((item) => keys.some((key) => this.appliedIdempotencyKeys.has(`${item.id}:${key}`)))) return "already-applied";
+    const contactKey = `${params.idempotencyKey}:contact`;
+    if (order.items.some((item) => this.appliedIdempotencyKeys.has(`${item.id}:${params.idempotencyKey}`))) return "already-applied";
+    if (this.orderAuditEntries.some((entry) => entry.orderId === order.id && entry.idempotencyKey === contactKey)) return "already-applied";
     if (order.updatedAt.getTime() !== params.expectedUpdatedAt.getTime()) throw new OrderChangedError();
     const stranger = params.details.pairs.find((pair) => !order.items.some((item) => item.id === pair.itemId));
     if (stranger) throw new ItemNotFoundError(stranger.itemId);
@@ -427,7 +457,7 @@ export class InMemoryOrderRepository implements OrderRepository {
       this.auditEntries.push({ itemId, action, fromStatus: null, toStatus: null, actorAccountId: params.actorAccountId, idempotencyKey: key, metadata, at: new Date() });
     };
     for (const change of diff.pairs) record(change.itemId, DETAILS_EDITED, params.idempotencyKey, { changes: change.changes });
-    if (diff.contact.length > 0) record(order.items[0]!.id, ORDER_CONTACT_EDITED, `${params.idempotencyKey}:contact`, { fields: diff.contact });
+    if (diff.contact.length > 0) this.recordOrderAudit(order.id, ORDER_CONTACT_EDITED, params.actorAccountId, { fields: diff.contact }, contactKey);
     return "updated";
   }
 
@@ -435,6 +465,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (!this.orders.has(params.orderId)) throw new OrderNotFoundError(params.orderId);
     const note = { id: fakeId("note"), orderId: params.orderId, body: params.body, createdAt: new Date() };
     this.notes.push(note);
+    this.recordOrderAudit(params.orderId, ORDER_NOTE_ADDED, params.authorAccountId, { noteId: note.id, length: params.body.length });
     return { id: note.id, body: note.body, createdAt: note.createdAt };
   }
 
@@ -442,16 +473,26 @@ export class InMemoryOrderRepository implements OrderRepository {
     return [...this.orders.values()].find((order) => order.items.some((item) => item.id === itemId)) ?? null;
   }
 
-  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date; actorAccountId: string | null }) {
     const found = await this.findAppointment(params.appointmentId);
     if (!found) throw new AppointmentNotFoundError(params.appointmentId);
     const { appointment } = found;
     if (appointment.status !== "SCHEDULED") throw new AppointmentNotScheduledError(appointment.status);
     if (appointment.startsAt.getTime() === params.startsAt.getTime()) return { appointment, changed: false };
     if (appointment.startsAt.getTime() !== params.expectedStartsAt.getTime()) throw new AppointmentMovedError();
+    this.recordOrderAudit(found.order.id, ORDER_RESCHEDULED, params.actorAccountId, {
+      appointmentId: appointment.id,
+      kind: appointment.kind,
+      from: { startsAt: appointment.startsAt.toISOString(), endsAt: appointment.endsAt.toISOString() },
+      to: { startsAt: params.startsAt.toISOString(), endsAt: params.endsAt.toISOString() },
+    });
     appointment.startsAt = params.startsAt;
     appointment.endsAt = params.endsAt;
     return { appointment, changed: true };
+  }
+
+  private recordOrderAudit(orderId: string, action: string, actorAccountId: string | null, metadata: Record<string, unknown>, idempotencyKey: string | null = null) {
+    this.orderAuditEntries.push({ orderId, action, actorAccountId, idempotencyKey, metadata, at: new Date() });
   }
 
   async bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }) {

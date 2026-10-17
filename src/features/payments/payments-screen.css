@@ -1,0 +1,311 @@
+/* The Payments screen (/admin/payments, design: scratch/payments.jpeg).
+   Reuses .ov-*, .att-*, .fo-* and .admin-* from the rest of the admin;
+   everything specific to this screen is prefixed .pm-. */
+
+.pm-subtitle {
+  margin: 4px 0 0;
+  color: var(--color-muted-foreground, #6b7280);
+  font-size: 14px;
+}
+
+.pm-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin: 20px 0;
+}
+
+@media (max-width: 960px) {
+  .pm-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.pm-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.pm-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex: none;
+  background: var(--color-muted, #f3f4f6);
+}
+
+.pm-card[data-tone="revenue"] .pm-card-icon {
+  background: #dcfce7;
+}
+.pm-card[data-tone="paid"] .pm-card-icon {
+  background: #dbeafe;
+}
+.pm-card[data-tone="pending"] .pm-card-icon {
+  background: #fef3c7;
+}
+.pm-card[data-tone="failed"] .pm-card-icon {
+  background: #fee2e2;
+}
+
+.pm-card-label {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-card-value {
+  margin: 2px 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.pm-card-change {
+  margin: 0;
+  font-size: 12px;
+}
+
+.pm-card-change[data-direction="up"] {
+  color: #16a34a;
+}
+.pm-card-change[data-direction="down"] {
+  color: #dc2626;
+}
+
+.pm-body {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.pm-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pm-toolbar .att-search-input {
+  flex: 1 1 260px;
+}
+
+.pm-select {
+  min-height: 40px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-foreground);
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.pm-reset {
+  font-size: 13px;
+  color: var(--color-primary, #2563eb);
+}
+
+.pm-range-dates {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-table .pm-check {
+  width: 36px;
+}
+
+.pm-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.pm-status[data-status="RECEIVED"] {
+  background: #dcfce7;
+  color: #15803d;
+}
+.pm-status[data-status="PENDING"] {
+  background: #fef3c7;
+  color: #b45309;
+}
+.pm-status[data-status="FAILED"] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.pm-status[data-status="REFUNDED"] {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.pm-panel {
+  flex: none;
+  width: 340px;
+  padding: 20px;
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.pm-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pm-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pm-panel-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pm-panel-amount {
+  margin: 10px 0 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.pm-panel-order {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 10px;
+  margin: 16px 0;
+  font-size: 13px;
+}
+
+.pm-facts dt {
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-facts dd {
+  margin: 0;
+  text-align: right;
+}
+
+.pm-panel-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.pm-panel-section h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.pm-order-summary {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pm-order-service {
+  display: block;
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-order-total {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  font-weight: 700;
+}
+
+.pm-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pm-timeline-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pm-timeline-detail {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-muted-foreground, #6b7280);
+}
+
+.pm-panel-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.pm-refund-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pm-refund-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pm-record-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pm-record-form label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.pm-record-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 960px) {
+  .pm-body {
+    flex-direction: column;
+  }
+  .pm-panel {
+    width: 100%;
+  }
+}

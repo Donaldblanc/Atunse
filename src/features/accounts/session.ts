@@ -10,19 +10,33 @@ import type { Role } from "./authz";
 // runs on any runtime: src/proxy.ts (Node.js since Next 16; middleware ran
 // on the Edge runtime before) and the route handlers.
 
+// `__Host-` cookies must be Secure, Path=/ and have no Domain, so browsers
+// pin them to this exact origin. Safari refuses a Secure cookie on plain
+// http://localhost, so `next dev` alone drops the prefix and the Secure
+// flag; every other environment keeps both.
+const LOCAL_DEV_COOKIES = process.env.NODE_ENV === "development";
+const COOKIE_PREFIX = LOCAL_DEV_COOKIES ? "" : "__Host-";
+
 /** The admin session (password login). Only ever carries role ADMIN. */
-export const SESSION_COOKIE_NAME = "atunse_session";
+export const SESSION_COOKIE_NAME = `${COOKIE_PREFIX}atunse_session`;
 /**
  * The customer session (email-code login), a separate cookie so admin and
  * customer logins never mix (ADR-0014): an admin browsing the booking flow
  * is a signed-out customer there. Only ever carries role CUSTOMER.
  */
-export const CUSTOMER_SESSION_COOKIE_NAME = "atunse_customer_session";
+export const CUSTOMER_SESSION_COOKIE_NAME = `${COOKIE_PREFIX}atunse_customer_session`;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
 
 export interface SessionPayload {
   accountId: string;
   role: Role;
+  /**
+   * The Account's sessionVersion when the cookie was issued. Admin sessions
+   * are rejected once the Account's current version has moved past it
+   * (sign-out, password or email change), which is how a stateless cookie
+   * gets revoked. Customer sessions carry 0 and aren't checked.
+   */
+  sessionVersion: number;
   exp: number; // epoch ms
 }
 
@@ -53,8 +67,8 @@ function fromBase64Url(value: string): Uint8Array {
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-export async function createSessionCookieValue(accountId: string, role: Role): Promise<string> {
-  const payload: SessionPayload = { accountId, role, exp: Date.now() + SESSION_TTL_MS };
+export async function createSessionCookieValue(accountId: string, role: Role, sessionVersion = 0): Promise<string> {
+  const payload: SessionPayload = { accountId, role, sessionVersion, exp: Date.now() + SESSION_TTL_MS };
   const encoded = toBase64Url(encoder().encode(JSON.stringify(payload)));
   const key = await hmacKey();
   const signature = await crypto.subtle.sign("HMAC", key, encoder().encode(encoded));
@@ -95,6 +109,8 @@ function isSessionPayload(value: unknown): value is SessionPayload {
     typeof v.accountId === "string" &&
     v.accountId.length > 0 &&
     (v.role === "ADMIN" || v.role === "CUSTOMER") &&
+    typeof v.sessionVersion === "number" &&
+    Number.isSafeInteger(v.sessionVersion) &&
     typeof v.exp === "number" &&
     Number.isFinite(v.exp)
   );
@@ -110,7 +126,7 @@ export const SESSION_COOKIE_MAX_AGE_SECONDS = SESSION_TTL_MS / 1000;
 export function sessionCookieOptions(maxAgeSeconds: number = SESSION_COOKIE_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: !LOCAL_DEV_COOKIES,
     sameSite: "lax" as const,
     path: "/",
     maxAge: maxAgeSeconds,

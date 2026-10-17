@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/features/orders/domain";
 import { NoPendingPaymentError } from "@/features/orders/repositories/order-repository";
 import { confirmPayment, InvalidPaymentMethodError } from "@/features/orders/use-cases/confirm-payment";
-import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
-import { prisma } from "@/shared/db/prisma-client";
 import { redactForLog } from "@/shared/logging/redact";
 
 export type ConfirmPaymentResult = { ok: true } | { ok: false; error: string };
@@ -27,7 +26,7 @@ export async function confirmPaymentAction(paymentId: string, method: string, id
   if (!PAYMENT_METHODS.includes(method as PaymentMethod)) return { ok: false, error: "Choose Zelle or Cash." };
   try {
     const actingUser = await actingUserFromCookies(await cookies());
-    await confirmPayment({ orders: new PrismaOrderRepository(prisma) }, actingUser, { paymentId, method: method as PaymentMethod, idempotencyKey });
+    await confirmPayment(buildOrderUseCaseDeps(), actingUser, { paymentId, method: method as PaymentMethod, idempotencyKey });
   } catch (err) {
     if (err instanceof UnauthorizedError) return { ok: false, error: "Your session has ended. Sign in again." };
     if (err instanceof InvalidPaymentMethodError) return { ok: false, error: err.message };

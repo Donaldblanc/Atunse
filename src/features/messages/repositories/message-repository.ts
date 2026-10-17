@@ -31,6 +31,45 @@ export interface ReplyRecipient {
   subject: string | null;
 }
 
+/** One row of the Messages screen's list (`/admin/messages`): every Conversation, read or not. */
+export interface ConversationSummary {
+  conversationId: string;
+  accountId: string;
+  customerName: string | null;
+  customerEmail: string;
+  subject: string | null;
+  order: { id: string; number: number } | null;
+  archivedAt: Date | null;
+  lastMessageAt: Date | null;
+  /** The latest Message's body, for the list row's preview line. */
+  lastMessagePreview: string | null;
+  unreadCount: number;
+}
+
+export interface ConversationFilter {
+  /** Matched against the customer's name, email and the Conversation's subject. */
+  search?: string;
+  /** "all" is every un-archived Conversation (the default inbox tab); "unread" narrows to those with an unread customer message. */
+  status?: "all" | "unread" | "archived";
+  /** Narrows to Conversations whose latest Message used this channel. */
+  channel?: "all" | "IN_APP" | "EMAIL" | "SMS";
+  /** Page window (the list is always bounded); the use-case sets these from the page number. */
+  limit?: number;
+  offset?: number;
+}
+
+/** One page of the list, plus how many Conversations match the filter in all. */
+export interface ConversationPage {
+  conversations: ConversationSummary[];
+  total: number;
+}
+
+/** One Conversation's whole thread, open or not (the Messages screen's thread view). */
+export interface ConversationThread extends UnreadConversation {
+  accountId: string;
+  archivedAt: Date | null;
+}
+
 export class ConversationNotFoundError extends Error {
   constructor() {
     super("Conversation not found");
@@ -66,4 +105,27 @@ export interface MessageRepository {
     idempotencyKey: string;
     at: Date;
   }): Promise<ReplyRecipient | null>;
+  /** The window (`limit`/`offset`) of Conversations matching `filter`, latest activity first (the Messages screen's list). */
+  listConversations(filter: ConversationFilter): Promise<ConversationPage>;
+  /** One Conversation's whole thread, or null for an id none has. */
+  getConversationThread(conversationId: string): Promise<ConversationThread | null>;
+  /** Sets or clears archivedAt (the Messages screen's Archive / Unarchive). */
+  setConversationArchived(conversationId: string, archived: boolean, at: Date): Promise<void>;
+  /**
+   * In ONE transaction: creates a Conversation for `accountId` and its first
+   * (ADMIN-authored, EMAIL) Message. Idempotent on `idempotencyKey`: a
+   * replay creates nothing and returns the Conversation the first call made,
+   * with `created: false`.
+   */
+  startConversation(input: {
+    accountId: string;
+    /** Only the in-memory twin needs these (it has no Account table to join); Prisma reads them off the relation. */
+    accountEmail: string;
+    accountName: string | null;
+    subject: string | null;
+    authorAccountId: string | null;
+    body: string;
+    idempotencyKey: string;
+    at: Date;
+  }): Promise<{ conversationId: string; created: boolean }>;
 }

@@ -20,6 +20,7 @@ function item(serviceIds: string[]): NewItemInput {
     material: null,
     serviceIds,
     estimate: Money.fromCents(3000),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
   };
 }
@@ -139,10 +140,11 @@ describe("getAdminOverview", () => {
 
   it("reports the work queues as they stand now, whatever the range", async () => {
     const d = deps();
-    const old = await book(d.orders, "2026-06-01T13:00:00Z", order(6000, [item(["standard"]), item(["standard"]), item(["standard"])]));
+    const old = await book(d.orders, "2026-06-01T13:00:00Z", order(6000, [item(["reglue"]), item(["reglue"]), item(["reglue"]), item(["standard"])]));
     old.items[1]!.status = "UNDER_REVIEW";
+    old.items[3]!.status = "UNDER_REVIEW"; // cleaning-only: needs no quote, so not counted
     old.items[2]!.status = "READY_FOR_PICKUP_SHIPPING";
-    const paid = await book(d.orders, "2026-06-02T13:00:00Z", order(4000));
+    const paid = await book(d.orders, "2026-06-02T13:00:00Z", order(4000, [item(["reglue"])]));
     paid.items[0]!.status = "UNDER_REVIEW";
     Object.assign(paid.payments[0]!, { status: "RECEIVED", receivedAt: NOW });
 

@@ -1,0 +1,342 @@
+/* The Messages screen (/admin/messages): list | thread | context panel.
+   A 3-column layout, so it keeps its own grid rather than .ov's 2-column
+   (minmax(0,1fr) 380px) one (see src/features/admin-overview/panels/overview-panels.tsx
+   for why reusing .ov's grid for more than two children is a trap). */
+
+.am-subtitle {
+  margin: 4px 0 0;
+  color: var(--color-muted-foreground);
+}
+
+.am-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+
+.am-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  padding: 12px;
+  min-width: 0;
+}
+
+.am-search {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.am-search .att-search-input {
+  flex: 1;
+  min-width: 120px;
+}
+
+.am-filter {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  background: var(--color-background);
+}
+
+.am-conversations {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.am-conversation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.am-conversation:hover {
+  background: var(--color-muted);
+}
+
+.am-conversation[aria-current="true"] {
+  background: var(--color-muted);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.am-avatar {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--color-muted);
+  color: var(--color-foreground);
+}
+
+.am-conversation-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.am-conversation-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.am-conversation-time {
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.am-conversation-subject,
+.am-conversation-preview {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am-order-tag {
+  color: var(--color-foreground);
+}
+
+.am-unread-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  margin-top: 6px;
+}
+
+.am-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  padding: 16px;
+  min-width: 0;
+}
+
+.am-thread-empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-foreground);
+}
+
+.am-thread-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.am-thread-contact {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+}
+
+.am-thread-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.am-bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
+.am-context {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.am-order-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.am-order-facts dt {
+  color: var(--color-muted-foreground);
+}
+
+.am-order-facts dd {
+  margin: 0;
+}
+
+.am-pairs {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.am-pair {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.am-pair-thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-muted);
+  display: grid;
+  place-items: center;
+}
+
+.am-pair-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.am-pair-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.am-pair-sub {
+  font-size: 12px;
+  color: var(--color-muted-foreground);
+}
+
+.am-pair-price {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.am-order-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+.am-full-width {
+  width: 100%;
+  justify-content: center;
+}
+
+.am-customer-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.am-customer-facts dd {
+  margin: 0;
+}
+
+.am-recent-orders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.am-recent-order {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.am-recent-order-ref {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.am-recent-order-meta {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.am-recent-order-price {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.am-new-message-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (max-width: 1200px) {
+  .am-grid {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+
+  .am-context {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .am-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.am-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+}

@@ -94,6 +94,9 @@ export interface NewOrderInput {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  /** Asked at booking for the 18+ check; absent for Orders made without it (tests, imports). */
+  birthMonth?: number | null;
+  birthYear?: number | null;
   policyAcceptedAt: Date;
   /** What was accepted at policyAcceptedAt (ADR-0015). */
   terms: Omit<TermsAcceptance, "acceptedAt">;
@@ -142,6 +145,12 @@ export interface NewItemInput {
   material: string | null;
   serviceIds: string[];
   estimate: Money;
+  /**
+   * ADR-0017: false when every Service is Cleaning/Add-on-only (set
+   * price) — the repository creates the Item already APPROVED, priced at
+   * its estimate, instead of REQUEST_SUBMITTED awaiting a Quote.
+   */
+  requiresQuote: boolean;
   /** `key`: the verified copy the Item keeps; `uploadKey`: the upload it came from. */
   photos: { key: string; uploadKey: string }[];
 }
@@ -319,6 +328,12 @@ export interface OrderRepository {
   /** The most recently booked Orders, newest first. */
   listRecent(limit: number): Promise<Order[]>;
 
+  /** An Account's Orders (the Customers detail screen's order history), newest first. */
+  listByAccountId(accountId: string): Promise<Order[]>;
+
+  /** How many Orders an Account has (the Customers list's count), without loading them. */
+  countByAccountId(accountId: string): Promise<number>;
+
   /** SCHEDULED Appointments starting in [from, to), earliest first, with their Order's summary. */
   listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]>;
 
@@ -384,8 +399,8 @@ export interface OrderRepository {
    * transaction, only if the Order's updatedAt is still `expectedUpdatedAt`
    * (else OrderChangedError, nothing written). Records what changed
    * (order-details.ts): a DETAILS_EDITED audit entry per changed pair, and
-   * one ORDER_CONTACT_EDITED entry on the Order's first pair for contact or
-   * address changes (there is no Order-level audit table). Returns
+   * one Order-level ORDER_CONTACT_EDITED entry (OrderAuditEntry) for contact or
+   * address changes. Returns
    * "unchanged" when nothing differs (nothing written), "already-applied"
    * when `idempotencyKey` was recorded by an earlier call (a retry).
    * Throws OrderNotFoundError, or ItemNotFoundError for a pair not on the Order.
@@ -401,7 +416,8 @@ export interface OrderRepository {
   /**
    * Adds an admin's note to the Order (filed under the Order's customer
    * Account; customers never see Notes). Append-only: nothing edits or
-   * removes one yet. Throws OrderNotFoundError.
+   * removes one yet. Also writes an ORDER_NOTE_ADDED OrderAuditEntry
+   * (id and length, never the text). Throws OrderNotFoundError.
    */
   addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote>;
 
@@ -417,13 +433,15 @@ export interface OrderRepository {
    * returns `changed: false` (a replay); at some third time throws
    * AppointmentMovedError. Throws AppointmentNotFoundError, or
    * AppointmentNotScheduledError for a COMPLETED/CANCELLED one, having
-   * written nothing.
+   * written nothing. A real move also writes an ORDER_RESCHEDULED
+   * OrderAuditEntry (by `actorAccountId`) in the same transaction.
    */
   rescheduleAppointment(params: {
     appointmentId: string;
     expectedStartsAt: Date;
     startsAt: Date;
     endsAt: Date;
+    actorAccountId: string | null;
   }): Promise<{ appointment: Appointment; changed: boolean }>;
 
   /**

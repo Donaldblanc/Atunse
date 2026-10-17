@@ -1,8 +1,8 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
-import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, type OrderDetailsInput } from "../order-details";
-import { balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
+import { AUTO_APPROVED_SET_PRICE, balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -130,6 +130,8 @@ function toDomainOrder(row: OrderRow): Order {
     contactName: row.contactName,
     contactEmail: row.contactEmail,
     contactPhone: row.contactPhone,
+    birthMonth: row.birthMonth,
+    birthYear: row.birthYear,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     policyAcceptedAt: row.policyAcceptedAt,
@@ -164,12 +166,12 @@ function isMissingBundle(err: unknown): boolean {
  * completed visit, a confirmed payment) starts here, so concurrent ones
  * run one after another and each reads the other's result.
  */
-async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+export async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
 }
 
 /** The fields of the unique constraint a Prisma P2002 violated, or null. */
-function uniqueViolationFields(err: unknown): string[] | null {
+export function uniqueViolationFields(err: unknown): string[] | null {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return null;
   const target = err.meta?.target;
   return Array.isArray(target) ? target.map(String) : [String(target ?? "")];
@@ -217,6 +219,8 @@ export class PrismaOrderRepository implements OrderRepository {
           contactName: input.contactName,
           contactEmail: input.contactEmail,
           contactPhone: input.contactPhone,
+          birthMonth: input.birthMonth ?? null,
+          birthYear: input.birthYear ?? null,
           policyAcceptedAt: input.policyAcceptedAt,
           termsVersion: input.terms.version,
           termsUrl: input.terms.url,
@@ -253,7 +257,21 @@ export class PrismaOrderRepository implements OrderRepository {
               photos: {
                 create: item.photos.map((photo, photoPosition) => ({ key: photo.key, uploadKey: photo.uploadKey, position: photoPosition })),
               },
-              status: "REQUEST_SUBMITTED" as const,
+              ...(item.requiresQuote
+                ? { status: "REQUEST_SUBMITTED" as const }
+                : {
+                    status: "APPROVED" as const,
+                    priceCents: item.estimate.cents,
+                    auditEntries: {
+                      create: {
+                        action: AUTO_APPROVED_SET_PRICE,
+                        fromStatus: "REQUEST_SUBMITTED" as const,
+                        toStatus: "APPROVED" as const,
+                        actorAccountId: null,
+                        metadata: { priceCents: item.estimate.cents },
+                      },
+                    },
+                  }),
             })),
           },
           payments: input.depositPayment
@@ -453,6 +471,15 @@ export class PrismaOrderRepository implements OrderRepository {
     return rows.map(toDomainOrder);
   }
 
+  async listByAccountId(accountId: string): Promise<Order[]> {
+    const rows = await this.prisma.order.findMany({ where: { accountId }, include: ORDER_INCLUDE, orderBy: { createdAt: "desc" } });
+    return rows.map(toDomainOrder);
+  }
+
+  async countByAccountId(accountId: string): Promise<number> {
+    return this.prisma.order.count({ where: { accountId } });
+  }
+
   async listAppointmentsBetween(from: Date, to: Date): Promise<ScheduledAppointment[]> {
     const rows = await this.prisma.appointment.findMany({
       where: { status: "SCHEDULED", startsAt: { gte: from, lt: to } },
@@ -635,7 +662,10 @@ export class PrismaOrderRepository implements OrderRepository {
         where: { idempotencyKey: { in: [params.idempotencyKey, `${params.idempotencyKey}:contact`] }, item: { orderId: params.orderId } },
         select: { id: true },
       });
-      if (applied) return "already-applied";
+      const appliedContact = applied
+        ? null
+        : await tx.orderAuditEntry.findFirst({ where: { orderId: params.orderId, idempotencyKey: `${params.idempotencyKey}:contact` }, select: { id: true } });
+      if (applied || appliedContact) return "already-applied";
 
       if (row.updatedAt.getTime() !== params.expectedUpdatedAt.getTime()) throw new OrderChangedError();
       const order = toDomainOrder(row);
@@ -673,10 +703,10 @@ export class PrismaOrderRepository implements OrderRepository {
         });
       }
       if (diff.contact.length > 0) {
-        // No Order-level audit table: the Order's first pair carries it. Field names only, never the customer's details.
-        await tx.itemAuditEntry.create({
+        // Field names only, never the customer's details.
+        await tx.orderAuditEntry.create({
           data: {
-            itemId: row.items[0]!.id,
+            orderId: params.orderId,
             action: ORDER_CONTACT_EDITED,
             actorAccountId: params.actorAccountId,
             idempotencyKey: `${params.idempotencyKey}:contact`,
@@ -691,8 +721,15 @@ export class PrismaOrderRepository implements OrderRepository {
   async addOrderNote(params: { orderId: string; authorAccountId: string | null; body: string }): Promise<OrderNote> {
     const order = await this.prisma.order.findUnique({ where: { id: params.orderId }, select: { accountId: true } });
     if (!order) throw new OrderNotFoundError(params.orderId);
-    const row = await this.prisma.note.create({
-      data: { accountId: order.accountId, orderId: params.orderId, authorAccountId: params.authorAccountId, body: params.body },
+    // The audit records that a note was added and how long it was, never what it said.
+    const row = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.note.create({
+        data: { accountId: order.accountId, orderId: params.orderId, authorAccountId: params.authorAccountId, body: params.body },
+      });
+      await tx.orderAuditEntry.create({
+        data: { orderId: params.orderId, action: ORDER_NOTE_ADDED, actorAccountId: params.authorAccountId, metadata: { noteId: created.id, length: params.body.length } },
+      });
+      return created;
     });
     return { id: row.id, body: row.body, createdAt: row.createdAt };
   }
@@ -702,18 +739,36 @@ export class PrismaOrderRepository implements OrderRepository {
     return row ? toDomainOrder(row) : null;
   }
 
-  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date }) {
-    // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
-    const moved = await this.prisma.appointment.updateMany({
-      where: { id: params.appointmentId, status: "SCHEDULED", startsAt: params.expectedStartsAt },
-      data: { startsAt: params.startsAt, endsAt: params.endsAt },
+  async rescheduleAppointment(params: { appointmentId: string; expectedStartsAt: Date; startsAt: Date; endsAt: Date; actorAccountId: string | null }) {
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.appointment.findUnique({ where: { id: params.appointmentId } });
+      // Status and the time the caller saw are part of the WHERE, so a concurrent cancel, completion or move can't be overwritten.
+      const moved = await tx.appointment.updateMany({
+        where: { id: params.appointmentId, status: "SCHEDULED", startsAt: params.expectedStartsAt },
+        data: { startsAt: params.startsAt, endsAt: params.endsAt },
+      });
+      const row = await tx.appointment.findUnique({ where: { id: params.appointmentId } });
+      if (!row) throw new AppointmentNotFoundError(params.appointmentId);
+      if (moved.count === 1 && before) {
+        await tx.orderAuditEntry.create({
+          data: {
+            orderId: row.orderId,
+            action: ORDER_RESCHEDULED,
+            actorAccountId: params.actorAccountId,
+            metadata: {
+              appointmentId: row.id,
+              kind: row.kind,
+              from: { startsAt: before.startsAt.toISOString(), endsAt: before.endsAt.toISOString() },
+              to: { startsAt: params.startsAt.toISOString(), endsAt: params.endsAt.toISOString() },
+            },
+          },
+        });
+        return { appointment: toDomainAppointment(row), changed: true };
+      }
+      if (row.status !== "SCHEDULED") throw new AppointmentNotScheduledError(row.status);
+      if (row.startsAt.getTime() === params.startsAt.getTime()) return { appointment: toDomainAppointment(row), changed: false };
+      throw new AppointmentMovedError();
     });
-    const row = await this.prisma.appointment.findUnique({ where: { id: params.appointmentId } });
-    if (!row) throw new AppointmentNotFoundError(params.appointmentId);
-    if (moved.count === 1) return { appointment: toDomainAppointment(row), changed: true };
-    if (row.status !== "SCHEDULED") throw new AppointmentNotScheduledError(row.status);
-    if (row.startsAt.getTime() === params.startsAt.getTime()) return { appointment: toDomainAppointment(row), changed: false };
-    throw new AppointmentMovedError();
   }
 
   async bookReturnAppointment(params: { orderId: string; startsAt: Date; endsAt: Date }) {

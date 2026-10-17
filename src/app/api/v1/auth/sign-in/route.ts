@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const response = NextResponse.json({ role: account.role });
   response.cookies.set(
     SESSION_COOKIE_NAME,
-    await createSessionCookieValue(account.accountId, account.role),
+    await createSessionCookieValue(account.accountId, account.role, account.sessionVersion),
     sessionCookieOptions(),
   );
   return response;

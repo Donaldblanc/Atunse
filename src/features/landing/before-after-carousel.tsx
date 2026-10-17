@@ -27,12 +27,12 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
             <h2>Before / After</h2>
             <div className="landing-ba-head-sub">Real sneakers. Real results.</div>
           </div>
-          <button className="landing-ba-nav" aria-label="Previous" onClick={() => step(-1)}>
+          <button className="landing-ba-nav" aria-label="Previous photos" onClick={() => step(-1)}>
             <svg width="14" height="14" viewBox="0 0 256 256" fill="none" aria-hidden="true">
               <path d="M164 48L92 128L164 208" stroke="currentColor" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
-          <button className="landing-ba-nav" aria-label="Next" onClick={() => step(1)}>
+          <button className="landing-ba-nav" aria-label="Next photos" onClick={() => step(1)}>
             <ArrowIcon />
           </button>
         </div>

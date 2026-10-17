@@ -1,4 +1,4 @@
-import { CheckIcon, EnvelopeSimpleIcon, PackageIcon, PencilSimpleIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOutIcon, CheckIcon, EnvelopeSimpleIcon, PackageIcon, PencilSimpleIcon, PhoneIcon } from "@phosphor-icons/react/dist/ssr";
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { calendarDateToUtcMidnight, SHOP_TIMEZONE } from "@/features/orders/calendar-date";
@@ -76,6 +76,7 @@ export function OrderDetailDialog({
   editHref,
   editing = false,
   returnAction,
+  fullPageHref,
 }: {
   detail: OrderDetail;
   closeHref: string;
@@ -86,25 +87,25 @@ export function OrderDetailDialog({
   editing?: boolean;
   /** Book return visit, or the booked Return (return-booking.ts); left out where it doesn't apply. */
   returnAction?: React.ReactNode;
+  /** This Order's standalone page (/admin/orders/[id]), for "View full order". */
+  fullPageHref?: string;
 }) {
-  const { customer, payment } = detail;
-  const multiple = detail.pairs.length > 1;
-  const initials = customer.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
-
   return (
     <AdminDialog
       size="lg"
       closeHref={closeHref}
       actions={
         editing ? null : (
-          <Link href={editHref} replace scroll={false} className="admin-btn" data-variant="secondary">
-            <PencilSimpleIcon size={16} aria-hidden="true" /> Edit Order
-          </Link>
+          <>
+            {fullPageHref && (
+              <Link href={fullPageHref} className="admin-btn" data-variant="secondary">
+                <ArrowSquareOutIcon size={16} aria-hidden="true" /> View full order
+              </Link>
+            )}
+            <Link href={editHref} replace scroll={false} className="admin-btn" data-variant="secondary">
+              <PencilSimpleIcon size={16} aria-hidden="true" /> Edit Order
+            </Link>
+          </>
         )
       }
       title={
@@ -125,10 +126,43 @@ export function OrderDetailDialog({
         </span>
       }
     >
-      {editing ? (
-        // Keyed by the Order's stamp, so a reload after a stale-edit refusal starts a fresh form (and a fresh key).
-        <OrderEditForm key={detail.edit.updatedAt} orderId={detail.orderId} values={detail.edit} viewHref={viewHref} idempotencyKey={randomUUID()} />
-      ) : (
+      <OrderDetailBody detail={detail} viewHref={viewHref} editing={editing} returnAction={returnAction} />
+    </AdminDialog>
+  );
+}
+
+/**
+ * The Order detail's body: Edit Order's form in place of the read-only
+ * view when `editing`. Shared by the Overview's dialog (OrderDetailDialog)
+ * and the standalone page (`/admin/orders/[id]`), so neither duplicates
+ * the price breakdown or the pipeline timeline.
+ */
+export function OrderDetailBody({
+  detail,
+  viewHref,
+  editing = false,
+  returnAction,
+}: {
+  detail: OrderDetail;
+  /** This Order's plain view: where Cancel and a saved edit return to. */
+  viewHref: string;
+  editing?: boolean;
+  /** Book return visit, or the booked Return (return-booking.ts); left out where it doesn't apply. */
+  returnAction?: React.ReactNode;
+}) {
+  const { customer, payment } = detail;
+  const multiple = detail.pairs.length > 1;
+  const initials = customer.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]!.toUpperCase())
+    .join("");
+
+  return editing ? (
+    // Keyed by the Order's stamp, so a reload after a stale-edit refusal starts a fresh form (and a fresh key).
+    <OrderEditForm key={detail.edit.updatedAt} orderId={detail.orderId} values={detail.edit} viewHref={viewHref} idempotencyKey={randomUUID()} />
+  ) : (
       <div className="od-grid">
         <div className="od-column">
           <section className="ov-card od-card" aria-labelledby="od-customer-title">
@@ -154,6 +188,12 @@ export function OrderDetailDialog({
               </div>
             </div>
             <dl className="od-facts">
+              {customer.born && (
+                <div>
+                  <dt>Born</dt>
+                  <dd>{customer.born}</dd>
+                </div>
+              )}
               <div>
                 <dt>Fulfillment</dt>
                 <dd>
@@ -190,6 +230,12 @@ export function OrderDetailDialog({
                 <Pair key={pair.itemId} pair={pair} label={multiple ? `Pair ${index + 1}` : null} />
               ))}
             </ul>
+            {detail.bundleName && detail.bundlePrice && (
+              <p className="od-pair-quote">
+                <strong>Bundle price {detail.bundlePrice.format()}</strong>
+                <span className="od-muted"> covers each pair&apos;s Bundle Services; Add-ons extra; the Suede fee is waived</span>
+              </p>
+            )}
           </section>
         </div>
 
@@ -324,8 +370,6 @@ export function OrderDetailDialog({
           </section>
         </div>
       </div>
-      )}
-    </AdminDialog>
   );
 }
 
@@ -348,6 +392,7 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
           </p>
         )}
         {pair.details.length > 0 && <p className="od-muted">{pair.details.join(" · ")}</p>}
+        <p className="od-muted">Catalog prices</p>
         <ul className="od-services">
           {pair.services.map((service) => (
             <li key={service.name}>
@@ -355,10 +400,20 @@ function Pair({ pair, label }: { pair: OrderDetailPair; label: string | null }) 
               {service.price && <span className="od-muted">{service.price}</span>}
             </li>
           ))}
+          {pair.suedeFee && (
+            <li>
+              <span>Suede fee</span>
+              <span className="od-muted">{pair.suedeFee.format()}</span>
+            </li>
+          )}
         </ul>
+        {!pair.price && pair.services.some((service) => service.isMinimum) && (
+          <p className="od-muted">Minimum estimate: the final price depends on the pair&apos;s condition.</p>
+        )}
+        {pair.autoApproved && <p className="od-muted">Set price — no quote needed</p>}
         {label && (
-          <span className="ov-pill" data-tone={STATUS_TONE[pair.status]}>
-            {ITEM_STATUS_LABELS[pair.status]}
+          <span className="ov-pill" data-tone={STATUS_TONE[pair.displayStatus]}>
+            {ITEM_STATUS_LABELS[pair.displayStatus]}
           </span>
         )}
       </div>
@@ -376,7 +431,7 @@ function quoteDifference(price: Money, estimate: Money): string {
 /** The Approval Gate steps: Send Quote for a pair Under Review, "Customer approved" once it's Quote Sent. */
 function QuoteSteps({ detail }: { detail: OrderDetail }) {
   const multiple = detail.pairs.length > 1;
-  const steps = detail.pairs.flatMap((pair, index) => (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT" ? [{ pair, index, status: pair.status }] : []));
+  const steps = detail.pairs.flatMap((pair, index) => (pair.requiresQuote && (pair.status === "UNDER_REVIEW" || pair.status === "QUOTE_SENT") ? [{ pair, index, status: pair.status }] : []));
   // Rendered even with no steps left, so the frame keeps "Approval recorded." after the last pair moves on.
   return (
     <QuoteStepsFrame key={detail.orderId} hasSteps={steps.length > 0}>

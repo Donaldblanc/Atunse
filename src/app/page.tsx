@@ -27,7 +27,7 @@ const FAQS = [
   {
     question: "How does the process work?",
     answer:
-      "Book a Local Drop-Off or ship us your sneakers, we send a quote, and once approved our team gets to work restoring them.",
+      "Book a Local Drop-Off or ship us your sneakers. Cleaning is priced upfront; for restoration or custom work, we send a quote after inspecting your pair, and once approved our team gets to work.",
   },
   {
     question: "How long does restoration take?",

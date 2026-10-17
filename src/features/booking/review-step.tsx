@@ -23,6 +23,7 @@ import { BookingSubmitError } from "./submit-booking";
 import { catalogService } from "@/features/orders/service-catalog";
 import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
+import { CancelNotice } from "./cancel-notice";
 import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export function ReviewStep({
@@ -41,6 +42,7 @@ export function ReviewStep({
   onEdit,
   onEditPair,
   onConfirm,
+  cancelEmail,
 }: {
   isBundle: boolean;
   /** The Services every pair of the chosen Bundle gets, e.g. "Premium Clean". */
@@ -60,6 +62,8 @@ export function ReviewStep({
   /** Opens the Details step on pair `index`. */
   onEditPair: (index: number) => void;
   onConfirm: (terms: TermsSelection) => Promise<void>;
+  /** The shop inbox (CONTACT_EMAIL) for cancellations, or null when unset. */
+  cancelEmail: string | null;
 }) {
   // Every risk acknowledgment and the Terms Agreement are required
   // (CONTEXT.md: Policy Acceptance); submitOrder refuses the booking
@@ -236,6 +240,8 @@ export function ReviewStep({
           </span>
         </label>
       </section>
+
+      <CancelNotice email={cancelEmail} />
 
       <button
         type="button"

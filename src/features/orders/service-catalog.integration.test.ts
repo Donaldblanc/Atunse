@@ -19,10 +19,13 @@ describe("service catalog parity (integration)", () => {
   it("has every catalog Service in the services table, same prices and rules, in catalog order", async () => {
     const rows = await prisma.service.findMany({ orderBy: { position: "asc" } });
 
+    const dbCategoryToCatalog: Record<string, string> = { CLEANING: "cleaning", RESTORATION: "restoration", CUSTOM_WORK: "custom-work", ADDITIONAL: "additional" };
+
     expect(
-      rows.map(({ id, name, isCleaningTier, isAddOn, baseCents, isMinimum, suedeFeeCents, minimumLabel, alsoFrom }) => ({
+      rows.map(({ id, name, category, isCleaningTier, isAddOn, baseCents, isMinimum, suedeFeeCents, minimumLabel, alsoFrom }) => ({
         id,
         name,
+        category: dbCategoryToCatalog[category],
         isCleaningTier,
         isAddOn,
         baseCents,

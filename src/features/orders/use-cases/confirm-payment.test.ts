@@ -17,6 +17,7 @@ function pair(): NewItemInput {
     material: null,
     serviceIds: ["standard"],
     estimate: Money.fromCents(3000),
+    requiresQuote: true,
     photos: [{ key: `photos/${counter}.jpg`, uploadKey: `bookings/${counter}.jpg` }],
   };
 }

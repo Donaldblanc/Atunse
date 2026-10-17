@@ -6,11 +6,17 @@ import { ItemNotFoundError, ItemStatusChangedError } from "../repositories/order
 import { Money } from "@/shared/money/money";
 import type { ItemStatus } from "../domain";
 import { submitOrder } from "./submit-order";
-import { bookingDeps, RecordingNotificationService, validBookingInput } from "./test-fixtures";
+import { bookingDeps, RecordingNotificationService, validBookingInput, validPair } from "./test-fixtures";
 import { InvalidTransitionError, MoveNotAllowedError, transitionItemStatus } from "./transition-item-status";
 
+// A restoration Service (requires a Quote, per ADR-0017), so the seeded Item starts REQUEST_SUBMITTED
+// instead of auto-approving — this file exercises the full Approval Gate pipeline.
 async function seedOrder(orders: InMemoryOrderRepository) {
-  const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
+  const order = await submitOrder(
+    bookingDeps({ orders }),
+    { accountId: null, role: "GUEST" },
+    validBookingInput({ items: [validPair({ serviceIds: ["oxidation"] })] }),
+  );
   return { order, item: order.items[0]! };
 }
 
@@ -301,5 +307,27 @@ describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
   it("allows Completed when the Deposit already covers the quoted total", async () => {
     const { deps, stored } = await seedPairs(["READY_FOR_PICKUP_SHIPPING"], [1000]);
     expect((await transitionItemStatus(deps, admin, { itemId: stored.items[0]!.id, fromStatus: "READY_FOR_PICKUP_SHIPPING", toStatus: "COMPLETED", action: "STATUS_TRANSITION" }))?.status).toBe("COMPLETED");
+  });
+
+  describe("a pair that needs no Quote (ADR-0017)", () => {
+    async function seedCleaning() {
+      const orders = new InMemoryOrderRepository();
+      const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput({ items: [validPair({ serviceIds: ["standard"] })] }));
+      return { deps: { orders, notifications: new ConsoleNotificationService() }, item: order.items[0]! };
+    }
+
+    it.each(["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT"] as const)("refuses a move to %s, and to Approved from Approved", async (toStatus) => {
+      const { deps, item } = await seedCleaning();
+      expect(item.status).toBe("APPROVED");
+      await expect(transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "APPROVED", toStatus, action: "STATUS_TRANSITION" })).rejects.toThrow(MoveNotAllowedError);
+    });
+
+    it("refuses Approved from an earlier stored status, but moves on to Awaiting Sneakers", async () => {
+      const { deps, item } = await seedCleaning();
+      deps.orders.orders.get(item.orderId)!.items[0]!.status = "QUOTE_SENT";
+      await expect(transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "QUOTE_SENT", toStatus: "APPROVED", action: "STATUS_TRANSITION" })).rejects.toThrow(MoveNotAllowedError);
+      const moved = await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "QUOTE_SENT", toStatus: "AWAITING_SNEAKERS", action: "STATUS_TRANSITION" });
+      expect(moved?.status).toBe("AWAITING_SNEAKERS");
+    });
   });
 });

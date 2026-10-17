@@ -5,12 +5,13 @@ import { ArrowRight, CircleCheck, Info, Mail, Package, Truck, Wallet } from "luc
 import { Money } from "@/shared/money/money";
 import { pairsPhrase } from "@/features/orders/domain";
 import type { SubmitOrderResponse } from "./submit-booking";
+import { CancelNotice } from "./cancel-notice";
 
 // Shown in place of the steps once POST /api/v1/orders succeeds. Everything
 // here comes from the server's response (its own estimate and Deposit, not
 // the browser's), and the same details go out in the confirmation email.
 // Rendered in-flow so there's no public order-lookup page to protect.
-export function ConfirmationStep({ result, email }: { result: SubmitOrderResponse; email: string }) {
+export function ConfirmationStep({ result, email, cancelEmail }: { result: SubmitOrderResponse; email: string; cancelEmail: string | null }) {
   const { order, paymentInstructions } = result;
   const estimate = Money.fromCents(order.estimateCents).format();
   const deposit = Money.fromCents(order.depositCents).format();
@@ -106,6 +107,8 @@ export function ConfirmationStep({ result, email }: { result: SubmitOrderRespons
           before any work begins.
         </span>
       </div>
+
+      <CancelNotice email={cancelEmail} />
 
       <Link className="landing-btn-primary booking-page-continue-btn" href="/">
         Back to home

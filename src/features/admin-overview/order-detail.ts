@@ -1,8 +1,10 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { formatBirthMonthYear } from "@/features/orders/age";
 import type { CalendarDate } from "@/features/orders/calendar-date";
 import {
   adminStatusMoves,
+  displayStatus,
   planBalance,
   canTransition,
   FULFILLMENT_LABELS,
@@ -10,14 +12,16 @@ import {
   liveEstimate,
   livePairs,
   orderNumber,
-  orderRollupStatus,
+  orderDisplayStatus,
+  orderRequiresQuote,
+  statusPipeline,
   type Item,
   type ItemStatus,
   type Order,
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { BUNDLE_CATALOG, RUSH_FEE_CENTS, SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { addOnsCents, findBundle, itemRequiresQuote, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -47,13 +51,22 @@ export interface OrderDetailPair {
   estimate: Money;
   /** The owner's quote (Item.price); null until sent. */
   price: Money | null;
+  /** The stored status: what Update Status and the quote steps act on. */
   status: ItemStatus;
+  /** What to show (displayStatus): a pair that needs no Quote reads Request Submitted until it moves past Approved. */
+  displayStatus: ItemStatus;
+  /** False for a Cleaning/Add-on-only pair (ADR-0017): no Send Quote or approval steps, and no quote-step statuses. */
+  requiresQuote: boolean;
   /** The Services booked; a price is left off inside a Bundle, whose fixed price covers them. */
-  services: { name: string; price: string | null }[];
+  services: { name: string; price: string | null; /** A "from" price: the real one depends on condition. */ isMinimum: boolean }[];
+  /** The Suede Fee the catalog adds for this pair, or null (not Suede, nothing it applies to, or inside a Bundle, which waives it). */
+  suedeFee: Money | null;
   /** Where Update Status can take this pair (adminStatusMoves in domain.ts). */
   nextStatuses: ItemStatus[];
   /** Why the next step isn't offered yet (awaiting the quote or the deposit), or null. */
   held: string | null;
+  /** True when every Service was cleaning/add-on, so this pair skipped the Quote step straight to Approved at its estimate (ADR-0017). */
+  autoApproved: boolean;
 }
 
 export interface TimelineStep {
@@ -67,18 +80,22 @@ export interface OrderDetail {
   orderId: string;
   reference: string;
   bookedAt: Date;
-  /** The Order's one status (orderRollupStatus). */
+  /** The Order's one status as shown (orderDisplayStatus). */
   status: ItemStatus;
   customer: {
     name: string;
     email: string;
     phone: string;
+    /** "Mar 1990" (month precision, from the 18+ check); null on Orders from before it. */
+    born: string | null;
     fulfillment: string;
     /** The booked collection (Local Drop-Off) or the preferred ship date (Mail-In); null if none. */
     schedule: { date: CalendarDate; slot: string | null } | null;
     address: string[];
   };
   bundleName: string | null;
+  /** The Bundle's one fixed price as the Order stored it: live pairs' estimates less their Add-ons; null for an Order without a Bundle. */
+  bundlePrice: Money | null;
   pairs: OrderDetailPair[];
   /** The pipeline of a single-pair Order's pair, or of the Order's rollup with several. */
   timeline: TimelineStep[];
@@ -130,8 +147,10 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   if (!order) return null;
   const [notes, changes] = await Promise.all([deps.orders.listOrderNotes(order.id), deps.orders.listStatusChanges(order.id)]);
 
+  const bundle = findBundle(order.bundleId);
   const live = livePairs(order);
-  const status = orderRollupStatus(order.items);
+  const status = orderDisplayStatus(order.items);
+  const requiresQuote = live.length > 0 ? orderRequiresQuote(order) : order.items.some((item) => itemRequiresQuote(item.serviceIds));
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
   const balance = order.payments.find((payment) => payment.kind === "BALANCE");
   const { fulfillment } = order;
@@ -154,13 +173,25 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       name: order.contactName,
       email: order.contactEmail,
       phone: order.contactPhone,
+      born: formatBirthMonthYear(order.birthMonth, order.birthYear),
       fulfillment: FULFILLMENT_LABELS[fulfillment.method],
       schedule,
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
     },
-    bundleName: BUNDLE_CATALOG.find((bundle) => bundle.id === order.bundleId)?.name ?? null,
-    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl))),
-    timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt),
+    bundleName: bundle?.name ?? null,
+    bundlePrice: bundle
+      ? Money.fromCents(
+          live.reduce(
+            (sum, item) =>
+              sum +
+              item.estimate.cents -
+              addOnsCents(item.serviceIds.filter((id) => SERVICE_CATALOG.find((service) => service.id === id)?.isAddOn)),
+            0,
+          ),
+        )
+      : null,
+    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl, changes))),
+    timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt, requiresQuote),
     payment: {
       deposit: deposit
         ? {
@@ -218,10 +249,23 @@ function quotedSummary(order: Order): OrderDetail["payment"]["quoted"] {
   };
 }
 
-async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"]): Promise<OrderDetailPair> {
+async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"], changes: StatusChange[]): Promise<OrderDetailPair> {
   const inBundle = order.bundleId !== null;
   const { moves, held } = adminStatusMoves(item, order);
   const photoKey = item.photoKeys[0];
+  const services = SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id));
+  // No Restoration/Custom-Work Service, so it was created already Approved at its estimate
+  // (ADR-0017), never through Under Review / Quote Sent. Keyed off the Service category, not
+  // status history: a plain Update Status move (adminStatusMoves) can jump a Restoration pair
+  // straight to Approved too, with no Quote Sent in its history, and that pair still needs one.
+  const autoApproved =
+    item.status !== "REQUEST_SUBMITTED" &&
+    item.status !== "UNDER_REVIEW" &&
+    item.status !== "QUOTE_SENT" &&
+    item.status !== "CANCELLED" &&
+    !services.some((service) => service.category === "restoration" || service.category === "custom-work") &&
+    !changes.some((change) => change.itemId === item.id && change.toStatus === "QUOTE_SENT");
+  const suedeApplies = !inBundle && suedeFeeApplies(item.material, services);
   return {
     itemId: item.id,
     photo: await pairPhoto(photoKey, photoUrl),
@@ -230,12 +274,18 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     estimate: item.estimate,
     price: item.price,
     status: item.status,
-    services: SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id)).map((service) => ({
+    displayStatus: displayStatus(item.status, itemRequiresQuote(item.serviceIds)),
+    requiresQuote: itemRequiresQuote(item.serviceIds),
+    services: services.map((service) => ({
       name: service.name,
-      price: inBundle ? null : `${Money.fromCents(service.baseCents).format()}${service.isMinimum ? "+" : ""}`,
+      // A Bundle's price covers its own Services; Add-ons are charged on top.
+      price: inBundle && !service.isAddOn ? null : formatPrice(service.baseCents, service.isMinimum),
+      isMinimum: !(inBundle && !service.isAddOn) && service.isMinimum,
     })),
+    suedeFee: suedeApplies ? Money.fromCents(SUEDE_FEE_CENTS) : null,
     nextStatuses: moves,
     held,
+    autoApproved,
   };
 }
 
@@ -246,9 +296,10 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
  * latest time if it stepped back and reached it again); it stays
  * untimed when the log has nothing, rather than guessing. The first step is
  * the booking itself. A cancelled Order stops where it was: the steps it
- * reached, then Cancelled.
+ * reached, then Cancelled. `status` is the displayed one; an Order with no pair
+ * needing a Quote skips Under Review, Quote Sent and Approved (statusPipeline).
  */
-export function buildTimeline(status: ItemStatus, pairs: { id: string }[], changes: StatusChange[], bookedAt: Date): TimelineStep[] {
+export function buildTimeline(status: ItemStatus, pairs: { id: string }[], changes: StatusChange[], bookedAt: Date, requiresQuote = true): TimelineStep[] {
   /** When every pair had reached `step`, or null if any didn't or the log doesn't say. */
   const reachedAt = (step: ItemStatus): Date | null => {
     if (step === "REQUEST_SUBMITTED") return bookedAt;
@@ -257,7 +308,7 @@ export function buildTimeline(status: ItemStatus, pairs: { id: string }[], chang
     return times.every((time): time is Date => time !== undefined) ? new Date(Math.max(...times.map((time) => time.getTime()))) : null;
   };
 
-  const pipeline = ITEM_STATUSES.filter((step) => step !== "CANCELLED");
+  const pipeline = statusPipeline(requiresQuote);
   if (status === "CANCELLED") {
     // Only what was reached, so a pair cancelled at review doesn't list "Completed".
     const reached = pipeline.flatMap((step): TimelineStep[] => {

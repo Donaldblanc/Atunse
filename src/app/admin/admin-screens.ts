@@ -39,15 +39,15 @@ export interface AdminScreen {
 
 export const ADMIN_SCREENS: AdminScreen[] = [
   { id: "overview", label: "Overview", href: "/admin", icon: HouseIcon, built: true },
-  { id: "orders", label: "Orders", href: "/admin/orders", icon: ClipboardTextIcon, built: false },
-  { id: "calendar", label: "Calendar", href: "/admin/calendar", icon: CalendarBlankIcon, built: false },
-  { id: "customers", label: "Customers", href: "/admin/customers", icon: UserIcon, built: false },
-  { id: "services", label: "Services & Pricing", href: "/admin/services", icon: TagIcon, built: false },
+  { id: "orders", label: "Orders", href: "/admin/orders", icon: ClipboardTextIcon, built: true },
+  { id: "calendar", label: "Calendar", href: "/admin/calendar", icon: CalendarBlankIcon, built: true },
+  { id: "customers", label: "Customers", href: "/admin/customers", icon: UserIcon, built: true },
+  { id: "services", label: "Services & Pricing", href: "/admin/services", icon: TagIcon, built: true },
   { id: "inventory", label: "Inventory", href: "/admin/inventory", icon: PackageIcon, built: false },
-  { id: "payments", label: "Payments", href: "/admin/payments", icon: CreditCardIcon, built: false },
-  { id: "messages", label: "Messages", href: "/admin/messages", icon: ChatCenteredTextIcon, built: false },
-  { id: "reviews", label: "Reviews", href: "/admin/reviews", icon: StarIcon, built: false },
-  { id: "settings", label: "Settings", href: "/admin/settings", icon: GearSixIcon, built: false },
+  { id: "payments", label: "Payments", href: "/admin/payments", icon: CreditCardIcon, built: true },
+  { id: "messages", label: "Messages", href: "/admin/messages", icon: ChatCenteredTextIcon, built: true },
+  { id: "reviews", label: "Reviews", href: "/admin/reviews", icon: StarIcon, built: true },
+  { id: "settings", label: "Settings", href: "/admin/settings", icon: GearSixIcon, built: true },
 ];
 
 /** A screen's route once it's built, or null while it's still coming. */

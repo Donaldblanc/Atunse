@@ -1,18 +1,18 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
-import { ITEM_STATUSES, type ItemStatus } from "../domain";
-import { orderNumberFromQuery, phoneDigitsFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
+import { ITEM_STATUSES, orderDisplayStatus, QUOTE_STEP_STATUSES, type ItemStatus } from "../domain";
 
 /**
- * An Order's derived status (orderRollupStatus) is its least advanced pair
- * that isn't cancelled, and Cancelled only when every pair is. So an Order
- * is at `status` when some pair is there and no live pair is earlier.
+ * Orders whose rollup (orderRollupStatus) is `status`: its least advanced pair
+ * that isn't cancelled, and Cancelled only when every pair is. So an Order is
+ * at `status` when some pair is there and no live pair is earlier.
  */
-function statusWhere(status: ItemStatus): Prisma.OrderWhereInput {
+function rollupWhere(status: ItemStatus): Prisma.OrderWhereInput {
   if (status === "CANCELLED") return { items: { some: {}, every: { status: "CANCELLED" } } };
   const earlier = ITEM_STATUSES.slice(0, ITEM_STATUSES.indexOf(status));
   return { items: { some: { status }, none: { status: { in: earlier } } } };
 }
+import { orderNumberFromQuery, phoneDigitsFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
 
 /** Prisma's `contains` passes LIKE wildcards through, so a "%" or "_" typed by the owner would match everything: match them literally. */
 const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
@@ -34,7 +34,6 @@ function whereFor(filters: OrderSearchFilters, phoneMatches: string[]): Prisma.O
       ],
     });
   }
-  if (filters.status) clauses.push(statusWhere(filters.status));
   if (filters.from || filters.to) clauses.push({ createdAt: { ...(filters.from && { gte: filters.from }), ...(filters.to && { lt: filters.to }) } });
   if (filters.serviceId) clauses.push({ items: { some: { serviceIds: { has: filters.serviceId } } } });
   return { AND: clauses };
@@ -50,7 +49,22 @@ export class PrismaOrderSearchRepository implements OrderSearchRepository {
     const phoneMatches = digits
       ? (await this.prisma.$queryRaw<{ id: string }[]>`SELECT id FROM orders WHERE regexp_replace("contactPhone", '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`).map((row) => row.id)
       : [];
-    const where = whereFor(filters, phoneMatches);
+    let where = whereFor(filters, phoneMatches);
+    const { status } = filters;
+    if (status && !QUOTE_STEP_STATUSES.includes(status)) {
+      // Past the quote steps the displayed status is the rollup, so SQL matches it exactly.
+      where = { AND: [where, rollupWhere(status)] };
+    } else if (status) {
+      // A quote-step status depends on each pair's Services (orderDisplayStatus), which SQL can't see:
+      // SQL narrows to the rollups that can display as `status`, then it's matched here and the page cut after.
+      const rollups = status === "REQUEST_SUBMITTED" ? QUOTE_STEP_STATUSES : [status];
+      const candidates = await this.prisma.order.findMany({
+        where: { AND: [where, { OR: rollups.map(rollupWhere) }] },
+        select: { id: true, items: { select: { status: true, serviceIds: true } } },
+      });
+      const ids = candidates.filter((order) => orderDisplayStatus(order.items) === status).map((order) => order.id);
+      where = { id: { in: ids } };
+    }
     const [total, found] = await Promise.all([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({

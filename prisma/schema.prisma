@@ -143,6 +143,11 @@ model Account {
   // with an emailed code instead (SignInCode), so this stays null for them.
   passwordHash String?
 
+  // Bumped on admin sign-out and on password or email change; an admin
+  // session cookie carries the value it was issued with and is rejected
+  // once this has moved past it (the cookie itself is stateless).
+  sessionVersion Int @default(0)
+
   createdAt DateTime @default(now())
 
   orders        Order[]
@@ -172,6 +177,9 @@ model Order {
   contactName  String
   contactEmail String
   contactPhone String
+  // Age check at booking (month precision, 18+): null only on Orders from before it existed.
+  birthMonth   Int?
+  birthYear    Int?
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
 
@@ -244,6 +252,7 @@ model Order {
   review        Review?
   notifications Notification[]
   stockUsed     StockMovement[]
+  auditEntries  OrderAuditEntry[]
 
   @@index([createdAt]) // the admin Overview's date ranges and Recent Orders
   @@map("orders")
@@ -325,6 +334,25 @@ model ItemAuditEntry {
 
   @@unique([itemId, idempotencyKey])
   @@map("item_audit_entries")
+}
+
+// Audit trail for changes to an Order itself rather than one pair: contact
+// and address edits, notes, rescheduled visits. Metadata never holds the
+// customer's details or note text.
+model OrderAuditEntry {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  action         String // "ORDER_CONTACT_EDITED", "ORDER_NOTE_ADDED", "ORDER_RESCHEDULED"
+  actorAccountId String? // who did it; null for system actions
+  idempotencyKey String? // set on actions that must be retry-safe
+  metadata       Json?
+
+  createdAt DateTime @default(now())
+
+  @@unique([orderId, idempotencyKey])
+  @@map("order_audit_entries")
 }
 
 // One-time email sign-in code (ADR-0014). Only an HMAC of the code is
