@@ -92,7 +92,7 @@ describe("PrismaSignInCodes (integration)", () => {
   });
 
   it("finds an Admin Account by id, never a Customer's", async () => {
-    expect(await accounts.findAdminById(adminId)).toEqual({ id: adminId, name: null, email: "codes@example.com", passwordHash: null });
+    expect(await accounts.findAdminById(adminId)).toEqual({ id: adminId, name: null, email: "codes@example.com", passwordHash: null, sessionVersion: 0 });
     expect(await accounts.findAdminById(customerId)).toBeNull();
     expect(await accounts.findAdminById("no-such-id")).toBeNull();
   });
