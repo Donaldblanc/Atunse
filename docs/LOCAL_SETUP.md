@@ -76,7 +76,7 @@ Set `FEATURE_CUSTOMER_SIGN_IN_ENABLED=true` in `.env` to try the booking
 flow's customer login. Without `RESEND_API_KEY`/`EMAIL_FROM`, codes aren't
 emailed: the dev server log shows them as
 `[notification] to=… subject="123456 is your Atunṣe sign-in code"`. The
-customer session is its own cookie (`atunse_customer_session`), separate
+customer session is its own cookie (`atunse_customer_session`, or `__Host-atunse_customer_session` outside `next dev`), separate
 from the admin one, so you can be signed in as both.
 
 ## API surface (Phase 1)

@@ -1,3 +1,5 @@
+import { verifiedAdminSession } from "./admin-check";
+import type { AdminSessionVersions } from "./admin-session-versions";
 import type { ActingUser } from "./authz";
 import { CUSTOMER_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME, verifySessionCookieValue } from "./session";
 
@@ -21,8 +23,8 @@ export async function customerFromCookies(cookies: CookieReader): Promise<Acting
  * admin session cookie, else a Customer from the customer one, else GUEST.
  * Use-cases then make the authorization decision (ADR-0012).
  */
-export async function actingUserFromCookies(cookies: CookieReader): Promise<ActingUser> {
-  const admin = await verifySessionCookieValue(cookies.get(SESSION_COOKIE_NAME)?.value);
-  if (admin?.role === "ADMIN") return { accountId: admin.accountId, role: "ADMIN" };
+export async function actingUserFromCookies(cookies: CookieReader, versions?: AdminSessionVersions): Promise<ActingUser> {
+  const admin = await verifiedAdminSession(cookies.get(SESSION_COOKIE_NAME)?.value, versions);
+  if (admin) return { accountId: admin.accountId, role: "ADMIN" };
   return customerFromCookies(cookies);
 }

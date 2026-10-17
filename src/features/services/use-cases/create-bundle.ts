@@ -4,7 +4,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { BundleIdTakenError, type BundleRecord, type CatalogRepository } from "../repositories/catalog-repository";
-import { CatalogValidationError, NOTES_MAX, SERVICE_NAME_MAX } from "./update-catalog-item";
+import { CatalogValidationError, NOTES_MAX, SERVICE_NAME_MAX, validateMoney } from "./update-catalog-item";
 
 export interface CreateBundleDeps {
   catalog: Pick<CatalogRepository, "getBundle" | "createBundle" | "listBundles">;
@@ -31,7 +31,7 @@ export async function createBundle(deps: CreateBundleDeps, actingUser: ActingUse
 
   const name = input.name.trim();
   if (!name || name.length > SERVICE_NAME_MAX) throw new CatalogValidationError(`Bundle name must be 1-${SERVICE_NAME_MAX} characters.`);
-  if (!Number.isInteger(input.priceCents) || input.priceCents < 0) throw new CatalogValidationError("Price must be a whole number of cents, zero or more.");
+  validateMoney(input.priceCents, "Price");
   const internalNotes = input.internalNotes?.trim() || null;
   if (internalNotes && internalNotes.length > NOTES_MAX) throw new CatalogValidationError(`Notes must be at most ${NOTES_MAX} characters.`);
 

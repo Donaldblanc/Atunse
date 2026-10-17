@@ -1,10 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
-import { MISSING_ACCOUNT_PASSWORD_HASH, verifyPassword } from "./password";
+import { hashPassword, MISSING_ACCOUNT_PASSWORD_HASH, passwordNeedsRehash, verifyPassword } from "./password";
 import type { Role } from "./authz";
 
 export interface AuthenticatedAccount {
   accountId: string;
   role: Role;
+  /** The Account's current sessionVersion, for the session cookie to carry. */
+  sessionVersion: number;
 }
 
 // Adapter boundary (ADR-0003): use-cases/routes depend on this interface,
@@ -28,6 +30,12 @@ export class PrismaPasswordAuthService implements AuthService {
     const matches = await verifyPassword(password, account?.passwordHash ?? MISSING_ACCOUNT_PASSWORD_HASH);
     if (!account || !account.passwordHash || !matches) return null;
 
-    return { accountId: account.id, role: account.role };
+    // Upgrade an old-cost hash now that we hold the plaintext. Not a
+    // password change: sessionVersion stays, so other sessions survive.
+    if (passwordNeedsRehash(account.passwordHash)) {
+      await this.prisma.account.update({ where: { id: account.id }, data: { passwordHash: await hashPassword(password) } });
+    }
+
+    return { accountId: account.id, role: account.role, sessionVersion: account.sessionVersion };
   }
 }

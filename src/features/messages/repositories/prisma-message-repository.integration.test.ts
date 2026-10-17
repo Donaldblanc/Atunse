@@ -142,6 +142,24 @@ describe("listConversations (integration)", () => {
     expect(await repo.listConversations({ search: "nobody-here" })).toEqual({ conversations: [], total: 0 });
   });
 
+  it("search treats % and _ literally instead of as wildcards", async () => {
+    const c = await conversation();
+    await message(c.id);
+    expect(await repo.listConversations({ search: "%" })).toEqual({ conversations: [], total: 0 });
+    expect(await repo.listConversations({ search: "j_rdan" })).toEqual({ conversations: [], total: 0 });
+    expect((await repo.listConversations({ search: "jordan" })).total).toBe(1);
+  });
+
+  it("search finds a literal % or _ in a subject and still excludes wildcard lookalikes (integration)", async () => {
+    const pct = await prisma.conversation.create({ data: { accountId, subject: "100% cotton laces" } });
+    const under = await prisma.conversation.create({ data: { accountId, subject: "a_b" } });
+    const lookalike = await prisma.conversation.create({ data: { accountId, subject: "axb" } });
+    for (const c of [pct, under, lookalike]) await message(c.id);
+    const ids = async (search: string) => (await repo.listConversations({ search })).conversations.map((x) => x.conversationId);
+    expect(await ids("100%")).toEqual([pct.id]);
+    expect(await ids("a_b")).toEqual([under.id]);
+  });
+
   it("channel filter matches the latest Message's channel", async () => {
     const emailLast = await conversation({ lastMessageAt: T1 });
     const smsLast = await conversation({ lastMessageAt: T0 });
