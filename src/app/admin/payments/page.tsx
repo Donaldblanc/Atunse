@@ -53,7 +53,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   const baseHref = hrefFor(query, range.selection, { page: list.page });
 
   return (
-    <div className="ov pm">
+    <div className="ov ov-page pm">
       <div className="ov-header">
         <div>
           <p className="ov-eyebrow">Payments</p>
