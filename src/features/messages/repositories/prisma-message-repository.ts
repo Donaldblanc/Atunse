@@ -3,6 +3,7 @@ import {
   ConversationNotFoundError,
   IdempotencyKeyReusedError,
   type ConversationFilter,
+  type ConversationPage,
   type ConversationSummary,
   type ConversationThread,
   type MessageRepository,
@@ -80,44 +81,67 @@ export class PrismaMessageRepository implements MessageRepository {
     }
   }
 
-  async listConversations(filter: ConversationFilter): Promise<ConversationSummary[]> {
+  async listConversations(filter: ConversationFilter): Promise<ConversationPage> {
     const search = filter.search?.trim();
-    const rows = await this.prisma.conversation.findMany({
-      where: {
-        // Archived is its own tab; "all" and "unread" both mean the inbox (not archived).
-        archivedAt: filter.status === "archived" ? { not: null } : null,
-        ...(filter.status === "unread" ? { messages: { some: UNREAD_CUSTOMER } } : {}),
-        ...(search
-          ? {
-              OR: [
-                { subject: { contains: search, mode: "insensitive" } },
-                { account: { name: { contains: search, mode: "insensitive" } } },
-                { account: { email: { contains: search, mode: "insensitive" } } },
-              ],
-            }
-          : {}),
-      },
-      orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }, { id: "asc" }],
-      include: {
-        account: { select: { name: true, email: true } },
-        order: { select: { id: true, number: true } },
-        messages: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
-      },
-    });
-    // The channel filter is per-Message; applied here against each Conversation's latest one.
-    const filtered = filter.channel && filter.channel !== "all" ? rows.filter((c) => c.messages.at(-1)?.channel === filter.channel) : rows;
-    return filtered.map((c) => ({
-      conversationId: c.id,
-      accountId: c.accountId,
-      customerName: c.account.name,
-      customerEmail: c.account.email,
-      subject: c.subject,
-      order: c.order,
-      archivedAt: c.archivedAt,
-      lastMessageAt: c.lastMessageAt,
-      lastMessagePreview: c.messages.at(-1)?.body ?? null,
-      unreadCount: c.messages.filter((m) => m.author === "CUSTOMER" && m.readAt === null).length,
-    }));
+    // "Latest Message's channel" can't be expressed in Prisma's filter, so SQL picks the matching ids.
+    let channelIds: string[] | null = null;
+    if (filter.channel && filter.channel !== "all") {
+      const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+        SELECT c.id FROM conversations c
+        WHERE (SELECT m.channel::text FROM messages m WHERE m."conversationId" = c.id ORDER BY m."createdAt" DESC, m.id DESC LIMIT 1) = ${filter.channel}`;
+      channelIds = rows.map((r) => r.id);
+    }
+    const where: Prisma.ConversationWhereInput = {
+      // Archived is its own tab; "all" and "unread" both mean the inbox (not archived).
+      archivedAt: filter.status === "archived" ? { not: null } : null,
+      ...(filter.status === "unread" ? { messages: { some: UNREAD_CUSTOMER } } : {}),
+      ...(channelIds ? { id: { in: channelIds } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { subject: { contains: search, mode: "insensitive" } },
+              { account: { name: { contains: search, mode: "insensitive" } } },
+              { account: { email: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+    const [total, rows] = await Promise.all([
+      this.prisma.conversation.count({ where }),
+      this.prisma.conversation.findMany({
+        where,
+        orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }, { id: "asc" }],
+        ...(filter.limit !== undefined ? { take: filter.limit } : {}),
+        skip: filter.offset ?? 0,
+        select: {
+          id: true,
+          accountId: true,
+          subject: true,
+          archivedAt: true,
+          lastMessageAt: true,
+          account: { select: { name: true, email: true } },
+          order: { select: { id: true, number: true } },
+          // Only the latest Message (the preview) and an unread count, not the whole thread.
+          messages: { take: 1, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { body: true } },
+          _count: { select: { messages: { where: UNREAD_CUSTOMER } } },
+        },
+      }),
+    ]);
+    return {
+      total,
+      conversations: rows.map((c) => ({
+        conversationId: c.id,
+        accountId: c.accountId,
+        customerName: c.account.name,
+        customerEmail: c.account.email,
+        subject: c.subject,
+        order: c.order,
+        archivedAt: c.archivedAt,
+        lastMessageAt: c.lastMessageAt,
+        lastMessagePreview: c.messages[0]?.body ?? null,
+        unreadCount: c._count.messages,
+      })),
+    };
   }
 
   async getConversationThread(conversationId: string): Promise<ConversationThread | null> {
@@ -145,14 +169,15 @@ export class PrismaMessageRepository implements MessageRepository {
   }
 
   async setConversationArchived(conversationId: string, archived: boolean, at: Date): Promise<void> {
-    await this.prisma.conversation.update({ where: { id: conversationId }, data: { archivedAt: archived ? at : null } });
+    const { count } = await this.prisma.conversation.updateMany({ where: { id: conversationId }, data: { archivedAt: archived ? at : null } });
+    if (count === 0) throw new ConversationNotFoundError();
   }
 
-  async startConversation(input: Parameters<MessageRepository["startConversation"]>[0]): Promise<{ conversationId: string }> {
+  async startConversation(input: Parameters<MessageRepository["startConversation"]>[0]): Promise<{ conversationId: string; created: boolean }> {
     try {
       return await this.prisma.$transaction(async (tx) => {
         const used = await tx.message.findUnique({ where: { idempotencyKey: input.idempotencyKey }, select: { conversationId: true } });
-        if (used) return { conversationId: used.conversationId };
+        if (used) return { conversationId: used.conversationId, created: false };
         const conversation = await tx.conversation.create({
           data: { accountId: input.accountId, subject: input.subject, lastMessageAt: input.at },
         });
@@ -167,13 +192,13 @@ export class PrismaMessageRepository implements MessageRepository {
             createdAt: input.at,
           },
         });
-        return { conversationId: conversation.id };
+        return { conversationId: conversation.id, created: true };
       });
     } catch (err) {
       // Two submits of the same key racing: the loser re-reads what the winner made.
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         const used = await this.prisma.message.findUniqueOrThrow({ where: { idempotencyKey: input.idempotencyKey }, select: { conversationId: true } });
-        return { conversationId: used.conversationId };
+        return { conversationId: used.conversationId, created: false };
       }
       throw err;
     }

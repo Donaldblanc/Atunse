@@ -20,6 +20,7 @@ export function messagesHref(query: MessagesQuery, overrides: Partial<MessagesQu
   if (next.q) params.set("q", next.q);
   if (next.status && next.status !== "all") params.set("status", next.status);
   if (next.channel && next.channel !== "all") params.set("channel", next.channel);
+  if (next.page > 1) params.set("page", String(next.page));
   if ("c" in overrides ? overrides.c : query.c) params.set("c", ("c" in overrides ? overrides.c : query.c)!);
   const search = params.toString();
   return search ? `/admin/messages?${search}` : "/admin/messages";
@@ -32,7 +33,18 @@ const STATUS_TABS: { id: NonNullable<ConversationFilter["status"]>; label: strin
 ];
 
 /** The Messages screen's left column: search, status tabs, filters and the Conversation list. */
-export function ConversationList({ conversations, unreadCount, query }: { conversations: ConversationSummary[]; unreadCount: number; query: MessagesQuery }) {
+export function ConversationList({
+  conversations,
+  unreadCount,
+  query,
+  pageCount = 1,
+}: {
+  conversations: ConversationSummary[];
+  /** The inbox's whole unread total (not just this page or filter). */
+  unreadCount: number;
+  query: MessagesQuery;
+  pageCount?: number;
+}) {
   return (
     <div className="am-list">
       <nav className="att-tabs" aria-label="Conversation status">
@@ -40,7 +52,7 @@ export function ConversationList({ conversations, unreadCount, query }: { conver
           <Link
             key={tab.id}
             className="att-tab"
-            href={messagesHref(query, { status: tab.id, c: null })}
+            href={messagesHref(query, { status: tab.id, c: null, page: 1 })}
             aria-current={(query.status ?? "all") === tab.id ? "page" : undefined}
           >
             {tab.id === "all" ? tab.label : `${tab.label}${tab.id === "unread" && unreadCount > 0 ? ` (${unreadCount})` : ""}`}
@@ -93,6 +105,28 @@ export function ConversationList({ conversations, unreadCount, query }: { conver
             </li>
           ))}
         </ul>
+      )}
+
+      {pageCount > 1 && (
+        <nav className="am-pages" aria-label="Pages">
+          {query.page > 1 ? (
+            <Link className="admin-btn" data-variant="secondary" href={messagesHref(query, { page: query.page - 1, c: null })} rel="prev">
+              Previous
+            </Link>
+          ) : (
+            <span />
+          )}
+          <span className="ov-cell-sub">
+            Page {query.page} of {pageCount}
+          </span>
+          {query.page < pageCount ? (
+            <Link className="admin-btn" data-variant="secondary" href={messagesHref(query, { page: query.page + 1, c: null })} rel="next">
+              Next
+            </Link>
+          ) : (
+            <span />
+          )}
+        </nav>
       )}
     </div>
   );

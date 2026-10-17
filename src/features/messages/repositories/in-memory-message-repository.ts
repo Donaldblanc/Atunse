@@ -2,6 +2,7 @@ import {
   ConversationNotFoundError,
   IdempotencyKeyReusedError,
   type ConversationFilter,
+  type ConversationPage,
   type ConversationSummary,
   type ConversationThread,
   type MessageRepository,
@@ -118,9 +119,9 @@ export class InMemoryMessageRepository implements MessageRepository {
     return { email: conversation.accountEmail, orderNumber: conversation.order?.number ?? null, subject: conversation.subject };
   }
 
-  async listConversations(filter: ConversationFilter): Promise<ConversationSummary[]> {
+  async listConversations(filter: ConversationFilter): Promise<ConversationPage> {
     const search = filter.search?.trim().toLowerCase();
-    return this.conversations
+    const matching = this.conversations
       .filter((c) => (filter.status === "archived" ? c.archivedAt !== null : c.archivedAt === null))
       .filter((c) => filter.status !== "unread" || this.unreadIn(c.id).length > 0)
       .filter((c) => {
@@ -132,8 +133,12 @@ export class InMemoryMessageRepository implements MessageRepository {
         const latest = this.threadOf(c.id).at(-1);
         return latest?.channel === filter.channel;
       })
-      .sort((a, b) => (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0))
-      .map((c) => ({
+      .sort((a, b) => (b.lastMessageAt?.getTime() ?? 0) - (a.lastMessageAt?.getTime() ?? 0));
+    const offset = filter.offset ?? 0;
+    const window = filter.limit === undefined ? matching.slice(offset) : matching.slice(offset, offset + filter.limit);
+    return {
+      total: matching.length,
+      conversations: window.map((c) => ({
         conversationId: c.id,
         accountId: c.accountId,
         customerName: c.accountName,
@@ -144,7 +149,8 @@ export class InMemoryMessageRepository implements MessageRepository {
         lastMessageAt: c.lastMessageAt,
         lastMessagePreview: this.threadOf(c.id).at(-1)?.body ?? null,
         unreadCount: this.unreadIn(c.id).length,
-      }));
+      })),
+    };
   }
 
   private threadOf(conversationId: string): StoredMessage[] {
@@ -174,9 +180,9 @@ export class InMemoryMessageRepository implements MessageRepository {
     conversation.archivedAt = archived ? at : null;
   }
 
-  async startConversation(input: Parameters<MessageRepository["startConversation"]>[0]): Promise<{ conversationId: string }> {
+  async startConversation(input: Parameters<MessageRepository["startConversation"]>[0]): Promise<{ conversationId: string; created: boolean }> {
     const used = this.messages.find((m) => m.idempotencyKey === input.idempotencyKey);
-    if (used) return { conversationId: used.conversationId };
+    if (used) return { conversationId: used.conversationId, created: false };
     const conversation = this.addConversation({
       id: `conv_${this.nextId++}`,
       accountId: input.accountId,
@@ -194,6 +200,6 @@ export class InMemoryMessageRepository implements MessageRepository {
       idempotencyKey: input.idempotencyKey,
       createdAt: input.at,
     });
-    return { conversationId: conversation.id };
+    return { conversationId: conversation.id, created: true };
   }
 }

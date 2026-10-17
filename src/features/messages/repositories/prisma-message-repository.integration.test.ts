@@ -32,7 +32,7 @@ afterAll(async () => {
 async function conversation(data: { archivedAt?: Date; lastMessageAt?: Date } = {}) {
   return prisma.conversation.create({ data: { accountId, subject: "Time", ...data } });
 }
-const message = (conversationId: string, data: { author?: "CUSTOMER" | "ADMIN"; readAt?: Date; createdAt?: Date } = {}) =>
+const message = (conversationId: string, data: { author?: "CUSTOMER" | "ADMIN"; channel?: "IN_APP" | "EMAIL" | "SMS"; readAt?: Date; createdAt?: Date } = {}) =>
   prisma.message.create({ data: { conversationId, author: "CUSTOMER", body: "Hi", ...data } });
 
 describe("unread messages", () => {
@@ -118,7 +118,8 @@ describe("listConversations", () => {
     await message(newer.id, { createdAt: T1 });
     await message(older.id, { createdAt: T0 });
     await message(archived.id);
-    const list = await repo.listConversations({});
+    const { conversations: list, total } = await repo.listConversations({});
+    expect(total).toBe(2);
     expect(list.map((c) => c.conversationId)).toEqual([newer.id, older.id]);
     expect(list[0]).toMatchObject({ accountId, lastMessagePreview: "Hi", unreadCount: 1 });
   });
@@ -130,15 +131,43 @@ describe("listConversations", () => {
     await message(unread.id);
     await message(read.id, { readAt: T0 });
     await message(archived.id);
-    expect((await repo.listConversations({ status: "unread" })).map((c) => c.conversationId)).toEqual([unread.id]);
-    expect((await repo.listConversations({ status: "archived" })).map((c) => c.conversationId)).toEqual([archived.id]);
+    expect((await repo.listConversations({ status: "unread" })).conversations.map((c) => c.conversationId)).toEqual([unread.id]);
+    expect((await repo.listConversations({ status: "archived" })).conversations.map((c) => c.conversationId)).toEqual([archived.id]);
   });
 
   it("search matches the customer's name, email or the Conversation's subject", async () => {
     const c = await conversation();
     await message(c.id);
-    expect((await repo.listConversations({ search: "jordan" })).map((x) => x.conversationId)).toEqual([c.id]);
-    expect(await repo.listConversations({ search: "nobody-here" })).toEqual([]);
+    expect((await repo.listConversations({ search: "jordan" })).conversations.map((x) => x.conversationId)).toEqual([c.id]);
+    expect(await repo.listConversations({ search: "nobody-here" })).toEqual({ conversations: [], total: 0 });
+  });
+
+  it("channel filter matches the latest Message's channel", async () => {
+    const emailLast = await conversation({ lastMessageAt: T1 });
+    const smsLast = await conversation({ lastMessageAt: T0 });
+    await message(emailLast.id, { channel: "SMS", createdAt: T0 });
+    await message(emailLast.id, { channel: "EMAIL", createdAt: T1 });
+    await message(smsLast.id, { channel: "EMAIL", createdAt: T0 });
+    await message(smsLast.id, { channel: "SMS", createdAt: T1 });
+    expect((await repo.listConversations({ channel: "EMAIL" })).conversations.map((c) => c.conversationId)).toEqual([emailLast.id]);
+    expect((await repo.listConversations({ channel: "SMS" })).conversations.map((c) => c.conversationId)).toEqual([smsLast.id]);
+    expect((await repo.listConversations({ channel: "IN_APP" })).total).toBe(0);
+    expect((await repo.listConversations({ channel: "all" })).total).toBe(2);
+  });
+
+  it("pages with limit/offset and reports the full total; unread count and preview still come from the right Messages", async () => {
+    const a = await conversation({ lastMessageAt: new Date("2026-10-03T00:00:00Z") });
+    const b = await conversation({ lastMessageAt: new Date("2026-10-02T00:00:00Z") });
+    const c = await conversation({ lastMessageAt: new Date("2026-10-01T00:00:00Z") });
+    await message(a.id, { createdAt: T0 });
+    await prisma.message.create({ data: { conversationId: a.id, author: "ADMIN", body: "Latest", createdAt: T1 } });
+    await message(b.id);
+    await message(c.id);
+    const first = await repo.listConversations({ limit: 2, offset: 0 });
+    expect(first.total).toBe(3);
+    expect(first.conversations.map((x) => x.conversationId)).toEqual([a.id, b.id]);
+    expect(first.conversations[0]).toMatchObject({ lastMessagePreview: "Latest", unreadCount: 1 });
+    expect((await repo.listConversations({ limit: 2, offset: 2 })).conversations.map((x) => x.conversationId)).toEqual([c.id]);
   });
 });
 
@@ -164,6 +193,10 @@ describe("setConversationArchived", () => {
     expect((await prisma.conversation.findUniqueOrThrow({ where: { id: c.id } })).archivedAt).toEqual(T1);
     await repo.setConversationArchived(c.id, false, T1);
     expect((await prisma.conversation.findUniqueOrThrow({ where: { id: c.id } })).archivedAt).toBeNull();
+  });
+
+  it("throws ConversationNotFoundError for an unknown id", async () => {
+    await expect(repo.setConversationArchived("nope", true, T1)).rejects.toThrow(ConversationNotFoundError);
   });
 });
 
@@ -191,6 +224,7 @@ describe("startConversation", () => {
     const results = await Promise.all([repo.startConversation(start()), repo.startConversation(start())]);
     expect(new Set(results.map((r) => r.conversationId)).size).toBe(1);
     expect(await prisma.conversation.count()).toBe(1);
-    expect(await repo.startConversation(start())).toEqual(results[0]);
+    expect(results.filter((r) => r.created)).toHaveLength(1);
+    expect(await repo.startConversation(start())).toEqual({ conversationId: results[0]!.conversationId, created: false });
   });
 });

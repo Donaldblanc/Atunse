@@ -14,6 +14,7 @@ import { NewMessageForm } from "@/features/admin-messages/new-message-form";
 import { ThreadView } from "@/features/admin-messages/thread-view";
 import { getOrderDetail } from "@/features/admin-overview/order-detail";
 import { getCustomerDetail } from "@/features/admin-customers/customer-detail";
+import { countUnreadMessages } from "@/features/messages/use-cases/get-unread-messages";
 import { getConversationThread } from "@/features/messages/use-cases/get-conversation-thread";
 import { listConversations } from "@/features/messages/use-cases/list-conversations";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
@@ -30,8 +31,10 @@ export default async function AdminMessagesPage({ searchParams }: { searchParams
   const deps = buildAdminMessagesDeps();
   const query = parseMessagesQuery(params);
 
-  const conversations = await listConversations(deps, actingUser, { search: query.q || undefined, status: query.status, channel: query.channel });
-  const unreadCount = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
+  const [{ conversations, pageCount }, unreadCount] = await Promise.all([
+    listConversations(deps, actingUser, { search: query.q || undefined, status: query.status, channel: query.channel, page: query.page }),
+    countUnreadMessages(deps, actingUser),
+  ]);
 
   const selectedId = query.c ?? conversations[0]?.conversationId ?? null;
   const thread = selectedId ? await getConversationThread(deps, actingUser, selectedId) : null;
@@ -60,7 +63,7 @@ export default async function AdminMessagesPage({ searchParams }: { searchParams
       </div>
 
       <div className="am-grid">
-        <ConversationList conversations={conversations} unreadCount={unreadCount} query={query} />
+        <ConversationList conversations={conversations} unreadCount={unreadCount} query={query} pageCount={pageCount} />
         {thread ? <ThreadView thread={thread} /> : <div className="am-thread am-thread-empty">No conversation selected.</div>}
         {thread && customerDetail && <ContextPanel order={orderDetail} customer={customerDetail} />}
       </div>

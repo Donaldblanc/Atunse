@@ -1,8 +1,11 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
+import type { NotificationService } from "@/features/notifications/notification-service";
+import { redactForLog } from "@/shared/logging/redact";
 import { REPLY_MAX_LENGTH } from "../reply-limits";
 import type { MessageRepository } from "../repositories/message-repository";
+import { replySubject } from "./reply-to-conversation";
 
 export class InvalidMessageError extends Error {
   constructor(message: string) {
@@ -21,14 +24,21 @@ export class CustomerNotFoundError extends Error {
 /**
  * The Messages screen's New Message: starts a Conversation with an existing
  * Customer Account and stores its first (ADMIN-authored) Message. Admin-only.
- * Idempotent on `idempotencyKey` (ADR-0012): a replay creates nothing and
- * returns the Conversation the first call made.
+ * Then it emails the Customer the Message (plain text). Idempotent on
+ * `idempotencyKey` (ADR-0012): a replay creates nothing, sends no second
+ * email and returns the Conversation the first call made. A failed send
+ * doesn't undo the stored Message; `emailFailed` says so.
  */
 export async function startConversation(
-  deps: { messages: Pick<MessageRepository, "startConversation">; accounts: Pick<AccountRepository, "findCustomerByEmail">; now: () => Date },
+  deps: {
+    messages: Pick<MessageRepository, "startConversation">;
+    accounts: Pick<AccountRepository, "findCustomerByEmail">;
+    notifications: NotificationService;
+    now: () => Date;
+  },
   actingUser: ActingUser,
   input: { customerEmail: string; subject: string | null; body: string; idempotencyKey: string },
-): Promise<{ conversationId: string }> {
+): Promise<{ conversationId: string; emailFailed: boolean }> {
   requireRole(actingUser, "ADMIN");
   if (!input.idempotencyKey) throw new InvalidMessageError("Reload and try again.");
   const body = input.body.trim();
@@ -40,14 +50,24 @@ export async function startConversation(
   const account = await deps.accounts.findCustomerByEmail(email);
   if (!account) throw new CustomerNotFoundError();
 
-  return deps.messages.startConversation({
+  const subject = input.subject?.trim() || null;
+  const { conversationId, created } = await deps.messages.startConversation({
     accountId: account.id,
     accountEmail: account.email,
     accountName: null,
-    subject: input.subject?.trim() || null,
+    subject,
     authorAccountId: actingUser.accountId,
     body,
     idempotencyKey: input.idempotencyKey,
     at: deps.now(),
   });
+  if (!created) return { conversationId, emailFailed: false };
+
+  try {
+    await deps.notifications.sendEmail({ to: account.email, subject: replySubject({ orderNumber: null, subject }), body });
+  } catch (err) {
+    console.error(`[messages] message saved, but the email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
+    return { conversationId, emailFailed: true };
+  }
+  return { conversationId, emailFailed: false };
 }

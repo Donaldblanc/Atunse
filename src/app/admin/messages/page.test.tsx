@@ -102,6 +102,29 @@ describe("AdminMessagesPage", () => {
     expect(html).not.toContain("All Read");
   });
 
+  it("shows Mark read only when the open thread has unread messages", async () => {
+    accounts.add({ id: "acc_a", role: "CUSTOMER", email: "a@example.com" });
+    messages.addConversation({ id: "c1", accountId: "acc_a", accountEmail: "a@example.com" });
+    messages.addMessage({ conversationId: "c1" });
+    expect(renderToStaticMarkup(await AdminMessagesPage({ searchParams: Promise.resolve({}) }))).toContain("Mark read");
+    await messages.markConversationRead("c1", new Date());
+    const html = renderToStaticMarkup(await AdminMessagesPage({ searchParams: Promise.resolve({}) }));
+    expect(html).not.toContain("Mark read");
+    expect(html).not.toContain("Unread (");
+  });
+
+  it("the Unread tab count is the inbox total, whatever the search filter", async () => {
+    accounts.add({ id: "acc_a", role: "CUSTOMER", email: "a@example.com" });
+    accounts.add({ id: "acc_b", role: "CUSTOMER", email: "b@example.com" });
+    messages.addConversation({ id: "c1", accountId: "acc_a", accountEmail: "a@example.com", accountName: "Alpha" });
+    messages.addMessage({ conversationId: "c1" });
+    messages.addConversation({ id: "c2", accountId: "acc_b", accountEmail: "b@example.com", accountName: "Beta" });
+    messages.addMessage({ conversationId: "c2" });
+    messages.addMessage({ conversationId: "c2" });
+    const html = renderToStaticMarkup(await AdminMessagesPage({ searchParams: Promise.resolve({ q: "Alpha" }) }));
+    expect(html).toContain("Unread (3)");
+  });
+
   it("rejects a non-admin acting user", async () => {
     actingUser = { accountId: "acc_c", role: "CUSTOMER" };
     await expect(AdminMessagesPage({ searchParams: Promise.resolve({}) })).rejects.toThrow();

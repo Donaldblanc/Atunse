@@ -6,6 +6,8 @@ export interface MessagesQuery {
   channel: ConversationFilter["channel"];
   /** The open Conversation, or null when none is selected. */
   c: string | null;
+  /** 1-based page of the Conversation list. */
+  page: number;
 }
 
 const STATUSES: NonNullable<ConversationFilter["status"]>[] = ["all", "unread", "archived"];
@@ -26,5 +28,6 @@ export function parseMessagesQuery(params: { [key: string]: string | string[] | 
     status: STATUSES.includes(status as never) ? (status as MessagesQuery["status"]) : "all",
     channel: CHANNELS.includes(channel as never) ? (channel as MessagesQuery["channel"]) : "all",
     c: ID_PATTERN.test(c) ? c : null,
+    page: /^[1-9][0-9]{0,5}$/.test(one(params.page)) ? Number(one(params.page)) : 1,
   };
 }

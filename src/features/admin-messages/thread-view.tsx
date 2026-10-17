@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import type { ConversationThread } from "@/features/messages/repositories/message-repository";
 import { MessageReplyForm } from "@/features/admin-overview/message-reply-form";
+import { markConversationReadAction } from "@/features/admin-overview/message-actions";
 import { setConversationArchivedAction } from "./messages-actions";
 
 const stamp = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: SHOP_TIMEZONE });
@@ -20,6 +21,14 @@ export function ThreadView({ thread }: { thread: ConversationThread }) {
           <Link href={`/admin/customers/${thread.accountId}`} className="att-link">
             View Customer →
           </Link>
+          {thread.unreadCount > 0 && (
+            <form action={markConversationReadAction}>
+              <input type="hidden" name="conversationId" value={thread.conversationId} />
+              <button type="submit" className="admin-btn" data-variant="secondary">
+                Mark read
+              </button>
+            </form>
+          )}
           <form action={setConversationArchivedAction}>
             <input type="hidden" name="conversationId" value={thread.conversationId} />
             <input type="hidden" name="archived" value={thread.archivedAt ? "false" : "true"} />
