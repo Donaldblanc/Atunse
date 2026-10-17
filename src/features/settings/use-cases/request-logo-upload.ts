@@ -9,6 +9,9 @@ const ALLOWED_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
 /** Every logo key starts with this; setLogo refuses any other. */
 export const LOGO_KEY_PREFIX = "business-logo/";
 
+/** The exact shape requestLogoUpload issues: the prefix and a random UUID, nothing else. */
+export const LOGO_KEY_PATTERN = /^business-logo\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 export class InvalidLogoUploadError extends Error {
   constructor(message: string) {
     super(message);

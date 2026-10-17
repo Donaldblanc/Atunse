@@ -23,6 +23,9 @@ export function AccountSettingsForm({ accountId, name, email, hasPassword }: { a
   // Controlled so the post-action form reset doesn't wipe typed values after an error.
   const [nameValue, setNameValue] = useState(name);
   const [emailValue, setEmailValue] = useState(email);
+  // Changing the email (the sign-in name) needs the current password, so a stolen session can't take the account over.
+  const [profilePassword, setProfilePassword] = useState("");
+  const emailChanged = emailValue.trim().toLowerCase() !== email.trim().toLowerCase();
   const passwordField = (field: keyof typeof passwords) => ({
     name: field,
     value: passwords[field],
@@ -43,6 +46,21 @@ export function AccountSettingsForm({ accountId, name, email, hasPassword }: { a
           Email
           <input type="email" name="email" value={emailValue} onChange={(event) => setEmailValue(event.target.value)} maxLength={254} required className="st-input" />
         </label>
+        {emailChanged && hasPassword && (
+          <label className="st-field">
+            Current password
+            <input
+              type="password"
+              name="currentPassword"
+              value={profilePassword}
+              onChange={(event) => setProfilePassword(event.target.value)}
+              autoComplete="current-password"
+              required
+              className="st-input"
+            />
+            <span className="st-hint">Required to change your email.</span>
+          </label>
+        )}
         {profileState.error && (
           <p role="alert" className="od-status-error st-error">
             {profileState.error}

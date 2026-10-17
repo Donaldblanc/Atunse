@@ -55,6 +55,18 @@ describe("updateService", () => {
     ).rejects.toThrow(CatalogValidationError);
   });
 
+  it.each([[500_001, 0], [1000, 500_001], [NaN, 0]])("rejects base %s / suede %s (over the cap or not a number)", async (baseCents, suedeFeeCents) => {
+    const catalog = new InMemoryCatalogRepository();
+    catalog.services.set("standard", makeService());
+    await expect(
+      updateService(
+        { catalog },
+        ADMIN,
+        { serviceId: "standard", name: "Standard Clean", description: "x", baseCents, suedeFeeCents, category: "CLEANING", active: true, internalNotes: null, expectedUpdatedAt: LOADED },
+      ),
+    ).rejects.toThrow(CatalogValidationError);
+  });
+
   it("saves the whole record, trimmed", async () => {
     const catalog = new InMemoryCatalogRepository();
     catalog.services.set("standard", makeService());
