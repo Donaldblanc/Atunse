@@ -9,10 +9,11 @@ export type ScheduleMethod = "pickup" | "mail-in";
 /** One pair as the customer describes it, with its own Add-ons (catalog ids). */
 export type PairDetails = { brand: string; material: string; notes: string; photos: File[]; addOnIds: string[] };
 export type PickupAddress = { address: string; apt: string; city: string; state: string; zip: string };
-export type ContactInfo = { name: string; email: string; phone: string };
+/** Birth month and year are select values: "" until chosen, else "1"-"12" and a 4-digit year. */
+export type ContactInfo = { name: string; email: string; phone: string; birthMonth: string; birthYear: string };
 /** What the customer ticked on the Review step, and which agreement version it showed (ADR-0015). */
 export type TermsSelection = { policyAccepted: boolean; acknowledgedTerms: string[]; termsVersion: string };
 
 export const EMPTY_PAIR: PairDetails = { brand: "", material: "", notes: "", photos: [], addOnIds: [] };
 export const EMPTY_ADDRESS: PickupAddress = { address: "", apt: "", city: "", state: "", zip: "" };
-export const EMPTY_CONTACT: ContactInfo = { name: "", email: "", phone: "" };
+export const EMPTY_CONTACT: ContactInfo = { name: "", email: "", phone: "", birthMonth: "", birthYear: "" };

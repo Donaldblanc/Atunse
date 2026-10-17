@@ -295,6 +295,9 @@ export interface Order {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  /** The customer's birth month (1-12) and year, asked at booking for the 18+ check; null on older Orders. */
+  birthMonth: number | null;
+  birthYear: number | null;
   createdAt: Date;
   /** Bumped by every write to the Order row itself; Edit Order's optimistic check reads it. */
   updatedAt: Date;

@@ -12,6 +12,9 @@ import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 
 export const FIXED_NOW = new Date("2026-10-01T15:00:00Z"); // Oct 1, 11 AM in New York
 
+/** Born March 1990: comfortably over 18 at FIXED_NOW. */
+export const ADULT_BIRTH = { birthMonth: 3, birthYear: 1990 };
+
 export class RecordingNotificationService implements NotificationService {
   readonly sent: EmailMessage[] = [];
   /** Set to make the next sends throw, like a provider outage. */
@@ -49,7 +52,7 @@ export function validBookingInput(overrides: Partial<SubmitOrderInput> = {}): Su
     policyAccepted: true,
     acknowledgedTerms: BOOKING_ACKNOWLEDGMENTS.map((ack) => ack.id),
     termsVersion: TERMS_AGREEMENT.version,
-    contact: { name: "Jordan Smith", email: "customer@example.com", phone: "(212) 555-0142" },
+    contact: { name: "Jordan Smith", email: "customer@example.com", phone: "(212) 555-0142", ...ADULT_BIRTH },
     fulfillment: {
       method: "PICKUP",
       address: { line1: "123 Main St", line2: null, city: "New York", state: "NY", zip: "10001" },

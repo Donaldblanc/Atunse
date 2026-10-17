@@ -27,7 +27,7 @@ function detail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     reference: "ATU-1001",
     bookedAt: new Date("2026-10-01T12:00:00Z"),
     status: "REQUEST_SUBMITTED",
-    customer: { name: "Jordan Smith", email: "jordan@example.com", phone: "(212) 555-0142", fulfillment: "Local Drop-Off", schedule: null, address: [] },
+    customer: { name: "Jordan Smith", email: "jordan@example.com", phone: "(212) 555-0142", born: null, fulfillment: "Local Drop-Off", schedule: null, address: [] },
     bundleName: null,
     bundlePrice: null,
     pairs: [],

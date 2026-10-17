@@ -1,5 +1,6 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { formatBirthMonthYear } from "@/features/orders/age";
 import type { CalendarDate } from "@/features/orders/calendar-date";
 import {
   adminStatusMoves,
@@ -85,6 +86,8 @@ export interface OrderDetail {
     name: string;
     email: string;
     phone: string;
+    /** "Mar 1990" (month precision, from the 18+ check); null on Orders from before it. */
+    born: string | null;
     fulfillment: string;
     /** The booked collection (Local Drop-Off) or the preferred ship date (Mail-In); null if none. */
     schedule: { date: CalendarDate; slot: string | null } | null;
@@ -170,6 +173,7 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       name: order.contactName,
       email: order.contactEmail,
       phone: order.contactPhone,
+      born: formatBirthMonthYear(order.birthMonth, order.birthYear),
       fulfillment: FULFILLMENT_LABELS[fulfillment.method],
       schedule,
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
