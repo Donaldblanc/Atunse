@@ -16,8 +16,10 @@ export function a11yProblems(element: ReactElement): string[] {
 
   for (const match of html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)) {
     const attrs = match[1] ?? "";
-    const text = (match[2] ?? "").replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, "").trim();
-    if (!/aria-label="[^"]+"/.test(attrs) && !/aria-labelledby=/.test(attrs) && !text) {
+    // Visible text = a non-blank text node outside any <svg> (icons carry no name).
+    // Checked in place rather than by stripping tags, which reads as HTML sanitizing.
+    const hasText = (match[2] ?? "").split(/<svg\b[\s\S]*?<\/svg>/).some((part) => /(?:^|>)[^<]*\S[^<]*(?:<|$)/.test(part));
+    if (!/aria-label="[^"]+"/.test(attrs) && !/aria-labelledby=/.test(attrs) && !hasText) {
       problems.push(`button without an accessible name: <button${attrs}>`);
     }
   }
