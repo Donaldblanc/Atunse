@@ -6,6 +6,9 @@ import type { FileStorage, UploadTarget } from "@/shared/storage/file-storage";
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
+/** Every logo key starts with this; setLogo refuses any other. */
+export const LOGO_KEY_PREFIX = "business-logo/";
+
 export class InvalidLogoUploadError extends Error {
   constructor(message: string) {
     super(message);
@@ -28,7 +31,7 @@ export async function requestLogoUpload(
   if (!ALLOWED_CONTENT_TYPES.includes(input.contentType)) throw new InvalidLogoUploadError("The logo must be a PNG, JPEG or WebP image.");
   if (input.size <= 0 || input.size > MAX_LOGO_BYTES) throw new InvalidLogoUploadError("The logo must be under 5 MB.");
 
-  const key = `business-logo/${randomUUID()}`;
+  const key = `${LOGO_KEY_PREFIX}${randomUUID()}`;
   const target = await deps.storage.createUploadTarget({ key, contentType: input.contentType, maxBytes: MAX_LOGO_BYTES });
   return { key, ...target };
 }

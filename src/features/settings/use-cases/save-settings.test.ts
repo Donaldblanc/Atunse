@@ -80,4 +80,50 @@ describe("saveSettings", () => {
     expect(result.ok).toBe(false);
     expect((await settings.getBusinessSettings()).businessName).not.toBe("");
   });
+
+  it("never writes a closed day's times as 0/0 (the database needs opensAt < closesAt)", async () => {
+    const settings = new InMemorySettingsRepository();
+    await saveSettings({ settings }, admin, VALID);
+    for (const row of await settings.getOperatingHours()) expect(row.opensAt).toBeLessThan(row.closesAt);
+  });
+});
+
+describe("cleanSettings closed days", () => {
+  const closedWith = (opensAt: string, closesAt: string) => ({ ...VALID, hours: [{ weekday: 2, isOpen: false, opensAt, closesAt }] });
+  const closedRow = (raw: RawSettings, stored?: Parameters<typeof cleanSettings>[1]) => {
+    const result = cleanSettings(raw, stored);
+    if (!result.ok) throw new Error("expected ok");
+    return result.input.hours[0];
+  };
+
+  it("keeps valid posted times", () => {
+    expect(closedRow(closedWith("09:00", "17:00"))).toEqual({ weekday: 2, isOpen: false, opensAt: 540, closesAt: 1020 });
+  });
+
+  it("falls back to the stored times when the posted ones are blank or backwards", () => {
+    const stored = [{ weekday: 2, isOpen: false, opensAt: 600, closesAt: 900 }];
+    expect(closedRow(closedWith("", ""), stored)).toMatchObject({ opensAt: 600, closesAt: 900 });
+    expect(closedRow(closedWith("18:00", "08:00"), stored)).toMatchObject({ opensAt: 600, closesAt: 900 });
+  });
+
+  it("falls back to 08:00-22:00 with nothing stored", () => {
+    expect(closedRow(closedWith("", ""), [])).toMatchObject({ opensAt: 480, closesAt: 1320 });
+  });
+});
+
+describe("cleanSettings field checks", () => {
+  const errorsFor = (patch: Partial<RawSettings>) => {
+    const result = cleanSettings({ ...VALID, ...patch });
+    return result.ok ? {} : result.errors;
+  };
+
+  it("checks email shape, phone, and time zone", () => {
+    expect(errorsFor({ email: "a@b" }).email).toBeTruthy();
+    expect(errorsFor({ email: "owner@example.com" }).email).toBeUndefined();
+    expect(errorsFor({ phone: "abc" }).phone).toBeTruthy();
+    expect(errorsFor({ phone: "123" }).phone).toBeTruthy();
+    expect(errorsFor({ phone: "+1 (555) 123-4567" }).phone).toBeUndefined();
+    expect(errorsFor({ timeZone: "Mars/Olympus" }).timeZone).toBeTruthy();
+    expect(errorsFor({ timeZone: "America/Chicago" }).timeZone).toBeUndefined();
+  });
 });

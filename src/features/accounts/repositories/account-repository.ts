@@ -38,6 +38,14 @@ export interface AdminAccount {
   passwordHash: string | null;
 }
 
+/** Thrown by updateAdminProfile when another Admin Account already uses the email. */
+export class AdminEmailTakenError extends Error {
+  constructor() {
+    super("Another admin uses that email");
+    this.name = "AdminEmailTakenError";
+  }
+}
+
 export interface AccountRepository {
   /** `email` is matched case-insensitively (emails are stored lowercased). */
   findCustomerByEmail(email: string): Promise<CustomerAccount | null>;
@@ -51,7 +59,7 @@ export interface AccountRepository {
 
   /** An Admin Account by id, or null for an id no Admin Account has. */
   findAdminById(accountId: string): Promise<AdminAccount | null>;
-  /** Settings' Account Settings "Save": the admin's own name and email. */
+  /** Settings' Account Settings "Save": the admin's own name and email. Throws AdminEmailTakenError if another admin has the email. */
   updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void>;
   /** Settings' Account Settings "Change Password": replaces the stored hash. */
   updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void>;

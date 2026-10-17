@@ -58,4 +58,12 @@ export class PrismaSettingsRepository implements SettingsRepository {
       }
     });
   }
+
+  async setLogoKey(logoKey: string | null): Promise<void> {
+    await this.prisma.businessSettings.upsert({
+      where: { id: SETTINGS_ID },
+      create: { id: SETTINGS_ID, ...DEFAULT_BUSINESS_SETTINGS, logoKey },
+      update: { logoKey },
+    });
+  }
 }

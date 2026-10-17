@@ -63,6 +63,11 @@ export interface SettingsRepository {
    * is a plain field overwrite, so applying it twice is harmless (ADR-0012).
    */
   saveSettings(input: SaveSettingsInput): Promise<void>;
+  /**
+   * Sets or clears (null) only the logo, leaving every other setting alone.
+   * Creates the singleton row with defaults if it was never saved.
+   */
+  setLogoKey(logoKey: string | null): Promise<void>;
 }
 
 /** Shown before BusinessSettings has ever been saved. */

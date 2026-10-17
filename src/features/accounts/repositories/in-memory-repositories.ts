@@ -16,7 +16,7 @@ import {
   type RedeemResult,
   type SignInCodes,
 } from "../sign-in-codes";
-import type { AccountRepository, AdminAccount, CustomerAccount, CustomerDetail, CustomerListRow } from "./account-repository";
+import { AdminEmailTakenError, type AccountRepository, type AdminAccount, type CustomerAccount, type CustomerDetail, type CustomerListRow } from "./account-repository";
 
 type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; passwordHash?: string | null; createdAt: Date };
 
@@ -80,8 +80,10 @@ export class InMemoryAccounts implements AccountRepository {
   async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
     if (!found) return;
+    const email = fields.email.trim().toLowerCase();
+    if (this.accounts.some((a) => a.role === "ADMIN" && a.id !== accountId && a.email === email)) throw new AdminEmailTakenError();
     found.name = fields.name;
-    found.email = fields.email.trim().toLowerCase();
+    found.email = email;
   }
 
   async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {

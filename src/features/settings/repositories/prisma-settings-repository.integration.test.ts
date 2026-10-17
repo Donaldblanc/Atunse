@@ -8,6 +8,9 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaSettingsRepository } from "./prisma-settings-repository";
+import { saveSettings, type RawSettings } from "../use-cases/save-settings";
+import { setLogo } from "../use-cases/set-logo";
+import { removeLogo } from "../use-cases/remove-logo";
 import { DEFAULT_BUSINESS_SETTINGS, defaultOperatingHours, type SaveSettingsInput } from "./settings-repository";
 
 const prisma = new PrismaClient();
@@ -89,5 +92,58 @@ describe("PrismaSettingsRepository (integration)", () => {
     await repo.saveSettings(input);
     const business = await repo.getBusinessSettings();
     expect(business).toMatchObject({ businessName: input.businessName });
+  });
+
+  it("setLogoKey changes only the logo, creating the row if needed", async () => {
+    await repo.setLogoKey("business-logo/first");
+    expect(await repo.getBusinessSettings()).toEqual({ ...DEFAULT_BUSINESS_SETTINGS, logoKey: "business-logo/first" });
+
+    await repo.saveSettings(input);
+    await repo.setLogoKey("business-logo/second");
+    expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, city: "Brooklyn", logoKey: "business-logo/second" });
+    expect((await repo.getOperatingHours()).find((row) => row.weekday === 1)).toMatchObject({ isOpen: true, opensAt: 540 });
+
+    await repo.setLogoKey(null);
+    expect((await repo.getBusinessSettings()).logoKey).toBeNull();
+  });
+
+  it("setLogo and removeLogo go through the real repository", async () => {
+    const admin = { accountId: "admin-1", role: "ADMIN" as const };
+    await repo.saveSettings(input);
+    await setLogo({ settings: repo }, admin, "business-logo/abc");
+    expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, logoKey: "business-logo/abc" });
+    await removeLogo({ settings: repo }, admin);
+    expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, logoKey: null });
+  });
+
+  it("saveSettings with a closed day satisfies operating_hours_times_check", async () => {
+    const admin = { accountId: "admin-1", role: "ADMIN" as const };
+    const raw: RawSettings = {
+      businessName: "Atunṣe",
+      tagline: "",
+      ownerName: "",
+      email: "",
+      phone: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      zip: "",
+      timeZone: "America/New_York",
+      currency: "USD",
+      allowLocalDropOff: true,
+      allowMailIn: true,
+      // Monday open; every other day closed with blank (disabled-input) times.
+      hours: defaultOperatingHours().map((row) =>
+        row.weekday === 1 ? { weekday: 1, isOpen: true, opensAt: "09:00", closesAt: "17:00" } : { weekday: row.weekday, isOpen: false, opensAt: "", closesAt: "" },
+      ),
+    };
+    expect(await saveSettings({ settings: repo }, admin, raw)).toEqual({ ok: true });
+    const hours = await repo.getOperatingHours();
+    expect(hours.find((row) => row.weekday === 1)).toEqual({ weekday: 1, isOpen: true, opensAt: 540, closesAt: 1020 });
+    for (const row of hours.filter((h) => h.weekday !== 1)) {
+      expect(row.isOpen).toBe(false);
+      expect(row.opensAt).toBeLessThan(row.closesAt);
+    }
   });
 });

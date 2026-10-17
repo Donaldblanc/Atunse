@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useRef, useState } from "react";
 import { removeLogoAction, setLogoAction, type RemoveLogoState } from "./settings-actions";
 
 const INITIAL: RemoveLogoState = { error: null };
@@ -38,7 +38,7 @@ export function LogoUpload({ logoUrl }: { logoUrl: string | null }) {
 
       const confirm = new FormData();
       confirm.append("logoKey", upload.key);
-      setFormAction(confirm);
+      startTransition(() => setFormAction(confirm));
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "That upload didn't finish.");
     } finally {

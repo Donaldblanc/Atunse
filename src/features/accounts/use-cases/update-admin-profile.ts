@@ -1,7 +1,8 @@
 import type { ActingUser } from "../authz";
 import { requireRole, UnauthorizedError } from "../authz";
+import { isValidEmail } from "@/features/orders/contact-rules";
 import { hashPassword, verifyPassword } from "../password";
-import type { AccountRepository } from "../repositories/account-repository";
+import { AdminEmailTakenError, type AccountRepository } from "../repositories/account-repository";
 
 export class AdminNotFoundError extends Error {
   constructor() {
@@ -29,12 +30,17 @@ export async function updateAdminProfile(
   const name = input.name.trim();
   const email = input.email.trim().toLowerCase();
   if (!name) return { ok: false, error: "Enter your name." };
-  if (!email.includes("@") || email.length > 254) return { ok: false, error: "Enter a valid email address." };
+  if (!isValidEmail(email) || email.length > 254) return { ok: false, error: "Enter a valid email address." };
 
   const admin = await deps.accounts.findAdminById(input.accountId);
   if (!admin) throw new AdminNotFoundError();
 
-  await deps.accounts.updateAdminProfile(input.accountId, { name, email });
+  try {
+    await deps.accounts.updateAdminProfile(input.accountId, { name, email });
+  } catch (err) {
+    if (err instanceof AdminEmailTakenError) return { ok: false, error: "Another admin uses that email." };
+    throw err;
+  }
   return { ok: true };
 }
 

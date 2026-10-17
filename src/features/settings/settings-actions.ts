@@ -6,6 +6,7 @@ import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { AdminNotFoundError, changeAdminPassword, updateAdminProfile } from "@/features/accounts/use-cases/update-admin-profile";
 import { buildSettingsDeps } from "./deps";
+import { InvalidLogoUploadError } from "./use-cases/request-logo-upload";
 import { removeLogo } from "./use-cases/remove-logo";
 import { setLogo } from "./use-cases/set-logo";
 import { saveSettings, type RawHoursRow, type SettingsErrors } from "./use-cases/save-settings";
@@ -77,6 +78,7 @@ export async function setLogoAction(_previous: RemoveLogoState, formData: FormDa
     const actingUser = await actingUserFromCookies(await cookies());
     await setLogo(buildSettingsDeps(), actingUser, logoKey);
   } catch (err) {
+    if (err instanceof InvalidLogoUploadError) return { error: err.message };
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     throw err;
   }

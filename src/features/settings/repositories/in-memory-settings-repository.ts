@@ -47,4 +47,8 @@ export class InMemorySettingsRepository implements SettingsRepository {
     };
     for (const row of input.hours) this.hours.set(row.weekday, row);
   }
+
+  async setLogoKey(logoKey: string | null): Promise<void> {
+    this.settings = { ...(this.settings ?? DEFAULT_BUSINESS_SETTINGS), logoKey };
+  }
 }

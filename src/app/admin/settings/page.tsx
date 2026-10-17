@@ -26,11 +26,10 @@ export const metadata = { title: "Settings · Atunṣe Admin" };
 export default async function AdminSettingsPage() {
   const actingUser = await actingUserFromCookies(await cookies());
   const deps = buildSettingsDeps();
-  const [{ business, hours, logoUrl }, admin, integrations] = await Promise.all([
-    getSettings(deps, actingUser),
-    actingUser.accountId ? deps.accounts.findAdminById(actingUser.accountId) : Promise.resolve(null),
-    Promise.resolve(getIntegrationsStatus()),
-  ]);
+  // getSettings runs requireRole first; only then look up the admin's account.
+  const { business, hours, logoUrl } = await getSettings(deps, actingUser);
+  const admin = actingUser.accountId ? await deps.accounts.findAdminById(actingUser.accountId) : null;
+  const integrations = getIntegrationsStatus();
 
   return (
     <div className="st">

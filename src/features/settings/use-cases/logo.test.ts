@@ -3,7 +3,7 @@ import { UnauthorizedError } from "@/features/accounts/authz";
 import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemorySettingsRepository } from "../repositories/in-memory-settings-repository";
 import { DEFAULT_BUSINESS_SETTINGS, defaultOperatingHours } from "../repositories/settings-repository";
-import { InvalidLogoUploadError, requestLogoUpload } from "./request-logo-upload";
+import { InvalidLogoUploadError, LOGO_KEY_PREFIX, requestLogoUpload } from "./request-logo-upload";
 import { removeLogo } from "./remove-logo";
 import { setLogo } from "./set-logo";
 
@@ -41,6 +41,13 @@ describe("setLogo and removeLogo", () => {
     const business = await settings.getBusinessSettings();
     expect(business.logoKey).toBe("business-logo/abc");
     expect(business.businessName).toBe("Atunṣe Sneaker Care");
+  });
+
+  it("setLogo rejects a key outside the business-logo/ prefix", async () => {
+    const settings = new InMemorySettingsRepository();
+    await expect(setLogo({ settings }, admin, "services/abc")).rejects.toThrow(InvalidLogoUploadError);
+    await expect(setLogo({ settings }, admin, LOGO_KEY_PREFIX)).rejects.toThrow(InvalidLogoUploadError);
+    expect((await settings.getBusinessSettings()).logoKey).toBeNull();
   });
 
   it("removeLogo clears the key", async () => {

@@ -22,6 +22,14 @@ describe("updateAdminProfile", () => {
     expect(found).toMatchObject({ name: "DJ Blanc", email: "dj2@atunse.com" });
   });
 
+  it("shows a field error when another admin already uses the email", async () => {
+    const { accounts, admin } = await setup();
+    const actingUser = { accountId: admin.id, role: "ADMIN" as const };
+    const result = await updateAdminProfile({ accounts }, actingUser, { accountId: admin.id, name: "DJ", email: "Other@atunse.com" });
+    expect(result).toEqual({ ok: false, error: "Another admin uses that email." });
+    expect((await accounts.findAdminById(admin.id))?.email).toBe("dj@atunse.com");
+  });
+
   it("refuses to edit another admin's account", async () => {
     const { accounts, admin, other } = await setup();
     const actingUser = { accountId: admin.id, role: "ADMIN" as const };

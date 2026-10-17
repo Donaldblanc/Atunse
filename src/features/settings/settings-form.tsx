@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveSettingsAction, type SaveSettingsState } from "./settings-actions";
 import type { BusinessSettingsData, OperatingHoursRow } from "./repositories/settings-repository";
 
@@ -25,6 +25,29 @@ export function SettingsForm({ business, hours, idempotencyKey }: { business: Bu
   const [state, formAction, pending] = useActionState<SaveSettingsState, FormData>(saveSettingsAction, INITIAL);
   const { errors } = state;
 
+  // Controlled so React 19's post-action form reset doesn't wipe what the
+  // admin typed when validation fails.
+  const [values, setValues] = useState({
+    businessName: business.businessName,
+    tagline: business.tagline ?? "",
+    ownerName: business.ownerName ?? "",
+    email: business.email ?? "",
+    phone: business.phone ?? "",
+    addressLine1: business.addressLine1 ?? "",
+    addressLine2: business.addressLine2 ?? "",
+    city: business.city ?? "",
+    state: business.state ?? "",
+    zip: business.zip ?? "",
+    timeZone: business.timeZone,
+    currency: business.currency,
+    allowLocalDropOff: business.allowLocalDropOff,
+    allowMailIn: business.allowMailIn,
+  });
+  const [hoursValues, setHoursValues] = useState(hours.map((row) => ({ isOpen: row.isOpen, opensAt: toClock(row.opensAt), closesAt: toClock(row.closesAt) })));
+  type TextField = Exclude<keyof typeof values, "allowLocalDropOff" | "allowMailIn">;
+  const bind = (name: TextField) => ({ name, value: values[name], onChange: (event: React.ChangeEvent<HTMLInputElement>) => setValues({ ...values, [name]: event.target.value }) });
+  const setHour = (index: number, patch: Partial<(typeof hoursValues)[number]>) => setHoursValues(hoursValues.map((h, i) => (i === index ? { ...h, ...patch } : h)));
+
   return (
     <form action={formAction} className="st-form">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
@@ -33,64 +56,69 @@ export function SettingsForm({ business, hours, idempotencyKey }: { business: Bu
         <h2 className="ov-card-title">Business Information</h2>
         <div className="st-grid">
           <Field label="Business name" error={errors.businessName}>
-            <input name="businessName" defaultValue={business.businessName} maxLength={120} required className="st-input" />
+            <input {...bind("businessName")} maxLength={120} required className="st-input" />
           </Field>
           <Field label="Tagline">
-            <input name="tagline" defaultValue={business.tagline ?? ""} maxLength={160} className="st-input" />
+            <input {...bind("tagline")} maxLength={160} className="st-input" />
           </Field>
           <Field label="Owner name">
-            <input name="ownerName" defaultValue={business.ownerName ?? ""} maxLength={120} className="st-input" />
+            <input {...bind("ownerName")} maxLength={120} className="st-input" />
           </Field>
           <Field label="Email" error={errors.email}>
-            <input type="email" name="email" defaultValue={business.email ?? ""} maxLength={254} className="st-input" />
+            <input type="email" {...bind("email")} maxLength={254} className="st-input" />
           </Field>
-          <Field label="Phone">
-            <input type="tel" name="phone" defaultValue={business.phone ?? ""} maxLength={30} className="st-input" />
+          <Field label="Phone" error={errors.phone}>
+            <input type="tel" {...bind("phone")} maxLength={30} className="st-input" />
           </Field>
           <Field label="Address line 1">
-            <input name="addressLine1" defaultValue={business.addressLine1 ?? ""} maxLength={120} className="st-input" />
+            <input {...bind("addressLine1")} maxLength={120} className="st-input" />
           </Field>
           <Field label="Address line 2">
-            <input name="addressLine2" defaultValue={business.addressLine2 ?? ""} maxLength={120} className="st-input" />
+            <input {...bind("addressLine2")} maxLength={120} className="st-input" />
           </Field>
           <Field label="City">
-            <input name="city" defaultValue={business.city ?? ""} maxLength={80} className="st-input" />
+            <input {...bind("city")} maxLength={80} className="st-input" />
           </Field>
           <Field label="State">
-            <input name="state" defaultValue={business.state ?? ""} maxLength={2} className="st-input" />
+            <input {...bind("state")} maxLength={2} className="st-input" />
           </Field>
           <Field label="Zip">
-            <input name="zip" defaultValue={business.zip ?? ""} maxLength={10} className="st-input" />
+            <input {...bind("zip")} maxLength={10} className="st-input" />
           </Field>
           <Field label="Time zone" error={errors.timeZone}>
-            <input name="timeZone" defaultValue={business.timeZone} maxLength={60} required className="st-input" placeholder="America/New_York" />
+            <input {...bind("timeZone")} maxLength={60} required className="st-input" placeholder="America/New_York" />
           </Field>
           <Field label="Currency" error={errors.currency}>
-            <input name="currency" defaultValue={business.currency} maxLength={3} required className="st-input" placeholder="USD" />
+            <input {...bind("currency")} maxLength={3} required className="st-input" placeholder="USD" />
           </Field>
         </div>
       </section>
 
       <section id="operating-hours" className="ov-card st-card">
         <h2 className="ov-card-title">Operating Hours</h2>
+        <p className="st-hint">These hours are saved but booking doesn&apos;t use them yet — /booking still reads its own schedule.</p>
         <div className="st-hours-grid">
-          {hours.map((row) => (
+          {hours.map((row, index) => {
+            const hv = hoursValues[index];
+            if (!hv) return null;
+            return (
             <div key={row.weekday} className="st-hours-row">
               <label className="st-hours-day">
                 <input type="hidden" name={`hours:${row.weekday}:weekday`} value={row.weekday} />
-                <input type="checkbox" name={`hours:${row.weekday}:isOpen`} defaultChecked={row.isOpen} />
+                <input type="checkbox" name={`hours:${row.weekday}:isOpen`} checked={hv.isOpen} onChange={(event) => setHour(index, { isOpen: event.target.checked })} />
                 {WEEKDAY_LABELS[row.weekday]}
               </label>
-              <input type="time" name={`hours:${row.weekday}:opensAt`} defaultValue={toClock(row.opensAt)} className="st-input" />
+              <input type="time" name={`hours:${row.weekday}:opensAt`} value={hv.opensAt} onChange={(event) => setHour(index, { opensAt: event.target.value })} className="st-input" />
               <span className="st-hours-sep">to</span>
-              <input type="time" name={`hours:${row.weekday}:closesAt`} defaultValue={toClock(row.closesAt)} className="st-input" />
+              <input type="time" name={`hours:${row.weekday}:closesAt`} value={hv.closesAt} onChange={(event) => setHour(index, { closesAt: event.target.value })} className="st-input" />
               {errors[`hours:${row.weekday}`] && (
                 <p role="alert" className="od-status-error st-error">
                   {errors[`hours:${row.weekday}`]}
                 </p>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -101,11 +129,11 @@ export function SettingsForm({ business, hours, idempotencyKey }: { business: Bu
           doesn&apos;t yet change what customers see on /booking.
         </p>
         <label className="st-toggle">
-          <input type="checkbox" name="allowLocalDropOff" defaultChecked={business.allowLocalDropOff} />
+          <input type="checkbox" name="allowLocalDropOff" checked={values.allowLocalDropOff} onChange={(event) => setValues({ ...values, allowLocalDropOff: event.target.checked })} />
           Allow Local Drop-Off bookings
         </label>
         <label className="st-toggle">
-          <input type="checkbox" name="allowMailIn" defaultChecked={business.allowMailIn} />
+          <input type="checkbox" name="allowMailIn" checked={values.allowMailIn} onChange={(event) => setValues({ ...values, allowMailIn: event.target.checked })} />
           Allow Mail-In bookings
         </label>
       </section>
