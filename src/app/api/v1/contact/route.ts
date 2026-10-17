@@ -7,6 +7,7 @@ import {
   ContactValidationError,
   sendContactMessage,
 } from "@/features/contact/contact-message";
+import { redactForLog } from "@/shared/logging/redact";
 import { limitByIp, RATE_LIMITS } from "@/shared/rate-limit";
 
 // POST /api/v1/contact — the /contact page's form. Public, rate-limited
@@ -33,10 +34,10 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof ContactValidationError) return NextResponse.json({ error: err.message }, { status: 400 });
     if (err instanceof ContactInboxNotConfiguredError) {
-      console.error("[contact]", err.message);
+      console.error("[contact]", redactForLog(err.message));
       return NextResponse.json({ error: "Our contact form is unavailable right now. Please try again later." }, { status: 503 });
     }
-    console.error("[contact] sending failed", err instanceof Error ? err.message : err);
+    console.error("[contact] sending failed", redactForLog(err instanceof Error ? err.message : String(err)));
     return NextResponse.json({ error: "We couldn't send your message. Please try again in a moment." }, { status: 502 });
   }
   return NextResponse.json({ ok: true }, { status: 202 });

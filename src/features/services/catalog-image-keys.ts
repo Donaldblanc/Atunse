@@ -7,6 +7,9 @@ import { isPhotoContentType, MAX_PHOTO_BYTES, PHOTO_CONTENT_TYPES, type PhotoCon
 
 export { isPhotoContentType, MAX_PHOTO_BYTES, type PhotoContentType };
 
+/** A Service id or Bundle slug as it may appear in a storage key: no slashes, dots or anything that could escape the prefix. */
+export const CATALOG_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 export function newServiceImageKey(serviceId: string, contentType: PhotoContentType): string {
   return `services/${serviceId}/${randomUUID()}.${PHOTO_CONTENT_TYPES[contentType]}`;
 }

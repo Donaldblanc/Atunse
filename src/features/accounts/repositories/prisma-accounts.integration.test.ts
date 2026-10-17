@@ -92,7 +92,7 @@ describe("PrismaSignInCodes (integration)", () => {
   });
 
   it("finds an Admin Account by id, never a Customer's", async () => {
-    expect(await accounts.findAdminById(adminId)).toEqual({ id: adminId, name: null, email: "codes@example.com", passwordHash: null });
+    expect(await accounts.findAdminById(adminId)).toEqual({ id: adminId, name: null, email: "codes@example.com", passwordHash: null, sessionVersion: 0 });
     expect(await accounts.findAdminById(customerId)).toBeNull();
     expect(await accounts.findAdminById("no-such-id")).toBeNull();
   });
@@ -103,6 +103,16 @@ describe("PrismaSignInCodes (integration)", () => {
     await accounts.updateAdminProfile(customerId, { name: "Hacked", email: "hacked@example.com" });
     expect(await prisma.account.findUnique({ where: { id: customerId } })).toMatchObject({ email: "codes@example.com", name: null });
     await prisma.account.deleteMany({ where: { email: "codes-new@example.com" } });
+  });
+
+  it("updateAdminProfile and updateAdminPasswordHash return the new sessionVersion atomically (null for non-admins)", async () => {
+    expect(await accounts.updateAdminProfile(adminId, { name: "DJ", email: "codes@example.com" })).toBe(0);
+    expect(await accounts.updateAdminProfile(adminId, { name: "DJ", email: "codes-new2@example.com" })).toBe(1);
+    expect(await accounts.updateAdminPasswordHash(adminId, "x")).toBe(2);
+    expect(await accounts.findAdminSessionVersion(adminId)).toBe(2);
+    expect(await accounts.updateAdminPasswordHash(customerId, "x")).toBeNull();
+    expect(await accounts.updateAdminProfile(customerId, { name: "X", email: "x@example.com" })).toBeNull();
+    await prisma.account.deleteMany({ where: { email: "codes-new2@example.com" } });
   });
 
   it("updateAdminProfile throws AdminEmailTakenError when another admin has the email", async () => {

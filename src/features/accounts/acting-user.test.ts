@@ -1,10 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import type { AdminSessionVersions } from "./admin-session-versions";
 import { actingUserFromCookies, customerFromCookies } from "./acting-user";
 import { createSessionCookieValue, CUSTOMER_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "./session";
 
 function jar(values: Record<string, string>) {
   return { get: (name: string) => (name in values ? { value: values[name]! } : undefined) };
 }
+
+const versions = (current: number | null): AdminSessionVersions => ({ findAdminSessionVersion: async () => current });
 
 let adminToken: string;
 let customerToken: string;
@@ -35,12 +38,16 @@ describe("customerFromCookies (booking, sign-in)", () => {
 describe("actingUserFromCookies (routes both sides use)", () => {
   it("prefers the admin session, then the customer one, else GUEST", async () => {
     const both = jar({ [SESSION_COOKIE_NAME]: adminToken, [CUSTOMER_SESSION_COOKIE_NAME]: customerToken });
-    expect(await actingUserFromCookies(both)).toMatchObject({ role: "ADMIN", accountId: "acc_admin" });
-    expect(await actingUserFromCookies(jar({ [CUSTOMER_SESSION_COOKIE_NAME]: customerToken }))).toMatchObject({ role: "CUSTOMER" });
-    expect(await actingUserFromCookies(jar({}))).toMatchObject({ role: "GUEST" });
+    expect(await actingUserFromCookies(both, versions(0))).toMatchObject({ role: "ADMIN", accountId: "acc_admin" });
+    expect(await actingUserFromCookies(jar({ [CUSTOMER_SESSION_COOKIE_NAME]: customerToken }), versions(0))).toMatchObject({ role: "CUSTOMER" });
+    expect(await actingUserFromCookies(jar({}), versions(0))).toMatchObject({ role: "GUEST" });
   });
 
   it("never treats a customer token in the admin cookie as an admin", async () => {
-    expect(await actingUserFromCookies(jar({ [SESSION_COOKIE_NAME]: customerToken }))).toMatchObject({ role: "GUEST" });
+    expect(await actingUserFromCookies(jar({ [SESSION_COOKIE_NAME]: customerToken }), versions(0))).toMatchObject({ role: "GUEST" });
+  });
+
+  it("treats an admin session as GUEST once the Account's sessionVersion has moved past it", async () => {
+    expect(await actingUserFromCookies(jar({ [SESSION_COOKIE_NAME]: adminToken }), versions(1))).toMatchObject({ role: "GUEST" });
   });
 });

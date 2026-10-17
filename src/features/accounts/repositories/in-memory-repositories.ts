@@ -18,7 +18,7 @@ import {
 } from "../sign-in-codes";
 import { AdminEmailTakenError, type AccountRepository, type AdminAccount, type CustomerAccount, type CustomerDetail, type CustomerListRow } from "./account-repository";
 
-type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; passwordHash?: string | null; createdAt: Date };
+type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; passwordHash?: string | null; sessionVersion: number; createdAt: Date };
 
 let nextAccountId = 0;
 
@@ -29,7 +29,7 @@ export class InMemoryAccounts implements AccountRepository {
   readonly accounts: StoredAccount[] = [];
 
   add(
-    account: Omit<StoredAccount, "id" | "phone" | "name" | "createdAt"> & { id?: string; phone?: string | null; name?: string | null; createdAt?: Date },
+    account: Omit<StoredAccount, "id" | "phone" | "name" | "createdAt" | "sessionVersion"> & { id?: string; phone?: string | null; name?: string | null; createdAt?: Date },
   ): StoredAccount {
     const email = account.email.trim().toLowerCase();
     if (this.accounts.some((a) => a.email === email && a.role === account.role)) throw new InMemoryEmailTakenError();
@@ -41,6 +41,7 @@ export class InMemoryAccounts implements AccountRepository {
       name: account.name ?? null,
       phone: account.phone ?? null,
       passwordHash: account.passwordHash ?? null,
+      sessionVersion: 0,
       createdAt: account.createdAt ?? new Date(Date.now() + nextAccountId),
     };
     this.accounts.push(stored);
@@ -74,21 +75,35 @@ export class InMemoryAccounts implements AccountRepository {
 
   async findAdminById(accountId: string): Promise<AdminAccount | null> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
-    return found ? { id: found.id, name: found.name, email: found.email, passwordHash: found.passwordHash ?? null } : null;
+    return found ? { id: found.id, name: found.name, email: found.email, passwordHash: found.passwordHash ?? null, sessionVersion: found.sessionVersion } : null;
   }
 
-  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<number | null> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
-    if (!found) return;
+    if (!found) return null;
     const email = fields.email.trim().toLowerCase();
     if (this.accounts.some((a) => a.role === "ADMIN" && a.id !== accountId && a.email === email)) throw new AdminEmailTakenError();
     found.name = fields.name;
+    if (found.email !== email) found.sessionVersion += 1;
     found.email = email;
+    return found.sessionVersion;
   }
 
-  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
+  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<number | null> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
-    if (found) found.passwordHash = passwordHash;
+    if (!found) return null;
+    found.passwordHash = passwordHash;
+    found.sessionVersion += 1;
+    return found.sessionVersion;
+  }
+
+  async findAdminSessionVersion(accountId: string): Promise<number | null> {
+    return this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId)?.sessionVersion ?? null;
+  }
+
+  async bumpAdminSessionVersion(accountId: string): Promise<void> {
+    const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
+    if (found) found.sessionVersion += 1;
   }
 }
 

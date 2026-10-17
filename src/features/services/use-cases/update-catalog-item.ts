@@ -6,6 +6,7 @@
 
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { MAX_QUOTE_CENTS } from "@/features/orders/domain";
 import {
   ServiceNotFoundError,
   BundleNotFoundError,
@@ -46,8 +47,12 @@ export interface UpdateServiceInput {
   expectedUpdatedAt: Date;
 }
 
-function validateMoney(cents: number, label: string): void {
+/** Catalog prices share the Quote ceiling ($5,000), so a typo can't list a four-figure-too-high price. */
+export const MAX_CATALOG_CENTS = MAX_QUOTE_CENTS;
+
+export function validateMoney(cents: number, label: string): void {
   if (!Number.isInteger(cents) || cents < 0) throw new CatalogValidationError(`${label} must be a whole number of cents, zero or more.`);
+  if (cents > MAX_CATALOG_CENTS) throw new CatalogValidationError(`${label} must be $${MAX_CATALOG_CENTS / 100} or less.`);
 }
 
 export async function updateService(deps: CatalogWriteDeps, actingUser: ActingUser, input: UpdateServiceInput): Promise<ServiceRecord> {

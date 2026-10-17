@@ -5,6 +5,9 @@ let cookieValue: string | undefined;
 vi.mock("next/headers", () => ({
   cookies: async () => ({ get: (name: string) => (name === SESSION_COOKIE_NAME && cookieValue !== undefined ? { value: cookieValue } : undefined) }),
 }));
+vi.mock("@/features/accounts/admin-session-versions", () => ({
+  defaultAdminSessionVersions: () => ({ findAdminSessionVersion: async () => 0 }),
+}));
 class RedirectSignal extends Error {}
 const redirect = vi.fn((url: string) => {
   throw new RedirectSignal(url);

@@ -4,10 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { buildOrderUseCaseDeps } from "@/features/orders/deps";
 import { OrderNotFoundError } from "@/features/orders/repositories/order-repository";
-import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
 import { createBalance } from "@/features/orders/use-cases/create-balance";
-import { prisma } from "@/shared/db/prisma-client";
 import { redactForLog } from "@/shared/logging/redact";
 
 export type CreateBalanceResult = { ok: true } | { ok: false; error: string };
@@ -17,7 +16,7 @@ export async function createBalanceAction(orderId: string): Promise<CreateBalanc
   if (typeof orderId !== "string" || !orderId) return { ok: false, error: "Something went wrong. Reload and try again." };
   try {
     const actingUser = await actingUserFromCookies(await cookies());
-    await createBalance({ orders: new PrismaOrderRepository(prisma) }, actingUser, { orderId });
+    await createBalance(buildOrderUseCaseDeps(), actingUser, { orderId });
   } catch (err) {
     if (err instanceof UnauthorizedError) return { ok: false, error: "Your session has ended. Sign in again." };
     if (err instanceof OrderNotFoundError) return { ok: false, error: "This order no longer exists." };

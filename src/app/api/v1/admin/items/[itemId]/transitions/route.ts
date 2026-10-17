@@ -8,6 +8,7 @@ import {
   MoveNotAllowedError,
   transitionItemStatus,
 } from "@/features/orders/use-cases/transition-item-status";
+import { rejectCrossSiteOrNonJson } from "@/shared/http/request-guards";
 import { ItemNotFoundError, ItemStatusChangedError } from "@/features/orders/repositories/order-repository";
 
 // POST /api/v1/admin/items/:itemId/transitions — every admin action on the
@@ -28,6 +29,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ ite
   if (!allowed) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const refused = rejectCrossSiteOrNonJson(req);
+  if (refused) return refused;
 
   let body: unknown;
   try {
@@ -89,8 +92,9 @@ function parseTransitionBody(
   if (!isItemStatus(b.toStatus)) {
     return { ok: false, error: `toStatus must be one of: ${ITEM_STATUSES.join(", ")}` };
   }
-  if (typeof b.action !== "string" || b.action.length === 0) {
-    return { ok: false, error: "action is required" };
+  // The only action this endpoint records; the audit trail never takes a caller-chosen label.
+  if (b.action !== "STATUS_TRANSITION") {
+    return { ok: false, error: "action must be STATUS_TRANSITION" };
   }
 
   return {

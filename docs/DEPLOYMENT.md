@@ -124,7 +124,7 @@ characters or a placeholder: check the Vercel value first
 2. **Manual abuse checks on the preview:**
    - 11 bad admin sign-ins from one IP: the 11th gets 429 with Retry-After.
    - Repeated attempts on one email from several IPs: the 21st gets 429.
-   - `atunse_session=x.!!!` on `/admin` redirects; it doesn't 500.
+   - `__Host-atunse_session=x.!!!` on `/admin` redirects; it doesn't 500.
    - `/admin` and `/api/v1/admin/*` without an admin session are refused.
    - Timing: compare the median of ~10 known-email and ~10 unknown-email
      wrong-password attempts. They should be within noise. This is an

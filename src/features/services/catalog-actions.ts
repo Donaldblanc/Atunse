@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { parseDollarsToCents } from "./dollars";
 import { buildCatalogDeps } from "./deps";
 import {
   BundleIdTakenError,
@@ -37,11 +38,9 @@ const text = (formData: FormData, name: string) => {
   return typeof value === "string" ? value : "";
 };
 
-function dollarsToCents(formData: FormData, name: string): number {
-  const raw = text(formData, name).trim();
-  const dollars = Number(raw);
-  if (!Number.isFinite(dollars)) return NaN;
-  return Math.round(dollars * 100);
+/** Required money field: blank is a validation error. Pass `optional` for fields where blank means $0. */
+function dollarsToCents(formData: FormData, name: string, optional = false): number {
+  return parseDollarsToCents(text(formData, name), { blankIsZero: optional });
 }
 
 function returnToAdmin(formData: FormData, fallback: string): string {
@@ -67,7 +66,7 @@ export async function updateServiceAction(_previous: CatalogFormState, formData:
       name: text(formData, "name"),
       description: text(formData, "description"),
       baseCents: dollarsToCents(formData, "baseDollars"),
-      suedeFeeCents: dollarsToCents(formData, "suedeDollars"),
+      suedeFeeCents: dollarsToCents(formData, "suedeDollars", true),
       category,
       active: formData.get("active") === "on",
       internalNotes: text(formData, "internalNotes") || null,
