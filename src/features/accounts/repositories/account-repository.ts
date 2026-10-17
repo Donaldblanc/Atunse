@@ -65,9 +65,9 @@ export interface AccountRepository {
    * AdminEmailTakenError if another admin has the email. Changing the email
    * bumps sessionVersion, which signs out every existing admin session.
    */
-  updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void>;
-  /** Settings' Account Settings "Change Password": replaces the stored hash and bumps sessionVersion (signs out every existing admin session). */
-  updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void>;
+  updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<number | null>;
+  /** Settings' Account Settings "Change Password": replaces the stored hash and bumps sessionVersion (signs out every existing admin session). Returns the new version (read in the same transaction), or null for an unknown admin. */
+  updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<number | null>;
   /** The admin's current sessionVersion, or null for an id no Admin Account has. */
   findAdminSessionVersion(accountId: string): Promise<number | null>;
   /** Revokes every admin session cookie issued so far (sign-out). */

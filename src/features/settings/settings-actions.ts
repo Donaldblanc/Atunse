@@ -24,11 +24,11 @@ const text = (formData: FormData, name: string) => {
 /**
  * A password or email change bumps the Account's sessionVersion, which
  * signs out every existing session including the one making the change.
- * Re-issue this browser's cookie at the new version so the admin who just
+ * Re-issue this browser's cookie at the new version (returned by the write
+ * itself, so another tab's sign-out can't race a separate read) so the admin who just
  * saved isn't kicked out; any other copy of the old cookie stays dead.
  */
-async function reissueSession(accountId: string) {
-  const sessionVersion = await buildSettingsDeps().accounts.findAdminSessionVersion(accountId);
+async function reissueSession(accountId: string, sessionVersion: number | null) {
   if (sessionVersion === null) return;
   (await cookies()).set(SESSION_COOKIE_NAME, await createSessionCookieValue(accountId, "ADMIN", sessionVersion), sessionCookieOptions());
 }
@@ -126,7 +126,7 @@ export async function updateAdminProfileAction(_previous: ProfileState, formData
       currentPassword: text(formData, "currentPassword"),
     });
     if (!result.ok) return { error: result.error };
-    await reissueSession(accountId);
+    await reissueSession(accountId, result.sessionVersion);
   } catch (err) {
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     if (err instanceof AdminNotFoundError) return { error: "This admin account no longer exists." };
@@ -153,7 +153,7 @@ export async function changeAdminPasswordAction(_previous: ProfileState, formDat
       newPassword,
     });
     if (!result.ok) return { error: result.error };
-    await reissueSession(accountId);
+    await reissueSession(accountId, result.sessionVersion);
   } catch (err) {
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     if (err instanceof AdminNotFoundError) return { error: "This admin account no longer exists." };

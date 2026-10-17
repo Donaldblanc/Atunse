@@ -42,16 +42,18 @@ export class PrismaAccountRepository implements AccountRepository {
     });
   }
 
-  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<number | null> {
     const email = fields.email.trim().toLowerCase();
     try {
-      await this.prisma.$transaction(async (tx) => {
+      return await this.prisma.$transaction(async (tx) => {
         const current = await tx.account.findFirst({ where: { id: accountId, role: "ADMIN" }, select: { email: true } });
-        if (!current) return;
-        await tx.account.updateMany({
-          where: { id: accountId, role: "ADMIN" },
+        if (!current) return null;
+        const updated = await tx.account.update({
+          where: { id: accountId },
           data: { name: fields.name, email, ...(current.email !== email ? { sessionVersion: { increment: 1 } } : {}) },
+          select: { sessionVersion: true },
         });
+        return updated.sessionVersion;
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new AdminEmailTakenError();
@@ -59,10 +61,16 @@ export class PrismaAccountRepository implements AccountRepository {
     }
   }
 
-  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
-    await this.prisma.account.updateMany({
-      where: { id: accountId, role: "ADMIN" },
-      data: { passwordHash, sessionVersion: { increment: 1 } },
+  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<number | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const found = await tx.account.findFirst({ where: { id: accountId, role: "ADMIN" }, select: { id: true } });
+      if (!found) return null;
+      const updated = await tx.account.update({
+        where: { id: accountId },
+        data: { passwordHash, sessionVersion: { increment: 1 } },
+        select: { sessionVersion: true },
+      });
+      return updated.sessionVersion;
     });
   }
 

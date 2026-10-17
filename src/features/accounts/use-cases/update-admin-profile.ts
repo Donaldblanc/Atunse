@@ -11,7 +11,8 @@ export class AdminNotFoundError extends Error {
   }
 }
 
-export type ProfileResult = { ok: true } | { ok: false; error: string };
+/** `sessionVersion` is the Account's version after the write (null if the Account vanished), for re-issuing the caller's cookie. */
+export type ProfileResult = { ok: true; sessionVersion: number | null } | { ok: false; error: string };
 
 /**
  * Counts one password check against the account's attempt budget; false
@@ -51,13 +52,14 @@ export async function updateAdminProfile(
     if (refused) return refused;
   }
 
+  let sessionVersion: number | null;
   try {
-    await deps.accounts.updateAdminProfile(input.accountId, { name, email });
+    sessionVersion = await deps.accounts.updateAdminProfile(input.accountId, { name, email });
   } catch (err) {
     if (err instanceof AdminEmailTakenError) return { ok: false, error: "Another admin uses that email." };
     throw err;
   }
-  return { ok: true };
+  return { ok: true, sessionVersion };
 }
 
 /**
@@ -81,8 +83,8 @@ export async function changeAdminPassword(
   const refused = await refuseUnlessPasswordMatches(deps, admin, input.currentPassword);
   if (refused) return refused;
 
-  await deps.accounts.updateAdminPasswordHash(input.accountId, await hashPassword(input.newPassword));
-  return { ok: true };
+  const sessionVersion = await deps.accounts.updateAdminPasswordHash(input.accountId, await hashPassword(input.newPassword));
+  return { ok: true, sessionVersion };
 }
 
 /** Null when the password is right; otherwise the refusal to return. Counts against the per-account attempt budget first. */

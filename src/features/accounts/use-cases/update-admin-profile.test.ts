@@ -17,7 +17,7 @@ describe("updateAdminProfile", () => {
     const { accounts, admin } = await setup();
     const actingUser = { accountId: admin.id, role: "ADMIN" as const };
     const result = await updateAdminProfile({ accounts }, actingUser, { accountId: admin.id, name: "DJ Blanc", email: "dj2@atunse.com", currentPassword: "correct-horse-battery" });
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, sessionVersion: 1 });
     const found = await accounts.findAdminById(admin.id);
     expect(found).toMatchObject({ name: "DJ Blanc", email: "dj2@atunse.com" });
   });
@@ -34,7 +34,7 @@ describe("updateAdminProfile", () => {
     const { accounts, admin } = await setup();
     const actingUser = { accountId: admin.id, role: "ADMIN" as const };
     const result = await updateAdminProfile({ accounts }, actingUser, { accountId: admin.id, name: "New Name", email: "DJ@atunse.com" });
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, sessionVersion: 0 });
     expect(await accounts.findAdminById(admin.id)).toMatchObject({ name: "New Name", sessionVersion: 0 });
   });
 
@@ -98,7 +98,7 @@ describe("changeAdminPassword", () => {
     const { accounts, admin } = await setup();
     const actingUser = { accountId: admin.id, role: "ADMIN" as const };
     const result = await changeAdminPassword({ accounts }, actingUser, { accountId: admin.id, currentPassword: "correct-horse-battery", newPassword: "a-new-password" });
-    expect(result).toEqual({ ok: true });
+    expect(result).toEqual({ ok: true, sessionVersion: 1 });
     expect(await accounts.findAdminSessionVersion(admin.id)).toBe(1);
   });
 

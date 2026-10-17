@@ -33,6 +33,21 @@ export async function hashPassword(password: string): Promise<string> {
   return `scrypt$${SCRYPT.N}$${SCRYPT.r}$${SCRYPT.p}$${salt.toString("hex")}$${derived.toString("hex")}`;
 }
 
+/**
+ * Seam for the timing equaliser below, so a test can see it run without
+ * asserting wall-clock time.
+ */
+export const passwordInternals = {
+  /** One throwaway derivation at the current cost (N=2^17). */
+  async burnCurrentCost(password: string): Promise<void> {
+    try {
+      await scryptAsync(password, Buffer.alloc(16), KEY_LENGTH, SCRYPT);
+    } catch {
+      // only the time spent matters
+    }
+  },
+};
+
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
   const current = CURRENT_FORMAT.exec(storedHash);
   let salt: Buffer;
@@ -57,13 +72,24 @@ export async function verifyPassword(password: string, storedHash: string): Prom
   } catch {
     return false; // unusable stored params (e.g. beyond maxmem)
   }
-  return actual.length === expected.length && timingSafeEqual(actual, expected);
+  const matches = actual.length === expected.length && timingSafeEqual(actual, expected);
+  // A legacy hash verifies ~7x faster than the N=2^17 dummy used for unknown
+  // accounts, so a wrong guess would reveal that the account exists. Pad the
+  // failure up to one current-cost derivation. (A right guess rehashes anyway.)
+  if (!matches && !current) await passwordInternals.burnCurrentCost(password);
+  return matches;
 }
 
-/** True when the stored hash isn't in the current format and cost, so a successful login should rehash it. */
+/**
+ * True when the stored hash is legacy or weaker than the current cost, so a
+ * successful login should rehash it. A stronger hash is never downgraded.
+ */
 export function passwordNeedsRehash(storedHash: string): boolean {
   const current = CURRENT_FORMAT.exec(storedHash);
-  return !current || Number(current[1]) !== SCRYPT.N || Number(current[2]) !== SCRYPT.r || Number(current[3]) !== SCRYPT.p;
+  if (!current) return true;
+  const [n, r, p] = [Number(current[1]), Number(current[2]), Number(current[3])];
+  if (n !== SCRYPT.N) return n < SCRYPT.N;
+  return r < SCRYPT.r || p < SCRYPT.p;
 }
 
 /**

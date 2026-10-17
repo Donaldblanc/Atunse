@@ -70,10 +70,22 @@ describe("admin session revocation (integration)", () => {
     expect(await allowed(await signInCookie())).toBe(true); // signing in again works
   });
 
+  it("sign-out with an already-revoked cookie does not bump the version again", async () => {
+    const stolen = await signInCookie();
+    const signOutWith = (cookie: string) =>
+      signOut(new NextRequest("http://localhost/api/v1/auth/sign-out", { method: "POST", headers: { cookie: `${SESSION_COOKIE_NAME}=${cookie}` } }));
+    await signOutWith(stolen); // the real admin signs out: revokes it
+    const fresh = await signInCookie();
+    const before = await accounts.findAdminSessionVersion(accountId);
+    await signOutWith(stolen); // replayed revoked cookie
+    expect(await accounts.findAdminSessionVersion(accountId)).toBe(before);
+    expect(await allowed(fresh)).toBe(true);
+  });
+
   it("a password change invalidates an old cookie", async () => {
     const cookie = await signInCookie();
     const result = await changeAdminPassword({ accounts }, { accountId, role: "ADMIN" }, { accountId, currentPassword: PASSWORD, newPassword: "a-brand-new-password" });
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true, sessionVersion: expect.any(Number) });
     expect(await allowed(cookie)).toBe(false);
   });
 
@@ -83,7 +95,7 @@ describe("admin session revocation (integration)", () => {
     await updateAdminProfile({ accounts }, actingUser, { accountId, name: "Renamed", email: EMAIL });
     expect(await allowed(cookie)).toBe(true);
     const result = await updateAdminProfile({ accounts }, actingUser, { accountId, name: "Renamed", email: "revocation-it-2@example.com", currentPassword: PASSWORD });
-    expect(result).toEqual({ ok: true });
+    expect(result).toMatchObject({ ok: true, sessionVersion: expect.any(Number) });
     expect(await allowed(cookie)).toBe(false);
   });
 

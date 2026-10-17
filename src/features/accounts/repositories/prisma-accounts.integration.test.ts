@@ -105,6 +105,16 @@ describe("PrismaSignInCodes (integration)", () => {
     await prisma.account.deleteMany({ where: { email: "codes-new@example.com" } });
   });
 
+  it("updateAdminProfile and updateAdminPasswordHash return the new sessionVersion atomically (null for non-admins)", async () => {
+    expect(await accounts.updateAdminProfile(adminId, { name: "DJ", email: "codes@example.com" })).toBe(0);
+    expect(await accounts.updateAdminProfile(adminId, { name: "DJ", email: "codes-new2@example.com" })).toBe(1);
+    expect(await accounts.updateAdminPasswordHash(adminId, "x")).toBe(2);
+    expect(await accounts.findAdminSessionVersion(adminId)).toBe(2);
+    expect(await accounts.updateAdminPasswordHash(customerId, "x")).toBeNull();
+    expect(await accounts.updateAdminProfile(customerId, { name: "X", email: "x@example.com" })).toBeNull();
+    await prisma.account.deleteMany({ where: { email: "codes-new2@example.com" } });
+  });
+
   it("updateAdminProfile throws AdminEmailTakenError when another admin has the email", async () => {
     const otherId = (await prisma.account.create({ data: { email: "codes-other@example.com", role: "ADMIN" } })).id;
     try {

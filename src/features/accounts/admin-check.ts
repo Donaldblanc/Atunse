@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { NextRequest } from "next/server";
 import { defaultAdminSessionVersions, type AdminSessionVersions } from "./admin-session-versions";
 import type { Role } from "./authz";
@@ -30,11 +31,25 @@ export async function checkAdminAccess(
  * The verified admin session in a raw cookie value, or null: signature and
  * expiry good, role ADMIN, and sessionVersion still current. The single
  * choke point every admin check goes through.
+ *
+ * With the default (database) versions, the result is memoized per cookie
+ * value for the length of one React render pass (React `cache`), so the
+ * layout, page and panels of one admin render hit the database once instead
+ * of 5-10 times. React scopes that to a single request and it is a plain
+ * pass-through outside a render (route handlers, the proxy, tests), so
+ * sign-out always sees the live version. Keyed by cookie value, so a
+ * re-issued cookie (password/email change) is looked up afresh.
  */
 export async function verifiedAdminSession(
   cookie: string | undefined,
-  versions: AdminSessionVersions = defaultAdminSessionVersions(),
+  versions?: AdminSessionVersions,
 ): Promise<SessionPayload | null> {
+  return versions ? checkSession(cookie, versions) : cachedForRender(cookie);
+}
+
+const cachedForRender = cache((cookie: string | undefined) => checkSession(cookie, defaultAdminSessionVersions()));
+
+async function checkSession(cookie: string | undefined, versions: AdminSessionVersions): Promise<SessionPayload | null> {
   const session = await verifySessionCookieValue(cookie);
   if (session?.role !== "ADMIN") return null;
   const current = await versions.findAdminSessionVersion(session.accountId);

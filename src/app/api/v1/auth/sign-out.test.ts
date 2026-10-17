@@ -1,9 +1,52 @@
 import { NextRequest } from "next/server";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { customerFromCookies } from "@/features/accounts/acting-user";
 import { CUSTOMER_SESSION_COOKIE_NAME, SESSION_COOKIE_NAME } from "@/features/accounts/session";
 import * as adminSignOut from "./sign-out/route";
 import * as customerSignOut from "./customer/sign-out/route";
+
+const { verified, bump } = vi.hoisted(() => ({ verified: vi.fn(), bump: vi.fn() }));
+vi.mock("@/features/accounts/admin-check", () => ({ verifiedAdminSession: verified }));
+vi.mock("@/shared/db/prisma-client", () => ({ prisma: {} }));
+vi.mock("@/features/accounts/repositories/prisma-account-repository", () => ({
+  PrismaAccountRepository: class {
+    bumpAdminSessionVersion = bump;
+    findAdminSessionVersion = vi.fn();
+  },
+}));
+
+const withCookie = () =>
+  new NextRequest("http://localhost/api/v1/auth/sign-out", { method: "POST", headers: { cookie: `${SESSION_COOKIE_NAME}=signed` } });
+
+describe("admin sign-out revocation", () => {
+  beforeEach(() => {
+    verified.mockReset();
+    bump.mockReset();
+  });
+
+  it("bumps the session version only for a still-valid admin session", async () => {
+    verified.mockResolvedValue({ accountId: "a1", role: "ADMIN", sessionVersion: 0 });
+    await adminSignOut.POST(withCookie());
+    expect(bump).toHaveBeenCalledWith("a1");
+  });
+
+  it("does not bump for a revoked or invalid cookie, but still clears it", async () => {
+    verified.mockResolvedValue(null);
+    const res = await adminSignOut.POST(withCookie());
+    expect(bump).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie") ?? "").toMatch(/Max-Age=0/);
+  });
+
+  it("still clears the cookie and answers ok when the database call throws", async () => {
+    verified.mockResolvedValue({ accountId: "a1", role: "ADMIN", sessionVersion: 0 });
+    bump.mockRejectedValue(new Error("db down"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const res = await adminSignOut.POST(withCookie());
+    spy.mockRestore();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie") ?? "").toMatch(/Max-Age=0/);
+  });
+});
 
 describe("sign-out routes", () => {
   it("customer sign-out expires only the customer cookie, with the session cookie's attributes", async () => {

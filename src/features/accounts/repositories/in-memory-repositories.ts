@@ -78,21 +78,23 @@ export class InMemoryAccounts implements AccountRepository {
     return found ? { id: found.id, name: found.name, email: found.email, passwordHash: found.passwordHash ?? null, sessionVersion: found.sessionVersion } : null;
   }
 
-  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<number | null> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
-    if (!found) return;
+    if (!found) return null;
     const email = fields.email.trim().toLowerCase();
     if (this.accounts.some((a) => a.role === "ADMIN" && a.id !== accountId && a.email === email)) throw new AdminEmailTakenError();
     found.name = fields.name;
     if (found.email !== email) found.sessionVersion += 1;
     found.email = email;
+    return found.sessionVersion;
   }
 
-  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
+  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<number | null> {
     const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
-    if (!found) return;
+    if (!found) return null;
     found.passwordHash = passwordHash;
     found.sessionVersion += 1;
+    return found.sessionVersion;
   }
 
   async findAdminSessionVersion(accountId: string): Promise<number | null> {
