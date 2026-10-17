@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { parseDollarsToCents } from "./dollars";
 import { buildCatalogDeps } from "./deps";
 import {
   BundleIdTakenError,
@@ -38,10 +39,7 @@ const text = (formData: FormData, name: string) => {
 };
 
 function dollarsToCents(formData: FormData, name: string): number {
-  const raw = text(formData, name).trim();
-  const dollars = Number(raw);
-  if (!Number.isFinite(dollars)) return NaN;
-  return Math.round(dollars * 100);
+  return parseDollarsToCents(text(formData, name));
 }
 
 function returnToAdmin(formData: FormData, fallback: string): string {

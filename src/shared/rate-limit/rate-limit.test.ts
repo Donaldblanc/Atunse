@@ -70,8 +70,9 @@ describe("limitByIp", () => {
     expect(() => hashClient("203.0.113.7", "")).toThrow(/secret is required/);
   });
 
-  it("has a policy for each public route", () => {
+  it("has a policy for each public route and admin password check", () => {
     expect(Object.keys(RATE_LIMITS).sort()).toEqual([
+      "adminPasswordCheck",
       "adminSignIn",
       "adminSignInAccount",
       "codeRequest",

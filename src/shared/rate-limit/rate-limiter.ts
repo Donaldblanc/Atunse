@@ -61,4 +61,10 @@ export const RATE_LIMITS = {
    * accepted trade against unlimited guessing.
    */
   adminSignInAccount: { name: "admin-sign-in-account", limit: 20, windowSeconds: 60 * 60 },
+  /**
+   * Current-password checks in Account Settings (email change, password
+   * change), per signed-in account, so a stolen session can't guess the
+   * password through the settings forms.
+   */
+  adminPasswordCheck: { name: "admin-password-check", limit: 5, windowSeconds: 15 * 60 },
 } satisfies Record<string, RateLimitPolicy>;

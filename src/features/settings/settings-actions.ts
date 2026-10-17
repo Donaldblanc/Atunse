@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { createSessionCookieValue, SESSION_COOKIE_NAME, sessionCookieOptions } from "@/features/accounts/session";
 import { AdminNotFoundError, changeAdminPassword, updateAdminProfile } from "@/features/accounts/use-cases/update-admin-profile";
 import { buildSettingsDeps } from "./deps";
 import { InvalidLogoUploadError } from "./use-cases/request-logo-upload";
@@ -19,6 +20,18 @@ const text = (formData: FormData, name: string) => {
   const value = formData.get(name);
   return typeof value === "string" ? value : "";
 };
+
+/**
+ * A password or email change bumps the Account's sessionVersion, which
+ * signs out every existing session including the one making the change.
+ * Re-issue this browser's cookie at the new version so the admin who just
+ * saved isn't kicked out; any other copy of the old cookie stays dead.
+ */
+async function reissueSession(accountId: string) {
+  const sessionVersion = await buildSettingsDeps().accounts.findAdminSessionVersion(accountId);
+  if (sessionVersion === null) return;
+  (await cookies()).set(SESSION_COOKIE_NAME, await createSessionCookieValue(accountId, "ADMIN", sessionVersion), sessionCookieOptions());
+}
 
 const WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
 
@@ -110,8 +123,10 @@ export async function updateAdminProfileAction(_previous: ProfileState, formData
       accountId,
       name: text(formData, "name"),
       email: text(formData, "email"),
+      currentPassword: text(formData, "currentPassword"),
     });
     if (!result.ok) return { error: result.error };
+    await reissueSession(accountId);
   } catch (err) {
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     if (err instanceof AdminNotFoundError) return { error: "This admin account no longer exists." };
@@ -138,6 +153,7 @@ export async function changeAdminPasswordAction(_previous: ProfileState, formDat
       newPassword,
     });
     if (!result.ok) return { error: result.error };
+    await reissueSession(accountId);
   } catch (err) {
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     if (err instanceof AdminNotFoundError) return { error: "This admin account no longer exists." };

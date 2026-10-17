@@ -36,6 +36,7 @@ export interface AdminAccount {
   name: string | null;
   email: string;
   passwordHash: string | null;
+  sessionVersion: number;
 }
 
 /** Thrown by updateAdminProfile when another Admin Account already uses the email. */
@@ -59,8 +60,16 @@ export interface AccountRepository {
 
   /** An Admin Account by id, or null for an id no Admin Account has. */
   findAdminById(accountId: string): Promise<AdminAccount | null>;
-  /** Settings' Account Settings "Save": the admin's own name and email. Throws AdminEmailTakenError if another admin has the email. */
+  /**
+   * Settings' Account Settings "Save": the admin's own name and email. Throws
+   * AdminEmailTakenError if another admin has the email. Changing the email
+   * bumps sessionVersion, which signs out every existing admin session.
+   */
   updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void>;
-  /** Settings' Account Settings "Change Password": replaces the stored hash. */
+  /** Settings' Account Settings "Change Password": replaces the stored hash and bumps sessionVersion (signs out every existing admin session). */
   updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void>;
+  /** The admin's current sessionVersion, or null for an id no Admin Account has. */
+  findAdminSessionVersion(accountId: string): Promise<number | null>;
+  /** Revokes every admin session cookie issued so far (sign-out). */
+  bumpAdminSessionVersion(accountId: string): Promise<void>;
 }

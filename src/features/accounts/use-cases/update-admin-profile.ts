@@ -14,15 +14,26 @@ export class AdminNotFoundError extends Error {
 export type ProfileResult = { ok: true } | { ok: false; error: string };
 
 /**
+ * Counts one password check against the account's attempt budget; false
+ * means the budget is spent. Optional so tests can omit it; the real deps
+ * (features/settings/deps.ts) always provide it.
+ */
+export type PasswordAttemptLimiter = (accountId: string) => Promise<boolean>;
+
+export const PASSWORD_RATE_LIMITED_MESSAGE = "Too many password attempts. Please wait a few minutes and try again.";
+
+/**
  * Settings' Account Settings "Save": the signed-in admin's own name and
  * email (ADR-0014: a separate identity from any Customer Account sharing
  * the email). `requireRole` alone isn't enough here — an admin may only
- * edit their own Account, never another admin's.
+ * edit their own Account, never another admin's. Changing the email (what
+ * the sign-in uses) also needs the current password, so a stolen session
+ * alone can't take over the account; a name-only change doesn't.
  */
 export async function updateAdminProfile(
-  deps: { accounts: AccountRepository },
+  deps: { accounts: AccountRepository; allowPasswordAttempt?: PasswordAttemptLimiter },
   actingUser: ActingUser,
-  input: { accountId: string; name: string; email: string },
+  input: { accountId: string; name: string; email: string; currentPassword?: string },
 ): Promise<ProfileResult> {
   requireRole(actingUser, "ADMIN");
   if (actingUser.accountId !== input.accountId) throw new UnauthorizedError("An admin may only edit their own account.");
@@ -34,6 +45,11 @@ export async function updateAdminProfile(
 
   const admin = await deps.accounts.findAdminById(input.accountId);
   if (!admin) throw new AdminNotFoundError();
+
+  if (email !== admin.email) {
+    const refused = await refuseUnlessPasswordMatches(deps, admin, input.currentPassword ?? "");
+    if (refused) return refused;
+  }
 
   try {
     await deps.accounts.updateAdminProfile(input.accountId, { name, email });
@@ -51,7 +67,7 @@ export async function updateAdminProfile(
  * real admin out.
  */
 export async function changeAdminPassword(
-  deps: { accounts: AccountRepository },
+  deps: { accounts: AccountRepository; allowPasswordAttempt?: PasswordAttemptLimiter },
   actingUser: ActingUser,
   input: { accountId: string; currentPassword: string; newPassword: string },
 ): Promise<ProfileResult> {
@@ -62,10 +78,24 @@ export async function changeAdminPassword(
 
   const admin = await deps.accounts.findAdminById(input.accountId);
   if (!admin) throw new AdminNotFoundError();
-  if (!admin.passwordHash || !(await verifyPassword(input.currentPassword, admin.passwordHash))) {
-    return { ok: false, error: "That current password isn't right." };
-  }
+  const refused = await refuseUnlessPasswordMatches(deps, admin, input.currentPassword);
+  if (refused) return refused;
 
   await deps.accounts.updateAdminPasswordHash(input.accountId, await hashPassword(input.newPassword));
   return { ok: true };
+}
+
+/** Null when the password is right; otherwise the refusal to return. Counts against the per-account attempt budget first. */
+async function refuseUnlessPasswordMatches(
+  deps: { allowPasswordAttempt?: PasswordAttemptLimiter },
+  admin: { id: string; passwordHash: string | null },
+  password: string,
+): Promise<{ ok: false; error: string } | null> {
+  if (deps.allowPasswordAttempt && !(await deps.allowPasswordAttempt(admin.id))) {
+    return { ok: false, error: PASSWORD_RATE_LIMITED_MESSAGE };
+  }
+  if (!admin.passwordHash || !(await verifyPassword(password, admin.passwordHash))) {
+    return { ok: false, error: "That current password isn't right." };
+  }
+  return null;
 }

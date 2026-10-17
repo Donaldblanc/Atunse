@@ -30,6 +30,12 @@ describe("createBundle", () => {
     await expect(createBundle({ catalog }, ADMIN, { name: "Revival", priceCents: 1000, perks: [] })).rejects.toThrow(BundleIdTakenError);
   });
 
+  it("rejects a price above the catalog maximum", async () => {
+    const catalog = new InMemoryCatalogRepository();
+    await expect(createBundle({ catalog }, ADMIN, { name: "Pricey", priceCents: 500_001, perks: [] })).rejects.toThrow(CatalogValidationError);
+    await expect(createBundle({ catalog }, ADMIN, { name: "Max", priceCents: 500_000, perks: [] })).resolves.toBeTruthy();
+  });
+
   it("rejects an empty name", async () => {
     const catalog = new InMemoryCatalogRepository();
     await expect(createBundle({ catalog }, ADMIN, { name: "   ", priceCents: 1000, perks: [] })).rejects.toThrow(CatalogValidationError);

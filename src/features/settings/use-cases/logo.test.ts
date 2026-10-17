@@ -8,6 +8,7 @@ import { removeLogo } from "./remove-logo";
 import { setLogo } from "./set-logo";
 
 const admin = { accountId: "admin-1", role: "ADMIN" as const };
+const LOGO_KEY = "business-logo/123e4567-e89b-42d3-a456-426614174000";
 const customer = { accountId: "c-1", role: "CUSTOMER" as const };
 
 describe("requestLogoUpload", () => {
@@ -37,9 +38,9 @@ describe("requestLogoUpload", () => {
 describe("setLogo and removeLogo", () => {
   it("setLogo stores the key without touching other fields", async () => {
     const settings = new InMemorySettingsRepository({ settings: { ...DEFAULT_BUSINESS_SETTINGS, businessName: "Atunṣe Sneaker Care" }, hours: defaultOperatingHours() });
-    await setLogo({ settings }, admin, "business-logo/abc");
+    await setLogo({ settings }, admin, LOGO_KEY);
     const business = await settings.getBusinessSettings();
-    expect(business.logoKey).toBe("business-logo/abc");
+    expect(business.logoKey).toBe(LOGO_KEY);
     expect(business.businessName).toBe("Atunṣe Sneaker Care");
   });
 
@@ -47,11 +48,14 @@ describe("setLogo and removeLogo", () => {
     const settings = new InMemorySettingsRepository();
     await expect(setLogo({ settings }, admin, "services/abc")).rejects.toThrow(InvalidLogoUploadError);
     await expect(setLogo({ settings }, admin, LOGO_KEY_PREFIX)).rejects.toThrow(InvalidLogoUploadError);
+    for (const bad of ["business-logo/abc", "business-logo/../services/x", `${LOGO_KEY}/extra`, `${LOGO_KEY}.png`, `x/${LOGO_KEY}`, "business-logo/..", `${LOGO_KEY}\n`]) {
+      await expect(setLogo({ settings }, admin, bad)).rejects.toThrow(InvalidLogoUploadError);
+    }
     expect((await settings.getBusinessSettings()).logoKey).toBeNull();
   });
 
   it("removeLogo clears the key", async () => {
-    const settings = new InMemorySettingsRepository({ settings: { ...DEFAULT_BUSINESS_SETTINGS, logoKey: "business-logo/abc" }, hours: defaultOperatingHours() });
+    const settings = new InMemorySettingsRepository({ settings: { ...DEFAULT_BUSINESS_SETTINGS, logoKey: LOGO_KEY }, hours: defaultOperatingHours() });
     await removeLogo({ settings }, admin);
     expect((await settings.getBusinessSettings()).logoKey).toBeNull();
   });

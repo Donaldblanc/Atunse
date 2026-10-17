@@ -28,3 +28,9 @@
 - The `grill-me` and `grill-with-docs` skills here are empty stubs. Run the interview by hand.
 - Don't run `npx prettier`. It isn't a project dependency, so npx fetches a fresh copy that rewraps whole files at 80 columns.
 - Turbopack rejects a symlinked `node_modules` in a worktree. Use `next dev --webpack` there.
+
+## Sessions and passwords
+- **Admin sessions are revocable.** The signed cookie carries `sessionVersion`; `verifiedAdminSession` (`accounts/admin-check.ts`) compares it with `accounts.sessionVersion` in the database on every admin check (proxy, layout, pages, actions, API routes), so a unit test that needs a valid admin session passes a fake `AdminSessionVersions` or mocks `accounts/admin-session-versions`. Admin sign-out, a password change and an email change bump the version; the settings actions re-issue the current browser's cookie so the admin who saved stays signed in. Customer cookies carry 0 and aren't checked.
+- **Cookie names are `__Host-atunse_session` and `__Host-atunse_customer_session`** (Secure, Path=/, no Domain). Only `next dev` drops the prefix and Secure, because Safari rejects Secure cookies on plain `http://localhost`. Rename = everyone signs in again once. Always use the `SESSION_COOKIE_NAME` constants, never the literal.
+- **Password hashes are `scrypt$N$r$p$salt$hash`** (N=2^17, r=8, p=1, 256 MiB maxmem). The old `salt:hash` form (Node defaults) still verifies and is rehashed on a successful admin sign-in (`passwordNeedsRehash`). A hash costs ~0.2 s and ~128 MiB, so tests that hash many passwords are slower.
+- **Admin JSON routes** (`/api/v1/admin/items/*/transitions`, `settings/logo-upload`) refuse a foreign `Origin` (403) and non-JSON content types (415) via `shared/http/request-guards.ts`. A missing Origin is allowed, as with Next's Server Actions.

@@ -142,6 +142,14 @@ describe("listConversations (integration)", () => {
     expect(await repo.listConversations({ search: "nobody-here" })).toEqual({ conversations: [], total: 0 });
   });
 
+  it("search treats % and _ literally instead of as wildcards", async () => {
+    const c = await conversation();
+    await message(c.id);
+    expect(await repo.listConversations({ search: "%" })).toEqual({ conversations: [], total: 0 });
+    expect(await repo.listConversations({ search: "j_rdan" })).toEqual({ conversations: [], total: 0 });
+    expect((await repo.listConversations({ search: "jordan" })).total).toBe(1);
+  });
+
   it("channel filter matches the latest Message's channel", async () => {
     const emailLast = await conversation({ lastMessageAt: T1 });
     const smsLast = await conversation({ lastMessageAt: T0 });

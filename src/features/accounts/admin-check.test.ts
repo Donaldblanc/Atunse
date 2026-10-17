@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { AdminSessionVersions } from "./admin-session-versions";
 import { adminFromCookieValue, checkAdminAccess } from "./admin-check";
 import { SESSION_COOKIE_NAME, createSessionCookieValue } from "./session";
 
@@ -7,6 +8,9 @@ function req(path: string, cookie?: string): NextRequest {
   const headers = cookie ? { cookie: `${SESSION_COOKIE_NAME}=${cookie}` } : undefined;
   return new NextRequest(new URL(path, "http://localhost:3000"), { headers });
 }
+
+// The Account's current sessionVersion, as the database would answer.
+const versions = (current: number | null): AdminSessionVersions => ({ findAdminSessionVersion: async () => current });
 
 describe("checkAdminAccess", () => {
   beforeEach(() => {
@@ -38,14 +42,14 @@ describe("checkAdminAccess", () => {
 
   it("rejects a valid signature for a non-ADMIN role", async () => {
     const value = await createSessionCookieValue("acct_1", "CUSTOMER");
-    const result = await checkAdminAccess(req("/admin", value));
+    const result = await checkAdminAccess(req("/admin", value), versions(0));
     expect(result.allowed).toBe(false);
     expect(result.role).toBe("CUSTOMER");
   });
 
   it("grants access for a valid ADMIN session and surfaces accountId", async () => {
     const value = await createSessionCookieValue("acct_1", "ADMIN");
-    const result = await checkAdminAccess(req("/admin", value));
+    const result = await checkAdminAccess(req("/admin", value), versions(0));
     expect(result.allowed).toBe(true);
     expect(result.role).toBe("ADMIN");
     expect(result.accountId).toBe("acct_1");
@@ -53,13 +57,25 @@ describe("checkAdminAccess", () => {
 
   it("treats a malformed signature as signed out instead of throwing (vulnerability scan)", async () => {
     for (const bad of ["x.!!!", "%%%.@@@", "only-one-part", "a.b.c"]) {
-      await expect(adminFromCookieValue(bad)).resolves.toMatchObject({ allowed: false, role: "GUEST" });
+      await expect(adminFromCookieValue(bad, versions(0))).resolves.toMatchObject({ allowed: false, role: "GUEST" });
     }
   });
 
   it("gives the admin layout the same decision from a raw cookie value", async () => {
     const cookie = await createSessionCookieValue("acct_1", "ADMIN");
-    expect(await adminFromCookieValue(cookie)).toEqual({ allowed: true, role: "ADMIN", accountId: "acct_1" });
-    expect(await adminFromCookieValue(undefined)).toMatchObject({ allowed: false });
+    expect(await adminFromCookieValue(cookie, versions(0))).toEqual({ allowed: true, role: "ADMIN", accountId: "acct_1" });
+    expect(await adminFromCookieValue(undefined, versions(0))).toMatchObject({ allowed: false });
+  });
+
+  it("rejects a session whose version the Account has moved past (sign-out, password change)", async () => {
+    const old = await createSessionCookieValue("acct_1", "ADMIN", 0);
+    expect((await checkAdminAccess(req("/admin", old), versions(1))).allowed).toBe(false);
+    const reissued = await createSessionCookieValue("acct_1", "ADMIN", 1);
+    expect((await checkAdminAccess(req("/admin", reissued), versions(1))).allowed).toBe(true);
+  });
+
+  it("rejects a session for an Account that no longer exists", async () => {
+    const value = await createSessionCookieValue("acct_1", "ADMIN", 0);
+    expect((await checkAdminAccess(req("/admin", value), versions(null))).allowed).toBe(false);
   });
 });

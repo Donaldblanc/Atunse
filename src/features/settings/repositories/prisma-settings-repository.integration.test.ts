@@ -110,8 +110,8 @@ describe("PrismaSettingsRepository (integration)", () => {
   it("setLogo and removeLogo go through the real repository", async () => {
     const admin = { accountId: "admin-1", role: "ADMIN" as const };
     await repo.saveSettings(input);
-    await setLogo({ settings: repo }, admin, "business-logo/abc");
-    expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, logoKey: "business-logo/abc" });
+    await setLogo({ settings: repo }, admin, "business-logo/123e4567-e89b-42d3-a456-426614174000");
+    expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, logoKey: "business-logo/123e4567-e89b-42d3-a456-426614174000" });
     await removeLogo({ settings: repo }, admin);
     expect(await repo.getBusinessSettings()).toMatchObject({ businessName: input.businessName, logoKey: null });
   });

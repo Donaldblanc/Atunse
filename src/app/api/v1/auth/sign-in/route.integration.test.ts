@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { hashPassword } from "@/features/accounts/password";
 import { prisma } from "@/shared/db/prisma-client";
 import { RATE_LIMITS } from "@/shared/rate-limit";
+import { SESSION_COOKIE_NAME } from "@/features/accounts/session";
 import { POST } from "./route";
 
 const ADMIN_EMAIL = "admin-it@example.com";
@@ -47,7 +48,7 @@ describe("POST /api/v1/auth/sign-in (integration)", () => {
   it("signs in with the right password, and sets the admin session cookie", async () => {
     const res = await signIn(ADMIN_EMAIL, PASSWORD, freshIp());
     expect(res.status).toBe(200);
-    expect(res.headers.get("set-cookie")).toMatch(/^atunse_session=[^;]+\./);
+    expect(res.headers.get("set-cookie")).toMatch(new RegExp(`^${SESSION_COOKIE_NAME}=[^;]+\\.`));
   });
 
   it("gives an unknown email exactly the same response as a wrong password", async () => {

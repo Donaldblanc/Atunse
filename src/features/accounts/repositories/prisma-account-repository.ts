@@ -38,15 +38,20 @@ export class PrismaAccountRepository implements AccountRepository {
   async findAdminById(accountId: string): Promise<AdminAccount | null> {
     return this.prisma.account.findFirst({
       where: { id: accountId, role: "ADMIN" },
-      select: { id: true, name: true, email: true, passwordHash: true },
+      select: { id: true, name: true, email: true, passwordHash: true, sessionVersion: true },
     });
   }
 
   async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+    const email = fields.email.trim().toLowerCase();
     try {
-      await this.prisma.account.updateMany({
-        where: { id: accountId, role: "ADMIN" },
-        data: { name: fields.name, email: fields.email.trim().toLowerCase() },
+      await this.prisma.$transaction(async (tx) => {
+        const current = await tx.account.findFirst({ where: { id: accountId, role: "ADMIN" }, select: { email: true } });
+        if (!current) return;
+        await tx.account.updateMany({
+          where: { id: accountId, role: "ADMIN" },
+          data: { name: fields.name, email, ...(current.email !== email ? { sessionVersion: { increment: 1 } } : {}) },
+        });
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new AdminEmailTakenError();
@@ -55,6 +60,18 @@ export class PrismaAccountRepository implements AccountRepository {
   }
 
   async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
-    await this.prisma.account.updateMany({ where: { id: accountId, role: "ADMIN" }, data: { passwordHash } });
+    await this.prisma.account.updateMany({
+      where: { id: accountId, role: "ADMIN" },
+      data: { passwordHash, sessionVersion: { increment: 1 } },
+    });
+  }
+
+  async findAdminSessionVersion(accountId: string): Promise<number | null> {
+    const found = await this.prisma.account.findFirst({ where: { id: accountId, role: "ADMIN" }, select: { sessionVersion: true } });
+    return found?.sessionVersion ?? null;
+  }
+
+  async bumpAdminSessionVersion(accountId: string): Promise<void> {
+    await this.prisma.account.updateMany({ where: { id: accountId, role: "ADMIN" }, data: { sessionVersion: { increment: 1 } } });
   }
 }
