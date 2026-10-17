@@ -97,6 +97,8 @@ export class InMemoryOrderRepository implements OrderRepository {
       contactName: input.contactName,
       contactEmail: input.contactEmail,
       contactPhone: input.contactPhone,
+      birthMonth: input.birthMonth ?? null,
+      birthYear: input.birthYear ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
       policyAcceptedAt: input.policyAcceptedAt,

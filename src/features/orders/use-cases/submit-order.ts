@@ -1,5 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import { AGE_REQUIREMENT_MESSAGE, isAdultByBirthMonth, isBirthMonthYear } from "../age";
+import { cancelEmailLine } from "../cancel-notice";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
 import { availablePickupSlots, collectionTimes, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
 import type { NotificationService } from "@/features/notifications/notification-service";
@@ -51,7 +53,8 @@ export interface SubmitOrderInput {
    * customer actually saw (ADR-0015).
    */
   termsVersion: string;
-  contact: { name: string; email: string; phone: string };
+  /** Birth month (1-12) and year: month precision is enough for the 18+ check. */
+  contact: { name: string; email: string; phone: string; birthMonth: number; birthYear: number };
   fulfillment: Fulfillment;
   rush: boolean;
   /** A Bundle id (service-catalog.ts) for three pairs, or null for a single pair. */
@@ -197,7 +200,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     if (existing) return sendConfirmationOnce(deps, await sameSubmission(deps, existing, fingerprint, now), now);
   }
 
-  const contact = validateContact(input.contact);
+  const contact = validateContact(input.contact, now);
   const fulfillment = validateFulfillment(input.fulfillment, now);
   const pairs = pricePairs(input, now);
   const orderEstimate = estimateOrder({ items: pairs.map((pair) => pair.estimate), rush: input.rush });
@@ -209,6 +212,8 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
       contactName: contact.name,
       contactEmail: contact.email,
       contactPhone: contact.phone,
+      birthMonth: contact.birthMonth,
+      birthYear: contact.birthYear,
       policyAcceptedAt: now,
       terms: {
         version: TERMS_AGREEMENT.version,
@@ -364,7 +369,7 @@ async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Da
     await deps.notifications.sendEmail({
       to: order.contactEmail,
       subject: `We received your booking (${orderNumber(order.number)})`,
-      body: confirmationEmailBody(order, deps.paymentInstructions),
+      body: confirmationEmailBody(order, deps.paymentInstructions, deps.ownerInbox),
     });
     await deps.orders.markConfirmationEmailSent(order.id, now);
     order.confirmationEmailSentAt = now;
@@ -373,14 +378,18 @@ async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Da
   return order;
 }
 
-function validateContact(contact: SubmitOrderInput["contact"]) {
+function validateContact(contact: SubmitOrderInput["contact"], now: Date) {
   const name = contact.name.trim();
   const email = contact.email.trim();
   const phone = contact.phone.trim();
   if (!name) throw new BookingValidationError("Enter your name.");
   if (!isValidEmail(email)) throw new BookingValidationError("Enter a valid email address.");
   if (!isValidUsPhone(phone)) throw new BookingValidationError("Enter a valid 10-digit US phone number.");
-  return { name, email, phone };
+  if (!isBirthMonthYear(contact.birthMonth, contact.birthYear, now)) {
+    throw new BookingValidationError("Choose your birth month and year.");
+  }
+  if (!isAdultByBirthMonth(contact.birthMonth, contact.birthYear, now)) throw new BookingValidationError(AGE_REQUIREMENT_MESSAGE);
+  return { name, email, phone, birthMonth: contact.birthMonth, birthYear: contact.birthYear };
 }
 
 function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
@@ -522,7 +531,7 @@ function blankToNull(value: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
-function confirmationEmailBody(order: Order, payment: PaymentInstructions): string {
+function confirmationEmailBody(order: Order, payment: PaymentInstructions, inbox: string | null): string {
   const reference = orderNumber(order.number);
   const estimate = `${order.estimateIsMinimum ? "from " : ""}${order.estimate.format()}`;
   const howToPay = payment.zelle
@@ -543,6 +552,7 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions): stri
     howToPay,
     nextStep,
     "We'll inspect your sneakers and confirm final pricing before any work begins.",
+    cancelEmailLine(inbox),
     // The customer's own copy of what they accepted (ADR-0015).
     ...(order.termsAcceptance
       ? [`You agreed to our ${TERMS_AGREEMENT.title} (version ${order.termsAcceptance.version}) when you booked.`]

@@ -34,6 +34,8 @@ const HOW_IT_WORKS = [
 ];
 
 export default function BookingPage() {
+  // Read on the server so the address never needs a NEXT_PUBLIC variable.
+  const cancelEmail = process.env.CONTACT_EMAIL?.trim() || null;
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="booking" />
@@ -68,7 +70,7 @@ export default function BookingPage() {
       </div>
 
       <Suspense fallback={null}>
-        <BookingFlow />
+        <BookingFlow cancelEmail={cancelEmail} />
       </Suspense>
 
       <div className="landing-section-head booking-page-how-head">

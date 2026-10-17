@@ -53,7 +53,7 @@ const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => stri
 // detail tab). "Confirm Booking" uploads each pair's photos and submits a
 // real Order (submit-booking.ts): one Item for a single pair, three for a
 // Bundle. Then it shows the confirmation.
-export function BookingFlow() {
+export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
   const requestedService = BOOKING_SERVICES.find((service) => service.id === requestedServiceId);
@@ -312,10 +312,11 @@ export function BookingFlow() {
               setStep("details");
             }}
             onConfirm={confirmBooking}
+            cancelEmail={cancelEmail}
           />
         )}
 
-        {confirmation && <ConfirmationStep result={confirmation} email={contact.email} />}
+        {confirmation && <ConfirmationStep result={confirmation} email={contact.email} cancelEmail={cancelEmail} />}
       </div>
 
       <aside className="booking-page-summary">

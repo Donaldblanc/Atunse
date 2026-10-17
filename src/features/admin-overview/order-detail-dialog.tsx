@@ -188,6 +188,12 @@ export function OrderDetailBody({
               </div>
             </div>
             <dl className="od-facts">
+              {customer.born && (
+                <div>
+                  <dt>Born</dt>
+                  <dd>{customer.born}</dd>
+                </div>
+              )}
               <div>
                 <dt>Fulfillment</dt>
                 <dd>

@@ -3,7 +3,7 @@ import { parseSubmitOrderRequest } from "./submit-order-request";
 
 const body = {
   policyAccepted: true,
-  contact: { name: "Jordan Smith", email: "customer@example.com", phone: "2125550142" },
+  contact: { name: "Jordan Smith", email: "customer@example.com", phone: "2125550142", birthMonth: 3, birthYear: 1990 },
   fulfillment: {
     method: "PICKUP",
     address: { line1: "123 Main St", city: "New York", state: "NY", zip: "10001" },
@@ -45,6 +45,20 @@ describe("parseSubmitOrderRequest", () => {
     expect(withTerms.ok && withTerms.value).toMatchObject({ acknowledgedTerms: ["pricing"], termsVersion: "2026-09-27-v1" });
     const without = parseSubmitOrderRequest(body, null);
     expect(without.ok && without.value).toMatchObject({ acknowledgedTerms: [], termsVersion: "" });
+  });
+
+  it.each([
+    ["a missing birth month and year", { name: "J", email: "a@b.co", phone: "2125550142" }],
+    ["a birth month of 13", { ...body.contact, birthMonth: 13 }],
+    ["a birth month given as text", { ...body.contact, birthMonth: "3" }],
+    ["a fractional birth year", { ...body.contact, birthYear: 1990.5 }],
+  ])("rejects %s", (_label, contact) => {
+    expect(parseSubmitOrderRequest({ ...body, contact }, null).ok).toBe(false);
+  });
+
+  it("passes the birth month and year through (submitOrder enforces 18+)", () => {
+    const result = parseSubmitOrderRequest(body, null);
+    expect(result.ok && result.value.contact).toMatchObject({ birthMonth: 3, birthYear: 1990 });
   });
 
   it("names the offending field", () => {
