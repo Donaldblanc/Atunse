@@ -58,7 +58,7 @@ Audited 2026-09-28 (axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice) on e
 Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (off). Deposits are paid by Zelle and confirmed manually by the owner (ADR-0002).
 - [x] **No double submission**: a per-booking idempotency key returns the same Order on retry (ADR-0012), and a changed retry is refused (#76).
 - [x] **Amount matches the displayed total**: the estimate and 50% Deposit are computed server-side from the catalog, and parity tests keep the page's total identical.
-- [ ] **Successful / declined / abandoned payment, refunds, production keys, test-mode cleanup**: all wait on the Stripe integration. For Zelle launch: set `ZELLE_RECIPIENT` / `ZELLE_NAME` (above) and decide how refunds are handled (manually, per the Terms' section 13).
+- [ ] **Successful / declined / abandoned payment, refunds, production keys, test-mode cleanup**: all wait on the Stripe integration. For Zelle launch: set `ZELLE_RECIPIENT` / `ZELLE_NAME` (above) and decide how refunds are handled (manually, per the Terms' section 13). Manual (Zelle/Cash) refunds are recorded from the Payments screen; card refunds still wait on Stripe.
 
 ### Security & authentication
 - [x] **HTTPS everywhere**: live, HTTP redirects to HTTPS (308), and HSTS is sent (`max-age=63072000; includeSubDomains`) along with nosniff, frame, referrer and permissions headers (#88).

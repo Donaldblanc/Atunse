@@ -16,9 +16,9 @@ import {
   type RedeemResult,
   type SignInCodes,
 } from "../sign-in-codes";
-import type { AccountRepository, CustomerAccount, CustomerDetail, CustomerListRow } from "./account-repository";
+import { AdminEmailTakenError, type AccountRepository, type AdminAccount, type CustomerAccount, type CustomerDetail, type CustomerListRow } from "./account-repository";
 
-type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; createdAt: Date };
+type StoredAccount = { id: string; role: Exclude<Role, "GUEST">; email: string; name: string | null; phone: string | null; passwordHash?: string | null; createdAt: Date };
 
 let nextAccountId = 0;
 
@@ -40,6 +40,7 @@ export class InMemoryAccounts implements AccountRepository {
       email,
       name: account.name ?? null,
       phone: account.phone ?? null,
+      passwordHash: account.passwordHash ?? null,
       createdAt: account.createdAt ?? new Date(Date.now() + nextAccountId),
     };
     this.accounts.push(stored);
@@ -69,6 +70,25 @@ export class InMemoryAccounts implements AccountRepository {
   async findCustomerDetail(accountId: string): Promise<CustomerDetail | null> {
     const found = this.accounts.find((a) => a.role === "CUSTOMER" && a.id === accountId);
     return found ? { id: found.id, name: found.name, email: found.email, phone: found.phone, createdAt: found.createdAt } : null;
+  }
+
+  async findAdminById(accountId: string): Promise<AdminAccount | null> {
+    const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
+    return found ? { id: found.id, name: found.name, email: found.email, passwordHash: found.passwordHash ?? null } : null;
+  }
+
+  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+    const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
+    if (!found) return;
+    const email = fields.email.trim().toLowerCase();
+    if (this.accounts.some((a) => a.role === "ADMIN" && a.id !== accountId && a.email === email)) throw new AdminEmailTakenError();
+    found.name = fields.name;
+    found.email = email;
+  }
+
+  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
+    const found = this.accounts.find((a) => a.role === "ADMIN" && a.id === accountId);
+    if (found) found.passwordHash = passwordHash;
   }
 }
 

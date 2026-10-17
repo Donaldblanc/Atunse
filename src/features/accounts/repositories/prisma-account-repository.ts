@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
-import type { AccountRepository, CustomerAccount, CustomerDetail, CustomerListRow } from "./account-repository";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { AdminEmailTakenError, type AccountRepository, type AdminAccount, CustomerAccount, CustomerDetail, CustomerListRow } from "./account-repository";
 
 export class PrismaAccountRepository implements AccountRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -33,5 +33,28 @@ export class PrismaAccountRepository implements AccountRepository {
       where: { id: accountId, role: "CUSTOMER" },
       select: { id: true, name: true, email: true, phone: true, createdAt: true },
     });
+  }
+
+  async findAdminById(accountId: string): Promise<AdminAccount | null> {
+    return this.prisma.account.findFirst({
+      where: { id: accountId, role: "ADMIN" },
+      select: { id: true, name: true, email: true, passwordHash: true },
+    });
+  }
+
+  async updateAdminProfile(accountId: string, fields: { name: string | null; email: string }): Promise<void> {
+    try {
+      await this.prisma.account.updateMany({
+        where: { id: accountId, role: "ADMIN" },
+        data: { name: fields.name, email: fields.email.trim().toLowerCase() },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new AdminEmailTakenError();
+      throw err;
+    }
+  }
+
+  async updateAdminPasswordHash(accountId: string, passwordHash: string): Promise<void> {
+    await this.prisma.account.updateMany({ where: { id: accountId, role: "ADMIN" }, data: { passwordHash } });
   }
 }

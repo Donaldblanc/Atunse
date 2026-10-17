@@ -164,12 +164,12 @@ function isMissingBundle(err: unknown): boolean {
  * completed visit, a confirmed payment) starts here, so concurrent ones
  * run one after another and each reads the other's result.
  */
-async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
+export async function lockOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
   await tx.$queryRaw`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`;
 }
 
 /** The fields of the unique constraint a Prisma P2002 violated, or null. */
-function uniqueViolationFields(err: unknown): string[] | null {
+export function uniqueViolationFields(err: unknown): string[] | null {
   if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") return null;
   const target = err.meta?.target;
   return Array.isArray(target) ? target.map(String) : [String(target ?? "")];

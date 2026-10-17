@@ -1,0 +1,216 @@
+/* The Settings screen (Business Profile tab). Prefixed st- (global sheet, see docs/kb/patterns.md). */
+
+.st-head {
+  margin-bottom: 16px;
+}
+
+.st-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.st-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  margin-bottom: 20px;
+}
+
+.st-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #667085);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.st-tab[data-active="true"] {
+  color: var(--color-text, #101828);
+  border-bottom-color: var(--color-primary, #1570ef);
+  font-weight: 600;
+}
+
+.st-tab[data-soon="true"] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.st-soon {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-border, #e5e7eb);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+.st-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .st-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.st-main,
+.st-side {
+  display: grid;
+  gap: 20px;
+}
+
+.st-card {
+  display: grid;
+  gap: 14px;
+}
+
+.st-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+@media (max-width: 600px) {
+  .st-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.st-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.st-label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.st-input {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.st-error {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.st-hours-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.st-hours-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.st-hours-day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.st-hours-sep {
+  color: var(--color-text-muted, #667085);
+  font-size: 0.85rem;
+}
+
+.st-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #667085);
+}
+
+.st-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.st-saved {
+  margin: 0;
+  color: var(--color-success, #067647);
+  font-size: 0.85rem;
+}
+
+.st-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.st-logo-preview {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.st-logo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.st-account-form {
+  display: grid;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.st-account-form:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.st-integrations {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.st-integration-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.st-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-border, #e5e7eb);
+  color: var(--color-text-muted, #667085);
+}
+
+.st-pill[data-connected="true"] {
+  background: #d1fadf;
+  color: #067647;
+}
