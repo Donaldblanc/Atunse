@@ -16,7 +16,8 @@ export class PrismaSettingsRepository implements SettingsRepository {
   async getBusinessSettings(): Promise<BusinessSettingsData> {
     const row = await this.prisma.businessSettings.findUnique({ where: { id: SETTINGS_ID } });
     if (!row) return DEFAULT_BUSINESS_SETTINGS;
-    const { id, updatedAt, ...rest } = row;
+    // websiteUrl is a column the Settings screen doesn't own yet (not in BusinessSettingsData).
+    const { id, updatedAt, websiteUrl, ...rest } = row;
     return rest;
   }
 
