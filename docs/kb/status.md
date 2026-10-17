@@ -1,4 +1,4 @@
-# Build status (as of 2026-10-02: Release 0.5.0 plus the actionable Overview)
+# Build status (as of 2026-10-17: develop after #161–#170; main is Release 0.6.0)
 
 Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md`.
 
@@ -37,18 +37,26 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Admin Calendar** (`/admin/calendar`): a month grid of scheduled visits, built on `getAdminCalendar` (same `listAppointmentsBetween` query and live-visit filter as Today's Schedule). A visit opens the Overview's Schedule Item dialog (`/admin?visit=`) for its details, Reschedule and Mark as Completed.
 - **Orders list** (`/admin/orders`): search, status tabs, day/service filters and paging, reusing the Overview's All-orders logic. Rows link to `/admin/orders/[id]`.
 - **Quote gate scoped to Restoration/Custom-Work** (ADR-0017, supersedes ADR-0001): a Cleaning/Add-on-only Item is created already Approved at its estimate (no Under Review, no Quote). Only a Restoration/Custom-Work Item goes through Send Quote/Customer approved.
+  Admin never shows or offers Under Review, Quote Sent or Approved for a pair that needs no quote: it reads Request Submitted (#157).
+- **Order detail extras:** per-Service prices, Suede fee and Bundle price (#149); an Order-level audit log for contact edits, notes and reschedules (#150).
+- **Payments** (`/admin/payments`, #161): list with method/status breakdown, Record Payment, manual (Zelle/Cash) refunds. A Deposit/Balance can't be refunded while the Order has live pairs; card refunds wait on Stripe.
+- **Services & Pricing** (`/admin/services`, #162): Services and Bundles tables with edit panels, images, deactivate (never delete), stale-form check. Edits the `services`/`bundles` tables only: **booking still prices from `service-catalog.ts`** (the page says so).
+- **Messages** (`/admin/messages`, #163): inbox with search, status tabs, channel filter, paging, thread view with Mark read and email reply, New Message (emails the customer), archive.
+- **Settings** (`/admin/settings`, #164): Business Profile (details, logo, hours, Local Drop-Off/Mail-In switches) and the admin's own account (name, email with password, password). **Not read by the customer site yet**: booking still uses `pickup-window.ts`.
+- **Admin security hardening** (#168): revocable sessions (`Account.sessionVersion`), `__Host-` cookies, scrypt N=2^17 with rehash on login, email change needs the password, rate-limited password checks, Origin/JSON guards on admin API routes (ADR-0014 amendment, `gotchas.md`).
+- **Booking age check and cancellation** (#167): birth month/year on Your Info, 18+ enforced server-side and stored on the Order; "Need to cancel? Email us at `CONTACT_EMAIL`" on Review, Confirmation and the confirmation email.
+- **Copyright Policy** (`/copyright`, #165): DMCA notice and counter-notice page, hidden (404, no footer link) until `DMCA_AGENT_*` are set.
+- **Accessibility** (#166): reviews carousel Pause/Resume, marquee stops on reduced motion, `aria-current` on the tab bar; no accessibility overlay, by decision (TODO, Accessibility).
 
 ## Not built (admin screens in SPEC's inventory)
-Services & Pricing, Inventory, Payments, Messages, Settings. Unbuilt screens
-show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`). Until they
-exist, the Overview's dialogs cover the day-to-day actions.
+Inventory: the only sidebar entry still marked "Soon" (`src/app/admin/admin-screens.ts`). Low stock is handled from the Overview until then.
 
 ## Top open items (see TODO.md for the rest)
-- **Launch blocker:** set `CONTACT_EMAIL` and Resend (`RESEND_API_KEY`, `EMAIL_FROM`) in production. Without them, no owner email for new bookings and no message replies go out (the bell still works).
-- **Launch blocker:** sales tax decision. Set `ZELLE_RECIPIENT`/`ZELLE_NAME` and Resend in Vercel.
-- Customer "My bookings" page. Customers have no self-serve cancellation or rescheduling.
-- Booking still prices from `service-catalog.ts`. ADR-0016 step 2 moves it to the DB tables.
-- `develop`'s `package.json` says 0.2.1 while `main` is 0.5.0: release back-merges never landed (TODO, Housekeeping).
+- **Launch blockers (owner):** Privacy Policy PDF must mention birth month/year; sales tax decision; set `CONTACT_EMAIL`, Resend (`RESEND_API_KEY`, `EMAIL_FROM`, monitored) and `ZELLE_RECIPIENT`/`ZELLE_NAME` in Vercel; register the DMCA agent.
+- **ADR-0016 step 2:** booking and the site read the DB catalog and Settings instead of `service-catalog.ts`/`pickup-window.ts`. Carry over the catalog-only Bundle fields (`endsAt`, `pairServiceIds`, e.g. `fall-boots`).
+- Enforce the CSP (report-only today; audit finding 9).
+- Customer "My bookings" page: no self-serve cancellation or rescheduling (customers email `CONTACT_EMAIL`).
+- Preview deploys run `prisma migrate deploy` (the `build` script): give Preview its own database so unmerged migrations never reach a shared one.
 
 ## Overview follow-ups (TODO, Admin Overview)
 - Per-chart ranges: kept as one page-wide range on purpose.
