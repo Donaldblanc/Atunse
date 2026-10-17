@@ -43,6 +43,13 @@ Audited 2026-09-28 (axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice) on e
 - [x] **Heading hierarchy and landmarks**: one H1 per page with no skipped levels (axe `heading-order`, `page-has-heading-one`); every page has a `<main>`; the nav, menu, footer and legal links are labelled landmarks.
 - [x] **200% zoom and 320 px reflow**: no horizontal scrolling on any page at 640 px (1280 px at 200%) or 320 px wide.
 - [x] **Errors not by colour alone**: every warning and error has an icon and text. Booking warnings are now always-present live regions, so screen readers announce them when they appear.
+- [x] **Interactive widgets re-checked 2026-10-17** (code review against the WAI-ARIA patterns plus static-markup tests in `src/features/landing/widgets-a11y.test.tsx`; the unit suite has no DOM, so axe-core itself isn't run there):
+  - reviews carousel: it rotated every 3 s with only a hover pause. Now it has a Pause/Resume button (2.2.2), pauses on focus, is silent to screen readers while rotating and polite once paused or stepped;
+  - brand logo marquee: the reduced-motion rule made its infinite animation flicker (0.01 ms loop), so it now stops outright; it pauses on hover and the repeated copy is hidden from screen readers;
+  - mobile tab bar: the current page now has `aria-current="page"`; before/after carousel buttons are named "Previous photos" / "Next photos";
+  - FAQ accordion, nav drawer (`use-dialog.ts`), theme toggle (toggle button with `aria-pressed`), date-picker dialog, mobile book bar, Fall Special banner (heading order, alt text, "Book Fall Special" link text) and our Silktide config (labelled buttons, contrast of our theme colours) read clean.
+  - Not verifiable offline: Silktide's own injected DOM (focus order, no focus trap, Escape) and axe on the new carousel button. Check by hand or re-run the browser axe audit.
+- [x] **Decision: no third-party accessibility overlay** (accessiBe, UserWay, EqualWeb, AudioEye and similar). Checked 2026-10-17: none in `src`, the layout or the CSP. Don't add one: overlays don't make a site conformant and have drawn FTC action (accessiBe, January 2025). Fix the markup instead.
 - [ ] **Screen-reader spot check**: automated tests can't replace listening. Do one pass with VoiceOver (iPhone and Mac) through a booking before launch.
 
 ### Booking & forms

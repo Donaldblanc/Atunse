@@ -8,9 +8,10 @@ export function BrandMarquee() {
 
   return (
     <div className="landing-trust-marquee">
+      {/* The second copy only makes the loop seamless: hidden from screen readers so each brand is read once. */}
       <div className="landing-trust-marquee-track">
         {doubled.map((logo, i) => (
-          <span className="landing-trust-wordmark" key={`${logo.slug}-${i}`}>
+          <span className="landing-trust-wordmark" key={`${logo.slug}-${i}`} aria-hidden={i >= BRAND_LOGOS.length || undefined}>
             {/* eslint-disable-next-line @next/next/no-img-element -- theme-swapped via CSS, not next/image */}
             <img className="logo-black" src={getBrandLogoUrl(logo.slug, "black")} alt={logo.name} />
             {/* eslint-disable-next-line @next/next/no-img-element -- theme-swapped via CSS, not next/image */}
