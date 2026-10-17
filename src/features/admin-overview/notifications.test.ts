@@ -3,7 +3,7 @@ import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import { InvalidNotificationIdsError, markNotificationsRead } from "./mark-notifications-read";
 import { listNotifications } from "./list-notifications";
-import { bookingDeps, validBookingInput, validPair } from "@/features/orders/use-cases/test-fixtures";
+import { ADULT_BIRTH, bookingDeps, validBookingInput, validPair } from "@/features/orders/use-cases/test-fixtures";
 import { submitOrder } from "@/features/orders/use-cases/submit-order";
 
 const ADMIN: ActingUser = { accountId: "acc_admin", role: "ADMIN" };
@@ -13,7 +13,7 @@ const GUEST: ActingUser = { accountId: null, role: "GUEST" };
 async function repoWithBookings(count: number) {
   const deps = bookingDeps();
   for (let i = 0; i < count; i++) {
-    await submitOrder(deps, GUEST, validBookingInput({ items: [validPair({}, i)], contact: { name: "Jordan Smith", email: `c${i}@example.com`, phone: "(212) 555-0142" } }));
+    await submitOrder(deps, GUEST, validBookingInput({ items: [validPair({}, i)], contact: { ...ADULT_BIRTH, name: "Jordan Smith", email: `c${i}@example.com`, phone: "(212) 555-0142" } }));
   }
   return deps.orders as InMemoryOrderRepository;
 }

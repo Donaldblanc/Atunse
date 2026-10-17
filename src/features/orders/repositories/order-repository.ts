@@ -94,6 +94,9 @@ export interface NewOrderInput {
   contactName: string;
   contactEmail: string;
   contactPhone: string;
+  /** Asked at booking for the 18+ check; absent for Orders made without it (tests, imports). */
+  birthMonth?: number | null;
+  birthYear?: number | null;
   policyAcceptedAt: Date;
   /** What was accepted at policyAcceptedAt (ADR-0015). */
   terms: Omit<TermsAcceptance, "acceptedAt">;

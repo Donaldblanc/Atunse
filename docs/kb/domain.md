@@ -15,6 +15,8 @@ Completing a visit (`completeAppointment`) moves pairs in the same transaction (
 
 The Order has no status of its own; it is rolled up from its Items for display.
 
+Age check: booking requires 18+ by birth month/year (`orders/age.ts` `isAdultByBirthMonth`, month precision, shop time), stored as `Order.birthMonth`/`birthYear` (nullable on old Orders).
+
 **Quote gate (ADR-0017, supersedes ADR-0001):** an Item created with only Cleaning/Add-on Services (`itemRequiresQuote` false, `service-catalog.ts`) starts `APPROVED` with `price` set to its estimate, skipping `REQUEST_SUBMITTED`/`UNDER_REVIEW`/`QUOTE_SENT`; the repository logs a system `AUTO_APPROVED_SET_PRICE` audit entry (no actor). Only an Item with a Restoration/Custom-Work Service goes through the full pipeline above. Admin display for a no-quote pair (old Orders included): the four early statuses all show as "Request Submitted" (`displayStatus`, `orderDisplayStatus`), and its timeline is `statusPipeline(false)` (no Under Review/Quote Sent/Approved). An Order uses the full pipeline if any live pair needs a Quote. Admin status filters match the displayed status.
 
 ## Customer emails (`status-emails.ts`, `visit-emails.ts`)

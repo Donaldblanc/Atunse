@@ -33,6 +33,8 @@ function newOrder(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
     contactName: "Jordan Smith",
     contactEmail: "jordan@example.com",
     contactPhone: "(212) 555-0142",
+    birthMonth: 3,
+    birthYear: 1990,
     policyAcceptedAt: new Date(),
     terms: {
       version: "v1",
@@ -101,6 +103,7 @@ describe("getOrderDetail", () => {
         name: "Jordan Smith",
         email: "jordan@example.com",
         phone: "(212) 555-0142",
+        born: "Mar 1990",
         fulfillment: "Local Drop-Off",
         schedule: { date: "2026-10-03", slot: "4:30 PM – 5:00 PM" },
         address: ["12 Elm St", "Apt 4", "Brooklyn, NY 11201"],

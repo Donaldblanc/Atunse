@@ -30,7 +30,8 @@ const submitOrderBody = z.object({
   acknowledgedTerms: z.array(text(40)).max(20).default([]),
   // The agreement version the page showed; missing (older tabs) never matches.
   termsVersion: text(40).default(""),
-  contact: z.object({ name: text(120), email: text(254), phone: text(30) }),
+  // Month and year of birth for the 18+ check; submitOrder enforces the rule.
+  contact: z.object({ name: text(120), email: text(254), phone: text(30), birthMonth: z.number().int().min(1).max(12), birthYear: z.number().int() }),
   fulfillment: z.discriminatedUnion("method", [
     z.object({ method: z.literal("PICKUP"), address, date: calendarDate, slot: text(40) }),
     z.object({ method: z.literal("MAIL_IN"), address, preferredDate: calendarDate.nullish().transform((v) => v ?? null) }),

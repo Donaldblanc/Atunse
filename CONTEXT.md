@@ -14,6 +14,9 @@ An Order's sequential reference, e.g. "ATU-1008" (first Order: ATU-1001), used e
 ## Order Status (display)
 There is no single Order status field. The customer-facing order view always shows a per-Item breakdown (each Item's own place in the Status Pipeline) — never a single collapsed label for the whole Order. Admin screens that list Orders by status (Pending Payment, In Progress, Ready, Completed, Cancelled) derive it from the Items and the Payments; it is never stored.
 
+## Booking age requirement
+Customers must be 18 or older to book; a parent or guardian can book for a minor. The booking's Your Info step asks for **birth month and birth year** (no day), and the rule is conservative at month precision: eligible only if the birth month is at least 18 full years before the current month (shop time), so someone turning 18 this month can't book yet (`isAdultByBirthMonth`, enforced by `submitOrder` too). Both are stored on the Order (`birthMonth`, `birthYear`, null on older Orders) and shown in admin Order detail as "Born Mar 1990". Wherever a customer commits (Review step, confirmation, confirmation email) they are told to email the shop inbox (`CONTACT_EMAIL`) to cancel a booking or close their account.
+
 ## Policy Acceptance
 Two required parts, presented once, at the final review-and-submit step of order creation, before the Deposit is charged:
 - **Pricing & Restoration Acknowledgments** — four risk acknowledgments, each its own checkbox: final pricing is determined after inspection (additional charges need the customer's approval first); results may vary; restoration involves inherent material risks; restoration doesn't guarantee structural or performance restoration. They record that the customer understood each risk. None of them, alone or together, is acceptance of the contract.
