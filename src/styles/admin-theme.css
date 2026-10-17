@@ -719,6 +719,13 @@ a.admin-nav-item:hover {
   align-items: start;
 }
 
+/* A full-width admin screen (Payments, Services & Pricing) that reuses .ov's
+   header and spacing but not the Overview's 380px side column: without this,
+   its second and later children auto-place into that column and overflow. */
+.ov.ov-page {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ov-primary,
 .ov-secondary {
   display: flex;

@@ -77,7 +77,7 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
   const closeHref = hrefFor({ tab, q, category, status });
 
   return (
-    <div className="ov">
+    <div className="ov ov-page">
       <div className="ov-header">
         <div>
           <p className="ov-eyebrow">Services &amp; Pricing</p>
