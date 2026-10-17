@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pause, Play } from "lucide-react";
 import { ArrowIcon } from "./arrow-icon";
 
 const REVIEW_INTERVAL_MS = 3000;
@@ -15,7 +16,10 @@ export type Review = {
 
 export function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
+  // Hover/focus pause temporarily; the button pauses until pressed again (WCAG 2.2.2).
+  const [hoverPaused, setHoverPaused] = useState(false);
+  const [userPaused, setUserPaused] = useState(false);
+  const paused = hoverPaused || userPaused;
   const review = reviews[index] ?? reviews[0];
 
   function step(dir: 1 | -1) {
@@ -33,18 +37,26 @@ export function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
   if (!review) return null;
 
   return (
-    <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <div
+      onMouseEnter={() => setHoverPaused(true)}
+      onMouseLeave={() => setHoverPaused(false)}
+      onFocus={() => setHoverPaused(true)}
+      onBlur={() => setHoverPaused(false)}
+    >
       <h2>What People Say</h2>
       <div className="landing-stars" aria-hidden="true">
         {"★★★★★".slice(0, review.stars)}
         {"☆☆☆☆☆".slice(0, 5 - review.stars)}
       </div>
-      <p className="landing-quote">&ldquo;{review.quote}&rdquo;</p>
-      <div className="landing-reviewer">
-        <div className="landing-avatar">{review.initials}</div>
-        <div>
-          <div className="landing-reviewer-name">{review.name}</div>
-          <div className="landing-reviewer-loc">{review.loc}</div>
+      {/* Announced only when the visitor steps or has paused; never while it rotates by itself. */}
+      <div aria-live={paused ? "polite" : "off"} aria-atomic="true">
+        <p className="landing-quote">&ldquo;{review.quote}&rdquo;</p>
+        <div className="landing-reviewer">
+          <div className="landing-avatar">{review.initials}</div>
+          <div>
+            <div className="landing-reviewer-name">{review.name}</div>
+            <div className="landing-reviewer-loc">{review.loc}</div>
+          </div>
         </div>
       </div>
       <div className="landing-review-nav">
@@ -55,6 +67,15 @@ export function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
         </button>
         <button className="landing-review-nav-btn" aria-label="Next review" onClick={() => step(1)}>
           <ArrowIcon size={13} />
+        </button>
+        <button
+          className="landing-review-nav-btn"
+          type="button"
+          aria-label={userPaused ? "Resume automatic review rotation" : "Pause automatic review rotation"}
+          aria-pressed={userPaused}
+          onClick={() => setUserPaused((current) => !current)}
+        >
+          {userPaused ? <Play size={13} aria-hidden="true" /> : <Pause size={13} aria-hidden="true" />}
         </button>
       </div>
     </div>

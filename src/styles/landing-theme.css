@@ -377,6 +377,11 @@
   animation: landing-trust-scroll 16s linear infinite;
 }
 
+/* WCAG 2.2.2: hovering the logos pauses the scroll. */
+.landing-trust-marquee:hover .landing-trust-marquee-track {
+  animation-play-state: paused;
+}
+
 @keyframes landing-trust-scroll {
   from {
     transform: translateX(0);
@@ -1903,6 +1908,10 @@
   .landing * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* An infinite 0.01ms loop would flicker, so the logo scroll stops outright. */
+  .landing .landing-trust-marquee-track {
+    animation: none !important;
   }
 }
 
