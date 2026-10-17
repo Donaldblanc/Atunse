@@ -76,7 +76,7 @@ export function ContactStep({
       <div className="booking-page-form-grid">
         <label className="booking-page-field">
           <span>Birth month</span>
-          <select required value={contact.birthMonth} onChange={(e) => onChangeContact({ ...contact, birthMonth: e.target.value })}>
+          <select required aria-describedby="booking-birth-hint" value={contact.birthMonth} onChange={(e) => onChangeContact({ ...contact, birthMonth: e.target.value })}>
             <option value="" disabled>
               Select
             </option>
@@ -89,7 +89,7 @@ export function ContactStep({
         </label>
         <label className="booking-page-field">
           <span>Birth year</span>
-          <select required value={contact.birthYear} onChange={(e) => onChangeContact({ ...contact, birthYear: e.target.value })}>
+          <select required aria-describedby="booking-birth-hint" value={contact.birthYear} onChange={(e) => onChangeContact({ ...contact, birthYear: e.target.value })}>
             <option value="" disabled>
               Select
             </option>
@@ -101,7 +101,7 @@ export function ContactStep({
           </select>
         </label>
       </div>
-      <p className="booking-page-form-hint">We only ask this to confirm you&rsquo;re 18 or older.</p>
+      <p className="booking-page-form-hint" id="booking-birth-hint">We only ask this to confirm you&rsquo;re 18 or older.</p>
 
       <div className="booking-page-section-head booking-page-section-head-tight">
         <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>
