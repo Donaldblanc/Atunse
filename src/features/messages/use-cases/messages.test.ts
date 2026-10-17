@@ -10,7 +10,7 @@ import { CONVERSATIONS_PAGE_SIZE, listConversations } from "./list-conversations
 import { markConversationRead } from "./mark-conversation-read";
 import { InvalidReplyError, replyToConversation, REPLY_MAX_LENGTH } from "./reply-to-conversation";
 import { setConversationArchived } from "./set-conversation-archived";
-import { CustomerNotFoundError, InvalidMessageError, startConversation } from "./start-conversation";
+import { CustomerNotFoundError, InvalidMessageError, newMessageSubject, startConversation } from "./start-conversation";
 
 const ADMIN: ActingUser = { accountId: "acc_admin", role: "ADMIN" };
 const CUSTOMER: ActingUser = { accountId: "acc_c", role: "CUSTOMER" };
@@ -239,7 +239,12 @@ describe("startConversation", () => {
     const stored = messages.messages.find((m) => m.conversationId === result.conversationId);
     expect(stored).toMatchObject({ author: "ADMIN", channel: "EMAIL", body: "Welcome!", authorAccountId: "acc_admin" });
     expect(result.emailFailed).toBe(false);
-    expect(notifications.sent).toEqual([{ to: "new@example.com", subject: "Re: Hi", body: "Welcome!" }]);
+    expect(notifications.sent).toEqual([{ to: "new@example.com", subject: "Hi", body: "Welcome!" }]);
+  });
+
+  it("titles a new thread with its subject as typed, or a plain fallback, never a \"Re:\"", () => {
+    expect(newMessageSubject("Your pair\r\nBcc: x@example.com")).toBe("Your pair Bcc: x@example.com");
+    expect(newMessageSubject(null)).toBe("A message from Atunṣe");
   });
 
   it("keeps the Message and reports a failed send, logging only a masked address", async () => {

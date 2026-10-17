@@ -35,7 +35,7 @@ async function conversation(data: { archivedAt?: Date; lastMessageAt?: Date } = 
 const message = (conversationId: string, data: { author?: "CUSTOMER" | "ADMIN"; channel?: "IN_APP" | "EMAIL" | "SMS"; readAt?: Date; createdAt?: Date } = {}) =>
   prisma.message.create({ data: { conversationId, author: "CUSTOMER", body: "Hi", ...data } });
 
-describe("unread messages", () => {
+describe("unread messages (integration)", () => {
   it("counts unread CUSTOMER messages in unarchived Conversations only", async () => {
     const open = await conversation();
     const archived = await conversation({ archivedAt: T0 });
@@ -63,7 +63,7 @@ describe("unread messages", () => {
   });
 });
 
-describe("markConversationRead", () => {
+describe("markConversationRead (integration)", () => {
   it("reads only that Conversation's unread CUSTOMER messages", async () => {
     const a = await conversation();
     const b = await conversation();
@@ -78,7 +78,7 @@ describe("markConversationRead", () => {
   });
 });
 
-describe("storeAdminReply", () => {
+describe("storeAdminReply (integration)", () => {
   const reply = (conversationId: string, idempotencyKey = "key-1") => ({ conversationId, authorAccountId: null, body: "On its way.", idempotencyKey, at: T1 });
 
   it("stores an ADMIN EMAIL message, bumps lastMessageAt and returns the recipient", async () => {
@@ -110,7 +110,7 @@ describe("storeAdminReply", () => {
   });
 });
 
-describe("listConversations", () => {
+describe("listConversations (integration)", () => {
   it("defaults to the inbox (not archived), newest activity first", async () => {
     const newer = await conversation({ lastMessageAt: T1 });
     const older = await conversation({ lastMessageAt: T0 });
@@ -171,7 +171,7 @@ describe("listConversations", () => {
   });
 });
 
-describe("getConversationThread", () => {
+describe("getConversationThread (integration)", () => {
   it("returns the whole thread for an existing Conversation, oldest first", async () => {
     const c = await conversation();
     await message(c.id, { createdAt: T0 });
@@ -186,7 +186,7 @@ describe("getConversationThread", () => {
   });
 });
 
-describe("setConversationArchived", () => {
+describe("setConversationArchived (integration)", () => {
   it("sets and clears archivedAt", async () => {
     const c = await conversation();
     await repo.setConversationArchived(c.id, true, T1);
@@ -200,7 +200,7 @@ describe("setConversationArchived", () => {
   });
 });
 
-describe("startConversation", () => {
+describe("startConversation (integration)", () => {
   const start = (idempotencyKey = "start-key") => ({
     accountId,
     accountEmail: EMAIL,

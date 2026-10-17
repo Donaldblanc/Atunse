@@ -5,7 +5,6 @@ import type { NotificationService } from "@/features/notifications/notification-
 import { redactForLog } from "@/shared/logging/redact";
 import { REPLY_MAX_LENGTH } from "../reply-limits";
 import type { MessageRepository } from "../repositories/message-repository";
-import { replySubject } from "./reply-to-conversation";
 
 export class InvalidMessageError extends Error {
   constructor(message: string) {
@@ -64,10 +63,16 @@ export async function startConversation(
   if (!created) return { conversationId, emailFailed: false };
 
   try {
-    await deps.notifications.sendEmail({ to: account.email, subject: replySubject({ orderNumber: null, subject }), body });
+    await deps.notifications.sendEmail({ to: account.email, subject: newMessageSubject(subject), body });
   } catch (err) {
     console.error(`[messages] message saved, but the email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
     return { conversationId, emailFailed: true };
   }
   return { conversationId, emailFailed: false };
+}
+
+/** A new thread's email subject: the owner's subject as typed (CR/LF collapsed so it can't add headers), not a "Re:". */
+export function newMessageSubject(subject: string | null): string {
+  const clean = subject?.replace(/[\r\n]+/g, " ").trim();
+  return clean || "A message from Atunṣe";
 }
