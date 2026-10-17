@@ -173,6 +173,16 @@ describe("PrismaOrderRepository (integration)", () => {
     expect(found?.termsAcceptance).toEqual({ ...TERMS, acceptedAt });
   });
 
+  it("stores the customer's birth month and year, and reads an Order without them as null (age check)", async () => {
+    const { order } = await repo.create(newOrder({ birthMonth: 3, birthYear: 1990 }));
+    const found = await repo.findById(order.id);
+    expect([found?.birthMonth, found?.birthYear]).toEqual([3, 1990]);
+
+    const { order: older } = await repo.create(newOrder());
+    const foundOlder = await repo.findById(older.id);
+    expect([foundOlder?.birthMonth, foundOlder?.birthYear]).toEqual([null, null]);
+  });
+
   it("reads an Order from before the agreement existed as having no terms acceptance", async () => {
     const { order } = await repo.create(newOrder());
     await prisma.order.update({

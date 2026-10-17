@@ -17,7 +17,7 @@ function submission(overrides: Partial<BookingSubmission> = {}): BookingSubmissi
     address: { ...EMPTY_ADDRESS, address: "123 Main St", city: "New York", state: "NY", zip: "10001" },
     pickupSelection: { date: new Date(2026, 9, 3), time: "4:30 PM – 5:00 PM" },
     mailInDate: null,
-    contact: { ...EMPTY_CONTACT, name: "Jordan", email: "j@example.com", phone: "2125550142" },
+    contact: { ...EMPTY_CONTACT, name: "Jordan", email: "j@example.com", phone: "2125550142", birthMonth: "3", birthYear: "1990" },
     rush: false,
     ...overrides,
   };
@@ -36,6 +36,18 @@ describe("buildOrderRequestBody", () => {
     expect(body.acknowledgedTerms).toEqual(["pricing", "restorationResults", "materialRisks", "structuralLimitations"]);
     expect(body.termsVersion).toBe("2026-09-27-v1");
     expect(body.items).toEqual([{ brand: "Nike AF1", material: "Suede", notes: null, serviceIds: ["standard"], photoKeys: ["k"] }]);
+  });
+
+  it("sends the birth month and year as numbers, and 0 when not chosen so the server refuses them", () => {
+    expect(buildOrderRequestBody(submission(), [["k"]]).contact).toEqual({
+      name: "Jordan",
+      email: "j@example.com",
+      phone: "2125550142",
+      birthMonth: 3,
+      birthYear: 1990,
+    });
+    const blank = buildOrderRequestBody(submission({ contact: { ...EMPTY_CONTACT, name: "J" } }), [["k"]]);
+    expect([blank.contact.birthMonth, blank.contact.birthYear]).toEqual([0, 0]);
   });
 
   it("sends a Bundle as its three pairs, each with its own photo keys and no Services of its own", () => {

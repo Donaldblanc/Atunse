@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { ArrowRight, Sparkles, TriangleAlert } from "lucide-react";
 import type { ContactInfo } from "./booking-types";
-import { isValidEmail, isValidUsPhone } from "@/features/orders/contact-rules";
+import { birthYearOptions, MONTH_NAMES } from "@/features/orders/age";
+import { contactStepProblems } from "./contact-validation";
 import { RUSH_FEE_CENTS } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { formatList } from "./format-list";
@@ -26,20 +27,7 @@ export function ContactStep({
   onContinue: () => void;
 }) {
   const [attempted, setAttempted] = useState(false);
-  const missingFields = [
-    !contact.name.trim() && "name",
-    !contact.email.trim() && "email",
-    !contact.phone.trim() && "phone",
-  ].filter((f): f is string => Boolean(f));
-  const formatProblem =
-    missingFields.length > 0
-      ? null
-      : !isValidEmail(contact.email)
-        ? "Please enter a valid email address to continue."
-        : !isValidUsPhone(contact.phone)
-          ? "Please enter a 10-digit US phone number to continue."
-          : null;
-  const isValid = missingFields.length === 0 && formatProblem === null;
+  const { missingFields, formatProblem, isValid } = contactStepProblems(contact, new Date());
   const showWarning = attempted && !isValid;
 
   return (
@@ -84,6 +72,36 @@ export function ContactStep({
           />
         </label>
       </div>
+
+      <div className="booking-page-form-grid">
+        <label className="booking-page-field">
+          <span>Birth month</span>
+          <select required value={contact.birthMonth} onChange={(e) => onChangeContact({ ...contact, birthMonth: e.target.value })}>
+            <option value="" disabled>
+              Select
+            </option>
+            {MONTH_NAMES.map((month, i) => (
+              <option key={month} value={i + 1}>
+                {month}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="booking-page-field">
+          <span>Birth year</span>
+          <select required value={contact.birthYear} onChange={(e) => onChangeContact({ ...contact, birthYear: e.target.value })}>
+            <option value="" disabled>
+              Select
+            </option>
+            {birthYearOptions(new Date()).map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <p className="booking-page-form-hint">We only ask this to confirm you&rsquo;re 18 or older.</p>
 
       <div className="booking-page-section-head booking-page-section-head-tight">
         <p className="booking-page-step-eyebrow" style={{ margin: 0 }}>

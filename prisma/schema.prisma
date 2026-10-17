@@ -172,6 +172,9 @@ model Order {
   contactName  String
   contactEmail String
   contactPhone String
+  // Age check at booking (month precision, 18+): null only on Orders from before it existed.
+  birthMonth   Int?
+  birthYear    Int?
 
   policyAcceptedAt DateTime // Policy Acceptance is captured at submission, not deferred (ADR revision)
 

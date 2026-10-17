@@ -4,6 +4,7 @@
 The owner's pre-launch list, checked against the code and the live site (`atunse-five.vercel.app`) on 2026-09-28. **[x]** = verified done (evidence in the line); **[ ]** = still to do, with what's there today. Items already tracked in detail elsewhere in this file say so instead of repeating it.
 
 ### Launch blockers found while merging
+- [ ] **Privacy Policy must mention the birth month and year collected for age verification.** Booking now asks for them (18+ check) and stores them on the Order, but the published Privacy Policy PDF doesn't say so. Needs a new PDF version from the owner (ADR-0015); do not edit the existing version in place.
 - [ ] **Make sure the shop is told about a new booking in production.** Done in code: each booking writes a bell notification and emails the shop inbox (`CONTACT_EMAIL`, the contact form's inbox). What remains: set `CONTACT_EMAIL` and Resend in Vercel (unset means no email, quietly).
 - [ ] **Sales tax.** The site charges no tax. New York generally taxes services that maintain or repair tangible personal property, which may include sneaker cleaning and restoration; NJ and CT have their own rules. Confirm with an accountant, then add tax to the estimate, Deposit and totals if needed.
 

@@ -14,7 +14,7 @@ function detail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     reference: "ATU-1001",
     bookedAt: new Date("2026-10-01T12:00:00Z"),
     status: "REQUEST_SUBMITTED",
-    customer: { name: "Jordan Smith", email: "jordan@example.com", phone: "(212) 555-0142", fulfillment: "Local Drop-Off", schedule: null, address: [] },
+    customer: { name: "Jordan Smith", email: "jordan@example.com", phone: "(212) 555-0142", born: "Mar 1990", fulfillment: "Local Drop-Off", schedule: null, address: [] },
     bundleName: null,
     bundlePrice: null,
     pairs: [],
@@ -57,6 +57,21 @@ function pair(overrides: Partial<OrderDetail["pairs"][number]> = {}): OrderDetai
 }
 
 describe("OrderDetailDialog", () => {
+  it("shows when the customer was born (month and year) in the customer section", () => {
+    const render = (born: string | null) =>
+      renderToStaticMarkup(
+        <OrderDetailDialog
+          detail={detail({ customer: { ...detail().customer, born } })}
+          closeHref="/admin"
+          viewHref="/admin?order=ord_1"
+          editHref="/admin?order=ord_1&edit=order"
+          fullPageHref="/admin/orders/ord_1"
+        />,
+      );
+    expect(render("Mar 1990")).toContain("<dt>Born</dt><dd>Mar 1990</dd>");
+    expect(render(null)).not.toContain("<dt>Born</dt>");
+  });
+
   it("shows a 'Set price — no quote needed' note for an auto-approved pair (ADR-0017)", () => {
     const html = renderToStaticMarkup(
       <OrderDetailDialog
