@@ -2,7 +2,7 @@
 // to PrismaCatalogRepository.
 
 import type { BundleRecord, BundleUpdate, CatalogImage, CatalogRepository, NewBundleInput, ServiceRecord, ServiceUpdate } from "./catalog-repository";
-import { CatalogImageNotFoundError, MAX_CATALOG_IMAGES, TooManyCatalogImagesError } from "./catalog-repository";
+import { BundleIdTakenError, CatalogChangedError, CatalogImageKeyTakenError, CatalogImageNotFoundError, MAX_CATALOG_IMAGES, TooManyCatalogImagesError } from "./catalog-repository";
 
 let nextImageId = 0;
 function fakeImageId(): string {
@@ -10,7 +10,13 @@ function fakeImageId(): string {
   return `image_${nextImageId}`;
 }
 
-function addImage(images: CatalogImage[], key: string): CatalogImage[] {
+/** Always later than `previous`, like a real `@updatedAt` bump, so a stale expectedUpdatedAt can't collide within one millisecond. */
+function bumped(previous: Date): Date {
+  return new Date(Math.max(Date.now(), previous.getTime() + 1));
+}
+
+function addImage(images: CatalogImage[], key: string, allImages: CatalogImage[]): CatalogImage[] {
+  if (allImages.some((image) => image.key === key)) throw new CatalogImageKeyTakenError(key);
   if (images.length >= MAX_CATALOG_IMAGES) throw new TooManyCatalogImagesError();
   const nextPosition = images.reduce((max, image) => Math.max(max, image.position), -1) + 1;
   return [...images, { id: fakeImageId(), key, position: nextPosition }];
@@ -41,23 +47,30 @@ export class InMemoryCatalogRepository implements CatalogRepository {
     return this.bundles.get(id) ?? null;
   }
 
-  async updateService(id: string, patch: ServiceUpdate): Promise<ServiceRecord | null> {
+  private allImages(): CatalogImage[] {
+    return [...this.services.values(), ...this.bundles.values()].flatMap((record) => record.images);
+  }
+
+  async updateService(id: string, patch: ServiceUpdate, expectedUpdatedAt?: Date): Promise<ServiceRecord | null> {
     const existing = this.services.get(id);
     if (!existing) return null;
-    const updated: ServiceRecord = { ...existing, ...patch, updatedAt: new Date() };
+    if (expectedUpdatedAt && existing.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new CatalogChangedError();
+    const updated: ServiceRecord = { ...existing, ...patch, updatedAt: bumped(existing.updatedAt) };
     this.services.set(id, updated);
     return updated;
   }
 
-  async updateBundle(id: string, patch: BundleUpdate): Promise<BundleRecord | null> {
+  async updateBundle(id: string, patch: BundleUpdate, expectedUpdatedAt?: Date): Promise<BundleRecord | null> {
     const existing = this.bundles.get(id);
     if (!existing) return null;
-    const updated: BundleRecord = { ...existing, ...patch, updatedAt: new Date() };
+    if (expectedUpdatedAt && existing.updatedAt.getTime() !== expectedUpdatedAt.getTime()) throw new CatalogChangedError();
+    const updated: BundleRecord = { ...existing, ...patch, updatedAt: bumped(existing.updatedAt) };
     this.bundles.set(id, updated);
     return updated;
   }
 
   async createBundle(input: NewBundleInput): Promise<BundleRecord> {
+    if (this.bundles.has(input.id)) throw new BundleIdTakenError(input.id);
     const now = new Date();
     const bundle: BundleRecord = {
       id: input.id,
@@ -78,7 +91,7 @@ export class InMemoryCatalogRepository implements CatalogRepository {
   async addServiceImage(serviceId: string, key: string): Promise<ServiceRecord | null> {
     const existing = this.services.get(serviceId);
     if (!existing) return null;
-    const updated: ServiceRecord = { ...existing, images: addImage(existing.images, key), updatedAt: new Date() };
+    const updated: ServiceRecord = { ...existing, images: addImage(existing.images, key, this.allImages()), updatedAt: new Date() };
     this.services.set(serviceId, updated);
     return updated;
   }
@@ -86,7 +99,7 @@ export class InMemoryCatalogRepository implements CatalogRepository {
   async addBundleImage(bundleId: string, key: string): Promise<BundleRecord | null> {
     const existing = this.bundles.get(bundleId);
     if (!existing) return null;
-    const updated: BundleRecord = { ...existing, images: addImage(existing.images, key), updatedAt: new Date() };
+    const updated: BundleRecord = { ...existing, images: addImage(existing.images, key, this.allImages()), updatedAt: new Date() };
     this.bundles.set(bundleId, updated);
     return updated;
   }

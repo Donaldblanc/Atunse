@@ -78,4 +78,18 @@ describe("AdminServicesPage", () => {
     expect(html).toContain("Lace Replacement");
     expect(html).not.toContain("Standard Clean");
   });
+
+  it("shows the booking-doesn't-use-these-yet notice", async () => {
+    const html = renderToStaticMarkup(await AdminServicesPage({ searchParams: Promise.resolve({}) }));
+    expect(html).toContain("don&#x27;t change the booking page yet");
+  });
+
+  it("badges a bundle that has a promotion end date in the built-in catalog", async () => {
+    const bundle = { id: "fall-boots", name: "Fall Boots", priceCents: 9000, perks: [], internalNotes: null, active: true, position: 0, images: [], createdAt: new Date(), updatedAt: new Date() };
+    catalog.bundles.set("fall-boots", bundle);
+    catalog.bundles.set("plain", { ...bundle, id: "plain", name: "Plain Pack", position: 1 });
+    const html = renderToStaticMarkup(await AdminServicesPage({ searchParams: Promise.resolve({ tab: "bundles" }) }));
+    expect(html).toContain("Promotion · ends Dec 21, 2026");
+    expect(html.match(/Promotion/g)).toHaveLength(1);
+  });
 });

@@ -99,6 +99,22 @@ export class BundleIdTakenError extends Error {
   }
 }
 
+/** Another save landed since the form was loaded (its `updatedAt` no longer matches). Nothing was written. */
+export class CatalogChangedError extends Error {
+  constructor() {
+    super("This was changed elsewhere. Reload and try again.");
+    this.name = "CatalogChangedError";
+  }
+}
+
+/** The storage key is already attached to a Service or Bundle image. Nothing was written. */
+export class CatalogImageKeyTakenError extends Error {
+  constructor(readonly key: string) {
+    super("That image is already attached.");
+    this.name = "CatalogImageKeyTakenError";
+  }
+}
+
 /** The image id a remove targeted isn't on that Service/Bundle. Nothing was written. */
 export class CatalogImageNotFoundError extends Error {
   constructor(readonly imageId: string) {
@@ -123,16 +139,22 @@ export interface CatalogRepository {
   getService(id: string): Promise<ServiceRecord | null>;
   getBundle(id: string): Promise<BundleRecord | null>;
 
-  /** Applies `patch`'s present fields in one write. Null if no Service has `id`. */
-  updateService(id: string, patch: ServiceUpdate): Promise<ServiceRecord | null>;
-  updateBundle(id: string, patch: BundleUpdate): Promise<BundleRecord | null>;
+  /**
+   * Applies `patch`'s present fields in one write. Null if no Service has `id`.
+   * With `expectedUpdatedAt`, the write only lands if the row still has that
+   * `updatedAt`; otherwise throws CatalogChangedError (stale form).
+   */
+  updateService(id: string, patch: ServiceUpdate, expectedUpdatedAt?: Date): Promise<ServiceRecord | null>;
+  updateBundle(id: string, patch: BundleUpdate, expectedUpdatedAt?: Date): Promise<BundleRecord | null>;
 
+  /** Throws BundleIdTakenError if the id is in use (including a concurrent create). */
   createBundle(input: NewBundleInput): Promise<BundleRecord>;
 
   /**
    * Adds one image (by storage key) at the next position. Throws
    * TooManyCatalogImagesError past MAX_CATALOG_IMAGES. Null if no Service/
-   * Bundle has that id.
+   * Bundle has that id. Throws CatalogImageKeyTakenError if the key is already
+   * attached anywhere.
    */
   addServiceImage(serviceId: string, key: string): Promise<ServiceRecord | null>;
   addBundleImage(bundleId: string, key: string): Promise<BundleRecord | null>;

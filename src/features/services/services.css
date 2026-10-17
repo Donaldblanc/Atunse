@@ -104,6 +104,15 @@
   color: var(--admin-muted, #9ca3af);
 }
 
+.sv-notice {
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--admin-border, #e5e7eb);
+  border-radius: 0.5rem;
+  background: var(--admin-surface-muted, #f9fafb);
+  font-size: 0.875rem;
+}
+
 .sv-hint,
 .sv-muted {
   font-size: 0.8rem;

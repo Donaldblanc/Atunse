@@ -27,6 +27,8 @@ export function AddBundleForm({ closeHref }: { closeHref: string }) {
         <textarea id="sv-new-bundle-perks" name="perks" rows={4} className="sv-textarea" />
       </label>
 
+      <p className="sv-hint">New bundles aren&apos;t offered in booking until booking reads these tables.</p>
+
       {state.error && (
         <p role="alert" className="sv-error">
           {state.error}

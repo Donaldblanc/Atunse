@@ -4,7 +4,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MAX_CATALOG_IMAGES, TooManyCatalogImagesError, CatalogImageNotFoundError } from "./catalog-repository";
+import { BundleIdTakenError, CatalogChangedError, CatalogImageKeyTakenError, MAX_CATALOG_IMAGES, TooManyCatalogImagesError, CatalogImageNotFoundError } from "./catalog-repository";
 import { PrismaCatalogRepository } from "./prisma-catalog-repository";
 
 const prisma = new PrismaClient();
@@ -95,5 +95,39 @@ describe("PrismaCatalogRepository (integration)", () => {
     const imageId = withImage!.images[0]!.id;
     const afterRemove = await repo.removeBundleImage(TEST_BUNDLE_ID, imageId);
     expect(afterRemove?.images).toHaveLength(0);
+  });
+
+  it("rejects a second create of the same Bundle id with BundleIdTakenError", async () => {
+    await repo.createBundle({ id: TEST_BUNDLE_ID, name: "Integration Bundle", priceCents: 5000, perks: [], position: 999 });
+    await expect(repo.createBundle({ id: TEST_BUNDLE_ID, name: "Again", priceCents: 1, perks: [], position: 1000 })).rejects.toThrow(BundleIdTakenError);
+  });
+
+  it("rejects a duplicate image key with CatalogImageKeyTakenError", async () => {
+    await repo.createBundle({ id: TEST_BUNDLE_ID, name: "Integration Bundle", priceCents: 5000, perks: [], position: 999 });
+    const key = `bundles/${TEST_BUNDLE_ID}/dup.jpg`;
+    await repo.addBundleImage(TEST_BUNDLE_ID, key);
+    await expect(repo.addBundleImage(TEST_BUNDLE_ID, key)).rejects.toThrow(CatalogImageKeyTakenError);
+  });
+
+  it("refuses a stale Bundle update (expectedUpdatedAt) and applies a fresh one", async () => {
+    const created = await repo.createBundle({ id: TEST_BUNDLE_ID, name: "Integration Bundle", priceCents: 5000, perks: [], position: 999 });
+
+    const first = await repo.updateBundle(TEST_BUNDLE_ID, { priceCents: 6000 }, created.updatedAt);
+    expect(first?.priceCents).toBe(6000);
+    expect(first!.updatedAt.getTime()).toBeGreaterThanOrEqual(created.updatedAt.getTime());
+
+    // The same (now stale) timestamp again: someone else saved in between.
+    await expect(repo.updateBundle(TEST_BUNDLE_ID, { priceCents: 7000 }, new Date(created.updatedAt.getTime() - 1000))).rejects.toThrow(CatalogChangedError);
+    expect((await repo.getBundle(TEST_BUNDLE_ID))?.priceCents).toBe(6000);
+    expect(await repo.updateBundle("no_such_bundle", { priceCents: 1 }, created.updatedAt)).toBeNull();
+  });
+
+  it("refuses a stale Service update (expectedUpdatedAt)", async () => {
+    const row = await prisma.service.create({
+      data: { id: TEST_SERVICE_ID, name: "Integration Service", description: "x", category: "CLEANING", isCleaningTier: false, isAddOn: false, baseCents: 1000, isMinimum: false, suedeFeeCents: 0, active: true, position: 999 },
+    });
+    await expect(repo.updateService(TEST_SERVICE_ID, { baseCents: 2000 }, new Date(row.updatedAt.getTime() - 1000))).rejects.toThrow(CatalogChangedError);
+    const ok = await repo.updateService(TEST_SERVICE_ID, { baseCents: 2000 }, row.updatedAt);
+    expect(ok?.baseCents).toBe(2000);
   });
 });

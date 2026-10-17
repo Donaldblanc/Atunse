@@ -1,7 +1,8 @@
 // Edit Service / Edit Bundle's Save Changes: validates the side panel's
 // fields and writes them in one update (the repository's whole-record
 // write is naturally idempotent — saving the same values twice leaves the
-// same row). Admin-only (ADR-0012).
+// same row; no idempotency key needed — the form's `updatedAt` check below
+// refuses a stale or replayed save instead). Admin-only (ADR-0012).
 
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
@@ -41,6 +42,8 @@ export interface UpdateServiceInput {
   category: ServiceCategory;
   active: boolean;
   internalNotes: string | null;
+  /** The `updatedAt` the form was rendered with; a mismatch means someone else saved first (CatalogChangedError). */
+  expectedUpdatedAt: Date;
 }
 
 function validateMoney(cents: number, label: string): void {
@@ -69,7 +72,7 @@ export async function updateService(deps: CatalogWriteDeps, actingUser: ActingUs
     active: input.active,
     internalNotes,
   };
-  const updated = await deps.catalog.updateService(input.serviceId, patch);
+  const updated = await deps.catalog.updateService(input.serviceId, patch, input.expectedUpdatedAt);
   if (!updated) throw new ServiceNotFoundError(input.serviceId);
   return updated;
 }
@@ -81,6 +84,7 @@ export interface UpdateBundleInput {
   perks: string[];
   active: boolean;
   internalNotes: string | null;
+  expectedUpdatedAt: Date;
 }
 
 export async function updateBundle(deps: CatalogWriteDeps, actingUser: ActingUser, input: UpdateBundleInput): Promise<BundleRecord> {
@@ -94,7 +98,7 @@ export async function updateBundle(deps: CatalogWriteDeps, actingUser: ActingUse
   if (internalNotes && internalNotes.length > NOTES_MAX) throw new CatalogValidationError(`Notes must be at most ${NOTES_MAX} characters.`);
 
   const patch: BundleUpdate = { name, priceCents: input.priceCents, perks, active: input.active, internalNotes };
-  const updated = await deps.catalog.updateBundle(input.bundleId, patch);
+  const updated = await deps.catalog.updateBundle(input.bundleId, patch, input.expectedUpdatedAt);
   if (!updated) throw new BundleNotFoundError(input.bundleId);
   return updated;
 }

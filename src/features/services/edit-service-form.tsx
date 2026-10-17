@@ -23,6 +23,7 @@ export function EditServiceForm({ service, closeHref }: { service: ServiceRecord
     <>
       <form action={formAction} className="sv-form">
         <input type="hidden" name="serviceId" value={service.id} />
+        <input type="hidden" name="updatedAt" value={service.updatedAt.toISOString()} />
         <input type="hidden" name="returnTo" value={closeHref} />
 
         <label className="sv-field" htmlFor="sv-name">
@@ -75,7 +76,7 @@ export function EditServiceForm({ service, closeHref }: { service: ServiceRecord
           <span>
             <strong>Active</strong>
             <br />
-            <span className="sv-muted">Service is visible to customers</span>
+            <span className="sv-muted">Active in the admin catalog</span>
           </span>
         </label>
 
@@ -113,7 +114,7 @@ export function EditServiceForm({ service, closeHref }: { service: ServiceRecord
       {confirmingDelete && (
         <div className="sv-confirm" role="alertdialog" aria-label="Confirm delete service">
           <p>
-            <strong>Delete {service.name}?</strong> This deactivates the service — it stops showing to customers, but stays on past orders. It can be
+            <strong>Delete {service.name}?</strong> This deactivates it in the admin catalog. It stays on past orders. The booking page doesn&apos;t use these settings yet. It can be
             reactivated later from its Active toggle.
           </p>
           {deactivateState.error && (

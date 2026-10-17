@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import type {
   BundleRecord,
   BundleUpdate,
@@ -7,7 +7,7 @@ import type {
   ServiceRecord,
   ServiceUpdate,
 } from "./catalog-repository";
-import { CatalogImageNotFoundError, MAX_CATALOG_IMAGES, TooManyCatalogImagesError } from "./catalog-repository";
+import { BundleIdTakenError, CatalogChangedError, CatalogImageKeyTakenError, CatalogImageNotFoundError, MAX_CATALOG_IMAGES, TooManyCatalogImagesError } from "./catalog-repository";
 
 const serviceInclude = { images: { orderBy: { position: "asc" as const } } };
 const bundleInclude = { images: { orderBy: { position: "asc" as const } } };
@@ -48,6 +48,10 @@ function toBundle(row: {
   return { ...row };
 }
 
+function isPrismaError(err: unknown, code: string): boolean {
+  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === code;
+}
+
 export class PrismaCatalogRepository implements CatalogRepository {
   constructor(private readonly db: PrismaClient) {}
 
@@ -71,37 +75,62 @@ export class PrismaCatalogRepository implements CatalogRepository {
     return row ? toBundle(row) : null;
   }
 
-  async updateService(id: string, patch: ServiceUpdate): Promise<ServiceRecord | null> {
+  async updateService(id: string, patch: ServiceUpdate, expectedUpdatedAt?: Date): Promise<ServiceRecord | null> {
+    if (expectedUpdatedAt) {
+      // Conditional on updatedAt: a save that landed since the form loaded makes count 0.
+      const { count } = await this.db.service.updateMany({ where: { id, updatedAt: expectedUpdatedAt }, data: patch });
+      if (count === 0) {
+        if (!(await this.db.service.findUnique({ where: { id }, select: { id: true } }))) return null;
+        throw new CatalogChangedError();
+      }
+      return this.getService(id);
+    }
     try {
       const row = await this.db.service.update({ where: { id }, data: patch, include: serviceInclude });
       return toService(row);
-    } catch {
-      return null;
+    } catch (err) {
+      if (isPrismaError(err, "P2025")) return null;
+      throw err;
     }
   }
 
-  async updateBundle(id: string, patch: BundleUpdate): Promise<BundleRecord | null> {
+  async updateBundle(id: string, patch: BundleUpdate, expectedUpdatedAt?: Date): Promise<BundleRecord | null> {
+    if (expectedUpdatedAt) {
+      const { count } = await this.db.bundle.updateMany({ where: { id, updatedAt: expectedUpdatedAt }, data: patch });
+      if (count === 0) {
+        if (!(await this.db.bundle.findUnique({ where: { id }, select: { id: true } }))) return null;
+        throw new CatalogChangedError();
+      }
+      return this.getBundle(id);
+    }
     try {
       const row = await this.db.bundle.update({ where: { id }, data: patch, include: bundleInclude });
       return toBundle(row);
-    } catch {
-      return null;
+    } catch (err) {
+      if (isPrismaError(err, "P2025")) return null;
+      throw err;
     }
   }
 
   async createBundle(input: NewBundleInput): Promise<BundleRecord> {
-    const row = await this.db.bundle.create({
-      data: {
-        id: input.id,
-        name: input.name,
-        priceCents: input.priceCents,
-        perks: input.perks,
-        internalNotes: input.internalNotes ?? null,
-        position: input.position,
-      },
-      include: bundleInclude,
-    });
-    return toBundle(row);
+    try {
+      const row = await this.db.bundle.create({
+        data: {
+          id: input.id,
+          name: input.name,
+          priceCents: input.priceCents,
+          perks: input.perks,
+          internalNotes: input.internalNotes ?? null,
+          position: input.position,
+        },
+        include: bundleInclude,
+      });
+      return toBundle(row);
+    } catch (err) {
+      // A double submit raced past the use-case's getBundle check.
+      if (isPrismaError(err, "P2002")) throw new BundleIdTakenError(input.id);
+      throw err;
+    }
   }
 
   async addServiceImage(serviceId: string, key: string): Promise<ServiceRecord | null> {
@@ -110,7 +139,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (!service) return null;
       if (service.images.length >= MAX_CATALOG_IMAGES) throw new TooManyCatalogImagesError();
       const nextPosition = service.images.reduce((max, image) => Math.max(max, image.position), -1) + 1;
-      await tx.serviceImage.create({ data: { serviceId, key, position: nextPosition } });
+      try {
+        await tx.serviceImage.create({ data: { serviceId, key, position: nextPosition } });
+      } catch (err) {
+        if (isPrismaError(err, "P2002")) throw new CatalogImageKeyTakenError(key);
+        throw err;
+      }
       const updated = await tx.service.findUniqueOrThrow({ where: { id: serviceId }, include: serviceInclude });
       return toService(updated);
     });
@@ -122,7 +156,12 @@ export class PrismaCatalogRepository implements CatalogRepository {
       if (!bundle) return null;
       if (bundle.images.length >= MAX_CATALOG_IMAGES) throw new TooManyCatalogImagesError();
       const nextPosition = bundle.images.reduce((max, image) => Math.max(max, image.position), -1) + 1;
-      await tx.bundleImage.create({ data: { bundleId, key, position: nextPosition } });
+      try {
+        await tx.bundleImage.create({ data: { bundleId, key, position: nextPosition } });
+      } catch (err) {
+        if (isPrismaError(err, "P2002")) throw new CatalogImageKeyTakenError(key);
+        throw err;
+      }
       const updated = await tx.bundle.findUniqueOrThrow({ where: { id: bundleId }, include: bundleInclude });
       return toBundle(updated);
     });

@@ -8,6 +8,8 @@ import { UnauthorizedError } from "@/features/accounts/authz";
 import { buildCatalogDeps } from "./deps";
 import {
   BundleIdTakenError,
+  CatalogChangedError,
+  CatalogImageKeyTakenError,
   BundleNotFoundError,
   CatalogImageNotFoundError,
   ServiceNotFoundError,
@@ -21,6 +23,14 @@ import { setBundleActive, setServiceActive } from "./use-cases/set-catalog-item-
 import { CatalogValidationError, SERVICE_CATEGORIES, updateBundle, updateService } from "./use-cases/update-catalog-item";
 
 export type CatalogFormState = { error: string | null };
+
+const CHANGED_ELSEWHERE = "This was changed elsewhere. Reload and try again.";
+
+/** The `updatedAt` the edit form was rendered with (ISO string in a hidden field); null if missing or malformed. */
+function expectedUpdatedAt(formData: FormData): Date | null {
+  const date = new Date(text(formData, "updatedAt"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
 
 const text = (formData: FormData, name: string) => {
   const value = formData.get(name);
@@ -44,6 +54,9 @@ export async function updateServiceAction(_previous: CatalogFormState, formData:
   const serviceId = text(formData, "serviceId");
   if (!serviceId) return { error: "That request wasn't valid. Reload and try again." };
 
+  const expected = expectedUpdatedAt(formData);
+  if (!expected) return { error: CHANGED_ELSEWHERE };
+
   const category = text(formData, "category") as ServiceCategory;
   if (!SERVICE_CATEGORIES.includes(category)) return { error: "Pick a valid category." };
 
@@ -58,9 +71,11 @@ export async function updateServiceAction(_previous: CatalogFormState, formData:
       category,
       active: formData.get("active") === "on",
       internalNotes: text(formData, "internalNotes") || null,
+      expectedUpdatedAt: expected,
     });
   } catch (err) {
     if (err instanceof CatalogValidationError) return { error: err.message };
+    if (err instanceof CatalogChangedError) return { error: err.message };
     if (err instanceof ServiceNotFoundError) return { error: "This service no longer exists." };
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     throw err;
@@ -94,6 +109,9 @@ export async function updateBundleAction(_previous: CatalogFormState, formData: 
   const bundleId = text(formData, "bundleId");
   if (!bundleId) return { error: "That request wasn't valid. Reload and try again." };
 
+  const expected = expectedUpdatedAt(formData);
+  if (!expected) return { error: CHANGED_ELSEWHERE };
+
   const perks = text(formData, "perks").split("\n");
 
   try {
@@ -105,9 +123,11 @@ export async function updateBundleAction(_previous: CatalogFormState, formData: 
       perks,
       active: formData.get("active") === "on",
       internalNotes: text(formData, "internalNotes") || null,
+      expectedUpdatedAt: expected,
     });
   } catch (err) {
     if (err instanceof CatalogValidationError) return { error: err.message };
+    if (err instanceof CatalogChangedError) return { error: err.message };
     if (err instanceof BundleNotFoundError) return { error: "This bundle no longer exists." };
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     throw err;
@@ -192,7 +212,7 @@ export async function addServiceImageAction(serviceId: string, key: string): Pro
     const actingUser = await actingUserFromCookies(await cookies());
     await addServiceImage(buildCatalogDeps(), actingUser, serviceId, key);
   } catch (err) {
-    if (err instanceof TooManyCatalogImagesError) return { error: err.message };
+    if (err instanceof TooManyCatalogImagesError || err instanceof CatalogImageKeyTakenError || err instanceof CatalogValidationError) return { error: err.message };
     if (err instanceof ServiceNotFoundError) return { error: "This service no longer exists." };
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     throw err;
@@ -220,7 +240,7 @@ export async function addBundleImageAction(bundleId: string, key: string): Promi
     const actingUser = await actingUserFromCookies(await cookies());
     await addBundleImage(buildCatalogDeps(), actingUser, bundleId, key);
   } catch (err) {
-    if (err instanceof TooManyCatalogImagesError) return { error: err.message };
+    if (err instanceof TooManyCatalogImagesError || err instanceof CatalogImageKeyTakenError || err instanceof CatalogValidationError) return { error: err.message };
     if (err instanceof BundleNotFoundError) return { error: "This bundle no longer exists." };
     if (err instanceof UnauthorizedError) return { error: "You need to be signed in as an admin to do that." };
     throw err;

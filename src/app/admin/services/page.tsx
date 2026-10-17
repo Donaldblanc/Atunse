@@ -5,13 +5,14 @@
 //
 // Booking still prices from src/features/orders/service-catalog.ts, not
 // these tables (TODO #257): editing a price here doesn't yet change what
-// customers see in /booking.
+// customers see in /booking. The page says so in a notice banner.
 
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { Money } from "@/shared/money/money";
+import { findBundle } from "@/features/orders/service-catalog";
 import { AddBundleForm } from "@/features/services/add-bundle-form";
 import { CATEGORY_LABELS } from "@/features/services/catalog-labels";
 import { EditBundleForm } from "@/features/services/edit-bundle-form";
@@ -83,6 +84,10 @@ export default async function AdminServicesPage({ searchParams }: { searchParams
           <h1 className="ov-title">Manage your services, pricing, and bundles.</h1>
         </div>
       </div>
+
+      <p className="sv-notice" role="note">
+        Prices and availability here don&apos;t change the booking page yet. Booking still uses the built-in price list.
+      </p>
 
       <nav className="sv-tabs" aria-label="Services & Pricing tabs">
         <Link className="sv-tab" href={hrefFor({ tab: "all" })} aria-current={tab === "all" ? "page" : undefined}>
@@ -195,6 +200,16 @@ function ServicesTable({ services, closeHref }: { services: ServiceRecord[]; clo
   );
 }
 
+const PROMO_DATE_FORMAT = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
+
+/** "Promotion · ends Dec 21, 2026" when the built-in catalog has an end date for this bundle id; null otherwise. */
+function promotionLabel(bundleId: string): string | null {
+  const endsAt = findBundle(bundleId)?.endsAt;
+  if (!endsAt) return null;
+  // endsAt is the instant after the last promo day; show the last day in New York time.
+  return `Promotion · ends ${PROMO_DATE_FORMAT.format(new Date(Date.parse(endsAt) - 1))}`;
+}
+
 function BundlesTable({ bundles, closeHref }: { bundles: BundleRecord[]; closeHref: string }) {
   return (
     <div className="ov-card">
@@ -221,7 +236,15 @@ function BundlesTable({ bundles, closeHref }: { bundles: BundleRecord[]; closeHr
             <tbody>
               {bundles.map((bundle) => (
                 <tr key={bundle.id}>
-                  <td className="ov-cell-main">{bundle.name}</td>
+                  <td className="ov-cell-main">
+                    {bundle.name}
+                    {promotionLabel(bundle.id) && (
+                      <>
+                        {" "}
+                        <span className="sv-pill">{promotionLabel(bundle.id)}</span>
+                      </>
+                    )}
+                  </td>
                   <td className="ov-cell-sub">{bundle.perks.join(", ")}</td>
                   <td>{Money.fromCents(bundle.priceCents).format()}</td>
                   <td>
