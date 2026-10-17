@@ -47,7 +47,7 @@ export const ADMIN_SCREENS: AdminScreen[] = [
   { id: "payments", label: "Payments", href: "/admin/payments", icon: CreditCardIcon, built: true },
   { id: "messages", label: "Messages", href: "/admin/messages", icon: ChatCenteredTextIcon, built: false },
   { id: "reviews", label: "Reviews", href: "/admin/reviews", icon: StarIcon, built: true },
-  { id: "settings", label: "Settings", href: "/admin/settings", icon: GearSixIcon, built: false },
+  { id: "settings", label: "Settings", href: "/admin/settings", icon: GearSixIcon, built: true },
 ];
 
 /** A screen's route once it's built, or null while it's still coming. */
