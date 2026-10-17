@@ -42,6 +42,7 @@ Never write "pickup" in customer-facing copy (`copy-rules.test.ts` enforces this
 - Zelle and Cash are confirmed by the owner (Mark Paid, ADR-0002).
 - Balance = quoted total (Rush included, `quotedTotal` in `domain.ts`) − Deposit. It is a PENDING `BALANCE` Payment, created in the transition that readies the last live pair (key `balance:<orderId>`, `planBalance`), recomputed on a cancelled pair, FAILED if the Order is cancelled. It has no schema status for "cancelled", so FAILED stands in.
 - `confirmPayment(paymentId, method)` marks a Deposit or Balance received (Zelle or Cash, the owner may change the method).
+- Refund Payment (admin Payments screen, `refundBlock` in `payment-repository.ts`): Zelle/Cash only (card waits on Stripe); a Deposit or Balance only once every pair is cancelled. Record Payment saves kind `FULL`. The Failed/Refunded stat leaves out FAILED Balances (they mean cancelled).
 - Tax and the Local Drop-Off fee are stored but never computed (open question).
 - Prices come from `service-catalog.ts` on the server. The client's prices are ignored.
 

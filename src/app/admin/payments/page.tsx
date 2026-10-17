@@ -6,12 +6,12 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
-import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS, type PaymentMethod } from "@/features/orders/domain";
+import { PAYMENT_METHOD_LABELS, PAYMENT_METHODS } from "@/features/orders/domain";
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
-import { OVERVIEW_PRESET_IDS, OVERVIEW_RANGE_LABELS, DEFAULT_OVERVIEW_RANGE, formatRangeDates, overviewRange, parseOverviewRangeId, type OverviewPresetId } from "@/features/admin-overview/overview-range";
+import { OVERVIEW_PRESET_IDS, OVERVIEW_RANGE_LABELS, DEFAULT_OVERVIEW_RANGE, formatRangeDates, overviewRange, parseOverviewSelection, rangeSearchParams, type OverviewSelection } from "@/features/admin-overview/overview-range";
 import { buildPaymentsDeps } from "@/features/payments/deps";
 import { getPaymentDetail } from "@/features/payments/use-cases/get-payment-detail";
-import { listPayments, parsePaymentsQuery, type PaymentsQuery } from "@/features/payments/use-cases/list-payments";
+import { listPayments, parsePaymentsQuery, PAYMENTS_PAGE_SIZE, type PaymentsQuery } from "@/features/payments/use-cases/list-payments";
 import { PAYMENT_STATUSES } from "@/features/payments/use-cases/list-payments";
 import { PaymentsTable } from "@/features/payments/payments-table";
 import { PaymentDetailsPanel } from "@/features/payments/payment-details-panel";
@@ -25,15 +25,13 @@ type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 const STATUS_LABELS: Record<string, string> = { PENDING: "Pending", RECEIVED: "Paid", FAILED: "Failed", REFUNDED: "Refunded" };
 
 /** "/admin/payments?..." keeping the current search, filters and range unless an override replaces it. */
-function hrefFor(query: PaymentsQuery, range: OverviewPresetId | "custom", overrides: { method?: PaymentMethod | null; status?: string | null; range?: OverviewPresetId; page?: number } = {}): string {
+function hrefFor(query: PaymentsQuery, selection: OverviewSelection, overrides: { page?: number } = {}): string {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
-  const method = overrides.method === undefined ? query.method : overrides.method;
-  if (method) params.set("method", method);
-  const status = overrides.status === undefined ? query.status : overrides.status;
-  if (status) params.set("status", status);
-  const rangeId = overrides.range ?? (range === "custom" ? DEFAULT_OVERVIEW_RANGE : range);
-  if (rangeId !== DEFAULT_OVERVIEW_RANGE) params.set("range", rangeId);
+  if (query.method) params.set("method", query.method);
+  if (query.status) params.set("status", query.status);
+  // A preset or a custom from/to, so paging and closing the panel keep the stretch of days.
+  for (const [key, value] of rangeSearchParams(selection)) params.set(key, value);
   if (overrides.page && overrides.page > 1) params.set("page", String(overrides.page));
   const search = params.toString();
   return search ? `/admin/payments?${search}` : "/admin/payments";
@@ -45,15 +43,14 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
   const query = parsePaymentsQuery(params);
 
   const now = new Date();
-  const rangeId = parseOverviewRangeId(params.range);
-  const range = overviewRange(rangeId, now);
+  const range = overviewRange(parseOverviewSelection(params, now), now);
 
   const deps = buildPaymentsDeps();
   const list = await listPayments(deps, actingUser, query, range);
 
   const paymentId = typeof params.payment === "string" ? params.payment : null;
   const detail = paymentId ? await getPaymentDetail(deps, actingUser, paymentId) : null;
-  const baseHref = hrefFor(query, range.id, { page: list.page });
+  const baseHref = hrefFor(query, range.selection, { page: list.page });
 
   return (
     <div className="ov pm">
@@ -104,17 +101,24 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
                 </option>
               ))}
             </select>
-            <select name="range" className="pm-select" defaultValue={range.id === "custom" ? DEFAULT_OVERVIEW_RANGE : range.id} aria-label="Date range">
+            <select name="range" className="pm-select" defaultValue={range.id === "custom" ? "" : range.id} aria-label="Date range">
+              {typeof range.selection === "object" && <option value="">Custom</option>}
               {OVERVIEW_PRESET_IDS.map((id) => (
                 <option key={id} value={id}>
                   {OVERVIEW_RANGE_LABELS[id]}
                 </option>
               ))}
             </select>
+            {typeof range.selection === "object" && (
+              <>
+                <input type="hidden" name="from" value={range.selection.from} />
+                <input type="hidden" name="to" value={range.selection.to} />
+              </>
+            )}
             <button type="submit" className="admin-btn">
               Search
             </button>
-            {(query.q || query.method || query.status || rangeId !== DEFAULT_OVERVIEW_RANGE) && (
+            {(query.q || query.method || query.status || range.id !== DEFAULT_OVERVIEW_RANGE) && (
               <Link className="pm-reset" href="/admin/payments">
                 Reset
               </Link>
@@ -127,17 +131,17 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
           {list.pageCount > 1 && (
             <nav className="fo-pages" aria-label="Pages">
               {list.page > 1 ? (
-                <Link className="admin-btn" data-variant="secondary" href={hrefFor(query, range.id, { page: list.page - 1 })} rel="prev">
+                <Link className="admin-btn" data-variant="secondary" href={hrefFor(query, range.selection, { page: list.page - 1 })} rel="prev">
                   Previous
                 </Link>
               ) : (
                 <span />
               )}
               <span className="ov-cell-sub">
-                Showing {(list.page - 1) * 10 + (list.rows.length > 0 ? 1 : 0)}–{(list.page - 1) * 10 + list.rows.length} of {list.total} payments
+                Showing {(list.page - 1) * PAYMENTS_PAGE_SIZE + (list.rows.length > 0 ? 1 : 0)}–{(list.page - 1) * PAYMENTS_PAGE_SIZE + list.rows.length} of {list.total} payments
               </span>
               {list.page < list.pageCount ? (
-                <Link className="admin-btn" data-variant="secondary" href={hrefFor(query, range.id, { page: list.page + 1 })} rel="next">
+                <Link className="admin-btn" data-variant="secondary" href={hrefFor(query, range.selection, { page: list.page + 1 })} rel="next">
                   Next
                 </Link>
               ) : (

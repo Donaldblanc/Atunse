@@ -6,7 +6,7 @@ import { Money } from "@/shared/money/money";
 import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
 import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
 import { deleteAllOrders } from "@/shared/testing/delete-all-orders";
-import { OrderNotFoundError, PaymentNotRefundableError } from "./payment-repository";
+import { OrderNotFoundError, PaymentNotRefundableError, PaymentRefundBlockedError } from "./payment-repository";
 import { PrismaPaymentRepository } from "./prisma-payment-repository";
 
 const prisma = new PrismaClient();
@@ -128,5 +128,65 @@ describe("PrismaPaymentRepository (integration)", () => {
     await payments.recordPayment({ orderReference: `ATU-${order.number}`, amountCents: 5000, method: "CASH", reference: null, actorAccountId: null, idempotencyKey: "rec-4" });
     const stats = await payments.statsFor({ start: new Date(Date.now() - 60_000), end: new Date(Date.now() + 60_000) });
     expect(stats.paid.amount.cents).toBeGreaterThanOrEqual(5000);
+  });
+
+  it("finds payments by customer name and by reference text", async () => {
+    const order = await book("Marisol Okafor");
+    await payments.recordPayment({ orderReference: `ATU-${order.number}`, amountCents: 900, method: "ZELLE", reference: "zelle-conf-77Q", actorAccountId: null, idempotencyKey: "rec-5" });
+    const search = (q: string) => payments.searchPayments({ q, method: null, status: null, from: null, to: null, limit: 10, offset: 0 });
+
+    expect((await search("okafor")).total).toBe(2); // the Deposit and the recorded payment
+    const byReference = await search("CONF-77q");
+    expect(byReference.total).toBe(1);
+    expect(byReference.rows[0]!.reference).toBe("zelle-conf-77Q");
+    expect((await search("100%")).total).toBe(0); // LIKE wildcards are literal
+  });
+
+  it("words the refund timeline as the owner marking it", async () => {
+    const order = await book("Timeline Tess");
+    await payments.recordPayment({ orderReference: `ATU-${order.number}`, amountCents: 2000, method: "CASH", reference: null, actorAccountId: null, idempotencyKey: "rec-6" });
+    const { rows } = await payments.searchPayments({ q: null, method: "CASH", status: null, from: null, to: null, limit: 10, offset: 0 });
+    await payments.refundPayment({ paymentId: rows[0]!.id, reason: null, actorAccountId: null, idempotencyKey: "ref-6" });
+    const detail = await payments.getPaymentDetail(rows[0]!.id);
+    expect(detail?.timeline.at(-1)?.detail).toBe("Marked refunded by the owner.");
+  });
+
+  it("refuses to refund a card payment", async () => {
+    const order = await book("Card Carl");
+    const deposit = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id, kind: "DEPOSIT" } });
+    await prisma.payment.update({ where: { id: deposit.id }, data: { method: "CARD", status: "RECEIVED", receivedAt: new Date() } });
+    const err = await payments.refundPayment({ paymentId: deposit.id, reason: null, actorAccountId: null, idempotencyKey: "ref-7" }).catch((e) => e);
+    expect(err).toBeInstanceOf(PaymentRefundBlockedError);
+    expect(err.message).toBe("Card refunds aren't available yet.");
+  });
+
+  it("refuses to refund a Deposit or Balance while a pair is live, and allows it once cancelled", async () => {
+    const order = await book("Strand Sam");
+    const deposit = await prisma.payment.findFirstOrThrow({ where: { orderId: order.id, kind: "DEPOSIT" } });
+    await prisma.payment.update({ where: { id: deposit.id }, data: { status: "RECEIVED", receivedAt: new Date() } });
+
+    const err = await payments.refundPayment({ paymentId: deposit.id, reason: null, actorAccountId: null, idempotencyKey: "ref-8" }).catch((e) => e);
+    expect(err).toBeInstanceOf(PaymentRefundBlockedError);
+    expect((await payments.getPaymentDetail(deposit.id))?.status).toBe("RECEIVED");
+
+    await prisma.item.updateMany({ where: { orderId: order.id }, data: { status: "CANCELLED" } });
+    expect(await payments.refundPayment({ paymentId: deposit.id, reason: null, actorAccountId: null, idempotencyKey: "ref-9" })).toBe("refunded");
+  });
+
+  it("settles concurrent submits with the same key once", async () => {
+    const order = await book("Race Rae");
+    const record = () => payments.recordPayment({ orderReference: `ATU-${order.number}`, amountCents: 1100, method: "CASH", reference: null, actorAccountId: null, idempotencyKey: "race-rec" });
+    expect([...(await Promise.all([record(), record()]))].sort()).toEqual(["already-recorded", "recorded"]);
+
+    const { rows } = await payments.searchPayments({ q: null, method: "CASH", status: null, from: null, to: null, limit: 10, offset: 0 });
+    const refund = () => payments.refundPayment({ paymentId: rows[0]!.id, reason: null, actorAccountId: null, idempotencyKey: "race-ref" });
+    expect([...(await Promise.all([refund(), refund()]))].sort()).toEqual(["already-refunded", "refunded"]);
+  });
+
+  it("leaves a FAILED Balance (a cancelled one) out of Failed/Refunded", async () => {
+    const order = await book("Cancelled Cal");
+    await prisma.payment.create({ data: { orderId: order.id, kind: "BALANCE", method: "ZELLE", amountCents: 1500, status: "FAILED", failureReason: "The order was cancelled." } });
+    const stats = await payments.statsFor({ start: new Date(Date.now() - 60_000), end: new Date(Date.now() + 60_000) });
+    expect(stats.failedOrRefunded.count).toBe(0);
   });
 });

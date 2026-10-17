@@ -5,10 +5,9 @@ import { cookies } from "next/headers";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { PAYMENT_METHODS, type PaymentMethod } from "@/features/orders/domain";
+import { buildPaymentsDeps } from "@/features/payments/deps";
 import { OrderNotFoundError } from "@/features/payments/repositories/payment-repository";
-import { PrismaPaymentRepository } from "@/features/payments/repositories/prisma-payment-repository";
 import { InvalidRecordPaymentError, recordPayment } from "@/features/payments/use-cases/record-payment";
-import { prisma } from "@/shared/db/prisma-client";
 import { redactForLog } from "@/shared/logging/redact";
 
 export type RecordPaymentResult = { ok: true } | { ok: false; error: string };
@@ -36,7 +35,7 @@ export async function recordPaymentAction(formData: FormData): Promise<RecordPay
   try {
     const actingUser = await actingUserFromCookies(await cookies());
     await recordPayment(
-      { payments: new PrismaPaymentRepository(prisma) },
+      buildPaymentsDeps(),
       actingUser,
       { orderReference, amountCents, method: method as PaymentMethod, reference: typeof reference === "string" ? reference : null, idempotencyKey },
     );

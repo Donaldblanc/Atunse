@@ -24,14 +24,18 @@ describe("listPayments", () => {
     payments.addOrder({ id: "o1", number: 1001, contactName: "Jordan", contactEmail: "j@example.com", contactPhone: "212", estimateCents: 12000, items: [] });
     payments.addPayment({ id: "p1", orderId: "o1", kind: "FULL", method: "APPLE_PAY", amountCents: 12000, status: "RECEIVED", reference: null, createdAt, receivedAt: createdAt });
     payments.addPayment({ id: "p2", orderId: "o1", kind: "DEPOSIT", method: "ZELLE", amountCents: 5000, status: "PENDING", reference: null, createdAt });
-    payments.addPayment({ id: "p3", orderId: "o1", kind: "BALANCE", method: "CARD", amountCents: 3000, status: "FAILED", reference: null, createdAt });
+    payments.addPayment({ id: "p3", orderId: "o1", kind: "DEPOSIT", method: "CARD", amountCents: 3000, status: "FAILED", reference: null, createdAt });
+    payments.addPayment({ id: "p4", orderId: "o1", kind: "FULL", method: "CASH", amountCents: 2000, status: "REFUNDED", reference: null, createdAt, receivedAt: createdAt, refundedAt: createdAt });
+    // A FAILED Balance stands in for a cancelled one, so it isn't a failure.
+    payments.addPayment({ id: "p5", orderId: "o1", kind: "BALANCE", method: "ZELLE", amountCents: 7000, status: "FAILED", reference: null, createdAt });
 
     const range = overviewRange(DEFAULT_OVERVIEW_RANGE, now);
     const list = await listPayments({ payments }, admin, parsePaymentsQuery({}), range);
     expect(list.stats.paid.amount).toBe("$120");
     expect(list.stats.pending.amount).toBe("$50");
-    expect(list.stats.failedOrRefunded.amount).toBe("$30");
-    expect(list.total).toBe(3);
+    expect(list.stats.failedOrRefunded.amount).toBe("$50");
+    expect(list.stats.failedOrRefunded.count).toBe(2);
+    expect(list.total).toBe(5);
   });
 
   it("filters by method, status and text", async () => {

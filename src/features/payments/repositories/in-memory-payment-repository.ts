@@ -1,7 +1,7 @@
 // Test double for PaymentRepository: an in-memory store with the Prisma
 // one's rules, for use-case tests (ADR-0011).
 
-import type { PaymentKind, PaymentMethod } from "@/features/orders/domain";
+import type { ItemStatus, PaymentKind, PaymentMethod } from "@/features/orders/domain";
 import { PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 import {
@@ -9,6 +9,7 @@ import {
   orderNumberFromReference,
   PaymentNotFoundError,
   PaymentNotRefundableError,
+  refundBlock,
   type PaymentDetail,
   type PaymentRepository,
   type PaymentRow,
@@ -24,7 +25,7 @@ export interface InMemoryOrderSeed {
   contactEmail: string;
   contactPhone: string;
   estimateCents: number;
-  items: { brand: string | null; model: string | null; colorway: string | null; serviceIds: string[]; priceCents: number | null; estimateCents: number }[];
+  items: { status?: ItemStatus; brand: string | null; model: string | null; colorway: string | null; serviceIds: string[]; priceCents: number | null; estimateCents: number }[];
 }
 
 export interface InMemoryPaymentSeed {
@@ -37,6 +38,7 @@ export interface InMemoryPaymentSeed {
   reference: string | null;
   failureReason?: string | null;
   createdAt: Date;
+  updatedAt?: Date;
   receivedAt?: Date | null;
   refundedAt?: Date | null;
 }
@@ -89,20 +91,22 @@ export class InMemoryPaymentRepository implements PaymentRepository {
         if (filters.to && payment.createdAt >= filters.to) return false;
         return true;
       })
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
     const rows = matches.slice(filters.offset, filters.offset + filters.limit).map((payment) => this.rowFor(payment));
     return { rows, total: matches.length };
   }
 
   async statsFor(range: { start: Date; end: Date }): Promise<PaymentStats> {
     const inRange = this.payments.filter((payment) => payment.createdAt >= range.start && payment.createdAt < range.end);
+    // A FAILED Balance stands in for a cancelled one, not a failed charge: leave it out of Failed/Refunded.
+    const failedOrRefunded = inRange.filter((p) => p.status === "REFUNDED" || (p.status === "FAILED" && p.kind !== "BALANCE"));
     const sum = (status: PaymentStatus | PaymentStatus[]) => {
       const statuses = Array.isArray(status) ? status : [status];
       const found = inRange.filter((p) => statuses.includes(p.status));
       return { amount: Money.fromCents(found.reduce((total, p) => total + p.amountCents, 0)), count: found.length };
     };
     const paid = sum("RECEIVED");
-    return { totalRevenue: paid.amount, paid, pending: sum("PENDING"), failedOrRefunded: sum(["FAILED", "REFUNDED"]) };
+    return { totalRevenue: paid.amount, paid, pending: sum("PENDING"), failedOrRefunded: { amount: Money.fromCents(failedOrRefunded.reduce((total, p) => total + p.amountCents, 0)), count: failedOrRefunded.length } };
   }
 
   async getPaymentDetail(paymentId: string): Promise<PaymentDetail | null> {
@@ -112,14 +116,14 @@ export class InMemoryPaymentRepository implements PaymentRepository {
 
     const timeline: PaymentDetail["timeline"] = [];
     if (payment.status === "FAILED") {
-      timeline.push({ label: "Payment failed", detail: payment.failureReason ?? "The charge didn't go through.", at: payment.createdAt });
+      timeline.push({ label: "Payment failed", detail: payment.failureReason ?? "The charge didn't go through.", at: payment.updatedAt ?? payment.createdAt });
     } else if (payment.receivedAt) {
       timeline.push({ label: "Payment successful", detail: `Payment processed via ${PAYMENT_METHOD_LABELS[payment.method]}.`, at: payment.receivedAt });
     } else {
       timeline.push({ label: "Payment recorded", detail: `Awaiting payment via ${PAYMENT_METHOD_LABELS[payment.method]}.`, at: payment.createdAt });
     }
     if (payment.status === "REFUNDED" && payment.refundedAt) {
-      timeline.push({ label: "Payment refunded", detail: "The amount was given back to the customer.", at: payment.refundedAt });
+      timeline.push({ label: "Payment refunded", detail: "Marked refunded by the owner.", at: payment.refundedAt });
     }
 
     return {
@@ -181,6 +185,9 @@ export class InMemoryPaymentRepository implements PaymentRepository {
     if (this.auditKeys.has(key)) return "already-refunded";
 
     if (payment.status !== "RECEIVED") throw new PaymentNotRefundableError();
+    const order = this.orders.get(payment.orderId)!;
+    const blocked = refundBlock(payment, order.items.map((item) => item.status ?? "REQUEST_SUBMITTED"));
+    if (blocked) throw blocked;
     this.auditKeys.add(key);
     payment.status = "REFUNDED";
     payment.refundedAt = new Date();

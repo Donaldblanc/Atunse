@@ -3,7 +3,7 @@
 // Payment's detail panel. Its own seam, apart from OrderRepository, since
 // it reads/writes across Orders rather than one at a time.
 
-import type { PaymentKind, PaymentMethod } from "@/features/orders/domain";
+import { livePairs, type ItemStatus, type PaymentKind, type PaymentMethod } from "@/features/orders/domain";
 import type { Money } from "@/shared/money/money";
 
 export type PaymentStatus = "PENDING" | "RECEIVED" | "FAILED" | "REFUNDED";
@@ -83,6 +83,30 @@ export class PaymentNotRefundableError extends Error {
   }
 }
 
+/** A refund the rules forbid even though the Payment was received (card refunds, or money the Order still depends on). */
+export class PaymentRefundBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PaymentRefundBlockedError";
+  }
+}
+
+/**
+ * Why a received Payment can't be refunded here, or null when it can. A card
+ * or Apple Pay refund waits on Stripe. A Deposit or Balance is what the
+ * Order's Balance and completion rules are computed from (completionHold,
+ * planBalance): refunding one while a pair is still live would strand the
+ * Order, so the owner cancels the pairs first. A Full payment feeds neither
+ * rule, so it is free to refund.
+ */
+export function refundBlock(payment: { kind: PaymentKind; method: PaymentMethod }, itemStatuses: ItemStatus[]): PaymentRefundBlockedError | null {
+  if (payment.method === "CARD" || payment.method === "APPLE_PAY") return new PaymentRefundBlockedError("Card refunds aren't available yet.");
+  if ((payment.kind === "DEPOSIT" || payment.kind === "BALANCE") && livePairs({ items: itemStatuses.map((status) => ({ status })) }).length > 0) {
+    return new PaymentRefundBlockedError("Cancel the order's pairs before refunding its deposit or balance.");
+  }
+  return null;
+}
+
 export class OrderNotFoundError extends Error {
   constructor(orderReference: string) {
     super(`Order ${orderReference} not found`);
@@ -99,7 +123,7 @@ export interface PaymentRepository {
   /**
    * Logs a payment received against an Order outside the Deposit/Balance
    * flow (a cash tip, a manual charge the owner took another way). One
-   * transaction: a new RECEIVED Payment (kind FULL) plus an audit entry.
+   * transaction: a new RECEIVED Payment (kind FULL: the schema has no other kind that fits an extra amount) plus an audit entry.
    * Idempotent on `idempotencyKey` (ADR-0012): a retry returns
    * "already-recorded" and writes nothing. Throws OrderNotFoundError when
    * `orderReference` ("ATU-1234" or "1234") doesn't match an Order.
@@ -115,8 +139,8 @@ export interface PaymentRepository {
   /**
    * Refunds a received Payment: sets it REFUNDED plus an audit entry, in
    * one transaction. Idempotent on `idempotencyKey`. Throws
-   * PaymentNotFoundError or PaymentNotRefundableError (already refunded,
-   * or never received).
+   * PaymentNotFoundError, PaymentNotRefundableError (already refunded, or
+   * never received) or PaymentRefundBlockedError (see refundBlock).
    */
   refundPayment(params: {
     paymentId: string;

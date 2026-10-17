@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { lockOrder, uniqueViolationFields } from "@/features/orders/repositories/prisma-order-repository";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
 import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
@@ -9,6 +10,7 @@ import {
   PAYMENT_REFUNDED,
   PaymentNotFoundError,
   PaymentNotRefundableError,
+  refundBlock,
   type PaymentDetail,
   type PaymentRepository,
   type PaymentRow,
@@ -88,7 +90,8 @@ export class PrismaPaymentRepository implements PaymentRepository {
     const [paid, pending, failedOrRefunded] = await Promise.all([
       this.prisma.payment.aggregate({ where: { ...where, status: "RECEIVED" }, _sum: { amountCents: true }, _count: true }),
       this.prisma.payment.aggregate({ where: { ...where, status: "PENDING" }, _sum: { amountCents: true }, _count: true }),
-      this.prisma.payment.aggregate({ where: { ...where, status: { in: ["FAILED", "REFUNDED"] } }, _sum: { amountCents: true }, _count: true }),
+      // A FAILED Balance stands in for a cancelled one (domain.md), not a failed charge: leave it out.
+      this.prisma.payment.aggregate({ where: { ...where, OR: [{ status: "REFUNDED" }, { status: "FAILED", kind: { not: "BALANCE" } }] }, _sum: { amountCents: true }, _count: true }),
     ]);
     return {
       totalRevenue: Money.fromCents(paid._sum.amountCents ?? 0),
@@ -125,7 +128,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       timeline.push({ label: "Payment recorded", detail: `Awaiting payment via ${PAYMENT_METHOD_LABELS[row.method]}.`, at: row.createdAt });
     }
     if (row.status === "REFUNDED" && row.refundedAt) {
-      timeline.push({ label: "Payment refunded", detail: "The amount was given back to the customer.", at: row.refundedAt });
+      timeline.push({ label: "Payment refunded", detail: "Marked refunded by the owner.", at: row.refundedAt });
     }
 
     return {
@@ -169,61 +172,81 @@ export class PrismaPaymentRepository implements PaymentRepository {
     const order = await this.prisma.order.findFirst({ where: number === null ? { id: params.orderReference } : { number }, select: { id: true } });
     if (!order) throw new OrderNotFoundError(params.orderReference);
 
-    return this.prisma.$transaction(async (tx) => {
-      const applied = await tx.orderAuditEntry.findFirst({ where: { orderId: order.id, idempotencyKey: params.idempotencyKey }, select: { id: true } });
-      if (applied) return "already-recorded";
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const applied = await tx.orderAuditEntry.findFirst({ where: { orderId: order.id, idempotencyKey: params.idempotencyKey }, select: { id: true } });
+        if (applied) return "already-recorded" as const;
 
-      const payment = await tx.payment.create({
-        data: {
-          orderId: order.id,
-          kind: "FULL",
-          method: params.method,
-          amountCents: params.amountCents,
-          status: "RECEIVED",
-          receivedAt: new Date(),
-          confirmedByAccountId: params.actorAccountId,
-          reference: params.reference,
-        },
+        const payment = await tx.payment.create({
+          data: {
+            orderId: order.id,
+            kind: "FULL",
+            method: params.method,
+            amountCents: params.amountCents,
+            status: "RECEIVED",
+            receivedAt: new Date(),
+            confirmedByAccountId: params.actorAccountId,
+            reference: params.reference,
+          },
+        });
+        await tx.orderAuditEntry.create({
+          data: {
+            orderId: order.id,
+            action: PAYMENT_RECORDED,
+            actorAccountId: params.actorAccountId,
+            idempotencyKey: params.idempotencyKey,
+            metadata: { paymentId: payment.id, amountCents: params.amountCents, method: params.method, reference: params.reference },
+          },
+        });
+        return "recorded" as const;
       });
-      await tx.orderAuditEntry.create({
-        data: {
-          orderId: order.id,
-          action: PAYMENT_RECORDED,
-          actorAccountId: params.actorAccountId,
-          idempotencyKey: params.idempotencyKey,
-          metadata: { paymentId: payment.id, amountCents: params.amountCents, method: params.method, reference: params.reference },
-        },
-      });
-      return "recorded";
-    });
+    } catch (err) {
+      // A concurrent submit with the same key won the unique (order, key) audit entry.
+      if (uniqueViolationFields(err)) return "already-recorded";
+      throw err;
+    }
   }
 
   async refundPayment(params: { paymentId: string; reason: string | null; actorAccountId: string | null; idempotencyKey: string }): Promise<"refunded" | "already-refunded"> {
-    const payment = await this.prisma.payment.findUnique({ where: { id: params.paymentId }, select: { orderId: true, status: true } });
+    const payment = await this.prisma.payment.findUnique({ where: { id: params.paymentId }, select: { orderId: true } });
     if (!payment) throw new PaymentNotFoundError(params.paymentId);
 
-    return this.prisma.$transaction(async (tx) => {
-      const applied = await tx.orderAuditEntry.findFirst({ where: { orderId: payment.orderId, idempotencyKey: params.idempotencyKey }, select: { id: true } });
-      if (applied) return "already-refunded";
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        await lockOrder(tx, payment.orderId);
+        const applied = await tx.orderAuditEntry.findFirst({ where: { orderId: payment.orderId, idempotencyKey: params.idempotencyKey }, select: { id: true } });
+        if (applied) return "already-refunded" as const;
 
-      const { count } = await tx.payment.updateMany({
-        where: { id: params.paymentId, status: "RECEIVED" },
-        data: { status: "REFUNDED", refundedAt: new Date() },
-      });
-      // Conditional on the Payment still being RECEIVED: not found above with a fresh idempotency
-      // key means it's PENDING, FAILED or already REFUNDED under a different key.
-      if (count === 0) throw new PaymentNotRefundableError();
+        const current = await tx.payment.findUnique({
+          where: { id: params.paymentId },
+          select: { status: true, kind: true, method: true, order: { select: { items: { select: { status: true } } } } },
+        });
+        if (!current) throw new PaymentNotFoundError(params.paymentId);
+        if (current.status !== "RECEIVED") throw new PaymentNotRefundableError();
+        const blocked = refundBlock(current, current.order.items.map((item) => item.status));
+        if (blocked) throw blocked;
 
-      await tx.orderAuditEntry.create({
-        data: {
-          orderId: payment.orderId,
-          action: PAYMENT_REFUNDED,
-          actorAccountId: params.actorAccountId,
-          idempotencyKey: params.idempotencyKey,
-          metadata: { paymentId: params.paymentId, reason: params.reason },
-        },
+        // Still conditional on RECEIVED, so the row can only be refunded once.
+        const { count } = await tx.payment.updateMany({
+          where: { id: params.paymentId, status: "RECEIVED" },
+          data: { status: "REFUNDED", refundedAt: new Date() },
+        });
+        if (count === 0) throw new PaymentNotRefundableError();
+
+        await tx.orderAuditEntry.create({
+          data: {
+            orderId: payment.orderId,
+            action: PAYMENT_REFUNDED,
+            actorAccountId: params.actorAccountId,
+            idempotencyKey: params.idempotencyKey,
+            metadata: { paymentId: params.paymentId, reason: params.reason },
+          },
+        });
+        return "refunded" as const;
       });
-      return "refunded";
-    });
+    } catch (err) {
+      if (uniqueViolationFields(err)) return "already-refunded";
+      throw err;
+    }
   }
 }

@@ -17,8 +17,9 @@ export type RefundPaymentResult = "refunded" | "already-refunded";
  * "Refund Payment" (Payment Details panel): gives back a received Payment.
  * Admin-only (ADR-0012). Idempotent on `idempotencyKey`: a retry is
  * "already-refunded" and writes nothing. The repository throws
- * PaymentNotFoundError or PaymentNotRefundableError (never received, or
- * already refunded under a different key).
+ * PaymentNotFoundError, PaymentNotRefundableError (never received, or
+ * already refunded under a different key) or PaymentRefundBlockedError
+ * (a card payment, or a Deposit/Balance while the Order has a live pair).
  */
 export async function refundPayment(
   deps: { payments: PaymentRepository },
