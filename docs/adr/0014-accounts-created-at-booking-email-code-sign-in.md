@@ -14,8 +14,8 @@ the booking flow, when a booking's email already has an Account.
 ## Decision
 - **No guest orders.** `orders.accountId` is required, and always points at a **Customer** Account. A signed-out booking creates one (lowercased email, phone) in the same transaction as the Order.
 - **Admins and customers are separate identities.** Account emails are unique per role (`@@unique([email, role])`), so the same person can have an Admin Account and a Customer Account. An admin's email books like any other, into its own Customer Account; Orders never attach to an Admin Account. The two logins are separate too:
-  - admins use the password login and the `atunse_session` cookie;
-  - customers use email codes and the `atunse_customer_session` cookie.
+  - admins use the password login and the `__Host-atunse_session` cookie;
+  - customers use email codes and the `__Host-atunse_customer_session` cookie.
 
   The booking flow reads only the customer cookie, so a signed-in admin goes through it as a signed-out customer.
 - **Owner resolution is the use-case's policy** (`resolveOwner` in `submitOrder`). The repository only connects an existing Account or creates a new one, and reports `EmailTakenError` when a concurrent first booking won the unique index, in which case the owner is resolved again. Resolution rules:
@@ -42,3 +42,5 @@ the booking flow, when a booking's email already has an Account.
 - The booking endpoint reveals whether an email has an Account (the 409). That's inherent to "prompt existing emails to log in", and it only confirms what a sign-in attempt would.
 - An admin who books is a customer for that booking; to see their own bookings as a customer, they sign in with a code like anyone else.
 - Still to come: a customer-facing "my bookings" page that uses the photo endpoint, moving admins to email codes once Resend is live, and choosing a managed provider (ADR-0005), which would replace the code routes behind the same session and acting-user seam.
+
+*Amended 2026-10-17:* session cookies are renamed with the `__Host-` prefix (dropped only under `next dev`). The admin cookie also carries `Account.sessionVersion`, checked against the database on every admin request and bumped on sign-out, password change and email change, so admin sessions can be revoked. Customer sessions are unchanged (stateless, 12 hours).

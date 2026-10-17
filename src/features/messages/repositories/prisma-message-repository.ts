@@ -11,6 +11,9 @@ import {
   type UnreadConversation,
 } from "./message-repository";
 
+// LIKE wildcards in the search box match literally ("100%" is not "100 anything").
+const escapeLike = (text: string) => text.replace(/[\\%_]/g, "\\$&");
+
 const UNREAD_CUSTOMER = { author: "CUSTOMER", readAt: null } as const;
 
 export class PrismaMessageRepository implements MessageRepository {
@@ -99,9 +102,9 @@ export class PrismaMessageRepository implements MessageRepository {
       ...(search
         ? {
             OR: [
-              { subject: { contains: search, mode: "insensitive" } },
-              { account: { name: { contains: search, mode: "insensitive" } } },
-              { account: { email: { contains: search, mode: "insensitive" } } },
+              { subject: { contains: escapeLike(search), mode: "insensitive" } },
+              { account: { name: { contains: escapeLike(search), mode: "insensitive" } } },
+              { account: { email: { contains: escapeLike(search), mode: "insensitive" } } },
             ],
           }
         : {}),

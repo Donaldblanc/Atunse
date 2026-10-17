@@ -1,5 +1,6 @@
 import { PrismaAccountRepository } from "@/features/accounts/repositories/prisma-account-repository";
 import { prisma } from "@/shared/db/prisma-client";
+import { limitByKey, RATE_LIMITS } from "@/shared/rate-limit";
 import { getFileStorage } from "@/shared/storage";
 import { PrismaSettingsRepository } from "./repositories/prisma-settings-repository";
 
@@ -11,5 +12,8 @@ export function buildSettingsDeps() {
     settings: new PrismaSettingsRepository(prisma),
     storage: getFileStorage(),
     accounts: new PrismaAccountRepository(prisma),
+    // Per-account budget for current-password checks (Account Settings).
+    allowPasswordAttempt: async (accountId: string) =>
+      (await limitByKey(RATE_LIMITS.adminPasswordCheck, `admin-password:${accountId}`)) === null,
   };
 }

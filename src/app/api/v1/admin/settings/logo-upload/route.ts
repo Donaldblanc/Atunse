@@ -4,6 +4,7 @@ import { checkAdminAccess } from "@/features/accounts/admin-check";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { buildSettingsDeps } from "@/features/settings/deps";
 import { InvalidLogoUploadError, requestLogoUpload } from "@/features/settings/use-cases/request-logo-upload";
+import { rejectCrossSiteOrNonJson } from "@/shared/http/request-guards";
 import { StorageNotConfiguredError } from "@/shared/storage";
 import { redactForLog } from "@/shared/logging/redact";
 
@@ -16,6 +17,8 @@ const body = z.object({ contentType: z.string().max(100), size: z.number().int()
 export async function POST(req: NextRequest) {
   const { allowed, accountId } = await checkAdminAccess(req);
   if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const refused = rejectCrossSiteOrNonJson(req);
+  if (refused) return refused;
 
   let json: unknown;
   try {

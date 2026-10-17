@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { proxy } from "./proxy";
 import { createSessionCookieValue, SESSION_COOKIE_NAME } from "./features/accounts/session";
 
@@ -7,6 +7,10 @@ function req(path: string, cookie?: string): NextRequest {
   const headers = cookie ? { cookie: `${SESSION_COOKIE_NAME}=${cookie}` } : undefined;
   return new NextRequest(new URL(path, "http://localhost:3000"), { headers });
 }
+
+vi.mock("@/features/accounts/admin-session-versions", () => ({
+  defaultAdminSessionVersions: () => ({ findAdminSessionVersion: async () => 0 }),
+}));
 
 describe("proxy (admin route guard)", () => {
   beforeEach(() => {
