@@ -3,14 +3,24 @@ import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { LEGAL_DOCUMENTS } from "@/shared/legal-documents";
 import { dmcaAgent } from "@/shared/dmca-agent";
 import { loadSiteSettings } from "@/features/settings/site-settings";
+import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
 import { businessProfile, loadBusinessProfile, type BusinessProfile } from "./business-profile";
 
 /** The footer with the business profile from Settings (the name, location and contact details), when it can be read. */
 export async function SiteFooter({ active }: { active?: NavActive } = {}) {
-  return <SiteFooterView active={active} profile={await loadBusinessProfile(loadSiteSettings)} />;
+  return <SiteFooterView active={active} profile={await loadBusinessProfile(loadSiteSettings)} accountLink={isCustomerSignInEnabled()} />;
 }
 
-export function SiteFooterView({ active, profile = businessProfile(null) }: { active?: NavActive; profile?: BusinessProfile }) {
+export function SiteFooterView({
+  active,
+  profile = businessProfile(null),
+  accountLink = false,
+}: {
+  active?: NavActive;
+  profile?: BusinessProfile;
+  /** Show "My bookings" (only while customer sign-in is on). */
+  accountLink?: boolean;
+}) {
   const name = profile.name ?? "Atunṣe";
   return (
     <footer>
@@ -25,6 +35,7 @@ export function SiteFooterView({ active, profile = businessProfile(null) }: { ac
               {link.label}
             </Link>
           ))}
+          {accountLink && <Link href="/account">My bookings</Link>}
         </div>
         <div className="landing-footer-social">
           <a
