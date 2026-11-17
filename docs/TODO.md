@@ -25,7 +25,7 @@ The owner's pre-launch list, checked against the code and the live site (`atunse
   - the Process page's step-1 phone photo shows made-up menu prices;
   - the Process and Contact photos are low-resolution crops from the design mockups (replace with originals);
   - confirm the brand list's Fendi and Alexander McQueen (see the client-feedback entry below).
-- [ ] **Pricing and service descriptions**: every price on the site comes from `SERVICE_CATALOG` (#81, #105), and descriptions were reworded in #106. The owner should still confirm the catalog prices, Bundle perks and Add-ons are current. Policies are covered by the legal review.
+- [ ] **Pricing and service descriptions**: every price and Service description on the site now comes from the `services`/`bundles` tables (Services & Pricing in admin). The owner should confirm the prices, Bundle perks and Add-ons there are current.
 - [ ] **Proofread** every page for spelling and grammar.
 
 ### Accessibility
@@ -61,7 +61,7 @@ Audited 2026-09-28 (axe-core, WCAG 2.0/2.1/2.2 A and AA plus best practice) on e
 - [ ] **Confirmation page**: manual pass on production.
 - [ ] **Confirmation emails**: blocked on Resend (`RESEND_API_KEY` / `EMAIL_FROM`, above).
 - [ ] **Cancellation / rescheduling**: no customer-facing flow exists. Decide: by email/contact form for launch (per the Terms' section 13), or build it.
-- [ ] **"My bookings" / customer account**: not built (tracked above).
+- [x] **"My bookings" / customer account**: built (`/account`), read-only.
 
 ### Payments
 Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (off). Deposits are paid by Zelle and confirmed manually by the owner (ADR-0002).
@@ -83,13 +83,13 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [x] **No secrets in frontend code or Git history**: the #88 scan found none. GitHub's secret scanning is on; push protection is still off (Housekeeping).
 
 ### SEO & social
-- [ ] **Unique page titles**: every page has its own title except home, which uses the generic "Atunṣe".
-- [ ] **Meta descriptions**: only the one site-wide description; add one per page.
-- [ ] **Open Graph / social sharing metadata**: none.
-- [ ] **Favicon**: none (`/favicon.ico` answers 404).
-- [ ] **Canonical URLs**: none; set once the custom domain is decided.
-- [ ] **`robots.txt`** and **sitemap**: none (both 404).
-- [ ] **Indexable, no staging noindex**: production sends no `noindex`, so it's indexable. The unlinked `/coming-soon` placeholder is still public; remove it or mark it `noindex` before launch.
+- [x] **Unique page titles**: every page has its own title, home included (`shared/site/page-metadata.ts`).
+- [x] **Meta descriptions**: one per customer page.
+- [x] **Open Graph / social sharing metadata**: Open Graph and Twitter tags per page, with `public/images/og-default.jpg`.
+- [x] **Favicon**: `src/app/icon.svg`, a placeholder mark: replace with the real brand mark.
+- [x] **Canonical URLs**: set per page from `SITE_URL` (falls back to Vercel's production hostname). Set `SITE_URL` when the custom domain exists.
+- [x] **`robots.txt`** and **sitemap**: `src/app/robots.ts` and `sitemap.ts`.
+- [x] **Indexable, no staging noindex**: only the production deployment is indexable; previews, dev, `/coming-soon` and the 404 send `noindex`.
 
 ### Mobile & browser testing
 - [x] **Layouts in every browser engine** (2026-09-28): every page in light and dark on WebKit (Safari's engine), Chromium and Firefox, emulating iPhone SE, iPhone 15 (portrait and landscape), Pixel 7, Galaxy S9+, iPad Mini (both orientations), iPad Pro 11 and Galaxy Tab S4, plus desktop Safari at 1280/1440 and Firefox at 1024/1280. The booking flow was walked from the service through the date picker to Review on each. Result: no horizontal scroll, overflow or nav collisions. Fixed along the way:
@@ -104,11 +104,11 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Real desktop browsers**: the desktop checks ran in the browser engines (WebKit, Chromium, Firefox), not the browsers themselves. On a Mac and a Windows PC, open every page and book up to Review in Safari, Chrome, Firefox and Edge, including at a narrow window width (the menu) and with the theme toggled.
 
 ### Performance
-- [ ] **Large images**: `hero-travis-scott-aj1-low.png` (2.1 MB) and `coming-soon-hero.png` (1.9 MB) are served as-is. Images use plain `<img>`, not `next/image`, so nothing is resized per device.
+- [x] **Large images**: both hero images are WebP now (110 KB and 160 KB). Images still use plain `<img>`, so nothing is resized per device.
 - [ ] **Lazy loading**: step and FAQ photos load lazily; audit the rest.
 - [ ] **Core Web Vitals, unnecessary JavaScript, slow connections**: not measured.
 - [ ] **Console errors and broken images**: none on the pages checked in headless runs; do a full pass.
-- [ ] **Database indexes, once the admin screens are ready for launch** (from the #118 review): the admin Overview filters and sorts `orders` by `createdAt` (both date ranges, Recent Orders) and `pickupDate` (Today's Schedule), and every Order load finds its pairs by `items.orderId`. Without indexes each of these reads the whole table. That's fine at today's size but grows with every booking.
+- [x] **Database indexes, once the admin screens are ready for launch**: migration `admin_query_indexes` adds `orders(pickupDate)`, `orders(accountId, createdAt)`, `items(orderId)`, `items(status)`, `payments(createdAt)`.
   - [x] `Order` `@@index([createdAt])` landed. The `pickupDate` index was added and then dropped, because Today's Schedule reads Appointments now.
   - `Item` `@@index([orderId])`: missing everywhere. Postgres doesn't index foreign keys on its own, and Prisma doesn't add one.
   - Then add indexes for whatever the finished admin screens (Orders queue, Calendar, Messages) filter or sort on that isn't covered, and check the busiest queries with `EXPLAIN ANALYZE` against production-sized data.
@@ -119,7 +119,7 @@ Online payment isn't built: Stripe is planned behind `FEATURE_STRIPE_ENABLED` (o
 - [ ] **Refund Policy and Cookie Policy links**: don't exist yet (see Legal).
 - [x] **No links to placeholders**: nothing on the site links to `/coming-soon` any more.
 - [x] **Logo returns to the homepage** (`SiteNav` brand links to `/`).
-- [ ] **Custom 404 page**: missing today is Next's default, unstyled "404: This page could not be found."
+- [x] **Custom 404 page**: `src/app/not-found.tsx`.
 
 ### Production & operations
 - [ ] **Production database**: Neon, set through Vercel; confirm the Neon Vercel integration (entry above).
@@ -158,7 +158,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 
 **Sample data (shown now, not real):**
 - [x] **Unread Messages** count: real count of CUSTOMER Messages with `readAt` null in unarchived Conversations; its dialog (`?attention=messages`) has Mark read and an email Reply.
-- [x] **Low Stock Items** count: real count of active Inventory Items with `stock <= lowStockAt`; `?attention=low-stock` lists them with Adjust stock. Follow-up: the Inventory screen to add items.
+- [x] **Low Stock Items** count: real count of active Inventory Items with `stock <= lowStockAt`; `?attention=low-stock` lists them with Adjust stock. Items are added from the Inventory screen (`/admin/inventory`).
 - [x] **Recent Reviews**: the latest PUBLISHED ones, with `?reviews=all` (Publish, Hide, Reply). Follow-up: how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram); until then the panel shows an empty state.
 
 **Placeholders (real data exists, but the design shows more):**
@@ -170,10 +170,10 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [x] **Schedule Item: completing a visit moves the pairs.** "Mark as Completed" now also moves the Order's pairs in the same transaction: a Collection takes each Awaiting Sneakers pair to In Progress (audit `STATUS_TRANSITION`, reason `COLLECTION_COMPLETED`), a Return each Ready for Drop-Off/Shipping pair to Completed (reason `RETURN_COMPLETED`). Pairs not yet approved, or held on the Deposit or Balance, stay, and the dialog lists who moved and who didn't, and why. A replay changes nothing. There's still no `completedAt` column; add one if the Calendar wants it.
 - [ ] **"Revenue" as payments received** rather than booked estimates, once payments are confirmed through Payment rows (#119 + the Payments screen).
 - [x] **Links "View all orders" and "View calendar"** open the All orders (`?orders=all`) and Upcoming visits (`?visits=upcoming`) dialogs. "View all orders" can move to the Orders screen once it exists; the Calendar screen now exists (`/admin/calendar`), but "View calendar" still opens the Upcoming visits dialog rather than linking there.
-- [ ] **Links:** "View orders" and "View all" (Needs Attention, Reviews) appear once their screens exist (`builtScreenHref` in `src/app/admin/admin-screens.ts`).
+- [x] **Links:** "View orders" and "View all": Recent Orders, Today's Schedule and Reviews link to their screens; the Low Stock dialog links to Inventory.
 - [x] **Recent Orders row "…" menu:** Open order, Mark Paid (the pending Deposit, else Balance, through `confirmPayment` by its own method; Pending Payments picks another) and Cancel order (`cancelOrder`, each live pair through `transitionItemStatus`).
 - [ ] **Needs Attention panels are read-only except Mark Paid:** Ready to Return and Needs a Quote list their Orders and link to the Order dialog (`?order=`), where the actions live. The Ready to Return stat card no longer links to `Orders?status=READY_FOR_PICKUP_SHIPPING`; it opens the panel. Pending Payments now lists Deposits and Balances (tabs, Mark Paid with a Zelle/Cash choice); the Order dialog's Payment Information also marks a Balance received.
-- [ ] **Notification bell** in the top bar: done for `NEW_BOOKING` (written with the Order, listed in the bell, owner emailed). Still to write: customer messages, received payments, low stock and new reviews.
+- [ ] **Notification bell** in the top bar: done for `NEW_BOOKING`, `PAYMENT_RECEIVED` (every path that marks a Payment received) and `LOW_STOCK` (when an active Inventory Item crosses its alert level). Still to write: customer messages and new reviews, once customers can send either from the site.
 - [x] **Order detail** (`?order=<id>` dialog opened from Recent Orders): customer, pairs with Services, status timeline timed from the audit log, payment, notes, and Update Status (next step or Cancel, via `transitionItemStatus`). Still to build from the design:
   - [x] **Edit Order** (`?order=<id>&edit=order`): contact, address and every pair's brand, model, size, colorway, material, condition and description, saved in one transaction (`updateOrderDetails`) with an optimistic check on the Order's `updatedAt`. Changes are audited as `DETAILS_EDITED` (per pair, with before/after) and `ORDER_CONTACT_EDITED` (Order-level, field names only). Not editable here: fulfillment method, dates and slots (rescheduling), price, services, status, and the Account's own email (ADR-0014).
   - [ ] **The dialog's "…" menu** has no feature behind it yet, so it isn't drawn. The drop-off fee and tax are still editable only in the database (the quoted price is set by Send Quote).
@@ -187,7 +187,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 - [ ] **Per-chart range dropdowns** ("This Week" on each chart in the design): today one range picker scopes the whole page, so the numbers always agree. Revisit only if DJ wants charts on different ranges. (The chips now open the shared range picker, still one range for the page.)
 - [ ] **Brand panel photo:** a 180×198 crop of the design image (`public/images/admin/brand-sneaker.jpg`), soft on retina screens. Replace with a proper photo.
 - [x] **Search** in the top bar: submits to the All orders dialog (`?orders=all&q=`), which matches order number, name, email and phone.
-- [ ] **Booking reads Settings** (ADR-0016): the booking flow and `submitOrder` use `operating_hours` and `business_settings.allowLocalDropOff`/`allowMailIn` instead of `pickup-window.ts`, then drop `pickup-window.integration.test.ts`.
+- [x] **Booking reads Settings** (ADR-0016): done 2026-11-17: slots come from `operating_hours`, the Fulfillment switches are honoured by the flow and `submitOrder`, and the parity test is gone.
 - [ ] **Settings tabs not modeled yet:** Notifications, Payments, Shipping & Pickup, Email & Templates, Team (multi-admin, see "Still to grill") and Billing. Design each when its tab is designed.
 
 ## Housekeeping
@@ -223,14 +223,14 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
   - **Re-check** when `braces` > 3.0.3 is published: `npm update braces` should then clear it with a lockfile-only change, no override needed.
   - **Also due:** bump `next` and `eslint-config-next` to 16.3.8 once it's 7 days old (2026-10-07, the local `min-release-age`).
 - [ ] **Turn on GitHub's security settings** (repo admin only, Settings → Code security). Checked 2026-10-01: secret scanning is **on**; Dependabot security updates and push protection are still **off**. See `docs/DEPLOYMENT.md`.
-- [ ] **Content-Security-Policy: roll out to nonce-based enforcement.** `next.config.mjs` sends it as `Content-Security-Policy-Report-Only` (vulnerability scan, #88), so browsers only log what it would block. The target state isn't just "flip it to enforcing": it's **nonce- (or hash-) based scripts with no `'unsafe-inline'`**, which is transitional debt kept only because Next's inline bootstrap has no nonce yet. Rollout:
+- [ ] **Content-Security-Policy: nonce-based scripts.** The policy is **enforced** since 2026-11-17 (`CSP_REPORT_ONLY=true` falls back to report-only). Still open: replacing `'unsafe-inline'` in `script-src` with a per-request nonce. A nonce makes every page render dynamically, giving up the cached customer pages: decide that trade first. Steps if it goes ahead:
   1. Report-Only: browse a preview (landing, services, booking with a photo upload, admin) and collect violations.
   2. Tighten sources to what's actually used.
   3. Generate a per-request nonce in `src/proxy.ts` (widen its matcher to pages), pass it to Next, and replace `'unsafe-inline'` in `script-src` with `'nonce-…' 'strict-dynamic'`.
   4. Rename the header to `Content-Security-Policy` (enforce) once a preview shows no violations.
 - [ ] **HSTS preload.** HSTS is sent with `includeSubDomains` but without `preload`. Add `preload` and submit the domain at hstspreload.org only once every subdomain serves HTTPS; it's hard to undo.
 - [ ] **Before turning on `FEATURE_CUSTOMER_SIGN_IN_ENABLED`:** set `RESEND_API_KEY` and `EMAIL_FROM` (a sender on a domain verified in Resend). Without them, sign-in codes only reach the server log and customers can't sign in (ADR-0014).
-- [ ] **Customer "my bookings" page.** Customers can sign in (ADR-0014) and `GET /api/v1/orders/:orderId/photos` already enforces ownership, but no front-end page lists a customer's own bookings and photos yet.
+- [x] **Customer "my bookings" page.** `/account` lists a signed-in customer's own Orders and photos (read-only, behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED`). Follow-up: self-serve cancel/reschedule.
 - [ ] **Move admins to email sign-in codes** once Resend is live, and retire the interim admin password login (ADR-0005 addendum).
 - [ ] **Legacy orders with a blank `contactPhone`.** The ADR-0014 migration marked pre-booking-flow smoke-test orders that had no phone with `''`. Check production for any before launch.
 - [x] **Landing booking panel copy** now matches the catalog and ADR-0010 (#105): prices come from `SERVICE_CATALOG`, no prepaid-label promise, and the local tab is "Local Drop-Off".
@@ -263,5 +263,5 @@ tracked elsewhere are marked; everything else is new.
 - [ ] Customer data import — a dedicated admin-only screen/flow to import existing customer records, format TBD. Not an MVP-launch blocker; build once the source format is confirmed.
 - [ ] Mail-in label generation via a third-party carrier API (e.g. Shippo/EasyPost) — behind the same adapter pattern as address validation. Not in MVP; MVP only captures/validates the shipping address (ADR-0010).
 - [x] **Messages inbox screen** (`/admin/messages`, design `scratch/messages.jpeg`): list with search/status tabs/channel filter, thread view (reuses the owner's reply and "Mark read" actions; Archive; New Message emails the customer), 25-per-page list, and a right-side Order + Customer context panel. A Conversation can still have no Order (`orderId` is optional); the context panel shows Customer Information only then. Customer-side replies still don't exist — only the admin inbox.
-- [ ] **Booking reads the catalog from the database** (ADR-0016 step 2): `submitOrder`, the booking flow and the Services page read the `services`/`bundles` tables instead of `service-catalog.ts`, then drop the parity test. Carry over `endsAt` and `pairServiceIds` (promo expiry, per-Bundle pair Service, e.g. `fall-boots`): they exist only in the catalog, so a DB read would drop the expiry and make every Bundle Premium Clean.
+- [x] **Booking reads the catalog from the database** (ADR-0016 step 2): done 2026-11-17 (ADR-0016 amendment): `bundles.pairServiceIds`/`endsAt` and `services.alsoFrom` carried into the tables; the parity test is gone.
 - [ ] **Decide tax and a Local Drop-Off fee** (Order detail design shows 8.875% tax): Orders can store both; nothing computes them yet (CONTEXT.md open question).

@@ -24,6 +24,7 @@ export async function NotificationBell() {
       title: n.title,
       body: n.body,
       orderId: n.orderId,
+      kind: n.kind,
       unread: n.readAt === null,
       when: relativeTime(n.createdAt, now),
     }));

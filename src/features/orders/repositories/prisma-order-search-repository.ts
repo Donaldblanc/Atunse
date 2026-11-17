@@ -62,7 +62,10 @@ export class PrismaOrderSearchRepository implements OrderSearchRepository {
         where: { AND: [where, { OR: rollups.map(rollupWhere) }] },
         select: { id: true, items: { select: { status: true, serviceIds: true } } },
       });
-      const ids = candidates.filter((order) => orderDisplayStatus(order.items) === status).map((order) => order.id);
+      const quoteServices = await this.prisma.service.findMany({ where: { category: { in: ["RESTORATION", "CUSTOM_WORK"] } }, select: { id: true } });
+      const quoteServiceIds = new Set(quoteServices.map((s) => s.id));
+      const requiresQuoteFor = (serviceIds: string[]) => serviceIds.some((id) => quoteServiceIds.has(id));
+      const ids = candidates.filter((order) => orderDisplayStatus(requiresQuoteFor, order.items) === status).map((order) => order.id);
       where = { id: { in: ids } };
     }
     const [total, found] = await Promise.all([

@@ -1,7 +1,9 @@
 // Test double for OrderSearchRepository: reads the orders an
 // InMemoryOrderRepository holds, applying the same rules as the Prisma one.
 
+import { DEFAULT_CATALOG } from "../default-catalog";
 import { orderDisplayStatus } from "../domain";
+import { quoteCheck } from "../service-catalog";
 import type { InMemoryOrderRepository } from "./in-memory-order-repository";
 import { orderNumberFromQuery, phoneDigitsFromQuery, type OrderSearchFilters, type OrderSearchRepository, type OrderSearchRow } from "./order-search-repository";
 
@@ -19,7 +21,7 @@ export class InMemoryOrderSearchRepository implements OrderSearchRepository {
           const phone = digits !== null && order.contactPhone.replace(/\D/g, "").includes(digits);
           if (!text && !phone && order.number !== number) return false;
         }
-        if (filters.status && orderDisplayStatus(order.items) !== filters.status) return false;
+        if (filters.status && orderDisplayStatus(quoteCheck(DEFAULT_CATALOG), order.items) !== filters.status) return false;
         if (filters.from && order.createdAt < filters.from) return false;
         if (filters.to && order.createdAt >= filters.to) return false;
         if (filters.serviceId && !order.items.some((item) => item.serviceIds.includes(filters.serviceId!))) return false;

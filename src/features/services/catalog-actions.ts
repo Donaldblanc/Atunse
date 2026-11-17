@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { actingUserFromCookies } from "@/features/accounts/acting-user";
 import { UnauthorizedError } from "@/features/accounts/authz";
+import { endOfShopDay, isCalendarDate } from "@/features/orders/calendar-date";
 import { parseDollarsToCents } from "./dollars";
 import { buildCatalogDeps } from "./deps";
 import {
@@ -41,6 +42,12 @@ const text = (formData: FormData, name: string) => {
 /** Required money field: blank is a validation error. Pass `optional` for fields where blank means $0. */
 function dollarsToCents(formData: FormData, name: string, optional = false): number {
   return parseDollarsToCents(text(formData, name), { blankIsZero: optional });
+}
+
+/** "Offer ends" date field: blank clears it; a day is stored as that day's end, New York time. */
+function parseOfferEnds(value: string): { value: Date | null } | null {
+  if (!value) return { value: null };
+  return isCalendarDate(value) ? { value: endOfShopDay(value) } : null;
 }
 
 function returnToAdmin(formData: FormData, fallback: string): string {
@@ -81,6 +88,8 @@ export async function updateServiceAction(_previous: CatalogFormState, formData:
   }
 
   revalidatePath("/admin/services");
+
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   redirect(returnToAdmin(formData, "/admin/services"));
 }
 
@@ -100,6 +109,8 @@ export async function setServiceActiveAction(_previous: CatalogFormState, formDa
   }
 
   revalidatePath("/admin/services");
+
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   redirect(returnToAdmin(formData, "/admin/services"));
 }
 
@@ -113,6 +124,9 @@ export async function updateBundleAction(_previous: CatalogFormState, formData: 
 
   const perks = text(formData, "perks").split("\n");
 
+  const endsAt = parseOfferEnds(text(formData, "endsOn"));
+  if (!endsAt) return { error: "Offer ends must be a valid date." };
+
   try {
     const actingUser = await actingUserFromCookies(await cookies());
     await updateBundle(buildCatalogDeps(), actingUser, {
@@ -121,6 +135,7 @@ export async function updateBundleAction(_previous: CatalogFormState, formData: 
       priceCents: dollarsToCents(formData, "priceDollars"),
       perks,
       active: formData.get("active") === "on",
+      endsAt: endsAt.value,
       internalNotes: text(formData, "internalNotes") || null,
       expectedUpdatedAt: expected,
     });
@@ -133,6 +148,8 @@ export async function updateBundleAction(_previous: CatalogFormState, formData: 
   }
 
   revalidatePath("/admin/services");
+
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   redirect(returnToAdmin(formData, "/admin/services"));
 }
 
@@ -152,6 +169,8 @@ export async function setBundleActiveAction(_previous: CatalogFormState, formDat
   }
 
   revalidatePath("/admin/services");
+
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   redirect(returnToAdmin(formData, "/admin/services"));
 }
 
@@ -172,6 +191,8 @@ export async function createBundleAction(_previous: CatalogFormState, formData: 
   }
 
   revalidatePath("/admin/services");
+
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   redirect(returnToAdmin(formData, "/admin/services"));
 }
 
@@ -217,6 +238,7 @@ export async function addServiceImageAction(serviceId: string, key: string): Pro
     throw err;
   }
   revalidatePath("/admin/services");
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   return { ok: true };
 }
 
@@ -231,6 +253,7 @@ export async function removeServiceImageAction(serviceId: string, imageId: strin
     throw err;
   }
   revalidatePath("/admin/services");
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   return { ok: true };
 }
 
@@ -245,6 +268,7 @@ export async function addBundleImageAction(bundleId: string, key: string): Promi
     throw err;
   }
   revalidatePath("/admin/services");
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   return { ok: true };
 }
 
@@ -259,5 +283,6 @@ export async function removeBundleImageAction(bundleId: string, imageId: string)
     throw err;
   }
   revalidatePath("/admin/services");
+  revalidatePath("/", "layout"); // the customer site reads the catalog
   return { ok: true };
 }

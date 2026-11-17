@@ -11,6 +11,7 @@ import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 // docs/TODO.md.
 export const metadata = {
   title: "Coming Soon — Atunṣe",
+  robots: { index: false },
 };
 
 export default function ComingSoonPage() {

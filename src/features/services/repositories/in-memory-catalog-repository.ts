@@ -77,6 +77,8 @@ export class InMemoryCatalogRepository implements CatalogRepository {
       name: input.name,
       priceCents: input.priceCents,
       perks: input.perks,
+      pairServiceIds: input.pairServiceIds ?? ["premium"],
+      endsAt: null,
       internalNotes: input.internalNotes ?? null,
       active: true,
       position: input.position,

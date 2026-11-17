@@ -1,0 +1,26 @@
+/* "My bookings" (/account). Site theme; every class is acct- prefixed. */
+.acct-page { max-width: 760px; margin: 0 auto; padding: 48px 20px 72px; font-family: var(--font-inter, Inter, system-ui, sans-serif); }
+.acct-page h1 { margin: 4px 0 8px; }
+.acct-lede { margin: 0 0 28px; opacity: 0.8; }
+.acct-list { display: grid; gap: 16px; list-style: none; margin: 0; padding: 0; }
+.acct-card { border: 1px solid rgba(128, 128, 128, 0.3); border-radius: 12px; padding: 20px; display: grid; gap: 14px; }
+.acct-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: baseline; }
+.acct-card-head h2 { margin: 0; font-size: 1.15rem; }
+.acct-meta { margin: 0; font-size: 0.9rem; opacity: 0.8; }
+.acct-pairs { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.acct-pair { border-top: 1px solid rgba(128, 128, 128, 0.2); padding-top: 12px; display: grid; gap: 4px; }
+.acct-pair-title { font-weight: 600; }
+.acct-status { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 2px 10px; border-radius: 999px; border: 1px solid currentColor; justify-self: start; }
+.acct-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.acct-photos img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; }
+.acct-totals { display: grid; gap: 2px; font-size: 0.9rem; border-top: 1px solid rgba(128, 128, 128, 0.2); padding-top: 12px; }
+.acct-empty { text-align: center; padding: 40px 0; display: grid; gap: 16px; justify-items: center; }
+.acct-help { margin-top: 28px; font-size: 0.9rem; opacity: 0.85; }
+.acct-signin { display: grid; gap: 14px; max-width: 420px; }
+.acct-field { display: grid; gap: 6px; font-size: 0.9rem; }
+.acct-field input { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(128, 128, 128, 0.5); background: transparent; color: inherit; min-width: 0; }
+.acct-error { display: flex; gap: 6px; align-items: center; color: #b42318; margin: 0; }
+@media (max-width: 640px) {
+  .acct-page { padding: 32px 16px 56px; }
+  .acct-card { padding: 16px; }
+}

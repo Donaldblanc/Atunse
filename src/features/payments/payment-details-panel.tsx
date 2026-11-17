@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { PAYMENT_METHOD_LABELS, orderNumber } from "@/features/orders/domain";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { serviceName, type Catalog } from "@/features/orders/service-catalog";
 import { formatDollars } from "./money-format";
 import { RefundPaymentButton } from "./refund-payment-button";
 import type { PaymentDetail } from "./repositories/payment-repository";
@@ -12,11 +12,7 @@ import type { PaymentDetail } from "./repositories/payment-repository";
 const STATUS_LABELS: Record<PaymentDetail["status"], string> = { PENDING: "Pending", RECEIVED: "Paid", FAILED: "Failed", REFUNDED: "Refunded" };
 const dateTimeFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-function serviceName(id: string): string {
-  return SERVICE_CATALOG.find((service) => service.id === id)?.name ?? id;
-}
-
-export function PaymentDetailsPanel({ detail, closeHref }: { detail: PaymentDetail; closeHref: string }) {
+export function PaymentDetailsPanel({ detail, closeHref, catalog }: { detail: PaymentDetail; closeHref: string; catalog: Catalog }) {
   return (
     <aside className="pm-panel" aria-label="Payment details">
       <div className="pm-panel-head">
@@ -69,7 +65,7 @@ export function PaymentDetailsPanel({ detail, closeHref }: { detail: PaymentDeta
                 <span>{formatDollars(item.price ?? item.estimate)}</span>
                 {item.serviceIds.map((id) => (
                   <span key={id} className="pm-order-service">
-                    Service: {serviceName(id)}
+                    Service: {serviceName(catalog, id)}
                   </span>
                 ))}
               </li>

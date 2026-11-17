@@ -71,3 +71,16 @@ describe("adjustStock", () => {
     await expect(adjustStock(deps, customer, req)).rejects.toBeInstanceOf(UnauthorizedError);
   });
 });
+
+describe("lowStockAlert (bell notification)", () => {
+  const item = { name: "Mink Oil", stock: 6, lowStockAt: 5, active: true };
+  it("fires only when stock crosses from above the alert level to at or below it", async () => {
+    const { lowStockAlert } = await import("../repositories/inventory-repository");
+    expect(lowStockAlert(item, 5)).toEqual({ title: "Low stock: Mink Oil", body: "5 left (alert at 5)" });
+    expect(lowStockAlert(item, 0)?.body).toBe("Out of stock");
+    expect(lowStockAlert(item, 6)).toBeNull();
+    expect(lowStockAlert({ ...item, stock: 4 }, 2)).toBeNull(); // already low
+    expect(lowStockAlert({ ...item, stock: 2 }, 9)).toBeNull(); // restock
+    expect(lowStockAlert({ ...item, active: false }, 1)).toBeNull();
+  });
+});

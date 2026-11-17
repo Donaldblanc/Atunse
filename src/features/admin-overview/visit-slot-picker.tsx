@@ -2,6 +2,7 @@
 
 import { adminVisitSlots, collectionTimes } from "@/features/orders/pickup-window";
 import { isCalendarDate, shopClock } from "@/features/orders/calendar-date";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
 
 /** "8:00 AM – 8:30 AM" -> "8:00 AM": a button only needs the start; the range is in its accessible name. */
 export function slotStartLabel(slot: string): string {
@@ -12,7 +13,7 @@ export function slotStartLabel(slot: string): string {
  * A date and the slots open on it, for the owner booking a visit
  * (rescheduling, or a Return). Controlled: the parent form owns
  * `date`/`slot` and submits them. Slot rules come from adminVisitSlots
- * (pickup-window.ts), the same grid booking uses; this file carries no
+ * (pickup-window.ts) over the stored operating hours, the same grid booking uses; this file carries no
  * customer copy. `now` is passed from the server so the first render agrees
  * with it. The date is a native date input (keyboard and screen-reader
  * friendly) and the slots are radios drawn as 44px buttons, so arrow keys
@@ -26,6 +27,7 @@ export function VisitSlotPicker({
   now,
   idPrefix,
   currentStartsAt,
+  hours,
 }: {
   date: string;
   slot: string;
@@ -35,11 +37,13 @@ export function VisitSlotPicker({
   idPrefix: string;
   /** ISO instant of the visit being rescheduled; omitted when booking a new one. */
   currentStartsAt?: string;
+  /** Settings' operating hours: the owner can book any slot inside a day's hours, without lead time. */
+  hours: OperatingHoursRow[];
 }) {
   const nowDate = new Date(now);
   const today = shopClock(nowDate).date;
   const current = currentStartsAt ? new Date(currentStartsAt).getTime() : null;
-  const slots = isCalendarDate(date) ? adminVisitSlots(date, nowDate).filter((option) => collectionTimes(date, option).startsAt.getTime() !== current) : [];
+  const slots = isCalendarDate(date) ? adminVisitSlots(date, nowDate, hours).filter((option) => collectionTimes(date, option).startsAt.getTime() !== current) : [];
 
   return (
     <div className="vsp">

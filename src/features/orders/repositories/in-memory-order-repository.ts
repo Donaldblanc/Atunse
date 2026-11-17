@@ -6,9 +6,10 @@
 
 import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/repositories/in-memory-repositories";
 import { Money } from "@/shared/money/money";
-import { AUTO_APPROVED_SET_PRICE, COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
+import { AUTO_APPROVED_SET_PRICE, COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, paymentReceivedNotification, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
-import { BUNDLE_CATALOG } from "../service-catalog";
+import { DEFAULT_CATALOG } from "../default-catalog";
+import { quoteCheck } from "../service-catalog";
 import {
   BundleNotFoundError,
   CompletionHeldError,
@@ -71,8 +72,8 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (new Set(uploadKeys).size !== uploadKeys.length || uploadKeys.some((key) => this.uploadKeysInUse.has(key))) {
       throw new PhotoKeyInUseError();
     }
-    // The bundles table is seeded from BUNDLE_CATALOG; its foreign key refuses any other id.
-    if (input.bundleId && !BUNDLE_CATALOG.some((bundle) => bundle.id === input.bundleId)) {
+    // The bundles table's foreign key refuses any id it lacks; the default catalog stands in for it.
+    if (input.bundleId && !DEFAULT_CATALOG.bundles.some((bundle) => bundle.id === input.bundleId)) {
       throw new BundleNotFoundError(input.bundleId);
     }
 
@@ -230,10 +231,25 @@ export class InMemoryOrderRepository implements OrderRepository {
     this.auditEntries.push({ ...params.entry, itemId: params.itemId, at: new Date() });
     if (params.receivesDeposit) {
       const deposit = this.orders.get(item.orderId)?.payments.find((p) => p.kind === "DEPOSIT" && p.status === "PENDING");
-      if (deposit) Object.assign(deposit, { status: "RECEIVED", receivedAt: new Date() });
+      if (deposit) {
+        Object.assign(deposit, { status: "RECEIVED", receivedAt: new Date() });
+        this.notifyPaymentReceived(this.orders.get(item.orderId)!, deposit);
+      }
     }
     this.settleBalance(item.orderId);
     return item;
+  }
+
+  private notifyPaymentReceived(order: Order, payment: Payment): void {
+    this.notifications.push({
+      id: fakeId("notification"),
+      kind: "PAYMENT_RECEIVED",
+      recipientAccountId: null,
+      ...paymentReceivedNotification({ orderNumber: order.number, kind: payment.kind, amountCents: payment.amount.cents, method: payment.method }),
+      orderId: order.id,
+      readAt: null,
+      createdAt: new Date(),
+    });
   }
 
   async ensureBalance(orderId: string): Promise<boolean> {
@@ -359,7 +375,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (appointment.status === "COMPLETED") return { appointment, moves: [], stays: [], alreadyCompleted: true };
     appointment.status = "COMPLETED";
 
-    const plan = planVisitMoves(appointment.kind, order);
+    const plan = planVisitMoves(quoteCheck(DEFAULT_CATALOG), appointment.kind, order);
     const reason = appointment.kind === "COLLECTION" ? COLLECTION_COMPLETED : RETURN_COMPLETED;
     for (const move of plan.moves) {
       order.items.find((item) => item.id === move.itemId)!.status = move.to;
@@ -409,6 +425,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (!awaiting) throw new NoPendingPaymentError(params.paymentId);
 
     Object.assign(awaiting.payment, { status: "RECEIVED", receivedAt: new Date(), method: params.method });
+    this.notifyPaymentReceived(order, awaiting.payment);
     for (const item of livePairs(order)) {
       this.appliedIdempotencyKeys.add(keyOf(item.id));
       this.auditEntries.push({

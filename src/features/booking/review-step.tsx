@@ -20,7 +20,8 @@ import { useState } from "react";
 import { formatDate, type PickupSelection } from "./pickup-date-picker";
 import type { ContactInfo, PairDetails, PickupAddress, ScheduleMethod, Step, TermsSelection } from "./booking-types";
 import { BookingSubmitError } from "./submit-booking";
-import { catalogService } from "@/features/orders/service-catalog";
+import { serviceName } from "@/features/orders/service-catalog";
+import { useSiteData } from "./site-data-context";
 import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { acknowledgesAll, BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
 import { CancelNotice } from "./cancel-notice";
@@ -276,6 +277,7 @@ export function ReviewStep({
 }
 
 function PairSummary({ pair }: { pair: PairDetails }) {
+  const { catalog } = useSiteData();
   return (
     <>
       <div className="booking-page-details-row">
@@ -305,7 +307,7 @@ function PairSummary({ pair }: { pair: PairDetails }) {
       </div>
       <div className="booking-page-details-row">
         <span>
-          Add-ons: <strong>{pair.addOnIds.map((id) => catalogService(id).name).join(", ") || "None"}</strong>
+          Add-ons: <strong>{pair.addOnIds.map((id) => serviceName(catalog, id)).join(", ") || "None"}</strong>
         </span>
       </div>
     </>

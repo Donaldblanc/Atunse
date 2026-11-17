@@ -14,6 +14,7 @@ import { getPaymentDetail } from "@/features/payments/use-cases/get-payment-deta
 import { listPayments, parsePaymentsQuery, PAYMENTS_PAGE_SIZE, type PaymentsQuery } from "@/features/payments/use-cases/list-payments";
 import { PAYMENT_STATUSES } from "@/features/payments/use-cases/list-payments";
 import { PaymentsTable } from "@/features/payments/payments-table";
+import { loadCatalog } from "@/features/services/site-catalog";
 import { PaymentDetailsPanel } from "@/features/payments/payment-details-panel";
 import { RecordPaymentDialog } from "@/features/payments/record-payment-dialog";
 import "@/features/payments/payments-screen.css";
@@ -50,6 +51,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
 
   const paymentId = typeof params.payment === "string" ? params.payment : null;
   const detail = paymentId ? await getPaymentDetail(deps, actingUser, paymentId) : null;
+  const catalog = detail ? await loadCatalog() : null;
   const baseHref = hrefFor(query, range.selection, { page: list.page });
 
   return (
@@ -151,7 +153,7 @@ export default async function AdminPaymentsPage({ searchParams }: { searchParams
           )}
         </div>
 
-        {detail && <PaymentDetailsPanel detail={detail} closeHref={baseHref} />}
+        {detail && catalog && <PaymentDetailsPanel detail={detail} closeHref={baseHref} catalog={catalog} />}
       </div>
     </div>
   );

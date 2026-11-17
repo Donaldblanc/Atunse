@@ -1,5 +1,6 @@
 import { PrismaAccountRepository } from "@/features/accounts/repositories/prisma-account-repository";
 import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
+import { loadCatalog } from "@/features/services/site-catalog";
 import { prisma } from "@/shared/db/prisma-client";
 import type { CustomerDetailDeps } from "./customer-detail";
 import type { ListCustomersDeps } from "./list-customers";
@@ -11,5 +12,6 @@ export function buildAdminCustomersDeps(): ListCustomersDeps & CustomerDetailDep
   return {
     accounts: new PrismaAccountRepository(prisma),
     orders: new PrismaOrderRepository(prisma),
+    catalog: { load: loadCatalog },
   };
 }

@@ -14,11 +14,14 @@ import {
   type PaymentMethod,
 } from "@/features/orders/domain";
 import type { AwaitingPayments, OrderRepository, ScheduledAppointment } from "@/features/orders/repositories/order-repository";
-import { itemRequiresQuote, SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { itemRequiresQuote, quoteCheck, type Catalog, type CatalogSource } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { metricDetail, type MetricDetail } from "./metric-detail";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
 import { overviewRange, type OverviewRange, type OverviewSelection } from "./overview-range";
+
+/** The categorical colours the donut has (--series-1..8). */
+const SERIES_SLOTS = 8;
 
 export interface AdminOverviewDeps {
   orders: Pick<
@@ -33,6 +36,8 @@ export interface AdminOverviewDeps {
   >;
   /** A short-lived view link for a stored photo (ADR-0014), or null when photos can't be shown. */
   photoUrl: (key: string) => Promise<string | null>;
+  /** The catalog that names Services and says which need a Quote. */
+  catalog: CatalogSource;
   now: () => Date;
 }
 
@@ -94,7 +99,8 @@ export interface AdminOverview {
   /** The range's Orders by day and by status, for the metric dialog (metric-detail.ts). */
   metricDetail: MetricDetail;
   /** How many of the range's pairs included each Service, in catalog order; unbooked Services are left out. */
-  servicesBooked: { serviceId: string; name: string; count: number }[];
+  /** `slot` is the Service's colour, 1..SERIES_SLOTS (--series-N in admin-theme.css): its place in the catalog, so it keeps its colour whichever others were booked. */
+  servicesBooked: { serviceId: string; name: string; count: number; slot: number }[];
   /** Right now, whatever the range: pairs waiting on the owner's quote (ADR-0001). */
   needsQuote: number;
   /** Right now: Deposits and Balances still PENDING (ADR-0002), and how they're paying. */
@@ -123,6 +129,7 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   requireRole(actingUser, "ADMIN");
 
   const now = deps.now();
+  const catalog = await deps.catalog.load();
   const range = overviewRange(selection, now);
   const today = calendarDateInShopTime(now);
   const [booked, previous, statusCounts, needingReview, awaitingPayments, recent, appointments] = await Promise.all([
@@ -149,24 +156,26 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   for (const item of current.flatMap(livePairs)) {
     for (const serviceId of item.serviceIds) serviceCounts.set(serviceId, (serviceCounts.get(serviceId) ?? 0) + 1);
   }
-  const servicesBooked = SERVICE_CATALOG.filter((service) => serviceCounts.has(service.id)).map((service) => ({
-    serviceId: service.id,
-    name: service.name,
-    count: serviceCounts.get(service.id)!,
-  }));
+  const servicesBooked = [
+    ...catalog.services
+      .map((service, index) => ({ serviceId: service.id, name: service.name, count: serviceCounts.get(service.id) ?? 0, slot: (index % SERIES_SLOTS) + 1 }))
+      .filter((service) => service.count > 0),
+    // A Service the catalog no longer has still shows under its id.
+    ...[...serviceCounts].filter(([id]) => !catalog.services.some((service) => service.id === id)).map(([id, count]) => ({ serviceId: id, name: id, count, slot: SERIES_SLOTS })),
+  ];
 
   return {
     range,
     orders: { current: current.length, previous: previous.orders },
     bookedRevenue: { current: current.reduce((sum, order) => sum.add(liveEstimate(order)), Money.zero()), previous: previous.value },
     revenueByDay,
-    metricDetail: metricDetail(booked, range.days),
+    metricDetail: metricDetail(quoteCheck(catalog), booked, range.days),
     servicesBooked,
     // Only pairs that need a Quote (ADR-0017); a quote-free pair reading Request Submitted is not waiting on one.
-    needsQuote: needingReview.flatMap((order) => order.items).filter((item) => NEEDS_QUOTE.includes(item.status) && itemRequiresQuote(item.serviceIds)).length,
+    needsQuote: needingReview.flatMap((order) => order.items).filter((item) => NEEDS_QUOTE.includes(item.status) && itemRequiresQuote(catalog, item.serviceIds)).length,
     awaitingPayments,
     readyForReturn: statusCounts.READY_FOR_PICKUP_SHIPPING ?? 0,
-    recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl))),
+    recentOrders: await Promise.all(recent.map((order) => toRecentOrder(order, deps.photoUrl, catalog))),
     todaysSchedule: appointments
       .filter(isLiveVisit)
       .map((appointment) => ({
@@ -180,12 +189,12 @@ export async function getAdminOverview(deps: AdminOverviewDeps, actingUser: Acti
   };
 }
 
-async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl"]): Promise<RecentOrder> {
+async function toRecentOrder(order: Order, photoUrl: AdminOverviewDeps["photoUrl"], catalog: Catalog): Promise<RecentOrder> {
   const pairs = shownPairs(order);
   const first = pairs[0];
   const photoKey = first?.photoKeys[0];
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
-  const figures = orderRowFigures(order);
+  const figures = orderRowFigures(catalog, order);
   const pending = figures.status === "CANCELLED" ? undefined : PENDING_ORDER.map((kind) => order.payments.find((payment) => payment.kind === kind && payment.status === "PENDING")).find(Boolean);
   return {
     orderId: order.id,
@@ -213,13 +222,13 @@ export function shownPairs<T extends { status: ItemStatus }>(order: { items: T[]
 }
 
 /** What an Order row shows about its pairs and total (Recent Orders, All orders), from the same pairs (shownPairs). */
-export function orderRowFigures(order: { estimate: Money; estimateIsMinimum: boolean; items: { status: ItemStatus; serviceIds: string[]; estimate: Money }[] }) {
+export function orderRowFigures(catalog: Catalog, order: { estimate: Money; estimateIsMinimum: boolean; items: { status: ItemStatus; serviceIds: string[]; estimate: Money }[] }) {
   const pairs = shownPairs(order);
   const anyLive = livePairs(order).length > 0;
   return {
     pairCount: pairs.length,
-    services: servicesSummary(pairs.map((item) => item.serviceIds)),
-    status: orderDisplayStatus(order.items),
+    services: servicesSummary(catalog, pairs.map((item) => item.serviceIds)),
+    status: orderDisplayStatus(quoteCheck(catalog), order.items),
     total: anyLive ? liveEstimate(order) : order.estimate,
     totalIsMinimum: order.estimateIsMinimum,
   };
@@ -232,11 +241,15 @@ export function isLiveVisit(appointment: Pick<ScheduledAppointment, "order">): b
 
 /**
  * The Services an Order's pairs take, as one short label: every distinct
- * Service in catalog order, "A + B" for two, "A + 2 more" past that.
+ * Service in catalog order (an id the catalog lacks follows, by its id),
+ * "A + B" for two, "A + 2 more" past that.
  */
-export function servicesSummary(serviceIdsByPair: string[][]): string {
+export function servicesSummary(catalog: Catalog, serviceIdsByPair: string[][]): string {
   const ids = new Set(serviceIdsByPair.flat());
-  const names = SERVICE_CATALOG.filter((service) => ids.has(service.id)).map((service) => service.name);
+  const names = [
+    ...catalog.services.filter((service) => ids.has(service.id)).map((service) => service.name),
+    ...[...ids].filter((id) => !catalog.services.some((service) => service.id === id)),
+  ];
   if (names.length <= 2) return names.join(" + ");
   return `${names[0]} + ${names.length - 1} more`;
 }

@@ -8,6 +8,12 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/copyright",
 }));
 
+// The real footer reads Settings (async); the view is the same markup, synchronous.
+vi.mock("@/features/landing/site-footer", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/features/landing/site-footer")>();
+  return { ...original, SiteFooter: original.SiteFooterView };
+});
+
 const { default: CopyrightPage } = await import("./page");
 
 afterEach(() => vi.unstubAllEnvs());

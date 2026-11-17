@@ -5,6 +5,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { AccountRepository } from "@/features/accounts/repositories/account-repository";
+import { quoteCheck, type CatalogSource } from "@/features/orders/service-catalog";
 import { orderDisplayStatus, orderNumber, type ItemStatus } from "@/features/orders/domain";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
@@ -29,6 +30,7 @@ export interface CustomerDetail {
 export interface CustomerDetailDeps {
   accounts: Pick<AccountRepository, "findCustomerDetail">;
   orders: Pick<OrderRepository, "listByAccountId">;
+  catalog: CatalogSource;
 }
 
 /** Null for an id no Customer Account has, so a stale or mistyped link shows "not found" instead of failing the page. */
@@ -39,13 +41,14 @@ export async function getCustomerDetail(deps: CustomerDetailDeps, actingUser: Ac
   if (!customer) return null;
 
   const orders = await deps.orders.listByAccountId(accountId);
+  const requiresQuoteFor = quoteCheck(await deps.catalog.load());
   return {
     ...customer,
     orders: orders.map((order) => ({
       orderId: order.id,
       reference: orderNumber(order.number),
       createdAt: order.createdAt,
-      status: orderDisplayStatus(order.items),
+      status: orderDisplayStatus(requiresQuoteFor, order.items),
       estimate: order.estimate,
     })),
   };

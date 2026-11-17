@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock("@/features/accounts/acting-user", () => ({ actingUserFromCookies: async () => actingUser }));
 
 const payments = new InMemoryPaymentRepository();
+vi.mock("@/features/services/site-catalog", async () => ({ loadCatalog: async () => (await import("@/features/orders/default-catalog")).DEFAULT_CATALOG }));
 vi.mock("@/features/payments/deps", () => ({ buildPaymentsDeps: () => ({ payments }) }));
 
 const { default: AdminPaymentsPage } = await import("./page");

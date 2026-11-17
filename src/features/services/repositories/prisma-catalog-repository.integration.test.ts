@@ -53,6 +53,15 @@ describe("PrismaCatalogRepository (integration)", () => {
     expect(fetched?.name).toBe("Renamed Service");
   });
 
+  it("round-trips alsoFrom, defaulting to an empty list", async () => {
+    await prisma.service.create({
+      data: { id: TEST_SERVICE_ID, name: "Integration Service", description: "d", category: "RESTORATION", isCleaningTier: false, isAddOn: false, baseCents: 1000, isMinimum: true, position: 999 },
+    });
+    expect((await repo.getService(TEST_SERVICE_ID))?.alsoFrom).toEqual([]);
+    await prisma.service.update({ where: { id: TEST_SERVICE_ID }, data: { alsoFrom: [{ label: "Sole", cents: 4000 }] } });
+    expect((await repo.getService(TEST_SERVICE_ID))?.alsoFrom).toEqual([{ label: "Sole", cents: 4000 }]);
+  });
+
   it("returns null updating a Service that doesn't exist", async () => {
     expect(await repo.updateService("no_such_service", { name: "x" })).toBeNull();
   });
@@ -129,5 +138,32 @@ describe("PrismaCatalogRepository (integration)", () => {
     await expect(repo.updateService(TEST_SERVICE_ID, { baseCents: 2000 }, new Date(row.updatedAt.getTime() - 1000))).rejects.toThrow(CatalogChangedError);
     const ok = await repo.updateService(TEST_SERVICE_ID, { baseCents: 2000 }, row.updatedAt);
     expect(ok?.baseCents).toBe(2000);
+  });
+
+  it("defaults a new Bundle's pair Services to Premium Clean and has no end date, and sets and clears endsAt", async () => {
+    const created = await repo.createBundle({ id: TEST_BUNDLE_ID, name: "Integration Bundle", priceCents: 5000, perks: [], position: 999 });
+    expect(created.pairServiceIds).toEqual(["premium"]);
+    expect(created.endsAt).toBeNull();
+
+    const endsAt = new Date("2026-12-22T05:00:00Z");
+    expect((await repo.updateBundle(TEST_BUNDLE_ID, { endsAt }))?.endsAt).toEqual(endsAt);
+    expect((await repo.updateBundle(TEST_BUNDLE_ID, { endsAt: null }))?.endsAt).toBeNull();
+  });
+
+  it("takes pairServiceIds on create", async () => {
+    const created = await repo.createBundle({ id: TEST_BUNDLE_ID, name: "Integration Bundle", priceCents: 5000, perks: [], pairServiceIds: ["standard"], position: 999 });
+    expect(created.pairServiceIds).toEqual(["standard"]);
+  });
+
+  it("migrated the Start of Fall Special with Standard Clean and its end date, and Oxidation's other price", async () => {
+    const fall = await repo.getBundle("fall-boots");
+    expect(fall?.pairServiceIds).toEqual(["standard"]);
+    expect(fall?.endsAt).toEqual(new Date("2026-12-22T05:00:00Z"));
+    // The standing Bundles keep the default.
+    expect((await repo.getBundle("revival"))?.pairServiceIds).toEqual(["premium"]);
+    expect((await repo.getBundle("revival"))?.endsAt).toBeNull();
+
+    expect((await repo.getService("oxidation"))?.alsoFrom).toEqual([{ label: "Sole", cents: 4000 }]);
+    expect((await repo.getService("standard"))?.alsoFrom).toEqual([]);
   });
 });

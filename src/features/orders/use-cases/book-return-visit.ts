@@ -1,5 +1,6 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import type { SiteSettings } from "@/features/settings/use-cases/get-site-settings";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import type { Appointment } from "../domain";
 import { OrderNotFoundError, type OrderRepository } from "../repositories/order-repository";
@@ -11,6 +12,8 @@ import { redactForLog } from "@/shared/logging/redact";
 export interface BookReturnVisitDeps {
   orders: Pick<OrderRepository, "findById" | "bookReturnAppointment">;
   notifications: NotificationService;
+  /** The operating hours the owner may book a visit within. */
+  settings: { load(): Promise<Pick<SiteSettings, "hours">> };
   now: () => Date;
 }
 
@@ -51,7 +54,7 @@ export async function bookReturnVisit(
   requireRole(actingUser, "ADMIN");
   const order = await deps.orders.findById(input.orderId);
   if (!order) throw new OrderNotFoundError(input.orderId);
-  const target = resolveVisitSlot(input.date, input.slot, deps.now());
+  const target = resolveVisitSlot(input.date, input.slot, deps.now(), (await deps.settings.load()).hours);
 
   // A replay finds the Return already booked (state "booked"): let the repository decide replay vs. conflict.
   const state = returnVisitState(order);

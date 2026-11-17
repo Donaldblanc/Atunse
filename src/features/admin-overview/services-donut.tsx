@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { serviceLegendHref } from "./chart-links";
 import { donutSegments, sharesOf100 } from "./chart-scale";
 import type { OverviewSelection } from "./overview-range";
@@ -11,11 +10,11 @@ const GAP = 1.6;
 
 /**
  * Colour follows the Service, never its rank: each catalog Service owns
- * one categorical slot (--series-1..8 in admin-theme.css), so a Service
- * keeps its colour whichever others were booked.
+ * one categorical slot (--series-1..8 in admin-theme.css, `slot` here), so a
+ * Service keeps its colour whichever others were booked.
  */
-function seriesVar(serviceId: string): string {
-  return `var(--series-${SERVICE_CATALOG.findIndex((s) => s.id === serviceId) + 1})`;
+function seriesVar(slot: number): string {
+  return `var(--series-${slot})`;
 }
 
 /**
@@ -24,7 +23,7 @@ function seriesVar(serviceId: string): string {
  * not pairs. The legend always prints every name, count and share, so no
  * value depends on colour or hover alone.
  */
-export function ServicesDonut({ services, selection }: { services: { serviceId: string; name: string; count: number }[]; selection: OverviewSelection }) {
+export function ServicesDonut({ services, selection }: { services: { serviceId: string; name: string; count: number; slot: number }[]; selection: OverviewSelection }) {
   const total = services.reduce((sum, service) => sum + service.count, 0);
   const segments = donutSegments(services.map((service) => service.count));
   const shares = sharesOf100(services.map((service) => service.count));
@@ -44,7 +43,7 @@ export function ServicesDonut({ services, selection }: { services: { serviceId: 
                 cy="60"
                 r={RADIUS}
                 className="ov-donut-segment"
-                stroke={seriesVar(service.serviceId)}
+                stroke={seriesVar(service.slot)}
                 strokeDasharray={`${Math.max(segment.length * CIRCUMFERENCE - gap, 0)} ${CIRCUMFERENCE}`}
                 strokeDashoffset={-segment.offset * CIRCUMFERENCE}
               >
@@ -71,7 +70,7 @@ export function ServicesDonut({ services, selection }: { services: { serviceId: 
                 scroll={false}
                 aria-label={`${service.name}: ${service.count} ${service.count === 1 ? "order" : "orders"} this range`}
               >
-                <span className="ov-legend-key" style={{ background: seriesVar(service.serviceId) }} aria-hidden="true" />
+                <span className="ov-legend-key" style={{ background: seriesVar(service.slot) }} aria-hidden="true" />
                 <span className="ov-legend-name">{service.name}</span>
                 <span className="ov-legend-count">{service.count}</span>
                 <span className="ov-legend-share">{shares[i]}%</span>

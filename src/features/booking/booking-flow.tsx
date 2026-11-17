@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Info, Shield, Star, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Info, Shield, SportShoe, Star, Truck } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import type { PickupSelection } from "./pickup-date-picker";
-import { BOOKING_BUNDLES, BOOKING_SERVICES, pricedLineForBundle } from "./services-data";
+import { pricedLineForBundle } from "./services-data";
+import { SiteDataProvider, useSiteData } from "./site-data-context";
 import {
   EMPTY_ADDRESS,
   EMPTY_CONTACT,
@@ -25,7 +26,8 @@ import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
 import { ConfirmationStep } from "./confirmation-step";
 import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
-import { bundlePairServiceIds, catalogService, formatPrice, isBundleAvailable } from "@/features/orders/service-catalog";
+import { bundlePairServiceIds, formatPrice, serviceName, type Catalog } from "@/features/orders/service-catalog";
+import type { SiteSettings } from "@/features/settings/use-cases/get-site-settings";
 import { CustomerSignIn } from "./customer-sign-in";
 import { SubmissionConflict } from "./submission-conflict";
 import { BookingSubmitError, submitBooking, type SubmitOrderResponse, type UploadedPhotoKeys } from "./submit-booking";
@@ -53,14 +55,24 @@ const STEP_SUBTEXT: Record<Exclude<Step, "service">, (isBundle: boolean) => stri
 // detail tab). "Confirm Booking" uploads each pair's photos and submits a
 // real Order (submit-booking.ts): one Item for a single pair, three for a
 // Bundle. Then it shows the confirmation.
-export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
+export function BookingFlow({ cancelEmail, catalog, settings }: { cancelEmail: string | null; catalog: Catalog; settings: SiteSettings }) {
+  return (
+    <SiteDataProvider catalog={catalog} settings={settings}>
+      <BookingFlowContent cancelEmail={cancelEmail} />
+    </SiteDataProvider>
+  );
+}
+
+function BookingFlowContent({ cancelEmail }: { cancelEmail: string | null }) {
+  const { catalog, settings, services: bookableServices, bundles } = useSiteData();
   const searchParams = useSearchParams();
   const requestedServiceId = searchParams.get("service");
-  const requestedService = BOOKING_SERVICES.find((service) => service.id === requestedServiceId);
+  const requestedService = bookableServices.find((service) => service.id === requestedServiceId);
   const requestedMethod = searchParams.get("method");
-  // ?bundle=<id> opens that Bundle, unless it's unknown or its promotion has ended.
-  const requestedBundle = BOOKING_BUNDLES.find((b) => b.id === searchParams.get("bundle") && isBundleAvailable(b, new Date()));
-  const [flow, setFlow] = useState<FlowType>(requestedService && !requestedBundle ? "single" : "bundle");
+  // ?bundle=<id> opens that Bundle, unless it's unknown, switched off, or its promotion has ended (bundles lists only bookable ones).
+  const requestedBundle = bundles.find((b) => b.id === searchParams.get("bundle"));
+  // With nothing of one kind on offer, the flow is the other kind.
+  const [flow, setFlow] = useState<FlowType>(bundles.length === 0 || (requestedService && !requestedBundle) ? "single" : "bundle");
   const [step, setStep] = useState<Step>("service");
   // Cleaning is single-select (Standard vs Premium — never both on one
   // pair); restoration/custom-work services stack, so they're tracked
@@ -72,11 +84,15 @@ export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
   const [selectedStackableIds, setSelectedStackableIds] = useState<string[]>(() =>
     requestedService && requestedService.category !== "cleaning" ? [requestedService.id] : [],
   );
-  const [selectedBundleId, setSelectedBundleId] = useState(() => requestedBundle?.id ?? BOOKING_BUNDLES[0]!.id);
+  const [selectedBundleId, setSelectedBundleId] = useState(() => requestedBundle?.id ?? bundles[0]?.id ?? "");
   const [activePair, setActivePair] = useState(0);
   const [singlePair, setSinglePair] = useState<PairDetails>(EMPTY_PAIR);
   const [pairs, setPairs] = useState<PairDetails[]>([EMPTY_PAIR, EMPTY_PAIR, EMPTY_PAIR]);
-  const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>(requestedMethod === "mail-in" ? "mail-in" : "pickup");
+  const [scheduleMethod, setScheduleMethod] = useState<ScheduleMethod>(() => {
+    // Only a Fulfillment Method Settings has on can be chosen.
+    if (!settings.allowLocalDropOff) return "mail-in";
+    return requestedMethod === "mail-in" && settings.allowMailIn ? "mail-in" : "pickup";
+  });
   const [pickupAddress, setPickupAddress] = useState<PickupAddress>(EMPTY_ADDRESS);
   const [pickupSelection, setPickupSelection] = useState<PickupSelection | null>(null);
   const [mailInDate, setMailInDate] = useState<PickupSelection | null>(null);
@@ -97,15 +113,15 @@ export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
   const termsRef = useRef<TermsSelection>({ policyAccepted: false, acknowledgedTerms: [], termsVersion: "" });
 
   const selectedServiceIds = [...(selectedCleaningId ? [selectedCleaningId] : []), ...selectedStackableIds];
-  const selectedServices = BOOKING_SERVICES.filter((s) => selectedServiceIds.includes(s.id));
-  const selectedBundle = BOOKING_BUNDLES.find((b) => b.id === selectedBundleId) ?? BOOKING_BUNDLES[0]!;
-  const isBundle = flow === "bundle";
-  const bundlePairServices = bundlePairServiceIds(selectedBundle).map((id) => catalogService(id).name).join(" + ");
-  const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? BOOKING_SERVICES[0]!.icon);
-  const selectedAddOns = addOnLines((isBundle ? pairs : [singlePair]).map((pair) => pair.addOnIds));
+  const selectedServices = bookableServices.filter((s) => selectedServiceIds.includes(s.id));
+  const selectedBundle = bundles.find((b) => b.id === selectedBundleId) ?? bundles[0];
+  const isBundle = flow === "bundle" && selectedBundle !== undefined;
+  const bundlePairServices = selectedBundle ? bundlePairServiceIds(selectedBundle).map((id) => serviceName(catalog, id)).join(" + ") : "";
+  const SelectedIcon = isBundle ? selectedBundle.icon : (selectedServices[0]?.icon ?? bookableServices[0]?.icon ?? SportShoe);
+  const selectedAddOns = addOnLines(catalog, (isBundle ? pairs : [singlePair]).map((pair) => pair.addOnIds));
   const { name: selectedName, price: selectedPrice, priceNote: selectedPriceNote } = isBundle
     ? computeMultiServicePricing([pricedLineForBundle(selectedBundle)], "", rush, selectedAddOns)
-    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(s.id)), singlePair.material, rush, selectedAddOns);
+    : computeMultiServicePricing(selectedServices.map((s) => pricedLineForService(catalog, s.id)), singlePair.material, rush, selectedAddOns);
   const stepIndex = confirmation ? STEPS.length : STEPS.findIndex((s) => s.key === step);
 
   function goBack() {
@@ -117,7 +133,7 @@ export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
   }
 
   function toggleService(id: string) {
-    const service = BOOKING_SERVICES.find((s) => s.id === id);
+    const service = bookableServices.find((s) => s.id === id);
     if (!service) return;
     if (service.category === "cleaning") {
       setSelectedCleaningId((prev) => (prev === id ? null : id));
@@ -177,7 +193,7 @@ export function BookingFlow({ cancelEmail }: { cancelEmail: string | null }) {
           </button>
         )}
 
-        {step === "service" && !confirmation && (
+        {step === "service" && !confirmation && bookableServices.length > 0 && bundles.length > 0 && (
           <div className="booking-page-flow-switch">
             <button type="button" data-active={!isBundle} onClick={() => setFlow("single")}>
               Single Pair

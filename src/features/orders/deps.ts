@@ -5,6 +5,8 @@ import { contactInboxFromEnv } from "@/features/contact/contact-message";
 import { isCustomerSignInEnabled } from "@/shared/config/feature-flags";
 import { getFileStorage } from "@/shared/storage";
 import { paymentInstructionsFromEnv } from "./payment-instructions";
+import { loadCatalog } from "@/features/services/site-catalog";
+import { loadSiteSettings } from "@/features/settings/site-settings";
 import { PrismaOrderRepository } from "./repositories/prisma-order-repository";
 
 // Wires the real (Prisma-backed) implementations behind the use-case
@@ -18,6 +20,9 @@ export function buildOrderUseCaseDeps() {
     notifications: notificationServiceFromEnv(),
     paymentInstructions: paymentInstructionsFromEnv(),
     customerSignInEnabled: isCustomerSignInEnabled(),
+    /** The catalog and hours booking validates against, read from the database (ADR-0016). */
+    catalog: { load: loadCatalog },
+    settings: { load: loadSiteSettings },
     /** The same inbox the contact form uses (CONTACT_EMAIL). */
     ownerInbox: contactInboxFromEnv(),
     /** Built on first use: it throws StorageNotConfiguredError when misconfigured. */

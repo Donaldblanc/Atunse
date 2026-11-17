@@ -329,7 +329,12 @@
 
 @media (max-width: 900px) {
   .am-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .am-thread-head,
+  .am-thread-actions {
+    flex-wrap: wrap;
   }
 }
 

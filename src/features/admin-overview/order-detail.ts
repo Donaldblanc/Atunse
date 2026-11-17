@@ -21,7 +21,7 @@ import {
   type Payment,
 } from "@/features/orders/domain";
 import type { OrderNote, OrderRepository, StatusChange } from "@/features/orders/repositories/order-repository";
-import { addOnsCents, findBundle, itemRequiresQuote, RUSH_FEE_CENTS, formatPrice, SERVICE_CATALOG, SUEDE_FEE_CENTS, suedeFeeApplies } from "@/features/orders/service-catalog";
+import { addOnsCents, findBundle, findService, itemRequiresQuote, quoteCheck, RUSH_FEE_CENTS, formatPrice, suedeFeeCents, type Catalog, type CatalogSource } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import { PAIR_DETAIL_FIELDS, type PairDetailField } from "@/features/orders/order-details";
 import { quotedTotal } from "@/features/orders/status-emails";
@@ -37,6 +37,8 @@ export interface OrderDetailDeps {
   orders: Pick<OrderRepository, "findById" | "listOrderNotes" | "listStatusChanges">;
   /** A short-lived view link for a stored photo (ADR-0014), or null when photos can't be shown. */
   photoUrl: (key: string) => Promise<string | null>;
+  /** Names the Services and Bundle, inactive ones included (past Items name them). */
+  catalog: CatalogSource;
 }
 
 export interface OrderDetailPair {
@@ -147,10 +149,12 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
   if (!order) return null;
   const [notes, changes] = await Promise.all([deps.orders.listOrderNotes(order.id), deps.orders.listStatusChanges(order.id)]);
 
-  const bundle = findBundle(order.bundleId);
+  const catalog = await deps.catalog.load();
+  const requiresQuoteFor = quoteCheck(catalog);
+  const bundle = findBundle(catalog, order.bundleId);
   const live = livePairs(order);
-  const status = orderDisplayStatus(order.items);
-  const requiresQuote = live.length > 0 ? orderRequiresQuote(order) : order.items.some((item) => itemRequiresQuote(item.serviceIds));
+  const status = orderDisplayStatus(requiresQuoteFor, order.items);
+  const requiresQuote = live.length > 0 ? orderRequiresQuote(requiresQuoteFor, order) : order.items.some((item) => requiresQuoteFor(item.serviceIds));
   const deposit = order.payments.find((payment) => payment.kind === "DEPOSIT");
   const balance = order.payments.find((payment) => payment.kind === "BALANCE");
   const { fulfillment } = order;
@@ -178,19 +182,19 @@ export async function getOrderDetail(deps: OrderDetailDeps, actingUser: ActingUs
       schedule,
       address: [address.line1, address.line2, `${address.city}, ${address.state} ${address.zip}`].filter((line): line is string => Boolean(line)),
     },
-    bundleName: bundle?.name ?? null,
+    bundleName: bundle?.name ?? order.bundleId,
     bundlePrice: bundle
       ? Money.fromCents(
           live.reduce(
             (sum, item) =>
               sum +
               item.estimate.cents -
-              addOnsCents(item.serviceIds.filter((id) => SERVICE_CATALOG.find((service) => service.id === id)?.isAddOn)),
+              addOnsCents(catalog, item.serviceIds.filter((id) => findService(catalog, id)?.isAddOn)),
             0,
           ),
         )
       : null,
-    pairs: await Promise.all(order.items.map((item) => toPair(item, order, deps.photoUrl, changes))),
+    pairs: await Promise.all(order.items.map((item) => toPair(catalog, item, order, deps.photoUrl, changes))),
     timeline: buildTimeline(status, live.length > 0 ? live : order.items, changes, order.createdAt, requiresQuote),
     payment: {
       deposit: deposit
@@ -249,11 +253,13 @@ function quotedSummary(order: Order): OrderDetail["payment"]["quoted"] {
   };
 }
 
-async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"], changes: StatusChange[]): Promise<OrderDetailPair> {
+async function toPair(catalog: Catalog, item: Item, order: Order, photoUrl: OrderDetailDeps["photoUrl"], changes: StatusChange[]): Promise<OrderDetailPair> {
   const inBundle = order.bundleId !== null;
-  const { moves, held } = adminStatusMoves(item, order);
+  const { moves, held } = adminStatusMoves(catalog, item, order);
   const photoKey = item.photoKeys[0];
-  const services = SERVICE_CATALOG.filter((service) => item.serviceIds.includes(service.id));
+  const services = catalog.services.filter((service) => item.serviceIds.includes(service.id));
+  // A Service the catalog no longer has is still named, by its id.
+  const unknownIds = item.serviceIds.filter((id) => !findService(catalog, id));
   // No Restoration/Custom-Work Service, so it was created already Approved at its estimate
   // (ADR-0017), never through Under Review / Quote Sent. Keyed off the Service category, not
   // status history: a plain Update Status move (adminStatusMoves) can jump a Restoration pair
@@ -265,7 +271,7 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     item.status !== "CANCELLED" &&
     !services.some((service) => service.category === "restoration" || service.category === "custom-work") &&
     !changes.some((change) => change.itemId === item.id && change.toStatus === "QUOTE_SENT");
-  const suedeApplies = !inBundle && suedeFeeApplies(item.material, services);
+  const suedeFee = inBundle ? 0 : suedeFeeCents(item.material, services);
   return {
     itemId: item.id,
     photo: await pairPhoto(photoKey, photoUrl),
@@ -274,15 +280,15 @@ async function toPair(item: Item, order: Order, photoUrl: OrderDetailDeps["photo
     estimate: item.estimate,
     price: item.price,
     status: item.status,
-    displayStatus: displayStatus(item.status, itemRequiresQuote(item.serviceIds)),
-    requiresQuote: itemRequiresQuote(item.serviceIds),
+    displayStatus: displayStatus(item.status, itemRequiresQuote(catalog, item.serviceIds)),
+    requiresQuote: itemRequiresQuote(catalog, item.serviceIds),
     services: services.map((service) => ({
       name: service.name,
       // A Bundle's price covers its own Services; Add-ons are charged on top.
       price: inBundle && !service.isAddOn ? null : formatPrice(service.baseCents, service.isMinimum),
       isMinimum: !(inBundle && !service.isAddOn) && service.isMinimum,
-    })),
-    suedeFee: suedeApplies ? Money.fromCents(SUEDE_FEE_CENTS) : null,
+    })).concat(unknownIds.map((id) => ({ name: id, price: null, isMinimum: false }))),
+    suedeFee: suedeFee > 0 ? Money.fromCents(suedeFee) : null,
     nextStatuses: moves,
     held,
     autoApproved,
