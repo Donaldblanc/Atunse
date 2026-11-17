@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -12,9 +13,12 @@ import { loadSiteSettings } from "@/features/settings/site-settings";
 import { ContactSection } from "@/features/contact/contact-section";
 import { CONTACT_FAQ_IMAGE, CONTACT_FAQS, CONTACT_HERO_IMAGE } from "@/features/contact/contact-content";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Contact — Atunṣe",
-};
+  description:
+    "Questions about a booking, a custom job or anything else? Send RestoredByDJ a message and we'll get back to you.",
+  path: "/contact",
+});
 
 // /contact?topic=booking (or general, custom, other) opens the form on
 // that topic, for links from emails and other pages.

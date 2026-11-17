@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check, Clock, Palette, Sparkles, Wrench } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -10,9 +11,12 @@ import { ArrowIcon } from "@/features/landing/arrow-icon";
 import { findService, formatPrice, formatServicePrice, suedeFeeNote, type Catalog, type CatalogService } from "@/features/orders/service-catalog";
 import { loadCatalog } from "@/features/services/site-catalog";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Services & Pricing — Atunṣe",
-};
+  description:
+    "Sneaker cleaning, restoration and custom work with published prices: Standard and Premium Clean, sole and midsole restoration, add-ons and three-pair bundles.",
+  path: "/services",
+});
 
 // Every price on this page comes from the catalog the owner edits in admin,
 // the same one the booking flow and the server's estimate use. A Service

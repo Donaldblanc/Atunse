@@ -8,6 +8,7 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 // unstyled default. Reuses the coming-soon page's layout classes.
 export const metadata = {
   title: "Page not found — Atunṣe",
+  robots: { index: false },
 };
 
 export default function NotFound() {

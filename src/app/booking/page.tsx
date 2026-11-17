@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Calendar, Package, Sparkles, SportShoe } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import { Suspense } from "react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
@@ -9,9 +10,12 @@ import { BookingFlow } from "@/features/booking/booking-flow";
 import { loadCatalog } from "@/features/services/site-catalog";
 import { loadSiteSettings } from "@/features/settings/site-settings";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Book a Restoration — Atunṣe",
-};
+  description:
+    "Book a sneaker cleaning or restoration in a few steps: choose a service, add your pair's details, and pick Local Drop-Off in NY/NJ/CT or Mail-In.",
+  path: "/booking",
+});
 
 const HOW_IT_WORKS = [
   {

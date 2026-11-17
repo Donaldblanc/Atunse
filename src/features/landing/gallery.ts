@@ -17,12 +17,12 @@ export interface GalleryImage {
 }
 
 export const HERO_IMAGE: GalleryImage = {
-  key: "hero-travis-scott-aj1-low.png",
+  key: "hero-travis-scott-aj1-low.webp",
   alt: "Restored Travis Scott Air Jordan 1 Low, before and after cleaning",
 };
 
 export const COMING_SOON_HERO_IMAGE: GalleryImage = {
-  key: "coming-soon-hero.png",
+  key: "coming-soon-hero.webp",
   alt: "Sneaker restoration in progress",
 };
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, Clock, Hand, MapPin, Truck } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import "@/styles/landing-theme.css";
 import { beforeAfterImages, HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
 import { SERVICES } from "@/features/landing/services";
@@ -98,6 +99,13 @@ const REVIEWS = [
 // the booking, so a stale page can't sell an expired promotion). An admin
 // save in Services & Pricing or Settings revalidates it at once.
 export const revalidate = 3600;
+
+export const metadata = pageMetadata({
+  title: "Atunṣe — Sneaker Cleaning & Restoration in New York",
+  description:
+    "RestoredByDJ cleans and restores sneakers by hand in New York. Book online, hand over your pair by Local Drop-Off in NY/NJ/CT or Mail-In, and get it back fresh.",
+  path: "/",
+});
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
