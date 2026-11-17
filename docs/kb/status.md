@@ -41,6 +41,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Order detail extras:** per-Service prices, Suede fee and Bundle price (#149); an Order-level audit log for contact edits, notes and reschedules (#150).
 - **Payments** (`/admin/payments`, #161): list with method/status breakdown, Record Payment, manual (Zelle/Cash) refunds. A Deposit/Balance can't be refunded while the Order has live pairs; card refunds wait on Stripe.
 - **Services & Pricing** (`/admin/services`, #162): Services and Bundles tables with edit panels, images, deactivate (never delete), stale-form check. Edits the `services`/`bundles` tables only: **booking still prices from `service-catalog.ts`** (the page says so).
+- **Inventory** (`/admin/inventory`): stat cards, filters (search, category, status, supplier), paged table, item panel (Details edit + Adjust stock + images, Stock History, Supplier + Add supplier), Add Item dialog. No delete (Deactivate/Reactivate; status is derived from stock); no "vs last month" trends, column sorting or Related tab.
 - **Messages** (`/admin/messages`, #163): inbox with search, status tabs, channel filter, paging, thread view with Mark read and email reply, New Message (emails the customer), archive.
 - **Settings** (`/admin/settings`, #164): Business Profile (details, logo, hours, Local Drop-Off/Mail-In switches) and the admin's own account (name, email with password, password). **Not read by the customer site yet**: booking still uses `pickup-window.ts`.
 - **Admin security hardening** (#168): revocable sessions (`Account.sessionVersion`), `__Host-` cookies, scrypt N=2^17 with rehash on login, email change needs the password, rate-limited password checks, Origin/JSON guards on admin API routes (ADR-0014 amendment, `gotchas.md`).
@@ -49,7 +50,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Accessibility** (#166): reviews carousel Pause/Resume, marquee stops on reduced motion, `aria-current` on the tab bar; no accessibility overlay, by decision (TODO, Accessibility).
 
 ## Not built (admin screens in SPEC's inventory)
-Inventory: the only sidebar entry still marked "Soon" (`src/app/admin/admin-screens.ts`). Low stock is handled from the Overview until then.
+None: every sidebar entry is built.
 
 ## Top open items (see TODO.md for the rest)
 - **Launch blockers (owner):** Privacy Policy PDF must mention birth month/year; sales tax decision; set `CONTACT_EMAIL`, Resend (`RESEND_API_KEY`, `EMAIL_FROM`, monitored) and `ZELLE_RECIPIENT`/`ZELLE_NAME` in Vercel; register the DMCA agent.

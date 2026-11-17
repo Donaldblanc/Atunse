@@ -158,7 +158,7 @@ The Overview (`/admin`, design `scratch/overview-dashboard.jpeg`) shows sample d
 
 **Sample data (shown now, not real):**
 - [x] **Unread Messages** count: real count of CUSTOMER Messages with `readAt` null in unarchived Conversations; its dialog (`?attention=messages`) has Mark read and an email Reply.
-- [x] **Low Stock Items** count: real count of active Inventory Items with `stock <= lowStockAt`; `?attention=low-stock` lists them with Adjust stock. Follow-up: the Inventory screen to add items.
+- [x] **Low Stock Items** count: real count of active Inventory Items with `stock <= lowStockAt`; `?attention=low-stock` lists them with Adjust stock. Items are added from the Inventory screen (`/admin/inventory`).
 - [x] **Recent Reviews**: the latest PUBLISHED ones, with `?reviews=all` (Publish, Hide, Reply). Follow-up: how reviews arrive (a link sent after Completed via Request Review, or imported from Google/Instagram); until then the panel shows an empty state.
 
 **Placeholders (real data exists, but the design shows more):**

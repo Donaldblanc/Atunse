@@ -177,7 +177,7 @@ The admin follows the approved design images (`scratch/01-09`); the data model a
 4. **Calendar** (built) — a month grid of Local Drop-Off collection and return Appointments; a visit opens the Overview's Schedule Item dialog for its details, Reschedule and Mark as Completed.
 5. **Customers** — list and detail: contact info, bookings, last booking.
 6. **Services & Pricing** — Services and Bundles: prices, descriptions, active or not.
-7. **Inventory** — supplies with stock and low-stock alerts, and their Suppliers.
+7. **Inventory** (built) — supplies with stock and low-stock alerts, and their Suppliers.
 8. **Payments** — every Deposit, Balance and Full payment, by method and status.
 9. **Messages** — an inbox of Conversations with customers, usually about an Order (unread, archived, channels, attachments).
 10. **Reviews** — ratings and reviews per Order, moderation (publish/hide), replies, Request Review.
