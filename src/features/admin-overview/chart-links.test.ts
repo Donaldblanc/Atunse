@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { formatChartDay, ordersFilterLabel, revenueBarHref, revenueTrendTitleHref, serviceLegendHref } from "./chart-links";
 
 describe("chart links", () => {
@@ -11,9 +12,9 @@ describe("chart links", () => {
 
   it("labels the active filter", () => {
     expect(formatChartDay("2026-09-30")).toBe("Wed, Sep 30");
-    expect(ordersFilterLabel({ day: "2026-09-30", serviceId: null }, "Sep 28 – Oct 4, 2026")).toBe("Booked Wed, Sep 30");
-    expect(ordersFilterLabel({ day: null, serviceId: "premium" }, "Sep 28 – Oct 4, 2026")).toBe("Premium Clean · Sep 28 – Oct 4, 2026");
-    expect(ordersFilterLabel({ day: "2026-09-30", serviceId: "premium" }, "x")).toBe("Premium Clean · Booked Wed, Sep 30");
-    expect(ordersFilterLabel({ day: null, serviceId: null }, "x")).toBeNull();
+    expect(ordersFilterLabel(DEFAULT_CATALOG, { day: "2026-09-30", serviceId: null }, "Sep 28 – Oct 4, 2026")).toBe("Booked Wed, Sep 30");
+    expect(ordersFilterLabel(DEFAULT_CATALOG, { day: null, serviceId: "premium" }, "Sep 28 – Oct 4, 2026")).toBe("Premium Clean · Sep 28 – Oct 4, 2026");
+    expect(ordersFilterLabel(DEFAULT_CATALOG, { day: "2026-09-30", serviceId: "premium" }, "x")).toBe("Premium Clean · Booked Wed, Sep 30");
+    expect(ordersFilterLabel(DEFAULT_CATALOG, { day: null, serviceId: null }, "x")).toBeNull();
   });
 });

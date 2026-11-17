@@ -2,7 +2,7 @@
 // import here (ADR-0003/0011: Prisma stays inside repositories).
 
 import { Money } from "@/shared/money/money";
-import { itemRequiresQuote, RUSH_FEE_CENTS } from "./service-catalog";
+import { itemRequiresQuote, RUSH_FEE_CENTS, type Catalog, type RequiresQuote } from "./service-catalog";
 
 export const ITEM_STATUSES = [
   "REQUEST_SUBMITTED",
@@ -88,8 +88,8 @@ export function statusPipeline(requiresQuote: boolean): ItemStatus[] {
 }
 
 /** An Order uses the full pipeline when any live pair needs a Quote; a fully cancelled Order has none to need it. */
-export function orderRequiresQuote(order: { items: { status: ItemStatus; serviceIds: string[] }[] }): boolean {
-  return livePairs(order).some((item) => itemRequiresQuote(item.serviceIds));
+export function orderRequiresQuote(requiresQuoteFor: RequiresQuote, order: { items: { status: ItemStatus; serviceIds: string[] }[] }): boolean {
+  return livePairs(order).some((item) => requiresQuoteFor(item.serviceIds));
 }
 
 /**
@@ -103,11 +103,12 @@ export function orderRequiresQuote(order: { items: { status: ItemStatus; service
  * Review, Quote Sent or Approved (it can't be moved into the quote steps).
  */
 export function adminStatusMoves(
+  catalog: Catalog,
   item: { status: ItemStatus; serviceIds: string[] },
   _order?: CompletionOrder,
 ): { moves: ItemStatus[]; held: string | null } {
   if (item.status === "COMPLETED" || item.status === "CANCELLED") return { moves: [], held: null };
-  const requiresQuote = itemRequiresQuote(item.serviceIds);
+  const requiresQuote = itemRequiresQuote(catalog, item.serviceIds);
   return { moves: ITEM_STATUSES.filter((next) => next !== item.status && (requiresQuote || !QUOTE_STEP_STATUSES.includes(next))), held: null };
 }
 
@@ -182,8 +183,8 @@ export function orderRollupStatus(items: { status: ItemStatus }[]): ItemStatus {
  * that an Order with no live pair needing a Quote reads Request Submitted
  * for its quote-step statuses (displayStatus).
  */
-export function orderDisplayStatus(items: { status: ItemStatus; serviceIds: string[] }[]): ItemStatus {
-  return displayStatus(orderRollupStatus(items), orderRequiresQuote({ items }));
+export function orderDisplayStatus(requiresQuoteFor: RequiresQuote, items: { status: ItemStatus; serviceIds: string[] }[]): ItemStatus {
+  return displayStatus(orderRollupStatus(items), orderRequiresQuote(requiresQuoteFor, { items }));
 }
 
 /**
@@ -312,7 +313,7 @@ export interface Order {
   /** Order detail's totals, set by the owner; zero until then. */
   dropOffFee: Money;
   tax: Money;
-  /** The Bundle bought (service-catalog.ts BUNDLE_CATALOG), or null for a single pair. */
+  /** The Bundle bought (the bundles table), or null for a single pair. */
   bundleId: string | null;
   confirmationEmailSentAt: Date | null;
   /** What was submitted with its submission key (#76); null for older Orders. */
@@ -471,6 +472,7 @@ export interface VisitPlan {
  * from. Pairs already past it, or cancelled, are neither.
  */
 export function planVisitMoves(
+  requiresQuoteFor: RequiresQuote,
   kind: Appointment["kind"],
   order: CompletionOrder & { items: { id: string; serviceIds?: string[] }[] },
 ): VisitPlan {
@@ -480,7 +482,7 @@ export function planVisitMoves(
   for (const item of order.items) {
     if (item.status === "CANCELLED" || ITEM_STATUSES.indexOf(item.status) > ITEM_STATUSES.indexOf(from)) continue;
     // A pair that needs no Quote reads Request Submitted before Awaiting Sneakers, never "approved".
-    const requiresQuote = item.serviceIds ? itemRequiresQuote(item.serviceIds) : true;
+    const requiresQuote = item.serviceIds ? requiresQuoteFor(item.serviceIds) : true;
     if (item.status === from) {
       const { moves, held } = visitStatusMoves(item, order);
       if (moves.includes(to)) plan.moves.push({ itemId: item.id, from, to });

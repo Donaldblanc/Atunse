@@ -1,7 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { lockOrder, uniqueViolationFields } from "@/features/orders/repositories/prisma-order-repository";
 import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
 import { Money } from "@/shared/money/money";
 import {
   OrderNotFoundError,

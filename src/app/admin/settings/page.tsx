@@ -5,9 +5,9 @@
 // page's scroll rather than as a second route (docs/plans/
 // admin-screens-batch-2.md).
 //
-// Saving the Booking Settings toggles here (allowLocalDropOff/allowMailIn)
-// doesn't yet change what /booking offers: the booking flow still reads
-// pickup-window.ts, not BusinessSettings (docs/TODO.md #181).
+// The Booking Settings toggles (allowLocalDropOff/allowMailIn), the
+// Operating Hours and the business profile are what the customer site and
+// /booking read (ADR-0016); saving revalidates those pages.
 
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";

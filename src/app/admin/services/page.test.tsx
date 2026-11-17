@@ -25,6 +25,7 @@ function service(overrides: Partial<Parameters<typeof catalog.services.set>[1]> 
     isMinimum: false,
     suedeFeeCents: 1000,
     minimumLabel: null,
+    alsoFrom: [],
     internalNotes: null,
     active: true,
     position: 0,
@@ -79,15 +80,10 @@ describe("AdminServicesPage", () => {
     expect(html).not.toContain("Standard Clean");
   });
 
-  it("shows the booking-doesn't-use-these-yet notice", async () => {
-    const html = renderToStaticMarkup(await AdminServicesPage({ searchParams: Promise.resolve({}) }));
-    expect(html).toContain("don&#x27;t change the booking page yet");
-  });
-
-  it("badges a bundle that has a promotion end date in the built-in catalog", async () => {
-    const bundle = { id: "fall-boots", name: "Fall Boots", priceCents: 9000, perks: [], internalNotes: null, active: true, position: 0, images: [], createdAt: new Date(), updatedAt: new Date() };
+  it("badges a bundle that has a promotion end date", async () => {
+    const bundle = { id: "fall-boots", name: "Fall Boots", priceCents: 9000, perks: [], pairServiceIds: ["premium"], endsAt: new Date("2026-12-22T05:00:00Z"), internalNotes: null, active: true, position: 0, images: [], createdAt: new Date(), updatedAt: new Date() };
     catalog.bundles.set("fall-boots", bundle);
-    catalog.bundles.set("plain", { ...bundle, id: "plain", name: "Plain Pack", position: 1 });
+    catalog.bundles.set("plain", { ...bundle, id: "plain", name: "Plain Pack", position: 1, endsAt: null });
     const html = renderToStaticMarkup(await AdminServicesPage({ searchParams: Promise.resolve({ tab: "bundles" }) }));
     expect(html).toContain("Promotion · ends Dec 21, 2026");
     expect(html.match(/Promotion/g)).toHaveLength(1);

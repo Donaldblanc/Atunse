@@ -3,7 +3,9 @@ import { requireRole } from "@/features/accounts/authz";
 import { AGE_REQUIREMENT_MESSAGE, isAdultByBirthMonth, isBirthMonthYear } from "../age";
 import { cancelEmailLine } from "../cancel-notice";
 import { isValidEmail, isValidUsPhone, isValidZip } from "../contact-rules";
-import { availablePickupSlots, collectionTimes, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_TIME_SLOTS, PICKUP_WINDOW_LABEL, US_STATES } from "../pickup-window";
+import { availablePickupSlots, collectionTimes, daySlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, US_STATES, windowLabel } from "../pickup-window";
+import { dayOfWeek } from "../calendar-date";
+import type { SiteSettings } from "@/features/settings/use-cases/get-site-settings";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import { calendarDateInShopTime, isCalendarDate } from "../calendar-date";
 import { orderNumber, pairsPhrase, type Fulfillment, type Order } from "../domain";
@@ -25,9 +27,12 @@ import {
   type OrderRepository,
 } from "../repositories/order-repository";
 import {
+  assertBundleBookable,
+  assertServicesBookable,
+  bundleName,
   bundlePairServiceIds,
-  catalogBundle,
-  isBundleAvailable,
+  serviceName,
+  type Catalog,
   BUNDLE_PAIRS,
   estimateBundleItems,
   estimateItem,
@@ -35,7 +40,6 @@ import {
   findBundle,
   InvalidServiceSelectionError,
   itemRequiresQuote,
-  catalogService,
   MATERIALS,
   type ItemEstimate,
   type Material,
@@ -57,7 +61,7 @@ export interface SubmitOrderInput {
   contact: { name: string; email: string; phone: string; birthMonth: number; birthYear: number };
   fulfillment: Fulfillment;
   rush: boolean;
-  /** A Bundle id (service-catalog.ts) for three pairs, or null for a single pair. */
+  /** A Bundle id (the bundles table) for three pairs, or null for a single pair. */
   bundleId: string | null;
   /** One entry per pair: exactly one without a Bundle, BUNDLE_PAIRS with one. */
   items: PairInput[];
@@ -88,6 +92,10 @@ export interface SubmitOrderDeps {
   customerSignInEnabled: boolean;
   /** The shop's inbox (CONTACT_EMAIL) for new-booking emails; null skips them quietly. */
   ownerInbox: string | null;
+  /** The catalog booking prices from: the server's own, never the client's (ADR-0016). */
+  catalog: { load(): Promise<Catalog> };
+  /** Settings' hours and Fulfillment Methods, read at submit time. */
+  settings: { load(): Promise<SiteSettings> };
   now?: () => Date;
 }
 
@@ -146,6 +154,26 @@ export class BookingValidationError extends Error {
   }
 }
 
+/** Settings has switched this Fulfillment Method off (or both). `message` is safe to show the customer. */
+export class FulfillmentMethodUnavailableError extends BookingValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FulfillmentMethodUnavailableError";
+  }
+}
+
+/** The collection slot isn't within that weekday's operating hours (or the shop is closed that day). */
+export class SlotOutsideHoursError extends BookingValidationError {
+  constructor(message: string) {
+    super(message);
+    this.name = "SlotOutsideHoursError";
+  }
+}
+
+function methodOffMessage(method: string, other: string, otherAllowed: boolean): string {
+  return otherAllowed ? `${method} isn't available right now. Choose ${other} instead.` : "We're not taking online bookings right now.";
+}
+
 /**
  * A photo the booking names isn't in storage (never finished uploading, or
  * cleaned up since). The code tells the booking client to upload the
@@ -190,6 +218,7 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   }
 
   const now = deps.now?.() ?? new Date();
+  const [catalog, settings] = await Promise.all([deps.catalog.load(), deps.settings.load()]);
 
   // A retry of a submission that already went through gets its Order back
   // before any other check: its photo keys are, by design, already in use,
@@ -197,12 +226,12 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
   const fingerprint = input.submissionKey ? submissionFingerprint(input) : null;
   if (input.submissionKey) {
     const existing = await deps.orders.findBySubmissionKey(input.submissionKey);
-    if (existing) return sendConfirmationOnce(deps, await sameSubmission(deps, existing, fingerprint, now), now);
+    if (existing) return sendConfirmationOnce(deps, await sameSubmission(deps, existing, fingerprint, now, catalog), now, catalog);
   }
 
   const contact = validateContact(input.contact, now);
-  const fulfillment = validateFulfillment(input.fulfillment, now);
-  const pairs = pricePairs(input, now);
+  const fulfillment = validateFulfillment(input.fulfillment, now, settings);
+  const pairs = pricePairs(catalog, input, now);
   const orderEstimate = estimateOrder({ items: pairs.map((pair) => pair.estimate), rush: input.rush });
   const photos = await keepVerifiedPhotos(deps, input.items.map((item) => item.photoKeys));
 
@@ -239,10 +268,10 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
         material: pairs[i]!.material,
         serviceIds: pairs[i]!.serviceIds,
         estimate: pairs[i]!.estimate.estimate,
-        requiresQuote: itemRequiresQuote(pairs[i]!.serviceIds),
+        requiresQuote: itemRequiresQuote(catalog, pairs[i]!.serviceIds),
         photos: photos[i]!,
       })),
-      alertBody: alertBody(contact.name, input.items.flatMap((_, i) => pairs[i]!.serviceIds), fulfillment),
+      alertBody: alertBody(catalog, contact.name, input.items.flatMap((_, i) => pairs[i]!.serviceIds), fulfillment),
     });
 
   let created;
@@ -259,30 +288,29 @@ export async function submitOrder(deps: SubmitOrderDeps, actingUser: ActingUser,
     // The database's unique photo key: a photo belongs to exactly one
     // booking, so another Order can never gain view access to it.
     if (err instanceof PhotoKeyInUseError) throw new PhotosInUseError();
-    // The code catalog offered a Bundle the bundles table no longer has
-    // (until booking reads the table, ADR-0016): a clear 400, not a 500.
+    // The Bundle was removed between loading the catalog and the write: a clear 400, not a 500.
     if (err instanceof BundleNotFoundError) throw new BookingValidationError(err.message);
     throw err;
   }
 
   // created is false when a concurrent request with the same key won.
-  if (!created.created) return sendConfirmationOnce(deps, await sameSubmission(deps, created.order, fingerprint, now), now);
+  if (!created.created) return sendConfirmationOnce(deps, await sameSubmission(deps, created.order, fingerprint, now, catalog), now, catalog);
   // Only a booking this call wrote tells the owner; a replay never does.
-  await emailOwnerOfNewBooking(deps, created.order);
-  return sendConfirmationOnce(deps, created.order, now);
+  await emailOwnerOfNewBooking(deps, created.order, catalog);
+  return sendConfirmationOnce(deps, created.order, now, catalog);
 }
 
 /** "Jordan · Standard Clean, Lace Replacement · Local Drop-Off 2026-10-03": never an address, phone or email. */
-function alertBody(contactName: string, serviceIds: string[], fulfillment: Fulfillment): string {
-  return [firstName(contactName), serviceNames(serviceIds), fulfillmentSummary(fulfillment)].join(" · ");
+function alertBody(catalog: Catalog, contactName: string, serviceIds: string[], fulfillment: Fulfillment): string {
+  return [firstName(contactName), serviceNames(catalog, serviceIds), fulfillmentSummary(fulfillment)].join(" · ");
 }
 
 function firstName(contactName: string): string {
   return contactName.split(/\s+/)[0] ?? contactName;
 }
 
-function serviceNames(serviceIds: string[]): string {
-  return [...new Set(serviceIds)].map((id) => catalogService(id).name).join(", ");
+function serviceNames(catalog: Catalog, serviceIds: string[]): string {
+  return [...new Set(serviceIds)].map((id) => serviceName(catalog, id)).join(", ");
 }
 
 function fulfillmentSummary(fulfillment: Fulfillment): string {
@@ -291,25 +319,25 @@ function fulfillmentSummary(fulfillment: Fulfillment): string {
 
 // The owner's copy of a new booking, after the write succeeded. Best
 // effort: the booking and its bell notification stand if the send fails.
-async function emailOwnerOfNewBooking(deps: SubmitOrderDeps, order: Order): Promise<void> {
+async function emailOwnerOfNewBooking(deps: SubmitOrderDeps, order: Order, catalog: Catalog): Promise<void> {
   if (!deps.ownerInbox) return;
   try {
     await deps.notifications.sendEmail({
       to: deps.ownerInbox,
       subject: `New booking ${orderNumber(order.number)}`,
-      body: ownerEmailBody(order),
+      body: ownerEmailBody(order, catalog),
     });
   } catch (err) {
     console.error(`[new-booking] owner email failed: ${redactForLog(err instanceof Error ? err.message : String(err))}`);
   }
 }
 
-function ownerEmailBody(order: Order): string {
+function ownerEmailBody(order: Order, catalog: Catalog): string {
   const estimate = `${order.estimateIsMinimum ? "from " : ""}${order.estimate.format()}`;
   return [
     `New booking ${orderNumber(order.number)}`,
     `Customer: ${firstName(order.contactName)}`,
-    `Services: ${serviceNames(order.items.flatMap((item) => item.serviceIds))}`,
+    `Services: ${serviceNames(catalog, order.items.flatMap((item) => item.serviceIds))}`,
     `Fulfillment: ${fulfillmentSummary(order.fulfillment)}`,
     `Estimate: ${estimate}`,
     `Open it in the admin: /admin?order=${order.id}`,
@@ -324,9 +352,9 @@ function ownerEmailBody(order: Order): string {
  * they edited and retried. Best effort: the refusal stands even if the
  * send fails again, and a later retry tries once more.
  */
-async function sameSubmission(deps: SubmitOrderDeps, existing: Order, fingerprint: string | null, now: Date): Promise<Order> {
+async function sameSubmission(deps: SubmitOrderDeps, existing: Order, fingerprint: string | null, now: Date, catalog: Catalog): Promise<Order> {
   if (existing.submissionFingerprint !== null && existing.submissionFingerprint !== fingerprint) {
-    await sendConfirmationOnce(deps, existing, now).catch(() => undefined);
+    await sendConfirmationOnce(deps, existing, now, catalog).catch(() => undefined);
     throw new SubmissionConflictError(existing);
   }
   return existing;
@@ -364,12 +392,12 @@ async function resolveOwner(
 
 // Sent until it succeeds once: a retry after a failed send (the route
 // returned 500) sends it, and a retry after a successful one doesn't.
-async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Date): Promise<Order> {
+async function sendConfirmationOnce(deps: SubmitOrderDeps, order: Order, now: Date, catalog: Catalog): Promise<Order> {
   if (!order.confirmationEmailSentAt) {
     await deps.notifications.sendEmail({
       to: order.contactEmail,
       subject: `We received your booking (${orderNumber(order.number)})`,
-      body: confirmationEmailBody(order, deps.paymentInstructions, deps.ownerInbox),
+      body: confirmationEmailBody(order, deps.paymentInstructions, deps.ownerInbox, catalog),
     });
     await deps.orders.markConfirmationEmailSent(order.id, now);
     order.confirmationEmailSentAt = now;
@@ -392,7 +420,7 @@ function validateContact(contact: SubmitOrderInput["contact"], now: Date) {
   return { name, email, phone, birthMonth: contact.birthMonth, birthYear: contact.birthYear };
 }
 
-function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
+function validateFulfillment(fulfillment: Fulfillment, now: Date, settings: SiteSettings): Fulfillment {
   // "Today" and slot availability are the shop's (New York's), the same
   // rules the booking picker uses (pickup-window.ts, #75).
   const today = calendarDateInShopTime(now);
@@ -407,16 +435,22 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
   if (!isValidZip(address.zip)) throw new BookingValidationError("Enter a valid 5-digit zip code.");
 
   if (fulfillment.method === "PICKUP") {
+    if (!settings.allowLocalDropOff) throw new FulfillmentMethodUnavailableError(methodOffMessage("Local Drop-Off", "Mail-In", settings.allowMailIn));
     if (!(PICKUP_STATES as readonly string[]).includes(address.state)) {
       throw new BookingValidationError("Local Drop-Off is only available in NY, NJ and CT. Choose Mail-In instead.");
     }
     if (!isCalendarDate(fulfillment.date) || fulfillment.date < today) {
       throw new BookingValidationError("Choose a collection date from today onward.");
     }
-    if (!PICKUP_TIME_SLOTS.includes(fulfillment.slot)) {
-      throw new BookingValidationError(`Choose a collection time from ${PICKUP_WINDOW_LABEL}.`);
+    if (!daySlots(fulfillment.date, settings.hours).includes(fulfillment.slot)) {
+      const weekday = dayOfWeek(fulfillment.date);
+      throw new SlotOutsideHoursError(
+        windowLabel(settings.hours, weekday) === "Closed"
+          ? "We're closed for collections on that day. Choose another date."
+          : `Choose a collection time from ${windowLabel(settings.hours, weekday)}.`,
+      );
     }
-    if (!availablePickupSlots(fulfillment.date, now).includes(fulfillment.slot)) {
+    if (!availablePickupSlots(fulfillment.date, now, settings.hours).includes(fulfillment.slot)) {
       throw new BookingValidationError(
         `That collection time is no longer available. Same-day collections need at least ${PICKUP_LEAD_MINUTES / 60} hours' notice.`,
       );
@@ -424,6 +458,7 @@ function validateFulfillment(fulfillment: Fulfillment, now: Date): Fulfillment {
     return { method: "PICKUP", address, date: fulfillment.date, slot: fulfillment.slot };
   }
 
+  if (!settings.allowMailIn) throw new FulfillmentMethodUnavailableError(methodOffMessage("Mail-In", "Local Drop-Off", settings.allowLocalDropOff));
   if (!(US_STATES as readonly string[]).includes(address.state)) {
     throw new BookingValidationError("Choose a US state for your shipping address.");
   }
@@ -487,7 +522,7 @@ function validateMaterial(material: string | null): Material | null {
  * each get the Bundle's Services and an even share of its fixed price, with
  * the Suede Fee waived (CONTEXT.md: Bundle), plus their own Add-ons.
  */
-function pricePairs(input: SubmitOrderInput, now: Date): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
+function pricePairs(catalog: Catalog, input: SubmitOrderInput, now: Date): { material: Material | null; serviceIds: string[]; estimate: ItemEstimate }[] {
   const pairLabel = (i: number) => (input.bundleId === null ? "your pair" : `pair ${i + 1}`);
   const materials = input.items.map((item) => validateMaterial(item.material));
   input.items.forEach((item, i) => validatePhotoKeys(item.photoKeys, pairLabel(i)));
@@ -498,16 +533,18 @@ function pricePairs(input: SubmitOrderInput, now: Date): { material: Material | 
     if (input.bundleId === null) {
       if (input.items.length !== 1) throw new BookingValidationError(`Book one pair, or choose a Bundle for ${BUNDLE_PAIRS}.`);
       const { serviceIds } = input.items[0]!;
-      return [{ material: materials[0]!, serviceIds, estimate: estimateItem({ serviceIds, material: materials[0]! }) }];
+      assertServicesBookable(catalog, serviceIds);
+      return [{ material: materials[0]!, serviceIds, estimate: estimateItem(catalog, { serviceIds, material: materials[0]! }) }];
     }
     if (input.items.length !== BUNDLE_PAIRS) {
       throw new BookingValidationError(`A Bundle covers exactly ${BUNDLE_PAIRS} pairs.`);
     }
-    const bundle = catalogBundle(input.bundleId);
-    if (!isBundleAvailable(bundle, now)) throw new BookingValidationError("This promotion has ended.");
+    const bundle = assertBundleBookable(catalog, input.bundleId, now);
     // Add-ons only: estimateBundleItems refuses any other Service per pair.
     const addOnIdsByPair = input.items.map((item) => item.serviceIds);
-    return estimateBundleItems(input.bundleId, addOnIdsByPair).map((estimate, i) => ({
+    addOnIdsByPair.forEach((ids) => assertServicesBookable(catalog, ids));
+    assertServicesBookable(catalog, bundlePairServiceIds(bundle));
+    return estimateBundleItems(catalog, input.bundleId, addOnIdsByPair).map((estimate, i) => ({
       material: materials[i]!,
       serviceIds: [...bundlePairServiceIds(bundle), ...addOnIdsByPair[i]!], // each Item its own array, never the catalog's
       estimate,
@@ -531,7 +568,7 @@ function blankToNull(value: string | null): string | null {
   return trimmed ? trimmed : null;
 }
 
-function confirmationEmailBody(order: Order, payment: PaymentInstructions, inbox: string | null): string {
+function confirmationEmailBody(order: Order, payment: PaymentInstructions, inbox: string | null, catalog: Catalog): string {
   const reference = orderNumber(order.number);
   const estimate = `${order.estimateIsMinimum ? "from " : ""}${order.estimate.format()}`;
   const howToPay = payment.zelle
@@ -542,7 +579,7 @@ function confirmationEmailBody(order: Order, payment: PaymentInstructions, inbox
     order.fulfillment.method === "PICKUP"
       ? `Local Drop-Off: DJ will collect ${pairs} on ${order.fulfillment.date}, ${order.fulfillment.slot}, and drop them back off when they're done.`
       : `Mail-In: we'll email you where to ship ${pairs}, and ship them back when they're done.`;
-  const bundle = findBundle(order.bundleId);
+  const bundle = findBundle(catalog, order.bundleId);
   return [
     `Thanks, ${order.contactName}. Your booking ${reference} was received.`,
     ...(bundle

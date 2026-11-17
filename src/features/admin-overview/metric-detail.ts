@@ -4,6 +4,7 @@
 // so opening the dialog costs no second query.
 
 import { calendarDateInShopTime, type CalendarDate } from "@/features/orders/calendar-date";
+import type { RequiresQuote } from "@/features/orders/service-catalog";
 import { ITEM_STATUSES, liveEstimate, livePairs, orderDisplayStatus, type ItemStatus } from "@/features/orders/domain";
 import type { BookedOrder } from "@/features/orders/repositories/order-repository";
 import { Money } from "@/shared/money/money";
@@ -43,7 +44,7 @@ export interface MetricDetail {
 }
 
 /** Breaks the Orders booked in the range down by day and by status. `days` are the range's days, oldest first. */
-export function metricDetail(booked: BookedOrder[], days: CalendarDate[]): MetricDetail {
+export function metricDetail(requiresQuoteFor: RequiresQuote, booked: BookedOrder[], days: CalendarDate[]): MetricDetail {
   const perDay = new Map<CalendarDate, number>(days.map((date) => [date, 0]));
   const perStatus = new Map<ItemStatus, StatusShare>();
   let cancelledOrders = 0;
@@ -56,7 +57,7 @@ export function metricDetail(booked: BookedOrder[], days: CalendarDate[]): Metri
     const date = calendarDateInShopTime(order.createdAt);
     if (perDay.has(date)) perDay.set(date, perDay.get(date)! + 1);
 
-    const status = orderDisplayStatus(order.items);
+    const status = orderDisplayStatus(requiresQuoteFor, order.items);
     const share = perStatus.get(status) ?? { status, orders: 0, revenue: Money.zero() };
     share.orders += 1;
     share.revenue = share.revenue.add(liveEstimate(order));

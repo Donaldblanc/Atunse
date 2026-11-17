@@ -554,7 +554,9 @@ export class PrismaOrderRepository implements OrderRepository {
       if (count === 0) return { appointment, moves: [], stays: [], alreadyCompleted: true };
 
       const order = toDomainOrder(await tx.order.findUniqueOrThrow({ where: { id: row.orderId }, include: ORDER_INCLUDE }));
-      const plan = planVisitMoves(row.kind, order);
+      // Which Services need a Quote comes from the services table (ADR-0016), inside the same transaction.
+      const quoteServiceIds = new Set((await tx.service.findMany({ where: { category: { in: ["RESTORATION", "CUSTOM_WORK"] } }, select: { id: true } })).map((s) => s.id));
+      const plan = planVisitMoves((serviceIds) => serviceIds.some((id) => quoteServiceIds.has(id)), row.kind, order);
       const reason = row.kind === "COLLECTION" ? COLLECTION_COMPLETED : RETURN_COMPLETED;
       for (const move of plan.moves) {
         // Conditional on the status planned from, like transitionItemStatus.

@@ -23,6 +23,7 @@ function toService(row: {
   isMinimum: boolean;
   suedeFeeCents: number;
   minimumLabel: string | null;
+  alsoFrom: Prisma.JsonValue;
   internalNotes: string | null;
   active: boolean;
   position: number;
@@ -30,7 +31,11 @@ function toService(row: {
   createdAt: Date;
   updatedAt: Date;
 }): ServiceRecord {
-  return { ...row, category: row.category as ServiceRecord["category"] };
+  return {
+    ...row,
+    category: row.category as ServiceRecord["category"],
+    alsoFrom: Array.isArray(row.alsoFrom) ? (row.alsoFrom as ServiceRecord["alsoFrom"]) : [],
+  };
 }
 
 function toBundle(row: {
@@ -38,6 +43,8 @@ function toBundle(row: {
   name: string;
   priceCents: number;
   perks: string[];
+  pairServiceIds: string[];
+  endsAt: Date | null;
   internalNotes: string | null;
   active: boolean;
   position: number;
@@ -120,6 +127,7 @@ export class PrismaCatalogRepository implements CatalogRepository {
           name: input.name,
           priceCents: input.priceCents,
           perks: input.perks,
+          pairServiceIds: input.pairServiceIds ?? ["premium"],
           internalNotes: input.internalNotes ?? null,
           position: input.position,
         },

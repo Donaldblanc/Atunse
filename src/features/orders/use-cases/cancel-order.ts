@@ -1,3 +1,4 @@
+import type { Catalog } from "../service-catalog";
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
@@ -25,7 +26,7 @@ export class OrderNotCancellableError extends Error {
  * nothing and reports "already-cancelled".
  */
 export async function cancelOrder(
-  deps: { orders: OrderRepository; notifications: NotificationService },
+  deps: { orders: OrderRepository; notifications: NotificationService; catalog: { load(): Promise<Catalog> } },
   actingUser: ActingUser,
   input: { orderId: string; idempotencyKey: string },
 ): Promise<"cancelled" | "already-cancelled"> {
@@ -55,7 +56,7 @@ export async function cancelOrder(
 }
 
 /** One email for the whole cancellation, after the writes. A failed send is logged, not thrown: the cancel already happened. */
-async function emailCustomer(deps: { orders: OrderRepository; notifications: NotificationService }, orderId: string, lastItemId: string): Promise<void> {
+async function emailCustomer(deps: { orders: OrderRepository; notifications: NotificationService; catalog: { load(): Promise<Catalog> } }, orderId: string, lastItemId: string): Promise<void> {
   try {
     const order = await deps.orders.findById(orderId);
     const item = order?.items.find((candidate) => candidate.id === lastItemId);

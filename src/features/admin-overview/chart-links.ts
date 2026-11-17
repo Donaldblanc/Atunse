@@ -1,5 +1,5 @@
 import { calendarDateToUtcMidnight, type CalendarDate } from "@/features/orders/calendar-date";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import { serviceName, type Catalog } from "@/features/orders/service-catalog";
 import { overviewHref, type OverviewSelection } from "./overview-range";
 
 const dayLabel = new Intl.DateTimeFormat("en-US", {
@@ -30,8 +30,8 @@ export function revenueTrendTitleHref(selection: OverviewSelection): string {
 }
 
 /** What the All orders dialog says is filtered, or null when neither the day nor the Service is. `rangeDates` is e.g. "Sep 28 – Oct 4, 2026". */
-export function ordersFilterLabel(filter: { day: CalendarDate | null; serviceId: string | null }, rangeDates: string): string | null {
-  const service = filter.serviceId ? SERVICE_CATALOG.find((s) => s.id === filter.serviceId)?.name : undefined;
+export function ordersFilterLabel(catalog: Catalog, filter: { day: CalendarDate | null; serviceId: string | null }, rangeDates: string): string | null {
+  const service = filter.serviceId ? serviceName(catalog, filter.serviceId) : undefined;
   if (filter.day) return service ? `${service} · Booked ${formatChartDay(filter.day)}` : `Booked ${formatChartDay(filter.day)}`;
   return service ? `${service} · ${rangeDates}` : null;
 }

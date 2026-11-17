@@ -8,7 +8,8 @@ import { InMemoryAccounts, InMemoryEmailTakenError } from "@/features/accounts/r
 import { Money } from "@/shared/money/money";
 import { AUTO_APPROVED_SET_PRICE, COLLECTION_COMPLETED, completionHold, liveEstimate, livePairs, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, type Item, type ItemStatus, type Order, type Payment, type PaymentMethod } from "../domain";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
-import { BUNDLE_CATALOG } from "../service-catalog";
+import { DEFAULT_CATALOG } from "../default-catalog";
+import { quoteCheck } from "../service-catalog";
 import {
   BundleNotFoundError,
   CompletionHeldError,
@@ -71,8 +72,8 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (new Set(uploadKeys).size !== uploadKeys.length || uploadKeys.some((key) => this.uploadKeysInUse.has(key))) {
       throw new PhotoKeyInUseError();
     }
-    // The bundles table is seeded from BUNDLE_CATALOG; its foreign key refuses any other id.
-    if (input.bundleId && !BUNDLE_CATALOG.some((bundle) => bundle.id === input.bundleId)) {
+    // The bundles table's foreign key refuses any id it lacks; the default catalog stands in for it.
+    if (input.bundleId && !DEFAULT_CATALOG.bundles.some((bundle) => bundle.id === input.bundleId)) {
       throw new BundleNotFoundError(input.bundleId);
     }
 
@@ -359,7 +360,7 @@ export class InMemoryOrderRepository implements OrderRepository {
     if (appointment.status === "COMPLETED") return { appointment, moves: [], stays: [], alreadyCompleted: true };
     appointment.status = "COMPLETED";
 
-    const plan = planVisitMoves(appointment.kind, order);
+    const plan = planVisitMoves(quoteCheck(DEFAULT_CATALOG), appointment.kind, order);
     const reason = appointment.kind === "COLLECTION" ? COLLECTION_COMPLETED : RETURN_COMPLETED;
     for (const move of plan.moves) {
       order.items.find((item) => item.id === move.itemId)!.status = move.to;

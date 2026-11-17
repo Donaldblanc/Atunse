@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
@@ -12,7 +13,7 @@ vi.mock("@/features/accounts/acting-user", () => ({ actingUserFromCookies: async
 
 const orders = new InMemoryOrderRepository();
 vi.mock("@/features/admin-overview/find-orders-deps", () => ({
-  buildFindOrdersDeps: () => ({ orderSearch: new InMemoryOrderSearchRepository(orders) }),
+  buildFindOrdersDeps: () => ({ orderSearch: new InMemoryOrderSearchRepository(orders), catalog: { load: async () => DEFAULT_CATALOG } }),
 }));
 
 const { default: AdminOrdersPage } = await import("./page");

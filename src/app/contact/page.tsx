@@ -7,6 +7,8 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { FaqAccordion } from "@/features/landing/faq-accordion";
 import { getGalleryImageUrl } from "@/features/landing/gallery";
+import { hasContactDetails, loadBusinessProfile } from "@/features/landing/business-profile";
+import { loadSiteSettings } from "@/features/settings/site-settings";
 import { ContactSection } from "@/features/contact/contact-section";
 import { CONTACT_FAQ_IMAGE, CONTACT_FAQS, CONTACT_HERO_IMAGE } from "@/features/contact/contact-content";
 
@@ -16,8 +18,12 @@ export const metadata = {
 
 // /contact?topic=booking (or general, custom, other) opens the form on
 // that topic, for links from emails and other pages.
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
+
 export default async function ContactPage({ searchParams }: { searchParams: Promise<{ topic?: string | string[] }> }) {
   const { topic } = await searchParams;
+  const profile = await loadBusinessProfile(loadSiteSettings);
 
   return (
     <div className="landing" id="landing-root">
@@ -38,6 +44,23 @@ export default async function ContactPage({ searchParams }: { searchParams: Prom
               Have a question about a restoration, your booking, or a custom request? Send us a message and we&rsquo;ll get back to you
               as soon as possible.
             </p>
+            {hasContactDetails(profile) && (
+              <p className="landing-lede contact-hero-profile">
+                {[profile.name, profile.location].filter(Boolean).join(" · ")}
+                {profile.email && (
+                  <>
+                    {" · "}
+                    <a href={`mailto:${profile.email}`}>{profile.email}</a>
+                  </>
+                )}
+                {profile.phone && (
+                  <>
+                    {" · "}
+                    <a href={`tel:${profile.phone.replace(/[^\d+]/g, "")}`}>{profile.phone}</a>
+                  </>
+                )}
+              </p>
+            )}
           </div>
           <div className="landing-about-cta-tagline contact-hero-tagline" aria-hidden="true">
             <span className="rule" />

@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { addDays, isCalendarDate, shopMidnight, type CalendarDate } from "@/features/orders/calendar-date";
-import { SERVICE_CATALOG } from "@/features/orders/service-catalog";
+import type { CatalogSource } from "@/features/orders/service-catalog";
 import { ITEM_STATUSES, orderNumber, type ItemStatus } from "@/features/orders/domain";
 import type { OrderSearchRepository, OrderSearchRow } from "@/features/orders/repositories/order-search-repository";
 import type { Money } from "@/shared/money/money";
@@ -27,6 +27,9 @@ const querySchema = z.string().trim().max(MAX_QUERY_LENGTH);
 const statusSchema = z.enum(ITEM_STATUSES);
 const pageSchema = z.coerce.number().int().min(1).max(MAX_PAGE);
 
+/** A Service id (a slug). Not checked against the catalog: an inactive Service still filters past Orders. */
+const SERVICE_ID = /^[a-z0-9-]{1,40}$/;
+
 const single = (value: string | string[] | undefined) => (typeof value === "string" ? value : undefined);
 
 /** Each param is checked on its own; one that's missing or invalid falls back to its default (no text, any status, page 1, no day, no Service). */
@@ -47,7 +50,7 @@ export function parseOrdersQuery(params: {
     status: status.success ? status.data : null,
     page: page.success ? page.data : 1,
     day: day !== undefined && isCalendarDate(day) ? day : null,
-    serviceId: service !== undefined && SERVICE_CATALOG.some((s) => s.id === service) ? service : null,
+    serviceId: service !== undefined && SERVICE_ID.test(service) ? service : null,
   };
 }
 
@@ -85,13 +88,14 @@ export interface OrderList {
 
 /** The admin All orders dialog's list: admin-only (ADR-0012), before anything is read. */
 export async function searchOrders(
-  deps: { orderSearch: OrderSearchRepository },
+  deps: { orderSearch: OrderSearchRepository; catalog: CatalogSource },
   actingUser: ActingUser,
   query: OrdersQuery,
   /** The Overview range's [start, end): what a Service filter is counted within. A day filter replaces it. */
   range: { start: Date; end: Date } | null = null,
 ): Promise<OrderList> {
   requireRole(actingUser, "ADMIN");
+  const catalog = await deps.catalog.load();
   const window = query.day
     ? {
         start: shopMidnight(query.day),
@@ -131,7 +135,7 @@ export async function searchOrders(
     reference: orderNumber(order.number),
     customerName: order.contactName,
     bookedAt: order.bookedAt,
-    ...orderRowFigures(order),
+    ...orderRowFigures(catalog, order),
     deposit: order.deposit,
   }));
   return { query, rows, total: found.total, page, pageCount };

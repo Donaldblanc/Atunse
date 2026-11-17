@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const deps = buildOrderUseCaseDeps();
   try {
     const order = await submitOrder(deps, actingUser, parsed.value);
-    return NextResponse.json(toSubmitOrderResponse(order, deps.paymentInstructions), { status: 201 });
+    return NextResponse.json(toSubmitOrderResponse(order, deps.paymentInstructions, await deps.catalog.load()), { status: 201 });
   } catch (err) {
     if (err instanceof PolicyNotAcceptedError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
           error: err.message,
           code: "SUBMISSION_CONFLICT",
           reference: err.reference,
-          existing: toSubmitOrderResponse(err.existing, deps.paymentInstructions),
+          existing: toSubmitOrderResponse(err.existing, deps.paymentInstructions, await deps.catalog.load()),
         },
         { status: 409 },
       );

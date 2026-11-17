@@ -1,7 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { BEFORE_AFTER_IMAGES } from "./gallery";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
+import { beforeAfterImages } from "./gallery";
+
+const BEFORE_AFTER_IMAGES = beforeAfterImages(DEFAULT_CATALOG);
 
 const LANDING_DIR = path.join(process.cwd(), "public/images/landing");
 
@@ -49,5 +52,13 @@ describe("before/after gallery", () => {
     expect(lines["Air Jordan 5"]).toBe("Oxidation Restoration · Sole from $40+");
     expect(lines['Air Jordan 3 "Black Cement"']).toBe("Oxidation Restoration · From $25+");
     expect(lines['Air Jordan 4 "Military Black"']).toBe("Lace Replacement · $15");
+  });
+
+  it("shows no price line for a Service that is switched off or gone", () => {
+    const catalog = { ...DEFAULT_CATALOG, services: DEFAULT_CATALOG.services.filter((s) => s.id !== "laces").map((s) => (s.id === "premium" ? { ...s, active: false } : s)) };
+    const images = beforeAfterImages(catalog);
+    expect(images.find((img) => img.caption === 'Air Jordan 4 "Military Black"')?.serviceLine).toBe("");
+    expect(images.find((img) => img.caption === "Bottega Veneta Orbit")?.serviceLine).toBe("");
+    expect(images.find((img) => img.caption === "Converse Weapon")?.serviceLine).toBe("Standard Clean · $30");
   });
 });

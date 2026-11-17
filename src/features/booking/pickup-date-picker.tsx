@@ -4,7 +4,9 @@ import { ArrowRight, Calendar, ChevronLeft, ChevronRight, Clock, X } from "lucid
 import { useState, useId } from "react";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
 import { useDialog } from "@/features/landing/use-dialog";
-import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES, PICKUP_WINDOW_LABEL } from "@/features/orders/pickup-window";
+import { availablePickupSlots, isBookableDay, PICKUP_LEAD_MINUTES, windowLabel, windowSummary } from "@/features/orders/pickup-window";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
+import { useSiteData } from "./site-data-context";
 
 export type PickupSelection = { date: Date; time: string };
 export type PickupPickerMode = "datetime" | "date";
@@ -35,7 +37,7 @@ type CalendarCell = { day: number; date: Date | null; outside: boolean; disabled
 // Which days and slots are open is the shop's rule (pickup-window.ts, on
 // New York time), the same one the server enforces (#75), not the
 // browser's local clock.
-function buildCalendarCells(year: number, month: number, mode: PickupPickerMode, now: Date) {
+function buildCalendarCells(year: number, month: number, mode: PickupPickerMode, now: Date, hours: OperatingHoursRow[]) {
   const method = mode === "datetime" ? "PICKUP" : "MAIL_IN";
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -47,7 +49,7 @@ function buildCalendarCells(year: number, month: number, mode: PickupPickerMode,
   }
   for (let d = 1; d <= daysInMonth; d++) {
     const date = new Date(year, month, d);
-    cells.push({ day: d, date, outside: false, disabled: !isBookableDay(calendarDateInLocalTime(date), method, now) });
+    cells.push({ day: d, date, outside: false, disabled: !isBookableDay(calendarDateInLocalTime(date), method, now, hours) });
   }
   let nextMonthDay = 1;
   while (cells.length % 7 !== 0) {
@@ -67,6 +69,7 @@ export function PickupDatePicker({
   mode?: PickupPickerMode;
   label?: string;
 }) {
+  const { hours } = useSiteData().settings;
   const [open, setOpen] = useState(false);
   const dialogRef = useDialog<HTMLDivElement>(open, () => setOpen(false));
   const headingId = useId();
@@ -101,8 +104,9 @@ export function PickupDatePicker({
     setViewYear(year);
   }
 
-  const cells = buildCalendarCells(viewYear, viewMonth, mode, today);
-  const timeSlots = pendingDate ? availablePickupSlots(calendarDateInLocalTime(pendingDate), today) : [];
+  const cells = buildCalendarCells(viewYear, viewMonth, mode, today, hours);
+  const timeSlots = pendingDate ? availablePickupSlots(calendarDateInLocalTime(pendingDate), today, hours) : [];
+  const summary = windowSummary(hours);
   const pendingTimeAvailable = pendingTime !== null && timeSlots.includes(pendingTime);
 
   return (
@@ -174,9 +178,15 @@ export function PickupDatePicker({
                   <div className="booking-page-info-box">
                     <Clock size={16} aria-hidden="true" />
                     <span>
-                      Collection times are available from
-                      <br />
-                      <strong>{PICKUP_WINDOW_LABEL}.</strong>
+                      {summary ? (
+                        <>
+                          Collection times are available from
+                          <br />
+                          <strong>{summary}.</strong>
+                        </>
+                      ) : (
+                        "Collection hours vary by day. Pick a date to see its times."
+                      )}
                     </span>
                   </div>
                 )}
@@ -216,7 +226,7 @@ export function PickupDatePicker({
                   </button>
                 </div>
                 <p className="booking-page-time-caption">
-                  Collection times are between {PICKUP_WINDOW_LABEL} (New York time). Same-day collections need at
+                  Collection times are between {pendingDate ? windowLabel(hours, pendingDate.getDay()) : summary} (New York time). Same-day collections need at
                   least {PICKUP_LEAD_MINUTES / 60} hours&rsquo; notice.
                 </p>
 

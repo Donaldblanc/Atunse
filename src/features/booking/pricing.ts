@@ -4,8 +4,8 @@ import {
   catalogService,
   RUSH_FEE_CENTS,
   rushFeeNote,
-  SUEDE_FEE_CENTS,
   suedeFeeNote,
+  type Catalog,
 } from "@/features/orders/service-catalog";
 
 /** One priced thing in the summary: a catalog Service, or a Bundle. */
@@ -13,7 +13,8 @@ export type PricedLine = {
   name: string;
   baseCents: number;
   isMinimum: boolean;
-  suedeFee: boolean;
+  /** The Suede Fee this line carries on a Suede pair; 0 = none. */
+  suedeFeeCents: number;
   /** Price notes other than the Suede fee, e.g. "Sole from $40+". */
   notes: string[];
 };
@@ -28,13 +29,13 @@ export type ComputedPricing = {
   priceNote: string | undefined;
 };
 
-export function pricedLineForService(serviceId: string): PricedLine {
-  const service = catalogService(serviceId);
+export function pricedLineForService(catalog: Catalog, serviceId: string): PricedLine {
+  const service = catalogService(catalog, serviceId);
   return {
     name: service.name,
     baseCents: service.baseCents,
     isMinimum: service.isMinimum,
-    suedeFee: service.suedeFee,
+    suedeFeeCents: service.suedeFeeCents,
     notes: alsoFromNotes(service),
   };
 }
@@ -43,10 +44,10 @@ export function pricedLineForService(serviceId: string): PricedLine {
  * The Add-ons chosen across the booking's pairs, one line each, labelled
  * with their pair when there's more than one (e.g. "Lace Replacement · Pair 2").
  */
-export function addOnLines(addOnIdsByPair: string[][]): (PricedLine & { key: string })[] {
+export function addOnLines(catalog: Catalog, addOnIdsByPair: string[][]): (PricedLine & { key: string })[] {
   return addOnIdsByPair.flatMap((addOnIds, pair) =>
     addOnIds.map((id) => {
-      const line = pricedLineForService(id);
+      const line = pricedLineForService(catalog, id);
       const label = addOnIdsByPair.length > 1 ? `${line.name} · Pair ${pair + 1}` : line.name;
       return { ...line, name: label, key: `${pair}-${id}` };
     }),
@@ -56,9 +57,9 @@ export function addOnLines(addOnIdsByPair: string[][]): (PricedLine & { key: str
 // Single-pair services are additive — a customer can select Standard
 // Clean, Oxidation Restoration, and Painting all on the same pair — so
 // price/name/note are computed over the whole selected set, not one
-// service. Everything comes from SERVICE_CATALOG in integer cents, with
-// the same rules as the server's estimate: the Suede fee is charged once,
-// only when a suedeFee service is selected and the material is Suede;
+// service. Everything comes from the catalog in integer cents, with
+// the same rules as the server's estimate: the Suede fee is the largest fee
+// among the selected services, charged once, only when the material is Suede;
 // Rush is a flat fee on top; any minimum ("from $25+") price makes the
 // total a minimum too. `addOns` count toward the total but not the name,
 // which stays the main selection (the summary lists Add-ons on their own).
@@ -71,13 +72,14 @@ export function computeMultiServicePricing(
   if (mainLines.length === 0) return { name: "No service selected", totalCents: 0, isMinimum: false, price: "$0", priceNote: undefined };
   const lines = [...mainLines, ...addOns];
 
-  const hasSuedeFee = lines.some((line) => line.suedeFee);
+  const suedeFeeCents = Math.max(0, ...lines.map((line) => line.suedeFeeCents));
+  const hasSuedeFee = suedeFeeCents > 0;
   const suedeApplies = hasSuedeFee && material === "Suede";
   const totalCents =
-    lines.reduce((sum, line) => sum + line.baseCents, 0) + (suedeApplies ? SUEDE_FEE_CENTS : 0) + (rush ? RUSH_FEE_CENTS : 0);
+    lines.reduce((sum, line) => sum + line.baseCents, 0) + (suedeApplies ? suedeFeeCents : 0) + (rush ? RUSH_FEE_CENTS : 0);
   const notes = [
     ...lines.flatMap((line) => line.notes),
-    hasSuedeFee ? suedeFeeNote(suedeApplies) : null,
+    hasSuedeFee ? suedeFeeNote(suedeFeeCents, suedeApplies) : null,
     rush ? rushFeeNote() : null,
   ].filter((n): n is string => Boolean(n));
 

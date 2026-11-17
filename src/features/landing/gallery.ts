@@ -1,4 +1,4 @@
-import { catalogService, formatPrice } from "@/features/orders/service-catalog";
+import { findService, formatPrice, type Catalog } from "@/features/orders/service-catalog";
 
 // Landing-page gallery images. Each entry is a storage KEY, not a URL —
 // resolved to an actual URL by getGalleryImageUrl below, the same
@@ -47,30 +47,33 @@ export type BeforeAfterImage =
 // restoration (see public/images/landing/README.txt for how these were cut).
 // serviceLine promotes which service produced the result, with price, so
 // the section informs pricing instead of just showing photos. The price
-// comes from SERVICE_CATALOG, like every other price on the site.
-function serviceLine(serviceId: string, part?: string): string {
-  const service = catalogService(serviceId);
+// comes from the catalog, like every other price on the site; a Service
+// that is missing or switched off shows no line.
+function serviceLine(catalog: Catalog, serviceId: string, part?: string): string {
+  const service = findService(catalog, serviceId);
+  if (!service || !service.active) return "";
   // A priced part of the Service (e.g. Oxidation's "Sole"), when the photo
   // shows that part rather than the Service's headline price.
   const partPrice = part ? service.alsoFrom?.find((p) => p.label === part) : undefined;
-  if (part && !partPrice) throw new Error(`${serviceId} has no "${part}" price in SERVICE_CATALOG`);
   if (partPrice) return `${service.name} · ${part} from ${formatPrice(partPrice.cents, true)}`;
   const price = formatPrice(service.baseCents, service.isMinimum);
   return `${service.name} · ${service.isMinimum ? `From ${price}` : price}`;
 }
 
-export const BEFORE_AFTER_IMAGES: BeforeAfterImage[] = [
-  { beforeKey: "converse-weapon-before.jpg", afterKey: "converse-weapon-after.jpg", caption: "Converse Weapon", serviceLine: serviceLine("standard") },
-  { beforeKey: "travis-scott-aj1-low-before.jpg", afterKey: "travis-scott-aj1-low-after.jpg", caption: "Travis Scott x Air Jordan 1 Low", serviceLine: serviceLine("premium") },
-  { beforeKey: "jordan4-offwhite-before.jpg", afterKey: "jordan4-offwhite-after.jpg", caption: 'Air Jordan 4 "Off-White"', serviceLine: serviceLine("premium") },
-  { beforeKey: "jordan11-concord-before.jpg", afterKey: "jordan11-concord-after.jpg", caption: 'Air Jordan 11 "Concord"', serviceLine: serviceLine("standard") },
-  { beforeKey: "bottega-veneta-orbit-before.jpg", afterKey: "bottega-veneta-orbit-after.jpg", caption: "Bottega Veneta Orbit", serviceLine: serviceLine("premium") },
-  { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"', serviceLine: serviceLine("oxidation") },
-  { beforeKey: "jordan5-sole-before.jpg", afterKey: "jordan5-sole-after.jpg", caption: "Air Jordan 5", serviceLine: serviceLine("oxidation", "Sole") },
+export function beforeAfterImages(catalog: Catalog): BeforeAfterImage[] {
+  return [
+  { beforeKey: "converse-weapon-before.jpg", afterKey: "converse-weapon-after.jpg", caption: "Converse Weapon", serviceLine: serviceLine(catalog, "standard") },
+  { beforeKey: "travis-scott-aj1-low-before.jpg", afterKey: "travis-scott-aj1-low-after.jpg", caption: "Travis Scott x Air Jordan 1 Low", serviceLine: serviceLine(catalog, "premium") },
+  { beforeKey: "jordan4-offwhite-before.jpg", afterKey: "jordan4-offwhite-after.jpg", caption: 'Air Jordan 4 "Off-White"', serviceLine: serviceLine(catalog, "premium") },
+  { beforeKey: "jordan11-concord-before.jpg", afterKey: "jordan11-concord-after.jpg", caption: 'Air Jordan 11 "Concord"', serviceLine: serviceLine(catalog, "standard") },
+  { beforeKey: "bottega-veneta-orbit-before.jpg", afterKey: "bottega-veneta-orbit-after.jpg", caption: "Bottega Veneta Orbit", serviceLine: serviceLine(catalog, "premium") },
+  { beforeKey: "jordan3-blackcement-before.jpg", afterKey: "jordan3-blackcement-after.jpg", caption: 'Air Jordan 3 "Black Cement"', serviceLine: serviceLine(catalog, "oxidation") },
+  { beforeKey: "jordan5-sole-before.jpg", afterKey: "jordan5-sole-after.jpg", caption: "Air Jordan 5", serviceLine: serviceLine(catalog, "oxidation", "Sole") },
   // The one single-image card: the composite shows before, the lace-swap
   // steps and after together, so it isn't split into halves.
-  { imageKey: "jordan4-militaryblack-laces.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: serviceLine("laces") },
-];
+  { imageKey: "jordan4-militaryblack-laces.jpg", caption: 'Air Jordan 4 "Military Black"', serviceLine: serviceLine(catalog, "laces") },
+  ];
+}
 
 export function getGalleryImageUrl(key: string): string {
   const base = process.env.NEXT_PUBLIC_ASSETS_BASE_URL;

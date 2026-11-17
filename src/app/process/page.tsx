@@ -12,6 +12,9 @@ export const metadata = {
   title: "Our Process — Atunṣe",
 };
 
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
+
 export default function ProcessPage() {
   return (
     <div className="landing" id="landing-root">

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Money } from "@/shared/money/money";
+import { DEFAULT_CATALOG as C } from "./default-catalog";
 import { adminStatusMoves, balanceDue, displayStatus, orderDisplayStatus, orderRequiresQuote, statusPipeline, ITEM_STATUSES, canTransition, isStepBack, liveEstimate, orderRollupStatus, planBalance, planVisitMoves, type ItemStatus, type Payment } from "./domain";
-import { RUSH_FEE_CENTS } from "./service-catalog";
+import { quoteCheck, RUSH_FEE_CENTS } from "./service-catalog";
 
 describe("Item status pipeline", () => {
   it("allows the next linear step", () => {
@@ -39,15 +40,17 @@ const pay = (kind: Payment["kind"], status: Payment["status"], amount = 1000) =>
 const quoted = (status: ItemStatus, price: number | null = 5000) => ({ status, price: price === null ? null : cents(price) });
 const orderOf = (payments: ReturnType<typeof pay>[], items: ReturnType<typeof quoted>[] = [quoted("IN_PROGRESS")]) => ({ rush: false, items, payments });
 
+const quote = quoteCheck(C);
+
 describe("adminStatusMoves", () => {
   const deposit = (status: "PENDING" | "RECEIVED") => orderOf([pay("DEPOSIT", status)]);
 
   it("offers every other status, forward, back or skipping, with nothing held", () => {
-    expect(adminStatusMoves({ status: "IN_PROGRESS", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({
+    expect(adminStatusMoves(C, { status: "IN_PROGRESS", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({
       moves: ITEM_STATUSES.filter((status) => status !== "IN_PROGRESS"),
       held: null,
     });
-    expect(adminStatusMoves({ status: "UNDER_REVIEW", serviceIds: ["reglue"] }, deposit("RECEIVED")).moves).toEqual(expect.arrayContaining(["QUOTE_SENT", "APPROVED", "COMPLETED"]));
+    expect(adminStatusMoves(C, { status: "UNDER_REVIEW", serviceIds: ["reglue"] }, deposit("RECEIVED")).moves).toEqual(expect.arrayContaining(["QUOTE_SENT", "APPROVED", "COMPLETED"]));
   });
 
   it("tells a step back from progress", () => {
@@ -57,16 +60,16 @@ describe("adminStatusMoves", () => {
   });
 
   it("holds nothing for a pending Deposit or an unpaid Balance", () => {
-    expect(adminStatusMoves({ status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING"))).toMatchObject({ held: null });
-    expect(adminStatusMoves({ status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING")).moves).toContain("AWAITING_SNEAKERS");
+    expect(adminStatusMoves(C, { status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING"))).toMatchObject({ held: null });
+    expect(adminStatusMoves(C, { status: "APPROVED", serviceIds: ["reglue"] }, deposit("PENDING")).moves).toContain("AWAITING_SNEAKERS");
     const owing = orderOf([pay("DEPOSIT", "RECEIVED"), pay("BALANCE", "PENDING", 4000)], [quoted("READY_FOR_PICKUP_SHIPPING")]);
-    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing)).toMatchObject({ held: null });
-    expect(adminStatusMoves({ status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing).moves).toContain("COMPLETED");
+    expect(adminStatusMoves(C, { status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing)).toMatchObject({ held: null });
+    expect(adminStatusMoves(C, { status: "READY_FOR_PICKUP_SHIPPING", serviceIds: ["reglue"] }, owing).moves).toContain("COMPLETED");
   });
 
   it("offers nothing from a finished pair", () => {
-    expect(adminStatusMoves({ status: "COMPLETED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
-    expect(adminStatusMoves({ status: "CANCELLED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+    expect(adminStatusMoves(C, { status: "COMPLETED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
+    expect(adminStatusMoves(C, { status: "CANCELLED", serviceIds: ["reglue"] }, deposit("RECEIVED"))).toEqual({ moves: [], held: null });
   });
 });
 
@@ -74,14 +77,14 @@ describe("adminStatusMoves for a pair that needs no Quote (ADR-0017)", () => {
   const QUOTE_STEPS: ItemStatus[] = ["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT", "APPROVED"];
 
   it.each(QUOTE_STEPS)("never offers a quote-step status from %s, but can go on or cancel", (status) => {
-    const { moves } = adminStatusMoves({ status, serviceIds: ["standard", "laces"] });
+    const { moves } = adminStatusMoves(C, { status, serviceIds: ["standard", "laces"] });
     for (const hidden of QUOTE_STEPS) expect(moves).not.toContain(hidden);
     expect(moves).toEqual(expect.arrayContaining(["AWAITING_SNEAKERS", "IN_PROGRESS", "COMPLETED", "CANCELLED"]));
   });
 
   it("still offers the quote steps to a Restoration or Custom Work pair", () => {
-    expect(adminStatusMoves({ status: "REQUEST_SUBMITTED", serviceIds: ["standard", "reglue"] }).moves).toEqual(expect.arrayContaining(["UNDER_REVIEW", "QUOTE_SENT", "APPROVED"]));
-    expect(adminStatusMoves({ status: "REQUEST_SUBMITTED", serviceIds: ["painting"] }).moves).toContain("APPROVED");
+    expect(adminStatusMoves(C, { status: "REQUEST_SUBMITTED", serviceIds: ["standard", "reglue"] }).moves).toEqual(expect.arrayContaining(["UNDER_REVIEW", "QUOTE_SENT", "APPROVED"]));
+    expect(adminStatusMoves(C, { status: "REQUEST_SUBMITTED", serviceIds: ["painting"] }).moves).toContain("APPROVED");
   });
 });
 
@@ -103,13 +106,13 @@ describe("displayStatus and statusPipeline", () => {
   it("uses the full pipeline for an Order when any live pair needs a Quote", () => {
     const clean = { status: "APPROVED" as const, serviceIds: ["standard"] };
     const reglue = { status: "UNDER_REVIEW" as const, serviceIds: ["reglue"] };
-    expect(orderRequiresQuote({ items: [clean] })).toBe(false);
-    expect(orderRequiresQuote({ items: [clean, reglue] })).toBe(true);
-    expect(orderRequiresQuote({ items: [clean, { ...reglue, status: "CANCELLED" }] })).toBe(false);
-    expect(orderDisplayStatus([clean])).toBe("REQUEST_SUBMITTED");
-    expect(orderDisplayStatus([{ ...clean, status: "QUOTE_SENT" }, { ...clean, status: "IN_PROGRESS" }])).toBe("REQUEST_SUBMITTED");
-    expect(orderDisplayStatus([clean, reglue])).toBe("UNDER_REVIEW");
-    expect(orderDisplayStatus([{ ...clean, status: "CANCELLED" }])).toBe("CANCELLED");
+    expect(orderRequiresQuote(quote, { items: [clean] })).toBe(false);
+    expect(orderRequiresQuote(quote, { items: [clean, reglue] })).toBe(true);
+    expect(orderRequiresQuote(quote, { items: [clean, { ...reglue, status: "CANCELLED" }] })).toBe(false);
+    expect(orderDisplayStatus(quote, [clean])).toBe("REQUEST_SUBMITTED");
+    expect(orderDisplayStatus(quote, [{ ...clean, status: "QUOTE_SENT" }, { ...clean, status: "IN_PROGRESS" }])).toBe("REQUEST_SUBMITTED");
+    expect(orderDisplayStatus(quote, [clean, reglue])).toBe("UNDER_REVIEW");
+    expect(orderDisplayStatus(quote, [{ ...clean, status: "CANCELLED" }])).toBe("CANCELLED");
   });
 });
 
@@ -184,7 +187,7 @@ describe("planVisitMoves", () => {
   const visitOrder = (payments: ReturnType<typeof pay>[], items: (ReturnType<typeof item> & { serviceIds?: string[] })[]) => ({ rush: false, payments, items });
 
   it("a Collection names a cleaning-only pair that hasn't reached Awaiting Sneakers as Request Submitted, not 'Not approved yet'", () => {
-    const plan = planVisitMoves("COLLECTION", visitOrder([received], [{ ...item("a", "QUOTE_SENT"), serviceIds: ["standard"] }, { ...item("b", "QUOTE_SENT"), serviceIds: ["reglue"] }]));
+    const plan = planVisitMoves(quote, "COLLECTION", visitOrder([received], [{ ...item("a", "QUOTE_SENT"), serviceIds: ["standard"] }, { ...item("b", "QUOTE_SENT"), serviceIds: ["reglue"] }]));
     expect(plan.stays).toEqual([
       { itemId: "a", status: "REQUEST_SUBMITTED", reason: "Not moved to Awaiting Sneakers yet." },
       { itemId: "b", status: "QUOTE_SENT", reason: "Not approved yet." },
@@ -192,7 +195,7 @@ describe("planVisitMoves", () => {
   });
 
   it("a Collection moves Awaiting Sneakers pairs, and names those that haven't got there", () => {
-    const plan = planVisitMoves("COLLECTION", visitOrder([received], [item("a", "AWAITING_SNEAKERS"), item("b", "UNDER_REVIEW"), item("c", "APPROVED"), item("d", "IN_PROGRESS"), item("e", "CANCELLED")]));
+    const plan = planVisitMoves(quote, "COLLECTION", visitOrder([received], [item("a", "AWAITING_SNEAKERS"), item("b", "UNDER_REVIEW"), item("c", "APPROVED"), item("d", "IN_PROGRESS"), item("e", "CANCELLED")]));
     expect(plan.moves).toEqual([{ itemId: "a", from: "AWAITING_SNEAKERS", to: "IN_PROGRESS" }]);
     expect(plan.stays).toEqual([
       { itemId: "b", status: "UNDER_REVIEW", reason: "Not approved yet." },
@@ -201,22 +204,22 @@ describe("planVisitMoves", () => {
   });
 
   it("an approved pair whose Deposit is still pending stays, with the Deposit as the reason", () => {
-    const plan = planVisitMoves("COLLECTION", visitOrder([pay("DEPOSIT", "PENDING")], [item("c", "APPROVED")]));
+    const plan = planVisitMoves(quote, "COLLECTION", visitOrder([pay("DEPOSIT", "PENDING")], [item("c", "APPROVED")]));
     expect(plan.moves).toEqual([]);
     expect(plan.stays[0]!.reason).toMatch(/deposit/);
   });
 
   it("a Return moves Ready pairs to Completed once the Balance is received, and holds them while it is pending", () => {
     const ready = item("a", "READY_FOR_PICKUP_SHIPPING");
-    expect(planVisitMoves("RETURN", visitOrder([received, pay("BALANCE", "PENDING", 4000)], [ready])).stays[0]!.reason).toMatch(/^Balance not collected yet/);
-    expect(planVisitMoves("RETURN", visitOrder([received, pay("BALANCE", "RECEIVED", 4000)], [ready, item("b", "QUALITY_CHECK")]))).toEqual({
+    expect(planVisitMoves(quote, "RETURN", visitOrder([received, pay("BALANCE", "PENDING", 4000)], [ready])).stays[0]!.reason).toMatch(/^Balance not collected yet/);
+    expect(planVisitMoves(quote, "RETURN", visitOrder([received, pay("BALANCE", "RECEIVED", 4000)], [ready, item("b", "QUALITY_CHECK")]))).toEqual({
       moves: [{ itemId: "a", from: "READY_FOR_PICKUP_SHIPPING", to: "COMPLETED" }],
       stays: [{ itemId: "b", status: "QUALITY_CHECK", reason: "Not ready to go back yet." }],
     });
   });
 
   it("a Return holds a pair readied early while another pair isn't ready", () => {
-    const result = planVisitMoves("RETURN", visitOrder([received], [item("a", "READY_FOR_PICKUP_SHIPPING"), item("b", "IN_PROGRESS")]));
+    const result = planVisitMoves(quote, "RETURN", visitOrder([received], [item("a", "READY_FOR_PICKUP_SHIPPING"), item("b", "IN_PROGRESS")]));
     expect(result.moves).toEqual([]);
     expect(result.stays[0]).toMatchObject({ itemId: "a", reason: "Collected once every pair is ready; the Balance is due then." });
   });

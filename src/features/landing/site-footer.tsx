@@ -2,13 +2,21 @@ import Link from "next/link";
 import { NAV_LINKS, navLinkClass, type NavActive } from "./nav-links";
 import { LEGAL_DOCUMENTS } from "@/shared/legal-documents";
 import { dmcaAgent } from "@/shared/dmca-agent";
+import { loadSiteSettings } from "@/features/settings/site-settings";
+import { businessProfile, loadBusinessProfile, type BusinessProfile } from "./business-profile";
 
-export function SiteFooter({ active }: { active?: NavActive } = {}) {
+/** The footer with the business profile from Settings (the name, location and contact details), when it can be read. */
+export async function SiteFooter({ active }: { active?: NavActive } = {}) {
+  return <SiteFooterView active={active} profile={await loadBusinessProfile(loadSiteSettings)} />;
+}
+
+export function SiteFooterView({ active, profile = businessProfile(null) }: { active?: NavActive; profile?: BusinessProfile }) {
+  const name = profile.name ?? "Atunṣe";
   return (
     <footer>
       <div className="landing-footer">
         <div className="landing-brand">
-          <span className="landing-brand-name">Atunṣe</span>
+          <span className="landing-brand-name">{name}</span>
           <span className="landing-brand-tag">POWERED BY RESTOREDBYDJ</span>
         </div>
         <div className="landing-footer-links">
@@ -64,7 +72,7 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
         </div>
       </div>
       <div className="landing-footer-bottom">
-        <span>&copy; 2026 Atunṣe. All rights reserved.</span>
+        <span>&copy; 2026 {name}. All rights reserved.</span>
         {/* The legal PDFs, open in a new tab (shared/legal-documents.ts). */}
         <nav className="landing-footer-legal" aria-label="Legal">
           {LEGAL_DOCUMENTS.map((doc) => (
@@ -76,7 +84,14 @@ export function SiteFooter({ active }: { active?: NavActive } = {}) {
           {/* Only once a DMCA Designated Agent is configured (shared/dmca-agent.ts). */}
           {dmcaAgent() && <Link href="/copyright">Copyright</Link>}
         </nav>
-        <span>RestoredByDJ &middot; New York, NY</span>
+        <span>RestoredByDJ &middot; {profile.location ?? "New York, NY"}</span>
+        {(profile.email || profile.phone) && (
+          <span>
+            {profile.email && <a href={`mailto:${profile.email}`}>{profile.email}</a>}
+            {profile.email && profile.phone && " · "}
+            {profile.phone && <a href={`tel:${profile.phone.replace(/[^\d+]/g, "")}`}>{profile.phone}</a>}
+          </span>
+        )}
       </div>
     </footer>
   );

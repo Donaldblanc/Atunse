@@ -1,6 +1,7 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import type { NotificationService } from "@/features/notifications/notification-service";
+import type { Catalog } from "../service-catalog";
 import { adminStatusMoves, ITEM_STATUS_LABELS, MANUAL_PAYMENT_CONFIRMED, type Item, type ItemStatus } from "../domain";
 import { CompletionHeldError, ItemNotFoundError, type OrderRepository } from "../repositories/order-repository";
 import { redactForLog } from "@/shared/logging/redact";
@@ -45,7 +46,7 @@ export interface TransitionItemStatusInput {
  * already happened and the owner shouldn't retry it.
  */
 export async function transitionItemStatus(
-  deps: { orders: OrderRepository; notifications: NotificationService },
+  deps: { orders: OrderRepository; notifications: NotificationService; catalog: { load(): Promise<Catalog> } },
   actingUser: ActingUser,
   input: TransitionItemStatusInput,
 ): Promise<Item | null> {
@@ -64,7 +65,7 @@ export async function transitionItemStatus(
   if (current.status === input.fromStatus) {
     // Confirming the payment settles the Deposit in the same write, so it can't be what holds the move (ADR-0002).
     const payments = receivesDeposit ? before.payments.map((payment) => (payment.kind === "DEPOSIT" ? { ...payment, status: "RECEIVED" as const } : payment)) : before.payments;
-    const { moves, held } = adminStatusMoves(current, { ...before, payments });
+    const { moves, held } = adminStatusMoves(await deps.catalog.load(), current, { ...before, payments });
     if (!moves.includes(input.toStatus)) throw new MoveNotAllowedError(input.fromStatus, input.toStatus, held);
   }
 

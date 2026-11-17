@@ -1,10 +1,10 @@
 import { Crown, Droplet, Palette, Ribbon, ShieldCheck, Snowflake, Sparkles, SportShoe, Wind, type LucideIcon } from "lucide-react";
 import type { ServiceCategoryId } from "@/features/landing/services";
-import { ADD_ON_SERVICES, BUNDLE_CATALOG, type CatalogBundle } from "@/features/orders/service-catalog";
+import { addOnServices, isBundleAvailable, type Catalog, type CatalogBundle, type CatalogService } from "@/features/orders/service-catalog";
 import type { PricedLine } from "./pricing";
 
 export type BookingService = {
-  /** A SERVICE_CATALOG id: prices, the Suede fee and minimums all come from there. */
+  /** A catalog Service id: prices, the Suede fee and minimums all come from the catalog. */
   id: string;
   name: string;
   description: string;
@@ -13,82 +13,69 @@ export type BookingService = {
   category: ServiceCategoryId;
 };
 
-// Granular SKUs for the booking flow: presentation only (copy, icon,
-// badge). Each `id` is a SERVICE_CATALOG entry, where its price lives
-// (src/features/orders/service-catalog.ts). Each carries a `category`
-// linking it to a landing-page service category
-// (src/features/landing/services.ts) — ServiceStep groups this list under
-// each category's title using it.
+// Presentation only (icon, badge), keyed by Service id. Names, descriptions,
+// prices and which Services exist come from the catalog the owner edits in
+// admin; a Service without an entry here still renders, with a default icon
+// and its own description.
 //
 // "protection" has no main SKU of its own: per services/page.tsx's
 // Standard/Premium Clean checklist ("Finished with Crep Protection Shoe
 // Deodorizer & Protection Spray"), protection is a finishing treatment
 // bundled into every clean. The Waterproof Seal and Premium Deodorizing
-// Treatment go further, as optional Add-ons (BOOKING_ADD_ONS below).
-export const BOOKING_SERVICES: BookingService[] = [
-  {
-    id: "standard",
-    name: "Standard Clean",
-    description: "A deep, thorough clean to keep your sneakers looking and feeling fresh.",
-    icon: SportShoe,
-    category: "cleaning",
-  },
-  {
-    id: "premium",
-    name: "Premium Clean",
-    description: "Our most detailed clean, designed for high-end and heavily worn pairs.",
-    badge: "MOST POPULAR",
-    icon: Crown,
-    category: "cleaning",
-  },
-  {
-    id: "oxidation",
-    name: "Oxidation Restoration",
-    description: "Treats yellowing and discoloration to brighten oxidized soles.",
-    icon: Sparkles,
-    category: "restoration",
-  },
-  {
-    id: "painting",
-    name: "Sneaker Painting & Dyeing",
-    description: "Custom color changes, touch-ups, and dye work to refresh, restore, or transform your shoes.",
-    icon: Palette,
-    category: "custom-work",
-  },
-  {
-    id: "reglue",
-    name: "Reglue",
-    description: "Professional repair for sole separation, reattaching soles that have come loose.",
-    icon: Droplet,
-    category: "restoration",
-  },
-];
-
-/** An Add-on (a SERVICE_CATALOG entry with isAddOn) with its copy and icon. */
-export type BookingAddOn = { id: string; name: string; description: string; icon: LucideIcon };
-
-const ADD_ON_COPY: Record<string, { description: string; icon: LucideIcon }> = {
-  laces: { description: "Fresh new laces to finish the look.", icon: Ribbon },
-  deodorizing: { description: "A deeper odor treatment that leaves the inside fresh.", icon: Wind },
-  waterproofing: { description: "A seal against rain, stains, and the unexpected.", icon: ShieldCheck },
+// Treatment go further, as optional Add-ons (bookingAddOns below).
+const SERVICE_PRESENTATION: Record<string, { icon: LucideIcon; badge?: string }> = {
+  standard: { icon: SportShoe },
+  premium: { icon: Crown, badge: "MOST POPULAR" },
+  oxidation: { icon: Sparkles },
+  painting: { icon: Palette },
+  reglue: { icon: Droplet },
 };
 
-// Optional extras chosen per pair in PairForm (CONTEXT.md: Add-on). Names
-// and prices come from SERVICE_CATALOG; only the copy and icon live here.
-export const BOOKING_ADD_ONS: BookingAddOn[] = ADD_ON_SERVICES.map((service) => ({
-  id: service.id,
-  name: service.name,
-  description: ADD_ON_COPY[service.id]?.description ?? "",
-  icon: ADD_ON_COPY[service.id]?.icon ?? Sparkles,
-}));
+const DEFAULT_ICON: LucideIcon = Sparkles;
 
-/** A catalog Bundle (BUNDLE_CATALOG) plus its icon. */
+/** The landing-page category a catalog Service is grouped under (ServiceStep). */
+function landingCategory(service: CatalogService): ServiceCategoryId {
+  return service.category === "additional" ? "protection" : service.category;
+}
+
+/** The Services a customer can book as a pair's main Service: active, and not an Add-on. */
+export function bookingServices(catalog: Catalog): BookingService[] {
+  return catalog.services
+    .filter((service) => service.active && !service.isAddOn)
+    .map((service) => ({
+      id: service.id,
+      name: service.name,
+      description: service.description,
+      badge: SERVICE_PRESENTATION[service.id]?.badge,
+      icon: SERVICE_PRESENTATION[service.id]?.icon ?? DEFAULT_ICON,
+      category: landingCategory(service),
+    }));
+}
+
+/** An Add-on (a catalog Service with isAddOn) with its icon. */
+export type BookingAddOn = { id: string; name: string; description: string; icon: LucideIcon };
+
+const ADD_ON_ICONS: Record<string, LucideIcon> = {
+  laces: Ribbon,
+  deodorizing: Wind,
+  waterproofing: ShieldCheck,
+};
+
+// Optional extras chosen per pair in PairForm (CONTEXT.md: Add-on). Names,
+// descriptions and prices come from the catalog; only the icon lives here.
+export function bookingAddOns(catalog: Catalog): BookingAddOn[] {
+  return addOnServices(catalog)
+    .filter((service) => service.active)
+    .map((service) => ({ id: service.id, name: service.name, description: service.description, icon: ADD_ON_ICONS[service.id] ?? DEFAULT_ICON }));
+}
+
+/** A catalog Bundle plus its icon. */
 export type BookingBundle = CatalogBundle & { icon: LucideIcon };
 
-// 3-pair bundles: an alternate booking flow to BOOKING_SERVICES for
+// 3-pair bundles: an alternate booking flow to bookingServices for
 // customers booking three pairs at once. Name, price and perks come from
-// BUNDLE_CATALOG in service-catalog.ts, which the server prices Bundles
-// from too; only the icon lives here.
+// the catalog, which the server prices Bundles from too; only the icon
+// lives here.
 const BUNDLE_ICONS: Record<string, LucideIcon> = {
   revival: Crown,
   restoration: Sparkles,
@@ -96,12 +83,14 @@ const BUNDLE_ICONS: Record<string, LucideIcon> = {
   "fall-boots": Snowflake,
 };
 
-export const BOOKING_BUNDLES: BookingBundle[] = BUNDLE_CATALOG.map((bundle) => ({
-  ...bundle,
-  icon: BUNDLE_ICONS[bundle.id] ?? Crown,
-}));
+/** The Bundles a customer can book now: active, and not past their end date. */
+export function bookingBundles(catalog: Catalog, now: Date): BookingBundle[] {
+  return catalog.bundles
+    .filter((bundle) => bundle.active && isBundleAvailable(bundle, now))
+    .map((bundle) => ({ ...bundle, icon: BUNDLE_ICONS[bundle.id] ?? Crown }));
+}
 
 export function pricedLineForBundle(bundle: BookingBundle): PricedLine {
   // Bundles waive the Suede fee and are flat-priced.
-  return { name: bundle.name, baseCents: bundle.priceCents, isMinimum: false, suedeFee: false, notes: [] };
+  return { name: bundle.name, baseCents: bundle.priceCents, isMinimum: false, suedeFeeCents: 0, notes: [] };
 }

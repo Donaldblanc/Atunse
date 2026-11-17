@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, Clock, Hand, MapPin, Truck } from "lucide-react";
 import "@/styles/landing-theme.css";
-import { BEFORE_AFTER_IMAGES, HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
+import { beforeAfterImages, HERO_IMAGE, getGalleryImageUrl } from "@/features/landing/gallery";
 import { SERVICES } from "@/features/landing/services";
 import { ArrowIcon } from "@/features/landing/arrow-icon";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
@@ -14,7 +14,10 @@ import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
-import { catalogBundle, isBundleAvailable } from "@/features/orders/service-catalog";
+import { findBundle, isBundleAvailable, startingPrice } from "@/features/orders/service-catalog";
+import { lastShopDayBefore } from "@/features/orders/calendar-date";
+import { Money } from "@/shared/money/money";
+import { loadCatalog } from "@/features/services/site-catalog";
 
 // Customer-facing landing page. Light (default) + dark theme via
 // data-theme on #landing-root (src/styles/landing-theme.css), toggled by
@@ -92,11 +95,23 @@ const REVIEWS = [
 
 // The page is static, so it's re-rendered hourly: that's how the Fall
 // Special banner disappears after its end date (the server also refuses
-// the booking, so a stale page can't sell an expired promotion).
+// the booking, so a stale page can't sell an expired promotion). An admin
+// save in Services & Pricing or Settings revalidates it at once.
 export const revalidate = 3600;
 
-export default function HomePage() {
-  const fallPromoOpen = isBundleAvailable(catalogBundle("fall-boots"), new Date());
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/** The last day a promotion can be booked, as "December 21st" (endsAt is exclusive, New York time). */
+function lastDayLabel(endsAt: string): string {
+  const [, month, day] = lastShopDayBefore(new Date(endsAt)).split("-").map(Number);
+  const suffix = day! % 10 === 1 && day !== 11 ? "st" : day! % 10 === 2 && day !== 12 ? "nd" : day! % 10 === 3 && day !== 13 ? "rd" : "th";
+  return `${MONTHS[month! - 1]} ${day}${suffix}`;
+}
+
+export default async function HomePage() {
+  const catalog = await loadCatalog();
+  const fallBoots = findBundle(catalog, "fall-boots");
+  const fallPromoOpen = fallBoots !== null && fallBoots.active && isBundleAvailable(fallBoots, new Date());
   return (
     <div className="landing" id="landing-root">
       <SiteNav />
@@ -175,7 +190,7 @@ export default function HomePage() {
               <p className="landing-promo-price">
                 3 BOOTS
                 <br />
-                FOR $120
+                FOR {Money.fromCents(fallBoots.priceCents).format()}
               </p>
               <p className="landing-promo-sub">UGGs. Timberlands. Any boot type. Any condition.</p>
               <p className="landing-promo-tiers">
@@ -198,7 +213,7 @@ export default function HomePage() {
               <CalendarDays size={28} aria-hidden="true" />
               <span>
                 <strong>Promotion Ends</strong>
-                <b>December 21st</b>
+                <b>{fallBoots.endsAt ? lastDayLabel(fallBoots.endsAt) : "Limited time"}</b>
                 Lock in your deal before the deadline.
               </span>
             </li>
@@ -256,7 +271,7 @@ export default function HomePage() {
       </div>
 
       <div className="landing-ba-band" id="gallery">
-        <BeforeAfterCarousel images={BEFORE_AFTER_IMAGES} />
+        <BeforeAfterCarousel images={beforeAfterImages(catalog)} />
       </div>
 
       <div className="landing-lower">
@@ -264,7 +279,7 @@ export default function HomePage() {
 
         <FaqAccordion faqs={FAQS} id="faq" />
 
-        <BookingPanel />
+        <BookingPanel fromPrice={startingPrice(catalog)} />
       </div>
 
       <div className="landing-cta-banner">

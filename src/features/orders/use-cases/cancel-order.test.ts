@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import { OrderNotFoundError } from "../repositories/order-repository";
@@ -12,7 +13,7 @@ async function booked() {
   const orders = new InMemoryOrderRepository();
   const notifications = new RecordingNotificationService();
   const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput());
-  return { deps: { orders, notifications }, order };
+  return { deps: { orders, notifications, catalog: { load: async () => DEFAULT_CATALOG } }, order };
 }
 
 describe("cancelOrder", () => {
@@ -43,7 +44,7 @@ describe("cancelOrder", () => {
       validBookingInput({ bundleId: "revival", items: [0, 1, 2].map((photo) => validPair({ serviceIds: [] }, photo)) }),
     );
     expect(order.items).toHaveLength(3);
-    const deps = { orders, notifications };
+    const deps = { orders, notifications, catalog: { load: async () => DEFAULT_CATALOG } };
     await cancelOrder(deps, ADMIN, { orderId: order.id, idempotencyKey: "k" });
     expect(notifications.sent).toHaveLength(1);
     expect(notifications.sent[0]!.subject).toMatch(/booking .* was cancelled/);

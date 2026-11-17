@@ -79,6 +79,8 @@ export async function saveSettingsAction(previous: SaveSettingsState, formData: 
   }
 
   revalidatePath("/admin/settings");
+
+  revalidatePath("/", "layout"); // the customer site reads hours and fulfillment settings
   return { error: null, errors: {}, saved: previous.saved + 1 };
 }
 
@@ -96,6 +98,7 @@ export async function setLogoAction(_previous: RemoveLogoState, formData: FormDa
     throw err;
   }
   revalidatePath("/admin/settings");
+  revalidatePath("/", "layout"); // the customer site reads hours and fulfillment settings
   return { error: null };
 }
 
@@ -109,6 +112,7 @@ export async function removeLogoAction(_previous: RemoveLogoState): Promise<Remo
     throw err;
   }
   revalidatePath("/admin/settings");
+  revalidatePath("/", "layout"); // the customer site reads hours and fulfillment settings
   return { error: null };
 }
 
@@ -134,6 +138,8 @@ export async function updateAdminProfileAction(_previous: ProfileState, formData
   }
 
   revalidatePath("/admin/settings");
+
+  revalidatePath("/", "layout"); // the customer site reads hours and fulfillment settings
   return { error: null };
 }
 
@@ -161,5 +167,7 @@ export async function changeAdminPasswordAction(_previous: ProfileState, formDat
   }
 
   revalidatePath("/admin/settings");
+
+  revalidatePath("/", "layout"); // the customer site reads hours and fulfillment settings
   return { error: null };
 }

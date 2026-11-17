@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
+import { quoteCheck } from "@/features/orders/service-catalog";
 import type { BookedOrder } from "@/features/orders/repositories/order-repository";
 import type { ItemStatus } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
@@ -14,6 +16,7 @@ function booked(createdAt: string, cents: number, ...statuses: ItemStatus[]): Bo
 describe("metricDetail", () => {
   it("counts Orders per day of the range in shop time, empty days as zero", () => {
     const detail = metricDetail(
+      quoteCheck(DEFAULT_CATALOG),
       [
         booked("2026-09-28T13:00:00Z", 3000, "APPROVED"),
         booked("2026-09-29T02:00:00Z", 3000, "APPROVED"), // 10 PM Monday in New York
@@ -31,6 +34,7 @@ describe("metricDetail", () => {
 
   it("groups live Orders by rollup status in pipeline order, leaving out empty statuses", () => {
     const detail = metricDetail(
+      quoteCheck(DEFAULT_CATALOG),
       [
         booked("2026-09-28T13:00:00Z", 3000, "COMPLETED"),
         booked("2026-09-28T14:00:00Z", 4000, "IN_PROGRESS"),
@@ -49,6 +53,7 @@ describe("metricDetail", () => {
 
   it("keeps fully cancelled Orders out of the days and statuses, counting them apart", () => {
     const detail = metricDetail(
+      quoteCheck(DEFAULT_CATALOG),
       [booked("2026-09-28T13:00:00Z", 3000, "CANCELLED"), booked("2026-09-28T14:00:00Z", 3000, "APPROVED")],
       DAYS,
     );
@@ -58,14 +63,14 @@ describe("metricDetail", () => {
   });
 
   it("drops a cancelled pair's share from a partly cancelled Order's revenue", () => {
-    const detail = metricDetail([booked("2026-09-28T13:00:00Z", 6000, "APPROVED", "CANCELLED")], DAYS);
+    const detail = metricDetail(quoteCheck(DEFAULT_CATALOG), [booked("2026-09-28T13:00:00Z", 6000, "APPROVED", "CANCELLED")], DAYS);
     expect(detail.byStatus).toHaveLength(1);
     expect(detail.byStatus[0]!.revenue.cents).toBe(3000);
     expect(detail.cancelledOrders).toBe(0);
   });
 
   it("is empty for an empty range", () => {
-    expect(metricDetail([], DAYS)).toEqual({ ordersByDay: DAYS.map((date) => ({ date, orders: 0 })), byStatus: [], cancelledOrders: 0 });
+    expect(metricDetail(quoteCheck(DEFAULT_CATALOG), [], DAYS)).toEqual({ ordersByDay: DAYS.map((date) => ({ date, orders: 0 })), byStatus: [], cancelledOrders: 0 });
   });
 });
 
@@ -79,7 +84,7 @@ describe("parseOverviewMetric", () => {
 
   it("counts a cleaning-only Order under Request Submitted, whatever status it is stored at", () => {
     const clean = { ...booked("2026-09-28T13:00:00Z", 3000, "APPROVED"), items: [{ status: "APPROVED" as const, serviceIds: ["standard"], estimate: Money.fromCents(3000) }] };
-    const detail = metricDetail([clean], ["2026-09-28"] as Parameters<typeof metricDetail>[1]);
+    const detail = metricDetail(quoteCheck(DEFAULT_CATALOG), [clean], ["2026-09-28"] as Parameters<typeof metricDetail>[2]);
     expect(detail.byStatus.map((share) => share.status)).toEqual(["REQUEST_SUBMITTED"]);
   });
 });

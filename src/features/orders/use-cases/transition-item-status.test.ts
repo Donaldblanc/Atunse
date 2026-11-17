@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { ConsoleNotificationService } from "@/features/notifications/notification-service";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
@@ -28,7 +29,7 @@ describe("transitionItemStatus", () => {
     const { item } = await seedOrder(orders);
     await expect(
       transitionItemStatus(
-        { orders, notifications: new ConsoleNotificationService() },
+        { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } },
         { accountId: "acc_1", role: "CUSTOMER" },
         { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" },
       ),
@@ -38,7 +39,7 @@ describe("transitionItemStatus", () => {
   it("rejects moving a finished pair, or to the status it already has", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
     await expect(
       transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "COMPLETED", toStatus: "UNDER_REVIEW", action: "REOPEN" }),
     ).rejects.toThrow(InvalidTransitionError);
@@ -54,7 +55,7 @@ describe("transitionItemStatus", () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
     const moved = await transitionItemStatus(
-      { orders, notifications: new ConsoleNotificationService() },
+      { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } },
       admin,
       { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "APPROVED", action: "STATUS_TRANSITION" },
     );
@@ -64,7 +65,7 @@ describe("transitionItemStatus", () => {
   it("advances the pipeline step by step and records each transition", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
 
     const underReview = await transitionItemStatus(deps, admin, {
       itemId: item.id,
@@ -86,7 +87,7 @@ describe("transitionItemStatus", () => {
   it("is idempotent: retrying the same manual-payment confirmation does not double-apply", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
     const key = "payment-confirm-click-1";
 
     const first = await transitionItemStatus(deps, admin, {
@@ -111,7 +112,7 @@ describe("transitionItemStatus", () => {
   it("settles the Order's Deposit Payment when a payment is confirmed, and only then", async () => {
     const orders = new InMemoryOrderRepository();
     const { order, item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
     const deposit = () => orders.orders.get(order.id)!.payments.find((payment) => payment.kind === "DEPOSIT")!;
     expect(deposit().status).toBe("PENDING");
 
@@ -131,7 +132,7 @@ describe("transitionItemStatus", () => {
   it("returns an Item from Under Review to Request Submitted, recorded like any transition", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
     await transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" });
 
     const reverted = await transitionItemStatus(deps, admin, {
@@ -149,7 +150,7 @@ describe("transitionItemStatus", () => {
     const orders = new InMemoryOrderRepository();
     await expect(
       transitionItemStatus(
-        { orders, notifications: new ConsoleNotificationService() },
+        { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } },
         admin,
         { itemId: "item_missing", fromStatus: "REQUEST_SUBMITTED", toStatus: "UNDER_REVIEW", action: "REVIEW_STARTED" },
       ),
@@ -159,7 +160,7 @@ describe("transitionItemStatus", () => {
   it("refuses a stale fromStatus, so a step can't be skipped, and leaves the item as it was", async () => {
     const orders = new InMemoryOrderRepository();
     const { item } = await seedOrder(orders);
-    const deps = { orders, notifications: new ConsoleNotificationService() };
+    const deps = { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } };
     // The item is REQUEST_SUBMITTED; a caller claiming it's IN_PROGRESS tries to move it on.
     await expect(
       transitionItemStatus(deps, admin, { itemId: item.id, fromStatus: "IN_PROGRESS", toStatus: "QUALITY_CHECK", action: "STATUS_TRANSITION" }),
@@ -174,7 +175,7 @@ describe("transitionItemStatus: what plain Update Status may do, and who is told
     const notifications = new RecordingNotificationService();
     const { order, item } = await seedOrder(orders);
     orders.orders.get(order.id)!.items[0]!.status = status;
-    return { orders, notifications, order, item, deps: { orders, notifications } };
+    return { orders, notifications, order, item, deps: { orders, notifications, catalog: { load: async () => DEFAULT_CATALOG } } };
   }
 
   it("allows Quote Sent and Approved, and moving backward", async () => {
@@ -250,7 +251,7 @@ describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
       item.price = Money.fromCents(prices[index]!);
     });
     stored.payments[0]!.status = "RECEIVED";
-    return { orders, stored, deps: { orders, notifications } };
+    return { orders, stored, deps: { orders, notifications, catalog: { load: async () => DEFAULT_CATALOG } } };
   }
 
   it("is created PENDING, for the quoted total less the Deposit, when the last live pair is ready", async () => {
@@ -313,7 +314,7 @@ describe("transitionItemStatus: the Balance Payment (ADR-0002)", () => {
     async function seedCleaning() {
       const orders = new InMemoryOrderRepository();
       const order = await submitOrder(bookingDeps({ orders }), { accountId: null, role: "GUEST" }, validBookingInput({ items: [validPair({ serviceIds: ["standard"] })] }));
-      return { deps: { orders, notifications: new ConsoleNotificationService() }, item: order.items[0]! };
+      return { deps: { orders, notifications: new ConsoleNotificationService(), catalog: { load: async () => DEFAULT_CATALOG } }, item: order.items[0]! };
     }
 
     it.each(["REQUEST_SUBMITTED", "UNDER_REVIEW", "QUOTE_SENT"] as const)("refuses a move to %s, and to Approved from Approved", async (toStatus) => {

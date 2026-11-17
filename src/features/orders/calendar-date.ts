@@ -122,3 +122,13 @@ export function shopTime(date: CalendarDate, minutesPastMidnight: number): Date 
 export function shopMidnight(date: CalendarDate): Date {
   return shopTime(date, 0);
 }
+
+/** The last instant of a day in the shop's time, exclusive: the start of the next day (e.g. a promotion's endsAt). */
+export function endOfShopDay(date: CalendarDate): Date {
+  return shopMidnight(addDays(date, 1));
+}
+
+/** The last day an exclusive end instant still covers, in the shop's time (inverse of endOfShopDay). */
+export function lastShopDayBefore(endsAt: Date): CalendarDate {
+  return shopClock(new Date(endsAt.getTime() - 1)).date;
+}
