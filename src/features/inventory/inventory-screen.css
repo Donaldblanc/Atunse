@@ -510,6 +510,11 @@ textarea.inv-input {
 @media (max-width: 960px) {
   .inv-body {
     flex-direction: column;
+    /* Stretch, not flex-start: otherwise the column sizes to the table's full width and the page scrolls sideways. */
+    align-items: stretch;
+  }
+  .inv-main {
+    width: 100%;
   }
   .inv-panel {
     width: 100%;

@@ -58,14 +58,17 @@
 
 @media (max-width: 900px) {
   .st-layout {
-    grid-template-columns: 1fr;
+    /* minmax(0, …): a plain 1fr track grows to its widest child and the page scrolls sideways. */
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 .st-main,
 .st-side {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+  min-width: 0;
 }
 
 .st-card {
@@ -213,4 +216,24 @@
 .st-pill[data-connected="true"] {
   background: #d1fadf;
   color: #067647;
+}
+
+/* Phone width: the weekday sits on its own line above its two times, so the row never outgrows the card. */
+@media (max-width: 600px) {
+  .st-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .st-hours-row {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .st-hours-day {
+    grid-column: 1 / -1;
+  }
+
+  .st-hours-row .st-input {
+    width: 100%;
+    min-width: 0;
+  }
 }
