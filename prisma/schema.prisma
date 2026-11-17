@@ -255,6 +255,8 @@ model Order {
   auditEntries  OrderAuditEntry[]
 
   @@index([createdAt]) // the admin Overview's date ranges and Recent Orders
+  @@index([pickupDate]) // Today's Schedule
+  @@index([accountId, createdAt]) // a customer's Orders (Customers screen, My bookings)
   @@map("orders")
 }
 
@@ -292,6 +294,8 @@ model Item {
 
   auditEntries ItemAuditEntry[]
 
+  @@index([orderId]) // every Order load finds its pairs
+  @@index([status]) // the work queues and status tabs
   @@map("items")
 }
 
@@ -414,6 +418,7 @@ model Payment {
   @@unique([orderId, idempotencyKey])
   @@index([orderId])
   @@index([status, kind])
+  @@index([createdAt]) // the Payments screen's list order
   @@map("payments")
 }
 

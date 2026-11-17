@@ -1,8 +1,10 @@
 // Security headers for every response (vulnerability scan, #87 follow-up).
-// The Content-Security-Policy ships as Report-Only first: browsers log what
-// it would block without blocking anything, so it can't break the site.
-// Rollout (docs/TODO.md): Report-Only -> observe violations -> tighten
-// sources -> nonce/hash-based scripts -> enforce.
+// The Content-Security-Policy is ENFORCED. Setting CSP_REPORT_ONLY=true
+// sends it as Report-Only instead (browsers log, nothing is blocked): the
+// quick way back if a new third-party source gets blocked in production.
+// Still open (docs/TODO.md): nonce-based scripts with no 'unsafe-inline'.
+// A nonce is per request, so it would make every page render dynamically
+// and give up the cached customer pages; decide that trade before doing it.
 
 const isDev = process.env.NODE_ENV === "development";
 
@@ -50,9 +52,7 @@ const assetsOrigin = validatedOrigin(process.env.NEXT_PUBLIC_ASSETS_BASE_URL);
 const contentSecurityPolicy = [
   "default-src 'self'",
   // TRANSITIONAL DEBT: 'unsafe-inline' is only here because Next's inline
-  // bootstrap scripts carry no nonce yet. The target state is nonce- (or
-  // hash-) based scripts with no 'unsafe-inline'; see docs/TODO.md for the
-  // rollout. Dev mode also evaluates code for hot reloading.
+  // bootstrap scripts carry no nonce (see the note at the top of this file). Dev mode also evaluates code for hot reloading.
   `script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
   "font-src 'self' https://fonts.gstatic.com",
@@ -67,13 +67,15 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+const cspReportOnly = process.env.CSP_REPORT_ONLY?.trim() === "true";
+
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-  { key: "Content-Security-Policy-Report-Only", value: contentSecurityPolicy },
+  { key: cspReportOnly ? "Content-Security-Policy-Report-Only" : "Content-Security-Policy", value: contentSecurityPolicy },
 ];
 
 /** @type {import('next').NextConfig} */
