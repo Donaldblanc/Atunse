@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { lockOrder, uniqueViolationFields } from "@/features/orders/repositories/prisma-order-repository";
-import { PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
+import { PAYMENT_METHOD_LABELS, paymentReceivedNotification, type PaymentMethod } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 import {
   OrderNotFoundError,
@@ -168,7 +168,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
     idempotencyKey: string;
   }): Promise<"recorded" | "already-recorded"> {
     const number = orderNumberFromReference(params.orderReference);
-    const order = await this.prisma.order.findFirst({ where: number === null ? { id: params.orderReference } : { number }, select: { id: true } });
+    const order = await this.prisma.order.findFirst({ where: number === null ? { id: params.orderReference } : { number }, select: { id: true, number: true } });
     if (!order) throw new OrderNotFoundError(params.orderReference);
 
     try {
@@ -186,6 +186,14 @@ export class PrismaPaymentRepository implements PaymentRepository {
             receivedAt: new Date(),
             confirmedByAccountId: params.actorAccountId,
             reference: params.reference,
+          },
+        });
+        await tx.notification.create({
+          data: {
+            kind: "PAYMENT_RECEIVED",
+            recipientAccountId: null,
+            orderId: order.id,
+            ...paymentReceivedNotification({ orderNumber: order.number, kind: "FULL", amountCents: params.amountCents, method: params.method }),
           },
         });
         await tx.orderAuditEntry.create({

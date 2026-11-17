@@ -2,7 +2,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 import { Money } from "@/shared/money/money";
 import { calendarDateFromUtcMidnight, calendarDateToUtcMidnight } from "../calendar-date";
 import { DETAILS_EDITED, diffOrderDetails, isNoop, ORDER_CONTACT_EDITED, ORDER_NOTE_ADDED, ORDER_RESCHEDULED, type OrderDetailsInput } from "../order-details";
-import { AUTO_APPROVED_SET_PRICE, balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
+import { AUTO_APPROVED_SET_PRICE, balanceKey, COLLECTION_COMPLETED, completionHold, MANUAL_PAYMENT_CONFIRMED, orderNumber, paymentReceivedNotification, planBalance, planVisitMoves, RETURN_COMPLETED, type Appointment, type AuditEntry, CalendarDate, Fulfillment, Item, ItemStatus, Order, Payment, PaymentMethod, TermsAcceptance } from "../domain";
 import {
   EmailTakenError,
   ItemNotFoundError,
@@ -392,6 +392,10 @@ export class PrismaOrderRepository implements OrderRepository {
       // A confirmed payment settles the Order's PENDING Deposit in the same
       // transaction, so the Payments view and the audit trail never disagree.
       if (params.receivesDeposit) {
+        const deposit = await tx.payment.findFirst({
+          where: { orderId: updated.orderId, kind: "DEPOSIT", status: "PENDING" },
+          select: { id: true, amountCents: true, method: true, order: { select: { number: true } } },
+        });
         await tx.payment.updateMany({
           where: { orderId: updated.orderId, kind: "DEPOSIT", status: "PENDING" },
           data: {
@@ -401,6 +405,16 @@ export class PrismaOrderRepository implements OrderRepository {
             idempotencyKey: params.entry.idempotencyKey,
           },
         });
+        if (deposit) {
+          await tx.notification.create({
+            data: {
+              kind: "PAYMENT_RECEIVED",
+              recipientAccountId: null,
+              orderId: updated.orderId,
+              ...paymentReceivedNotification({ orderNumber: deposit.order.number, kind: "DEPOSIT", amountCents: deposit.amountCents, method: deposit.method }),
+            },
+          });
+        }
       }
 
       await this.settleBalance(tx, updated.orderId);
@@ -606,7 +620,10 @@ export class PrismaOrderRepository implements OrderRepository {
 
   async confirmPayment(params: { paymentId: string; method: PaymentMethod; actorAccountId: string | null; idempotencyKey: string }): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
-      const payment = await tx.payment.findUnique({ where: { id: params.paymentId }, select: { orderId: true, kind: true, idempotencyKey: true } });
+      const payment = await tx.payment.findUnique({
+        where: { id: params.paymentId },
+        select: { orderId: true, kind: true, amountCents: true, idempotencyKey: true, order: { select: { number: true } } },
+      });
       if (!payment) throw new NoPendingPaymentError(params.paymentId);
       await lockOrder(tx, payment.orderId);
 
@@ -630,6 +647,15 @@ export class PrismaOrderRepository implements OrderRepository {
         },
       });
       if (count === 0) throw new NoPendingPaymentError(params.paymentId);
+
+      await tx.notification.create({
+        data: {
+          kind: "PAYMENT_RECEIVED",
+          recipientAccountId: null,
+          orderId: payment.orderId,
+          ...paymentReceivedNotification({ orderNumber: payment.order.number, kind: payment.kind, amountCents: payment.amountCents, method: params.method }),
+        },
+      });
 
       const live = await tx.item.findMany({ where: { orderId: payment.orderId, status: { not: "CANCELLED" } }, select: { id: true, status: true } });
       await tx.itemAuditEntry.createMany({

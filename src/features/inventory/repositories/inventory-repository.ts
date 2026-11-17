@@ -59,6 +59,18 @@ export function stockStatus(item: { stock: number; lowStockAt: number }): StockS
   return "IN_STOCK";
 }
 
+/**
+ * The bell notification for an adjustment that moves an active item from above its alert level to at or below it
+ * (crossing only: not while it stays low, not when restocking). Null when nothing should be written.
+ */
+export function lowStockAlert(item: { name: string; stock: number; lowStockAt: number; active: boolean }, nextStock: number): { title: string; body: string } | null {
+  if (!item.active || item.stock <= item.lowStockAt || nextStock > item.lowStockAt) return null;
+  return {
+    title: `Low stock: ${item.name}`,
+    body: nextStock <= 0 ? "Out of stock" : `${nextStock} left (alert at ${item.lowStockAt})`,
+  };
+}
+
 export const MAX_INVENTORY_IMAGES = 5;
 
 export interface InventoryImage {

@@ -224,3 +224,13 @@ describe("planVisitMoves", () => {
     expect(result.stays[0]).toMatchObject({ itemId: "a", reason: "Collected once every pair is ready; the Balance is due then." });
   });
 });
+
+describe("paymentReceivedNotification", () => {
+  it("names the Order, the payment kind, amount and method", async () => {
+    const { paymentReceivedNotification } = await import("./domain");
+    expect(paymentReceivedNotification({ orderNumber: 1008, kind: "DEPOSIT", amountCents: 6000, method: "ZELLE" })).toEqual({
+      title: "Payment received ATU-1008",
+      body: "Deposit · $60.00 · Zelle",
+    });
+  });
+});

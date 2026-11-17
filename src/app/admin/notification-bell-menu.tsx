@@ -10,12 +10,13 @@ export interface BellItem {
   title: string;
   body: string | null;
   orderId: string | null;
+  kind: string;
   unread: boolean;
   /** Already formatted on the server ("5 min ago"), so hydration can't disagree. */
   when: string;
 }
 
-/** The bell button and its popover of the 10 latest notifications. Each item is a form: it marks itself read, then opens its Order. */
+/** The bell button and its popover of the 10 latest notifications. Each item is a form: it marks itself read, then opens its Order (or, for low stock, the Inventory screen). */
 export function NotificationBellMenu({ items, unreadCount }: { items: BellItem[]; unreadCount: number }) {
   const { open, toggle, rootRef } = usePopover<HTMLDivElement>();
   const panelId = useId();
@@ -51,6 +52,7 @@ export function NotificationBellMenu({ items, unreadCount }: { items: BellItem[]
                 <form action={openNotificationAction}>
                   <input type="hidden" name="notificationId" value={item.id} />
                   <input type="hidden" name="orderId" value={item.orderId ?? ""} />
+                  <input type="hidden" name="kind" value={item.kind} />
                   <button type="submit" className="admin-bell-item" data-unread={item.unread}>
                     <span className="admin-bell-dot" aria-hidden="true" />
                     <span className="admin-bell-text">

@@ -9,6 +9,7 @@ import {
   MAX_INVENTORY_IMAGES,
   NegativeStockError,
   StockChangedError,
+  lowStockAlert,
   TooManyInventoryImagesError,
   stockStatus,
   type AdjustStockInput,
@@ -71,6 +72,8 @@ export class InMemoryInventoryRepository implements InventoryRepository {
   readonly movements: InMemoryStockMovement[] = [];
   /** When each entry of `movements` happened, and the Order it was used on (kept apart so `movements` keeps its shape). */
   private readonly movementMeta: { createdAt: Date; orderId: string | null; reason: StockMovementRecord["reason"] }[] = [];
+  /** Bell notifications written by adjustStock (kind LOW_STOCK), like the Prisma repository's notifications rows. */
+  readonly notifications: { kind: "LOW_STOCK"; title: string; body: string }[] = [];
   readonly suppliers: SupplierRecord[] = [];
   private nextId = 1;
 
@@ -110,8 +113,10 @@ export class InMemoryInventoryRepository implements InventoryRepository {
     if (item.stock !== input.seenStock) throw new StockChangedError(item.stock);
     const next = item.stock + input.change;
     if (next < 0) throw new NegativeStockError(item.stock);
+    const alert = lowStockAlert(item, next);
     item.stock = next;
     item.updatedAt = this.stamp(item.updatedAt);
+    if (alert) this.notifications.push({ kind: "LOW_STOCK", ...alert });
     this.movements.push({ itemId: input.itemId, change: input.change, reason: input.reason, note: input.note, actorAccountId: input.actorAccountId });
     this.movementMeta.push({ createdAt: new Date(), orderId: null, reason: input.reason });
     return { stock: next };

@@ -8,6 +8,7 @@ import {
   MAX_INVENTORY_IMAGES,
   NegativeStockError,
   StockChangedError,
+  lowStockAlert,
   TooManyInventoryImagesError,
   type AdjustStockInput,
   type InventoryItemInput,
@@ -197,7 +198,7 @@ export class PrismaInventoryRepository implements InventoryRepository {
 
   async adjustStock(input: AdjustStockInput): Promise<{ stock: number }> {
     return this.prisma.$transaction(async (tx) => {
-      const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId }, select: { stock: true } });
+      const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId }, select: { stock: true, name: true, lowStockAt: true, active: true } });
       if (!item) throw new InventoryItemNotFoundError();
       if (item.stock !== input.seenStock) throw new StockChangedError(item.stock);
       const next = item.stock + input.change;
@@ -214,6 +215,8 @@ export class PrismaInventoryRepository implements InventoryRepository {
       await tx.stockMovement.create({
         data: { itemId: input.itemId, change: input.change, reason: input.reason, note: input.note, actorAccountId: input.actorAccountId },
       });
+      const alert = lowStockAlert(item, next);
+      if (alert) await tx.notification.create({ data: { kind: "LOW_STOCK", recipientAccountId: null, ...alert } });
       return { stock: next };
     });
   }

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { LowStockItem } from "@/features/inventory/repositories/inventory-repository";
+import Link from "next/link";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { StockAdjustForm } from "./stock-adjust-form";
 import "@/styles/overview-stock-reviews.css";
@@ -29,6 +30,11 @@ export function LowStockDialog({ items, closeHref }: { items: LowStockItem[]; cl
           ))}
         </ul>
       )}
+      <p>
+        <Link className="ov-card-link" href="/admin/inventory?status=LOW_STOCK">
+          Open Inventory
+        </Link>
+      </p>
     </AdminDialog>
   );
 }

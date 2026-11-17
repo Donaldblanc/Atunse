@@ -332,6 +332,16 @@ export function orderNumber(number: number): string {
   return `ATU-${number}`;
 }
 
+const PAYMENT_KIND_LABELS: Record<PaymentKind, string> = { DEPOSIT: "Deposit", BALANCE: "Balance", FULL: "Payment" };
+
+/** The bell notification for a Payment that just became RECEIVED: "Payment received ATU-1008", "Deposit · $60.00 · Zelle". */
+export function paymentReceivedNotification(params: { orderNumber: number; kind: PaymentKind; amountCents: number; method: PaymentMethod }): { title: string; body: string } {
+  return {
+    title: `Payment received ${orderNumber(params.orderNumber)}`,
+    body: `${PAYMENT_KIND_LABELS[params.kind]} · $${(params.amountCents / 100).toFixed(2)} · ${PAYMENT_METHOD_LABELS[params.method]}`,
+  };
+}
+
 /** An Order's pairs that aren't cancelled. */
 export function livePairs<T extends { status: ItemStatus }>(order: { items: T[] }): T[] {
   return order.items.filter((item) => item.status !== "CANCELLED");

@@ -54,6 +54,7 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **SEO and launch polish:** per-page titles, descriptions, canonical and Open Graph tags (`shared/site/page-metadata.ts`), `robots.txt`, `sitemap.xml`, a favicon (`app/icon.svg`, placeholder mark), a custom 404, WebP hero images, noindex outside production. `SITE_URL` sets the public origin.
 - **CSP enforced** (`next.config.mjs`); `CSP_REPORT_ONLY=true` falls back to report-only. Scripts still allow `'unsafe-inline'` (nonces would make every page dynamic).
 - **Indexes** for the Overview schedule, a customer's Orders, an Order's pairs, pair status and the Payments list.
+- **Bell notifications** for received payments and low stock (written in the same transaction as the change); the Low Stock dialog links to Inventory.
 
 ## Not built (admin screens in SPEC's inventory)
 None: every sidebar entry is built.
