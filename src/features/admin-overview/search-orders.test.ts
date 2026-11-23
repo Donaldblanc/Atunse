@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import { InMemoryOrderSearchRepository } from "@/features/orders/repositories/in-memory-order-search-repository";
@@ -76,7 +77,7 @@ async function setup() {
   return {
     orders,
     book,
-    deps: { orderSearch: new InMemoryOrderSearchRepository(orders) },
+    deps: { orderSearch: new InMemoryOrderSearchRepository(orders), catalog: { load: async () => DEFAULT_CATALOG } },
   };
 }
 
@@ -146,10 +147,12 @@ describe("parseOrdersQuery day and service", () => {
     });
   });
 
-  it("ignores a malformed or impossible day and an unknown Service", () => {
+  it("ignores a malformed or impossible day and a malformed Service id", () => {
     for (const day of ["2026-9-30", "2026-02-30", "tomorrow", "2026-09-30T00:00"]) expect(parseOrdersQuery({ day }).day).toBeNull();
     expect(parseOrdersQuery({ day: ["2026-09-30"] }).day).toBeNull();
-    expect(parseOrdersQuery({ service: "nope" }).serviceId).toBeNull();
+    expect(parseOrdersQuery({ service: "No pe!" }).serviceId).toBeNull();
+    // Not checked against the catalog: an inactive Service still filters past Orders.
+    expect(parseOrdersQuery({ service: "retired-service" }).serviceId).toBe("retired-service");
     expect(parseOrdersQuery({ service: ["premium"] }).serviceId).toBeNull();
   });
 });

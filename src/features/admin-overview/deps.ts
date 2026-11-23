@@ -1,3 +1,4 @@
+import { loadCatalog } from "@/features/services/site-catalog";
 import { PrismaOrderRepository } from "@/features/orders/repositories/prisma-order-repository";
 import { prisma } from "@/shared/db/prisma-client";
 import { redactForLog } from "@/shared/logging/redact";
@@ -11,6 +12,7 @@ export function buildAdminOverviewDeps(): AdminOverviewDeps {
   let storage: FileStorage | undefined;
   return {
     orders: new PrismaOrderRepository(prisma),
+    catalog: { load: loadCatalog },
     photoUrl: async (key) => photoUrlOrNull(() => (storage ??= getFileStorage()), key),
     now: () => new Date(),
   };

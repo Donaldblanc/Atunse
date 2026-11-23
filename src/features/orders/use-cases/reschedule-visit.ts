@@ -1,5 +1,6 @@
 import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
+import type { SiteSettings } from "@/features/settings/use-cases/get-site-settings";
 import type { NotificationService } from "@/features/notifications/notification-service";
 import type { Appointment } from "../domain";
 import { AppointmentNotFoundError, type OrderRepository } from "../repositories/order-repository";
@@ -10,6 +11,8 @@ import { redactForLog } from "@/shared/logging/redact";
 export interface RescheduleVisitDeps {
   orders: Pick<OrderRepository, "findAppointment" | "rescheduleAppointment">;
   notifications: NotificationService;
+  /** The operating hours the owner may book a visit within. */
+  settings: { load(): Promise<Pick<SiteSettings, "hours">> };
   now: () => Date;
 }
 
@@ -42,7 +45,7 @@ export async function rescheduleVisit(
   input: { appointmentId: string; expectedStartsAt: Date; date: string; slot: string },
 ): Promise<RescheduleVisitResult> {
   requireRole(actingUser, "ADMIN");
-  const target = resolveVisitSlot(input.date, input.slot, deps.now());
+  const target = resolveVisitSlot(input.date, input.slot, deps.now(), (await deps.settings.load()).hours);
   if (target.startsAt.getTime() === input.expectedStartsAt.getTime()) throw new VisitSlotError("That's already this visit's time. Pick a different one.");
 
   const found = await deps.orders.findAppointment(input.appointmentId);

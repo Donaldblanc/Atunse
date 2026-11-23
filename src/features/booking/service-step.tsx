@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { ArrowRight, TriangleAlert } from "lucide-react";
-import { catalogService, formatPrice, formatServicePrice, isBundleAvailable, serviceNotes } from "@/features/orders/service-catalog";
-import { BOOKING_BUNDLES, BOOKING_SERVICES } from "./services-data";
+import { catalogService, formatPrice, formatServicePrice, serviceNotes } from "@/features/orders/service-catalog";
+import { useSiteData } from "./site-data-context";
 import { SERVICES } from "@/features/landing/services";
 import { ServiceRow } from "./service-row";
 
@@ -22,8 +22,9 @@ export function ServiceStep({
   onSelectBundle: (id: string) => void;
   onContinue: () => void;
 }) {
+  const { catalog, services: bookingServices, bundles } = useSiteData();
   const [attempted, setAttempted] = useState(false);
-  const canContinue = isBundle || selectedServiceIds.length > 0;
+  const canContinue = isBundle ? bundles.length > 0 : selectedServiceIds.length > 0;
   const showWarning = attempted && !canContinue;
 
   return (
@@ -40,7 +41,7 @@ export function ServiceStep({
 
       <div className="booking-page-service-list">
         {isBundle
-          ? BOOKING_BUNDLES.filter((bundle) => isBundleAvailable(bundle, new Date())).map((bundle) => (
+          ? bundles.map((bundle) => (
               <ServiceRow
                 key={bundle.id}
                 Icon={bundle.icon}
@@ -52,7 +53,7 @@ export function ServiceStep({
               />
             ))
           : SERVICES.flatMap((category) => {
-              const services = BOOKING_SERVICES.filter((service) => service.category === category.id);
+              const services = bookingServices.filter((service) => service.category === category.id);
               if (services.length === 0) return [];
               // Cleaning is single-select (you'd never book both Standard
               // and Premium on the same pair); every other category stacks
@@ -69,8 +70,8 @@ export function ServiceStep({
                     Icon={service.icon}
                     name={service.name}
                     subtitle={service.description}
-                    price={formatServicePrice(catalogService(service.id))}
-                    priceNote={serviceNotes(catalogService(service.id)).join(" · ") || undefined}
+                    price={formatServicePrice(catalogService(catalog, service.id))}
+                    priceNote={serviceNotes(catalogService(catalog, service.id)).join(" · ") || undefined}
                     badge={service.badge}
                     shape={shape}
                     isActive={selectedServiceIds.includes(service.id)}

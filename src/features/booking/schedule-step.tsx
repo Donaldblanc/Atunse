@@ -7,7 +7,9 @@ import type { PickupAddress, ScheduleMethod } from "./booking-types";
 import { FULFILLMENT_LABELS } from "@/features/orders/domain";
 import { isValidZip } from "@/features/orders/contact-rules";
 import { calendarDateInLocalTime } from "@/features/orders/calendar-date";
-import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, PICKUP_WINDOW_LABEL, US_STATES } from "@/features/orders/pickup-window";
+import { availablePickupSlots, PICKUP_LEAD_MINUTES, PICKUP_STATES, US_STATES, windowSummary } from "@/features/orders/pickup-window";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
+import { useSiteData } from "./site-data-context";
 
 export function ScheduleStep({
   method,
@@ -30,8 +32,10 @@ export function ScheduleStep({
   onChangeMailInDate: (selection: PickupSelection) => void;
   onContinue: () => void;
 }) {
+  const { hours, allowLocalDropOff, allowMailIn } = useSiteData().settings;
   const [attempted, setAttempted] = useState(false);
-  const problem = scheduleProblem(method, pickupAddress, pickupSelection);
+  const problem = scheduleProblem(method, pickupAddress, pickupSelection, hours);
+  const summary = windowSummary(hours);
   const showWarning = attempted && problem !== null;
 
   return (
@@ -43,6 +47,7 @@ export function ScheduleStep({
       </div>
 
       <div className="booking-page-shipping-grid">
+        {allowLocalDropOff && (
         <button type="button" className="booking-page-shipping-card" data-active={method === "pickup"} onClick={() => onSelectMethod("pickup")}>
           <Truck size={20} aria-hidden="true" />
           <span>
@@ -50,6 +55,8 @@ export function ScheduleStep({
             <span>DJ collects your sneakers from your address (NY / NJ / CT) and drops them back off when they&rsquo;re done.</span>
           </span>
         </button>
+        )}
+        {allowMailIn && (
         <button type="button" className="booking-page-shipping-card" data-active={method === "mail-in"} onClick={() => onSelectMethod("mail-in")}>
           <Package size={20} aria-hidden="true" />
           <span>
@@ -57,6 +64,7 @@ export function ScheduleStep({
             <span>We&rsquo;ll email you where to ship after checkout, and ship them back when they&rsquo;re done.</span>
           </span>
         </button>
+        )}
       </div>
 
       <div className="booking-page-section-head booking-page-section-head-tight">
@@ -131,9 +139,15 @@ export function ScheduleStep({
           <div className="booking-page-info-box">
             <Info size={16} aria-hidden="true" />
             <span>
-              DJ collects between
-              <br />
-              <strong>{PICKUP_WINDOW_LABEL}.</strong>
+              {summary ? (
+                <>
+                  DJ collects between
+                  <br />
+                  <strong>{summary}.</strong>
+                </>
+              ) : (
+                "DJ collects within our hours, which vary by day. Pick a date to see its times."
+              )}
             </span>
           </div>
         </>
@@ -182,6 +196,7 @@ function scheduleProblem(
   method: ScheduleMethod,
   address: PickupAddress,
   pickupSelection: PickupSelection | null,
+  hours: OperatingHoursRow[],
 ): string | null {
   if (!address.address.trim() || !address.city.trim() || !address.state) {
     return "Enter your street address, city and state to continue.";
@@ -194,7 +209,7 @@ function scheduleProblem(
     if (!pickupSelection) return "Choose a collection date and time to continue.";
     // The picker only offers bookable slots, but one can lapse while the
     // customer fills in the form (same-day notice, #75).
-    if (!availablePickupSlots(calendarDateInLocalTime(pickupSelection.date), new Date()).includes(pickupSelection.time)) {
+    if (!availablePickupSlots(calendarDateInLocalTime(pickupSelection.date), new Date(), hours).includes(pickupSelection.time)) {
       return `That collection time is no longer available (same-day collections need ${PICKUP_LEAD_MINUTES / 60} hours' notice). Choose another.`;
     }
   }

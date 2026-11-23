@@ -1,8 +1,9 @@
-// The one source of truth for Service prices (CONTEXT.md: Service, Add-on,
-// Suede Fee, Rush, Deposit): the server computes estimates from it, and every
-// price the site shows (booking flow, Services page) is formatted from it
-// by the helpers at the bottom. Pure — no React, no icons — so the
-// use-case can import it.
+// Service prices as data (CONTEXT.md: Service, Add-on, Suede Fee, Rush,
+// Deposit): a Catalog is loaded from the services/bundles tables
+// (features/services/site-catalog.ts) and handed to these pure functions.
+// The server computes estimates from it, and every price the site shows
+// (booking flow, Services page) is formatted from it by the helpers at the
+// bottom. Pure — no React, no icons — so the use-case can import it.
 
 import { Money } from "@/shared/money/money";
 
@@ -12,7 +13,10 @@ export type ServiceCategory = "cleaning" | "restoration" | "custom-work" | "addi
 export interface CatalogService {
   id: string;
   name: string;
+  description: string;
   category: ServiceCategory;
+  /** Off the site and refused for new bookings; past Items still name it. */
+  active: boolean;
   /** Standard and Premium Clean. At most one per Item. */
   isCleaningTier: boolean;
   /**
@@ -23,44 +27,29 @@ export interface CatalogService {
   baseCents: number;
   /** True for "from $25+" prices: the real price depends on condition. */
   isMinimum: boolean;
-  /** Carries the Suede Fee when the pair's material is Suede. */
-  suedeFee: boolean;
+  /** The Suede Fee this Service carries on a Suede pair; 0 = none. */
+  suedeFeeCents: number;
   /** What a minimum price covers when the Service prices parts separately, e.g. "Midsole". */
   minimumLabel?: string;
   /** Other published "from" prices for parts of the Service (display only; the estimate uses baseCents). */
   alsoFrom?: { label: string; cents: number }[];
 }
 
-export const SERVICE_CATALOG: CatalogService[] = [
-  { id: "standard", name: "Standard Clean", category: "cleaning", isCleaningTier: true, isAddOn: false, baseCents: 3000, isMinimum: false, suedeFee: true },
-  { id: "premium", name: "Premium Clean", category: "cleaning", isCleaningTier: true, isAddOn: false, baseCents: 5000, isMinimum: false, suedeFee: true },
-  {
-    id: "oxidation",
-    name: "Oxidation Restoration",
-    category: "restoration",
-    isCleaningTier: false,
-    isAddOn: false,
-    baseCents: 2500,
-    isMinimum: true,
-    suedeFee: false,
-    minimumLabel: "Midsole",
-    alsoFrom: [{ label: "Sole", cents: 4000 }],
-  },
-  { id: "painting", name: "Sneaker Painting & Dyeing", category: "custom-work", isCleaningTier: false, isAddOn: false, baseCents: 4000, isMinimum: true, suedeFee: false },
-  { id: "reglue", name: "Reglue", category: "restoration", isCleaningTier: false, isAddOn: false, baseCents: 5000, isMinimum: true, suedeFee: false },
-  // Add-ons: flat-priced, no Suede Fee.
-  { id: "laces", name: "Lace Replacement", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 1500, isMinimum: false, suedeFee: false },
-  { id: "deodorizing", name: "Premium Deodorizing Treatment", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 1000, isMinimum: false, suedeFee: false },
-  { id: "waterproofing", name: "Waterproof Seal", category: "additional", isCleaningTier: false, isAddOn: true, baseCents: 500, isMinimum: false, suedeFee: false },
-];
+/** The Services and Bundles the site and booking read, in display order. */
+export interface Catalog {
+  services: CatalogService[];
+  bundles: CatalogBundle[];
+}
 
 /** The Add-ons, in the order the booking flow offers them. */
-export const ADD_ON_SERVICES: CatalogService[] = SERVICE_CATALOG.filter((s) => s.isAddOn);
+export function addOnServices(catalog: Catalog): CatalogService[] {
+  return catalog.services.filter((s) => s.isAddOn);
+}
 
 /**
  * CONTEXT.md: Bundle. A fixed-price package covering three pairs, each its
  * own Item. Every pair gets the Bundle's pairServiceIds (Premium Clean
- * unless it says otherwise); the perks that cover
+ * unless the shop sets others); the perks that cover
  * only some pairs ("Oxidation touch-up on 1 pair") are assigned by the shop
  * after inspection, so the Order records which Bundle was bought.
  */
@@ -69,70 +58,25 @@ export interface CatalogBundle {
   name: string;
   priceCents: number;
   perks: string[];
-  /** The Services every pair gets. Defaults to BUNDLE_PAIR_SERVICE_IDS. */
-  pairServiceIds?: readonly string[];
+  /** Off the site and refused for new bookings; past Orders still name it. */
+  active: boolean;
+  /** The Services every pair gets. */
+  pairServiceIds: string[];
   /** A promotion's last instant (ISO, exclusive): it can't be booked at or after it. Absent for always-on Bundles. */
   endsAt?: string;
 }
 
+/** Where a use-case gets the Catalog: loadCatalog() in the app, DEFAULT_CATALOG in tests. */
+export interface CatalogSource {
+  load(): Promise<Catalog>;
+}
+
 export const BUNDLE_PAIRS = 3;
-
-/** Premium Clean on every pair: the one perk each Bundle gives all three pairs. */
-export const BUNDLE_PAIR_SERVICE_IDS = ["premium"] as const;
-
-export const BUNDLE_CATALOG: CatalogBundle[] = [
-  {
-    id: "revival",
-    name: "The Revival Pack",
-    priceCents: 15000,
-    perks: ["Premium Clean (all 3 pairs)", "Suede fee waived", "Priority turnaround", "Oxidation touch-up on 1 pair"],
-  },
-  {
-    id: "restoration",
-    name: "The Restoration Trio",
-    priceCents: 17500,
-    perks: [
-      "Premium Clean (all 3 pairs)",
-      "Suede fee waived",
-      "Deep sole whitening (all pairs)",
-      "Oxidation midsole on 1 pair",
-    ],
-  },
-  {
-    id: "collector",
-    name: "The Collector’s Triple",
-    priceCents: 20000,
-    perks: [
-      "Premium Clean (all 3 pairs)",
-      "Suede fee waived",
-      "Oxidation midsole (2 pairs)",
-      "Reglue inspection",
-      "Paint/dye touch-up on 1 pair",
-      "VIP turnaround (typically 48–72 hours)",
-    ],
-  },
-  {
-    id: "fall-boots",
-    name: "Start of Fall Special: 3 Boots",
-    priceCents: 12000,
-    perks: [
-      "Basic Clean, Boot Restoration or Fall Finish, chosen after inspection",
-      "Deep clean, stain lift, scuff repair, suede revival",
-      "UGGs, Timberlands, any boot type",
-      "Suede fee waived",
-      "Typical turnaround 3–7 business days",
-    ],
-    pairServiceIds: ["standard"],
-    // End of December 21st 2026, New York time (EST, UTC-5).
-    endsAt: "2026-12-22T05:00:00Z",
-  },
-];
 
 export const MATERIALS = ["Leather", "Suede", "Canvas", "Knit / Mesh"] as const;
 export type Material = (typeof MATERIALS)[number];
 
 export const RUSH_FEE_CENTS = 2000;
-export const SUEDE_FEE_CENTS = 1000;
 /** CONTEXT.md: Deposit is 50% of the estimate. */
 export const DEPOSIT_FRACTION = 0.5;
 
@@ -150,37 +94,75 @@ export interface ItemEstimate {
 }
 
 /** Catalog Services for these ids: each known, each at most once. */
-function lookUpServices(serviceIds: string[]): CatalogService[] {
+function lookUpServices(catalog: Catalog, serviceIds: string[]): CatalogService[] {
   if (new Set(serviceIds).size !== serviceIds.length) {
     throw new InvalidServiceSelectionError("A service can only be selected once.");
   }
   return serviceIds.map((id) => {
-    const service = SERVICE_CATALOG.find((s) => s.id === id);
+    const service = findService(catalog, id);
     if (!service) throw new InvalidServiceSelectionError(`Unknown service: ${id}`);
     return service;
   });
 }
 
+/** The Service with this id, active or not (past Items name inactive ones), or null. */
+export function findService(catalog: Catalog, id: string): CatalogService | null {
+  return catalog.services.find((s) => s.id === id) ?? null;
+}
+
+/** A Service's name for display on an existing Order: the raw id if the catalog no longer has it. */
+export function serviceName(catalog: Catalog, id: string): string {
+  return findService(catalog, id)?.name ?? id;
+}
+
+/** A Bundle's name for display on an existing Order: the raw id if the catalog no longer has it. */
+export function bundleName(catalog: Catalog, id: string): string {
+  return findBundle(catalog, id)?.name ?? id;
+}
+
+/** New bookings only: refuses a Service the shop has switched off. */
+export function assertServicesBookable(catalog: Catalog, serviceIds: string[]): void {
+  for (const service of lookUpServices(catalog, serviceIds)) {
+    if (!service.active) throw new InvalidServiceSelectionError(`${service.name} isn't available any more.`);
+  }
+}
+
+/** New bookings only: refuses an inactive or ended Bundle. */
+export function assertBundleBookable(catalog: Catalog, bundleId: string, now: Date): CatalogBundle {
+  const bundle = catalogBundle(catalog, bundleId);
+  if (!bundle.active) throw new InvalidServiceSelectionError(`${bundle.name} isn't available any more.`);
+  if (!isBundleAvailable(bundle, now)) throw new InvalidServiceSelectionError("This promotion has ended.");
+  return bundle;
+}
+
 /** The price of a pair's Add-ons; rejects anything that isn't one. */
-export function addOnsCents(addOnIds: string[]): number {
-  const addOns = lookUpServices(addOnIds);
+export function addOnsCents(catalog: Catalog, addOnIds: string[]): number {
+  const addOns = lookUpServices(catalog, addOnIds);
   const notAddOn = addOns.find((s) => !s.isAddOn);
   if (notAddOn) throw new InvalidServiceSelectionError("A Bundle's Services come with it: only add-ons can be chosen per pair.");
   return addOns.reduce((sum, s) => sum + s.baseCents, 0);
 }
 
-/** True when the Suede Fee is charged: a Suede pair with a Service that carries it. */
-export function suedeFeeApplies(material: string | null, services: CatalogService[]): boolean {
-  return material === "Suede" && services.some((s) => s.suedeFee);
+/**
+ * The Suede Fee for a pair: the largest fee among its Services, charged once,
+ * and only when the material is Suede. 0 when none applies.
+ */
+export function suedeFeeCents(material: string | null, services: CatalogService[]): number {
+  return material === "Suede" ? Math.max(0, ...services.map((s) => s.suedeFeeCents)) : 0;
 }
 
-export function estimateItem(params: { serviceIds: string[]; material: Material | null }): ItemEstimate {
+/** True when the Suede Fee is charged: a Suede pair with a Service that carries it. */
+export function suedeFeeApplies(material: string | null, services: CatalogService[]): boolean {
+  return suedeFeeCents(material, services) > 0;
+}
+
+export function estimateItem(catalog: Catalog, params: { serviceIds: string[]; material: Material | null }): ItemEstimate {
   const { serviceIds, material } = params;
   if (serviceIds.length === 0) {
     throw new InvalidServiceSelectionError("Select at least one service.");
   }
 
-  const services = lookUpServices(serviceIds);
+  const services = lookUpServices(catalog, serviceIds);
   if (services.every((s) => s.isAddOn)) {
     throw new InvalidServiceSelectionError("Add-ons go with a cleaning or restoration service. Choose one to continue.");
   }
@@ -188,13 +170,13 @@ export function estimateItem(params: { serviceIds: string[]; material: Material 
     throw new InvalidServiceSelectionError("Choose Standard or Premium Clean, not both.");
   }
 
-  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + (suedeFeeApplies(material, services) ? SUEDE_FEE_CENTS : 0);
+  const cents = services.reduce((sum, s) => sum + s.baseCents, 0) + suedeFeeCents(material, services);
   return { estimate: Money.fromCents(cents), isMinimum: services.some((s) => s.isMinimum) };
 }
 
 /** The Bundle with this id, or null (e.g. a single-pair Order's null bundleId). */
-export function findBundle(id: string | null): CatalogBundle | null {
-  return id === null ? null : (BUNDLE_CATALOG.find((b) => b.id === id) ?? null);
+export function findBundle(catalog: Catalog, id: string | null): CatalogBundle | null {
+  return id === null ? null : (catalog.bundles.find((b) => b.id === id) ?? null);
 }
 
 /** False once a promotional Bundle's endsAt has passed. */
@@ -204,11 +186,11 @@ export function isBundleAvailable(bundle: CatalogBundle, now: Date): boolean {
 
 /** The Services every pair of this Bundle gets. */
 export function bundlePairServiceIds(bundle: CatalogBundle): string[] {
-  return [...(bundle.pairServiceIds ?? BUNDLE_PAIR_SERVICE_IDS)];
+  return [...bundle.pairServiceIds];
 }
 
-export function catalogBundle(id: string): CatalogBundle {
-  const bundle = BUNDLE_CATALOG.find((b) => b.id === id);
+export function catalogBundle(catalog: Catalog, id: string): CatalogBundle {
+  const bundle = findBundle(catalog, id);
   if (!bundle) throw new InvalidServiceSelectionError(`Unknown bundle: ${id}`);
   return bundle;
 }
@@ -220,12 +202,12 @@ export function catalogBundle(id: string): CatalogBundle {
  * Add-ons (CONTEXT.md: the Deposit is 50% of the sum of the Items). Flat,
  * and the Suede Fee is waived whatever the material.
  */
-export function estimateBundleItems(bundleId: string, addOnIdsByPair: string[][] = []): ItemEstimate[] {
-  const { priceCents } = catalogBundle(bundleId);
+export function estimateBundleItems(catalog: Catalog, bundleId: string, addOnIdsByPair: string[][] = []): ItemEstimate[] {
+  const { priceCents } = catalogBundle(catalog, bundleId);
   const share = Math.floor(priceCents / BUNDLE_PAIRS);
   const leftover = priceCents - share * BUNDLE_PAIRS;
   return Array.from({ length: BUNDLE_PAIRS }, (_, i) => ({
-    estimate: Money.fromCents(share + (i < leftover ? 1 : 0) + addOnsCents(addOnIdsByPair[i] ?? [])),
+    estimate: Money.fromCents(share + (i < leftover ? 1 : 0) + addOnsCents(catalog, addOnIdsByPair[i] ?? [])),
     isMinimum: false,
   }));
 }
@@ -248,8 +230,8 @@ export function estimateOrder(params: { items: ItemEstimate[]; rush: boolean }):
 
 // ---- Display: every price string the site shows is formatted here ----
 
-export function catalogService(id: string): CatalogService {
-  const service = SERVICE_CATALOG.find((s) => s.id === id);
+export function catalogService(catalog: Catalog, id: string): CatalogService {
+  const service = findService(catalog, id);
   if (!service) throw new InvalidServiceSelectionError(`Unknown service: ${id}`);
   return service;
 }
@@ -260,11 +242,26 @@ export function catalogService(id: string): CatalogService {
  * Services are flat-priced, so an Item with only those gets its published
  * price straight away.
  */
-export function itemRequiresQuote(serviceIds: string[]): boolean {
+export function itemRequiresQuote(catalog: Catalog, serviceIds: string[]): boolean {
   return serviceIds.some((id) => {
-    const category = catalogService(id).category;
+    // An id missing from the catalog reads as flat-priced.
+    const category = findService(catalog, id)?.category;
     return category === "restoration" || category === "custom-work";
   });
+}
+
+/** Whether a pair with these Services needs a Quote, answerable without a whole Catalog (a repository only has the services table). */
+export type RequiresQuote = (serviceIds: string[]) => boolean;
+
+/** `itemRequiresQuote` bound to a Catalog, for the domain functions that take a RequiresQuote. */
+export function quoteCheck(catalog: Catalog): RequiresQuote {
+  return (serviceIds) => itemRequiresQuote(catalog, serviceIds);
+}
+
+/** The lowest flat price a pair can be booked at: the cheapest active cleaning tier, e.g. "$30". Null if none is on offer. */
+export function startingPrice(catalog: Catalog): string | null {
+  const cleaning = catalog.services.filter((s) => s.active && s.isCleaningTier).sort((a, b) => a.baseCents - b.baseCents)[0];
+  return cleaning ? formatPrice(cleaning.baseCents, cleaning.isMinimum) : null;
 }
 
 /** A price as the site shows it: "$30" when flat, "$25+" when it's a minimum. */
@@ -286,11 +283,11 @@ export function alsoFromNotes(service: CatalogService): string[] {
 
 /** Secondary price lines for a Service, e.g. ["+$10 for Suede"] or ["Sole from $40+"]. */
 export function serviceNotes(service: CatalogService): string[] {
-  return [...alsoFromNotes(service), ...(service.suedeFee ? [suedeFeeNote(false)] : [])];
+  return [...alsoFromNotes(service), ...(service.suedeFeeCents > 0 ? [suedeFeeNote(service.suedeFeeCents, false)] : [])];
 }
 
-export function suedeFeeNote(applied: boolean): string {
-  const fee = Money.fromCents(SUEDE_FEE_CENTS).format();
+export function suedeFeeNote(feeCents: number, applied: boolean): string {
+  const fee = Money.fromCents(feeCents).format();
   return applied ? `Includes +${fee} Suede fee` : `+${fee} for Suede`;
 }
 

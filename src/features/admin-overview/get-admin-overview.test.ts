@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { collectionTimes } from "@/features/orders/pickup-window";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
@@ -58,7 +59,7 @@ async function book(orders: InMemoryOrderRepository, createdAt: string, input: N
 
 function deps() {
   const orders = new InMemoryOrderRepository();
-  return { orders, photoUrl: async (key: string) => `https://photos.test/${key}`, now: () => NOW };
+  return { orders, catalog: { load: async () => DEFAULT_CATALOG }, photoUrl: async (key: string) => `https://photos.test/${key}`, now: () => NOW };
 }
 
 /** A Local Drop-Off booking collected at `slot` on `date`. */
@@ -119,8 +120,8 @@ describe("getAdminOverview", () => {
     expect(overview.bookedRevenue.previous.cents).toBe(0);
     expect(overview.revenueByDay[0]!.revenue.cents).toBe(6000);
     expect(overview.servicesBooked).toEqual([
-      { serviceId: "premium", name: "Premium Clean", count: 1 },
-      { serviceId: "laces", name: "Lace Replacement", count: 1 },
+      { serviceId: "premium", name: "Premium Clean", count: 1, slot: 2 },
+      { serviceId: "laces", name: "Lace Replacement", count: 1, slot: 6 },
     ]);
   });
 
@@ -258,10 +259,10 @@ describe("getAdminOverview: Recent Orders and Today's Schedule", () => {
 
 describe("servicesSummary", () => {
   it("names up to two Services, in catalog order, and counts the rest", () => {
-    expect(servicesSummary([["standard"]])).toBe("Standard Clean");
-    expect(servicesSummary([["laces", "premium"]])).toBe("Premium Clean + Lace Replacement");
-    expect(servicesSummary([["premium"], ["premium", "oxidation"], ["reglue"]])).toBe("Premium Clean + 2 more");
-    expect(servicesSummary([])).toBe("");
+    expect(servicesSummary(DEFAULT_CATALOG, [["standard"]])).toBe("Standard Clean");
+    expect(servicesSummary(DEFAULT_CATALOG, [["laces", "premium"]])).toBe("Premium Clean + Lace Replacement");
+    expect(servicesSummary(DEFAULT_CATALOG, [["premium"], ["premium", "oxidation"], ["reglue"]])).toBe("Premium Clean + 2 more");
+    expect(servicesSummary(DEFAULT_CATALOG, [])).toBe("");
   });
 });
 

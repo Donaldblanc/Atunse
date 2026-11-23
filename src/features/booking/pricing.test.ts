@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { estimateBundleItems, estimateItem, estimateOrder, MATERIALS, RUSH_FEE_CENTS, SERVICE_CATALOG, SUEDE_FEE_CENTS } from "@/features/orders/service-catalog";
+import { DEFAULT_CATALOG as C } from "@/features/orders/default-catalog";
+import { estimateBundleItems, estimateItem, estimateOrder, MATERIALS, RUSH_FEE_CENTS, type Catalog } from "@/features/orders/service-catalog";
 
 const RUSH_FEE = RUSH_FEE_CENTS / 100;
-const SUEDE_FEE = SUEDE_FEE_CENTS / 100;
+const SUEDE_FEE = 10;
 import { addOnLines, computeMultiServicePricing, pricedLineForService } from "./pricing";
-import { BOOKING_BUNDLES, pricedLineForBundle } from "./services-data";
+import { bookingBundles, pricedLineForBundle } from "./services-data";
 
-const standardClean = pricedLineForService("standard");
-const premiumClean = pricedLineForService("premium");
-const oxidation = pricedLineForService("oxidation");
-const painting = pricedLineForService("painting");
+const BOOKING_BUNDLES = bookingBundles(C, new Date("2026-11-01T00:00:00Z"));
+
+const standardClean = pricedLineForService(C, "standard");
+const premiumClean = pricedLineForService(C, "premium");
+const oxidation = pricedLineForService(C, "oxidation");
+const painting = pricedLineForService(C, "painting");
 const revivalPack = pricedLineForBundle(BOOKING_BUNDLES.find((b) => b.id === "revival")!);
 
 describe("computeMultiServicePricing", () => {
@@ -34,7 +37,7 @@ describe("computeMultiServicePricing", () => {
     expect(suede.priceNote).toBe("Includes +$10 Suede fee");
   });
 
-  it("never applies the suede fee to a service without suedeFee: true", () => {
+  it("never applies the suede fee to a service without a suede fee", () => {
     const result = computeMultiServicePricing([oxidation], "Suede", false);
     expect(result.price).toBe("$25+");
     expect(result.priceNote).toBe("Sole from $40+");
@@ -100,9 +103,9 @@ describe("computeMultiServicePricing", () => {
 // check every valid selection (at most one cleaning tier) × material × rush.
 describe("client total vs server estimate", () => {
   const subsets = (ids: string[]) => ids.reduce<string[][]>((sets, id) => [...sets, ...sets.map((set) => [...set, id])], [[]]);
-  const cleaning = SERVICE_CATALOG.filter((s) => s.isCleaningTier).map((s) => s.id);
-  const stackable = SERVICE_CATALOG.filter((s) => !s.isCleaningTier && !s.isAddOn).map((s) => s.id);
-  const addOnSets = subsets(SERVICE_CATALOG.filter((s) => s.isAddOn).map((s) => s.id));
+  const cleaning = C.services.filter((s) => s.isCleaningTier).map((s) => s.id);
+  const stackable = C.services.filter((s) => !s.isCleaningTier && !s.isAddOn).map((s) => s.id);
+  const addOnSets = subsets(C.services.filter((s) => s.isAddOn).map((s) => s.id));
   // Every main selection the Service step allows, with every set of Add-ons.
   const selections = [null, ...cleaning]
     .flatMap((tier) => subsets(stackable).map((set) => [...(tier ? [tier] : []), ...set]))
@@ -112,8 +115,8 @@ describe("client total vs server estimate", () => {
   it.each(selections.map((s) => [[...s.main, ...s.addOns].join(" + "), s] as const))("%s", (_label, { main, addOns }) => {
     for (const material of [...MATERIALS, ""]) {
       for (const rush of [false, true]) {
-        const client = computeMultiServicePricing(main.map(pricedLineForService), material, rush, addOnLines([addOns]));
-        const item = estimateItem({ serviceIds: [...main, ...addOns], material: material === "" ? null : (material as (typeof MATERIALS)[number]) });
+        const client = computeMultiServicePricing(main.map((id) => pricedLineForService(C, id)), material, rush, addOnLines(C, [addOns]));
+        const item = estimateItem(C, { serviceIds: [...main, ...addOns], material: material === "" ? null : (material as (typeof MATERIALS)[number]) });
         const server = estimateOrder({ items: [item], rush });
         expect(client.totalCents).toBe(server.estimate.cents);
         expect(client.isMinimum).toBe(server.isMinimum);
@@ -129,8 +132,8 @@ describe("client Bundle total vs server estimate", () => {
   it.each(BOOKING_BUNDLES.map((bundle) => [bundle.name, bundle] as const))("%s", (_label, bundle) => {
     for (const rush of [false, true]) {
       for (const addOnIdsByPair of [[[], [], []], perPair]) {
-        const client = computeMultiServicePricing([pricedLineForBundle(bundle)], "", rush, addOnLines(addOnIdsByPair));
-        const server = estimateOrder({ items: estimateBundleItems(bundle.id, addOnIdsByPair), rush });
+        const client = computeMultiServicePricing([pricedLineForBundle(bundle)], "", rush, addOnLines(C, addOnIdsByPair));
+        const server = estimateOrder({ items: estimateBundleItems(C, bundle.id, addOnIdsByPair), rush });
         expect(client.totalCents).toBe(server.estimate.cents);
         expect(client.isMinimum).toBe(server.isMinimum);
       }
@@ -140,17 +143,30 @@ describe("client Bundle total vs server estimate", () => {
 
 describe("addOnLines", () => {
   it("labels each Add-on with its pair only when there's more than one pair", () => {
-    expect(addOnLines([["laces"]]).map((l) => l.name)).toEqual(["Lace Replacement"]);
-    expect(addOnLines([[], ["laces"], ["waterproofing"]]).map((l) => [l.name, l.baseCents])).toEqual([
+    expect(addOnLines(C, [["laces"]]).map((l) => l.name)).toEqual(["Lace Replacement"]);
+    expect(addOnLines(C, [[], ["laces"], ["waterproofing"]]).map((l) => [l.name, l.baseCents])).toEqual([
       ["Lace Replacement · Pair 2", 1500],
       ["Waterproof Seal · Pair 3", 500],
     ]);
   });
 
   it("leaves the selection's name to its main Services", () => {
-    expect(computeMultiServicePricing([premiumClean], "", false, addOnLines([["laces"]]))).toMatchObject({
+    expect(computeMultiServicePricing([premiumClean], "", false, addOnLines(C, [["laces"]]))).toMatchObject({
       name: "Premium Clean",
       price: "$65",
     });
+  });
+});
+
+describe("a Suede fee the owner set", () => {
+  const catalog: Catalog = { ...C, services: C.services.map((s) => (s.id === "painting" ? { ...s, suedeFeeCents: 2500 } : s)) };
+
+  it("charges the largest fee among the selected services, once, and matches the server", () => {
+    const lines = ["standard", "painting"].map((id) => pricedLineForService(catalog, id));
+    const client = computeMultiServicePricing(lines, "Suede", false);
+    expect(client.priceNote).toBe("Includes +$25 Suede fee");
+    const server = estimateOrder({ items: [estimateItem(catalog, { serviceIds: ["standard", "painting"], material: "Suede" })], rush: false });
+    expect(client.totalCents).toBe(server.estimate.cents);
+    expect(client.totalCents).toBe(3000 + 4000 + 2500);
   });
 });

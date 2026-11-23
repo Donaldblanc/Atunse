@@ -4,12 +4,10 @@ import Link from "next/link";
 import { MapPin, Clock, Tag, Package, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { ArrowIcon } from "./arrow-icon";
-import { catalogService, formatPrice } from "@/features/orders/service-catalog";
 
-// The lowest price a pair can be booked at (Standard Clean), from the same
-// catalog the booking flow and the server's estimate use.
-const standard = catalogService("standard");
-const FROM_PRICE = `Pricing from ${formatPrice(standard.baseCents, standard.isMinimum)}`;
+// The lowest price a pair can be booked at (the cheapest cleaning tier), from
+// the same catalog the booking flow and the server's estimate use: the page
+// passes it in as `fromPrice` (startingPrice in service-catalog.ts).
 
 type BookingMode = "pickup" | "mail-in";
 
@@ -20,7 +18,9 @@ type BookingModeConfig = {
   href: string;
 };
 
-const MODES: Record<BookingMode, BookingModeConfig> = {
+function modes(fromPrice: string | null): Record<BookingMode, BookingModeConfig> {
+  const FROM_PRICE = fromPrice ? `Pricing from ${fromPrice}` : "Transparent pricing";
+  return {
   pickup: {
     label: "Local Drop-Off",
     rows: [
@@ -42,10 +42,12 @@ const MODES: Record<BookingMode, BookingModeConfig> = {
     cta: "Book a mail-in",
     href: "/booking?method=mail-in",
   },
-};
+  };
+}
 
-export function BookingPanel() {
+export function BookingPanel({ fromPrice }: { fromPrice: string | null }) {
   const [mode, setMode] = useState<BookingMode>("pickup");
+  const MODES = modes(fromPrice);
   const config = MODES[mode];
 
   return (

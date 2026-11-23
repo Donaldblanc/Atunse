@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { calendarDateToUtcMidnight } from "@/features/orders/calendar-date";
 import { bookReturnVisitAction, rescheduleVisitAction, type ScheduleVisitState } from "./visit-schedule-actions";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
 import { VisitSlotPicker } from "./visit-slot-picker";
 
 const dayFormat = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" });
@@ -27,6 +28,7 @@ export function VisitScheduleForm({
   now,
   initialDate,
   currentStartsAt,
+  hours,
   cancelHref,
 }: {
   mode: "reschedule" | "return";
@@ -36,6 +38,7 @@ export function VisitScheduleForm({
   initialDate: string;
   /** Rescheduling: the visit's own start, which the picker leaves out. */
   currentStartsAt?: string;
+  hours: OperatingHoursRow[];
   cancelHref: string;
 }) {
   const action = mode === "reschedule" ? rescheduleVisitAction : bookReturnVisitAction;
@@ -95,6 +98,7 @@ export function VisitScheduleForm({
           slot={choice.slot}
           onChange={setChoice}
           currentStartsAt={currentStartsAt}
+          hours={hours}
         />
       )}
 

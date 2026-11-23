@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewOrderInput } from "@/features/orders/repositories/order-repository";
@@ -49,12 +50,12 @@ function newOrderInput(overrides: Partial<NewOrderInput> = {}): NewOrderInput {
 describe("getCustomerDetail", () => {
   it("rejects a non-admin", async () => {
     const orders = new InMemoryOrderRepository();
-    await expect(getCustomerDetail({ accounts: orders.accounts, orders }, CUSTOMER, "acc_1")).rejects.toThrow(UnauthorizedError);
+    await expect(getCustomerDetail({ accounts: orders.accounts, orders, catalog: { load: async () => DEFAULT_CATALOG } }, CUSTOMER, "acc_1")).rejects.toThrow(UnauthorizedError);
   });
 
   it("returns null for an id no Customer Account has", async () => {
     const orders = new InMemoryOrderRepository();
-    expect(await getCustomerDetail({ accounts: orders.accounts, orders }, ADMIN, "nope")).toBeNull();
+    expect(await getCustomerDetail({ accounts: orders.accounts, orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN, "nope")).toBeNull();
   });
 
   it("returns the Account's contact details and its Orders, newest first", async () => {
@@ -64,7 +65,7 @@ describe("getCustomerDetail", () => {
     const { order: second } = await orders.create(newOrderInput({ owner: { accountId: first.accountId } }));
     second.createdAt = new Date("2026-09-02T00:00:00Z");
 
-    const detail = await getCustomerDetail({ accounts: orders.accounts, orders }, ADMIN, first.accountId);
+    const detail = await getCustomerDetail({ accounts: orders.accounts, orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN, first.accountId);
 
     expect(detail).toMatchObject({ email: "jordan@example.com", phone: "2125550142" });
     expect(detail?.orders.map((o) => o.orderId)).toEqual([second.id, first.id]);

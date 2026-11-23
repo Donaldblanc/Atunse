@@ -4,6 +4,7 @@
 
 import { isCalendarDate } from "./calendar-date";
 import { adminVisitSlots, collectionTimes } from "./pickup-window";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
 
 /** The date or slot isn't one the owner can book. The message is safe to show. */
 export class VisitSlotError extends Error {
@@ -14,13 +15,13 @@ export class VisitSlotError extends Error {
 }
 
 /**
- * The instants for `date` + `slot` (a PICKUP_TIME_SLOTS label), or a
- * VisitSlotError when the day is malformed, the slot isn't on the daily
- * grid, or it has already started. Same window and 30-minute grid as
- * booking; no customer lead time (see adminVisitSlots).
+ * The instants for `date` + `slot` (a slot label), or a
+ * VisitSlotError when the day is malformed, the slot isn't on that day's
+ * grid per the operating hours, or it has already started. Same hours and
+ * 30-minute grid as booking; no customer lead time (see adminVisitSlots).
  */
-export function resolveVisitSlot(date: string, slot: string, now: Date): { startsAt: Date; endsAt: Date } {
+export function resolveVisitSlot(date: string, slot: string, now: Date, hours: OperatingHoursRow[]): { startsAt: Date; endsAt: Date } {
   if (!isCalendarDate(date)) throw new VisitSlotError("Pick a valid date.");
-  if (!adminVisitSlots(date, now).includes(slot)) throw new VisitSlotError("That time isn't available. Pick another.");
+  if (!adminVisitSlots(date, now, hours).includes(slot)) throw new VisitSlotError("That time isn't available. Pick another.");
   return collectionTimes(date, slot);
 }

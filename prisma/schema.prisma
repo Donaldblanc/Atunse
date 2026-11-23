@@ -255,6 +255,8 @@ model Order {
   auditEntries  OrderAuditEntry[]
 
   @@index([createdAt]) // the admin Overview's date ranges and Recent Orders
+  @@index([pickupDate]) // Today's Schedule
+  @@index([accountId, createdAt]) // a customer's Orders (Customers screen, My bookings)
   @@map("orders")
 }
 
@@ -292,6 +294,8 @@ model Item {
 
   auditEntries ItemAuditEntry[]
 
+  @@index([orderId]) // every Order load finds its pairs
+  @@index([status]) // the work queues and status tabs
   @@map("items")
 }
 
@@ -414,6 +418,7 @@ model Payment {
   @@unique([orderId, idempotencyKey])
   @@index([orderId])
   @@index([status, kind])
+  @@index([createdAt]) // the Payments screen's list order
   @@map("payments")
 }
 
@@ -456,7 +461,7 @@ model Service {
   isMinimum      Boolean
   suedeFeeCents  Int             @default(0) // the Suede Fee on suede pairs; 0 = none
   minimumLabel   String? // what a minimum price covers, e.g. "Midsole"
-  alsoFrom       Json? // other published "from" prices: [{ label, cents }]
+  alsoFrom       Json            @default("[]") // other published "from" prices: [{ label, cents }]
   internalNotes  String? // admin only, never shown to customers
   active         Boolean         @default(true)
   position       Int // display order
@@ -471,13 +476,15 @@ model Service {
 
 // CONTEXT.md: Bundle (Services & Pricing, Bundles tab).
 model Bundle {
-  id            String   @id // stable slug, e.g. "revival"
-  name          String
-  priceCents    Int
-  perks         String[]
-  internalNotes String?
-  active        Boolean  @default(true)
-  position      Int
+  id             String    @id // stable slug, e.g. "revival"
+  name           String
+  priceCents     Int
+  perks          String[]
+  pairServiceIds String[]  @default(["premium"]) // the Services every pair of the Bundle gets
+  endsAt         DateTime? // a promotion's last instant (exclusive); null = always on
+  internalNotes  String?
+  active         Boolean   @default(true)
+  position       Int
 
   orders Order[]
   images BundleImage[]

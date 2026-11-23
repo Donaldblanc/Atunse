@@ -1,5 +1,6 @@
 import Link from "next/link";
 import "@/styles/landing-theme.css";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
@@ -8,9 +9,15 @@ import { ArrowIcon } from "@/features/landing/arrow-icon";
 import { getGalleryImageUrl } from "@/features/landing/gallery";
 import { PROCESS_HERO_IMAGE, PROCESS_STEPS } from "@/features/landing/process";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Our Process — Atunṣe",
-};
+  description:
+    "How a restoration works, step by step: book, hand over your pair by Local Drop-Off or Mail-In, we clean and restore it, and you get it back fresh.",
+  path: "/process",
+});
+
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
 
 export default function ProcessPage() {
   return (

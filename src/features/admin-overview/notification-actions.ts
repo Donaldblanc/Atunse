@@ -19,10 +19,11 @@ const text = (formData: FormData, name: string) => {
 // A database id (cuid): the only thing allowed into the redirect URL.
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** One bell item: marks it read, then opens its Order's dialog (/admin?order=). */
+/** One bell item: marks it read, then opens its Order's dialog (/admin?order=); a low-stock one opens the low-stock Inventory list. */
 export async function openNotificationAction(formData: FormData): Promise<void> {
   const id = text(formData, "notificationId");
   const orderId = text(formData, "orderId");
+  const kind = text(formData, "kind");
 
   const actingUser = await actingUserFromCookies(await cookies());
   requireRole(actingUser, "ADMIN");
@@ -30,6 +31,8 @@ export async function openNotificationAction(formData: FormData): Promise<void> 
   await markNotificationsRead(buildOrderUseCaseDeps(), actingUser, { ids: [id] });
 
   revalidatePath("/admin");
+  // The Notification has no field for an inventory item, so it opens the low-stock list.
+  if (kind === "LOW_STOCK") redirect("/admin/inventory?status=LOW_STOCK");
   redirect(ID_PATTERN.test(orderId) ? `/admin?order=${encodeURIComponent(orderId)}` : "/admin");
 }
 

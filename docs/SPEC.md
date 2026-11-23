@@ -74,7 +74,7 @@ prove it against.
 
 **Phase 1 — booking submission connected end to end (single pair).**
 - `/booking` → `POST /api/v1/uploads` → presigned photo uploads → `POST /api/v1/orders` → `submitOrder`. A single-pair booking lands in Postgres with its photos, Services, material, Fulfillment Method, address, Local Drop-Off collection slot or preferred mail-in date, Rush and contact name.
-- The estimate and 50% Deposit are computed server-side from `src/features/orders/service-catalog.ts`. The browser's display prices in `services-data.ts` are kept in step by a parity test; client-sent prices are ignored.
+- The estimate and 50% Deposit are computed server-side from the `services`/`bundles` tables (ADR-0016 step 2) by `src/features/orders/service-catalog.ts`. The browser shows the same catalog, passed down from the page; client-sent prices are ignored.
 - Server-side rules: Policy Acceptance, Local Drop-Off only in NY/NJ/CT within the 8:00 AM–10:00 PM collection window, no past dates (New York time), one cleaning tier per pair, 1–10 photos with server-minted keys.
 - Submission is idempotent on an `Idempotency-Key` header: a retried Confirm returns the same Order and sends no second email.
 - The confirmation (in-flow, and in the email) shows the order reference, estimate, Deposit and Zelle instructions from `ZELLE_RECIPIENT`/`ZELLE_NAME`.
@@ -108,14 +108,14 @@ prove it against.
   - The shell (black sidebar, search, account menu) lists every designed screen; unbuilt ones show "Soon" and nothing links to them (`src/app/admin/admin-screens.ts`). Search is disabled until the Orders screen exists.
 - **Data model mirrors the admin screens** ([ADR-0016](adr/0016-admin-data-model-and-catalog-in-database.md)):
   - Payments (incl. Apple Pay, failed and refunded) and Appointments (with status and assignee).
-  - Services and Bundles (seeded from `service-catalog.ts`, parity-tested; with categories, suede fees and image galleries).
+  - Services and Bundles (with categories, suede fees, image galleries, a Bundle's pair Services and offer end): the source of every price on the site.
   - Inventory Items with stock history and Suppliers.
   - Conversations, Messages and attachments.
   - Reviews, Notes, Notifications.
-  - Business settings and operating hours (seeded to match the booking flow, parity-tested).
+  - Business settings and operating hours: booking's collection slots and offered Fulfillment Methods come from them.
   - Order numbers (ATU-1001 on), customer names, item size, colorway and condition. Booking creates each Order's PENDING Deposit Payment and, for Local Drop-Off, its COLLECTION Appointment.
 - Not built yet:
-  - Booking still prices from `service-catalog.ts`; switching it (and the Services page) to the `services`/`bundles` tables is step 2 of ADR-0016.
+  - Booking, the Services page and the homepage read the `services`/`bundles` tables and Settings (ADR-0016 step 2, done).
   - No Balance Payment is created or collected yet. The quote email only states the balance.
   - The owner isn't told about new bookings: no email, and no Orders screen.
   - The other admin working screens (Orders, Customers, Services & Pricing, Inventory, Payments, Messages, Reviews, Settings).
@@ -131,7 +131,7 @@ prove it against.
   - **Review:** Policy Acceptance checkbox, then Confirm Booking submits.
 - **Bundles** book three Items in one Order. The Bundle flow is the default for a bare `/booking`.
   - Each pair has its own details and photos, and Review shows all three.
-  - Bundle names, prices and perks come from `BUNDLE_CATALOG` in `service-catalog.ts`, which the server also prices from.
+  - Bundle names, prices and perks come from the `bundles` table, which the server also prices from.
   - Every pair is booked as Premium Clean with the Suede Fee waived. The Order keeps the Bundle id, and the shop assigns the one- or two-pair perks after inspection.
 
 ## Build sequence
@@ -177,7 +177,7 @@ The admin follows the approved design images (`scratch/01-09`); the data model a
 4. **Calendar** (built) — a month grid of Local Drop-Off collection and return Appointments; a visit opens the Overview's Schedule Item dialog for its details, Reschedule and Mark as Completed.
 5. **Customers** — list and detail: contact info, bookings, last booking.
 6. **Services & Pricing** — Services and Bundles: prices, descriptions, active or not.
-7. **Inventory** — supplies with stock and low-stock alerts, and their Suppliers.
+7. **Inventory** (built) — supplies with stock and low-stock alerts, and their Suppliers.
 8. **Payments** — every Deposit, Balance and Full payment, by method and status.
 9. **Messages** — an inbox of Conversations with customers, usually about an Order (unread, archived, channels, attachments).
 10. **Reviews** — ratings and reviews per Order, moderation (publish/hide), replies, Request Review.

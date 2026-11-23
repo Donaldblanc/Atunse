@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { collectionTimes } from "@/features/orders/pickup-window";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
@@ -55,7 +56,7 @@ function booking(items: NewItemInput[] = [pair()]): NewOrderInput {
 
 function setup() {
   const orders = new InMemoryOrderRepository();
-  return { orders, photoUrl: async (key: string) => `https://photos.test/${key}` };
+  return { orders, catalog: { load: async () => DEFAULT_CATALOG }, photoUrl: async (key: string) => `https://photos.test/${key}` };
 }
 
 describe("getScheduledVisit", () => {

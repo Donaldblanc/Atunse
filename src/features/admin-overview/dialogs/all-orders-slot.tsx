@@ -9,6 +9,7 @@ export const matchesAllOrders = (params: OverviewParams) => params.orders === "a
 
 export async function AllOrdersSlot({ params, selection, actingUser, now }: OverviewDialogContext) {
   const range = overviewRange(selection, now);
-  const list = await searchOrders(buildFindOrdersDeps(), actingUser, parseOrdersQuery(params), range);
-  return <AllOrdersDialog list={list} selection={selection} filterLabel={ordersFilterLabel(list.query, formatRangeDates(range))} />;
+  const deps = buildFindOrdersDeps();
+  const list = await searchOrders(deps, actingUser, parseOrdersQuery(params), range);
+  return <AllOrdersDialog list={list} selection={selection} filterLabel={ordersFilterLabel(await deps.catalog.load(), list.query, formatRangeDates(range))} />;
 }

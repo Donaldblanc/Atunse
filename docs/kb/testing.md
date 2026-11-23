@@ -22,8 +22,7 @@
 
 ## Guard tests worth knowing
 - `copy-rules.test.ts`: banned customer-facing claims and words, such as "pickup" and guarantees.
-- `service-catalog` parity tests: client display prices must equal server prices.
-- `pickup-window` integration test: booking slots must match the `operating_hours` seed.
+- Catalog and Settings come from the database (ADR-0016 step 2): unit tests pass `DEFAULT_CATALOG` / `DEFAULT_SITE_SETTINGS` (`orders/default-catalog.ts`); nothing at runtime imports it.
 
 ## Browser checks (Playwright, not a repo dependency)
 - Install it in your scratchpad: `npm i playwright@^1 && npx playwright install chromium`.

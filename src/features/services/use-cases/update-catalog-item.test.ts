@@ -99,7 +99,7 @@ describe("updateBundle", () => {
   it("throws for a Bundle that doesn't exist", async () => {
     const catalog = new InMemoryCatalogRepository();
     await expect(
-      updateBundle({ catalog }, ADMIN, { bundleId: "missing", name: "Name", priceCents: 1, perks: [], active: true, internalNotes: null, expectedUpdatedAt: LOADED }),
+      updateBundle({ catalog }, ADMIN, { bundleId: "missing", name: "Name", priceCents: 1, perks: [], active: true, endsAt: null, internalNotes: null, expectedUpdatedAt: LOADED }),
     ).rejects.toThrow(BundleNotFoundError);
   });
 
@@ -110,18 +110,29 @@ describe("updateBundle", () => {
     const updated = await updateBundle(
       { catalog },
       ADMIN,
-      { bundleId: "revival", name: "The Revival Pack", priceCents: 16000, perks: ["Perk one", "  ", "Perk two"], active: true, internalNotes: null, expectedUpdatedAt: LOADED },
+      { bundleId: "revival", name: "The Revival Pack", priceCents: 16000, perks: ["Perk one", "  ", "Perk two"], active: true, endsAt: null, internalNotes: null, expectedUpdatedAt: LOADED },
     );
 
     expect(updated.priceCents).toBe(16000);
     expect(updated.perks).toEqual(["Perk one", "Perk two"]);
   });
 
+  it("sets and clears the Offer ends instant", async () => {
+    const catalog = new InMemoryCatalogRepository();
+    catalog.bundles.set("revival", makeBundle());
+    const endsAt = new Date("2026-12-22T05:00:00Z");
+    const input = { bundleId: "revival", name: "The Revival Pack", priceCents: 15000, perks: [], active: true, internalNotes: null };
+    const set = await updateBundle({ catalog }, ADMIN, { ...input, endsAt, expectedUpdatedAt: LOADED });
+    expect(set.endsAt).toEqual(endsAt);
+    const cleared = await updateBundle({ catalog }, ADMIN, { ...input, endsAt: null, expectedUpdatedAt: set.updatedAt });
+    expect(cleared.endsAt).toBeNull();
+  });
+
   it("refuses a stale Bundle form", async () => {
     const catalog = new InMemoryCatalogRepository();
     catalog.bundles.set("revival", makeBundle({ updatedAt: new Date("2026-02-01T00:00:00Z") }));
     await expect(
-      updateBundle({ catalog }, ADMIN, { bundleId: "revival", name: "The Revival Pack", priceCents: 1, perks: [], active: true, internalNotes: null, expectedUpdatedAt: LOADED }),
+      updateBundle({ catalog }, ADMIN, { bundleId: "revival", name: "The Revival Pack", priceCents: 1, perks: [], active: true, endsAt: null, internalNotes: null, expectedUpdatedAt: LOADED }),
     ).rejects.toThrow(CatalogChangedError);
     expect(catalog.bundles.get("revival")?.priceCents).toBe(15000);
   });

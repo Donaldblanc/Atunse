@@ -1,14 +1,21 @@
+import Link from "next/link";
 import { Calendar, Package, Sparkles, SportShoe } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import { Suspense } from "react";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { BookingFlow } from "@/features/booking/booking-flow";
+import { loadCatalog } from "@/features/services/site-catalog";
+import { loadSiteSettings } from "@/features/settings/site-settings";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Book a Restoration — Atunṣe",
-};
+  description:
+    "Book a sneaker cleaning or restoration in a few steps: choose a service, add your pair's details, and pick Local Drop-Off in NY/NJ/CT or Mail-In.",
+  path: "/booking",
+});
 
 const HOW_IT_WORKS = [
   {
@@ -33,9 +40,15 @@ const HOW_IT_WORKS = [
   },
 ];
 
-export default function BookingPage() {
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
+
+export default async function BookingPage() {
   // Read on the server so the address never needs a NEXT_PUBLIC variable.
   const cancelEmail = process.env.CONTACT_EMAIL?.trim() || null;
+  const [catalog, settings] = await Promise.all([loadCatalog(), loadSiteSettings()]);
+  // Settings can switch both Fulfillment Methods off: nothing can be booked online then.
+  const bookingOpen = settings.allowLocalDropOff || settings.allowMailIn;
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="booking" />
@@ -69,9 +82,20 @@ export default function BookingPage() {
         </div>
       </div>
 
-      <Suspense fallback={null}>
-        <BookingFlow cancelEmail={cancelEmail} />
-      </Suspense>
+      {bookingOpen ? (
+        <Suspense fallback={null}>
+          <BookingFlow cancelEmail={cancelEmail} catalog={catalog} settings={settings} />
+        </Suspense>
+      ) : (
+        <div className="landing-section-head booking-page-how-head">
+          <div>
+            <h2>We&rsquo;re not taking online bookings right now.</h2>
+            <p>
+              Please <Link href="/contact?topic=booking" className="landing-link-arrow">contact us</Link> and we&rsquo;ll help you directly.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="landing-section-head booking-page-how-head">
         <div>

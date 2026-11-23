@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check, Clock, Palette, Sparkles, Wrench } from "lucide-react";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
 import { SiteFooter } from "@/features/landing/site-footer";
@@ -7,27 +8,28 @@ import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 import { ArrowIcon } from "@/features/landing/arrow-icon";
-import { catalogService, formatPrice, formatServicePrice, suedeFeeNote } from "@/features/orders/service-catalog";
+import { findService, formatPrice, formatServicePrice, suedeFeeNote, type Catalog, type CatalogService } from "@/features/orders/service-catalog";
+import { loadCatalog } from "@/features/services/site-catalog";
 
-// Every price on this page comes from SERVICE_CATALOG, the same source the
-// booking flow and the server's estimate use.
-const standard = catalogService("standard");
-const premium = catalogService("premium");
-const oxidation = catalogService("oxidation");
-const painting = catalogService("painting");
-const reglue = catalogService("reglue");
-
-export const metadata = {
+export const metadata = pageMetadata({
   title: "Services & Pricing — Atunṣe",
-};
+  description:
+    "Sneaker cleaning, restoration and custom work with published prices: Standard and Premium Clean, sole and midsole restoration, add-ons and three-pair bundles.",
+  path: "/services",
+});
 
-const CLEANING_PLANS = [
-  {
-    serviceId: "standard",
-    label: "STANDARD CLEAN",
-    price: formatServicePrice(standard),
-    priceNote: standard.suedeFee ? suedeFeeNote(false) : undefined,
-    description: "A deep, thorough clean to keep your sneakers looking and feeling fresh.",
+// Every price on this page comes from the catalog the owner edits in admin,
+// the same one the booking flow and the server's estimate use. A Service
+// that's switched off isn't listed. Checklists and titles are page copy.
+
+/** The active Service with this id, or null when it's missing or switched off. */
+function activeService(catalog: Catalog, id: string): CatalogService | null {
+  const service = findService(catalog, id);
+  return service?.active ? service : null;
+}
+
+const CLEANING_COPY = {
+  standard: {
     checklist: [
       "Laces detached & scrubbed clean",
       "Uppers thoroughly deep-cleaned",
@@ -39,12 +41,7 @@ const CLEANING_PLANS = [
     cta: "Book Standard Clean",
     badge: undefined as string | undefined,
   },
-  {
-    serviceId: "premium",
-    label: "PREMIUM CLEAN",
-    price: formatServicePrice(premium),
-    priceNote: premium.suedeFee ? suedeFeeNote(false) : undefined,
-    description: "Our most detailed clean, designed for high-end and heavily worn pairs.",
+  premium: {
     checklist: [
       "Targeted stain treatment",
       "Careful handling of premium materials",
@@ -54,33 +51,58 @@ const CLEANING_PLANS = [
     cta: "Book Premium Clean",
     badge: "MOST POPULAR" as string | undefined,
   },
-];
+};
 
-const RESTORATION_SERVICES = [
-  {
-    icon: Sparkles,
-    title: "OXIDATION RESTORATION",
-    description: "Treats yellowing and discoloration to brighten oxidized soles and midsoles.",
-    subitems: [
-      { label: (oxidation.minimumLabel ?? "From").toUpperCase(), price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
-      ...(oxidation.alsoFrom ?? []).map((part) => ({ label: part.label.toUpperCase(), price: `From ${formatPrice(part.cents, true)}` })),
-    ],
-  },
-  {
-    icon: Palette,
-    title: "SNEAKER PAINTING & DYEING",
-    description: "Custom color changes, touch-ups, and dye work to refresh, restore, or transform your shoes.",
-    price: formatPrice(painting.baseCents, painting.isMinimum),
-  },
-  {
-    icon: Wrench,
-    title: "REGLUE",
-    description: "Professional repair for sole separation, reattaching soles that have come loose.",
-    price: formatPrice(reglue.baseCents, reglue.isMinimum),
-  },
-];
+function cleaningPlans(catalog: Catalog) {
+  return (Object.keys(CLEANING_COPY) as (keyof typeof CLEANING_COPY)[]).flatMap((serviceId) => {
+    const service = activeService(catalog, serviceId);
+    if (!service) return [];
+    return [
+      {
+        serviceId,
+        label: service.name.toUpperCase(),
+        price: formatServicePrice(service),
+        priceNote: service.suedeFeeCents > 0 ? suedeFeeNote(service.suedeFeeCents, false) : undefined,
+        description: service.description,
+        ...CLEANING_COPY[serviceId],
+      },
+    ];
+  });
+}
 
-export default function ServicesPage() {
+function restorationServices(catalog: Catalog) {
+  const oxidation = activeService(catalog, "oxidation");
+  const painting = activeService(catalog, "painting");
+  const reglue = activeService(catalog, "reglue");
+  return [
+    ...(oxidation
+      ? [
+          {
+            icon: Sparkles,
+            title: oxidation.name.toUpperCase(),
+            description: oxidation.description,
+            price: undefined as string | undefined,
+            subitems: [
+              { label: (oxidation.minimumLabel ?? "From").toUpperCase(), price: `From ${formatPrice(oxidation.baseCents, oxidation.isMinimum)}` },
+              ...(oxidation.alsoFrom ?? []).map((part) => ({ label: part.label.toUpperCase(), price: `From ${formatPrice(part.cents, true)}` })),
+            ],
+          },
+        ]
+      : []),
+    ...(painting
+      ? [{ icon: Palette, title: painting.name.toUpperCase(), description: painting.description, price: formatPrice(painting.baseCents, painting.isMinimum), subitems: undefined }]
+      : []),
+    ...(reglue ? [{ icon: Wrench, title: reglue.name.toUpperCase(), description: reglue.description, price: formatPrice(reglue.baseCents, reglue.isMinimum), subitems: undefined }] : []),
+  ];
+}
+
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
+
+export default async function ServicesPage() {
+  const catalog = await loadCatalog();
+  const CLEANING_PLANS = cleaningPlans(catalog);
+  const RESTORATION_SERVICES = restorationServices(catalog);
   return (
     <div className="landing" id="landing-root">
       <SiteNav active="services" />

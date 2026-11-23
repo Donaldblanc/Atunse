@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SITE_SETTINGS } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { Money } from "@/shared/money/money";
 import type { Fulfillment } from "../domain";
@@ -44,7 +45,7 @@ async function seed(fulfillment: Fulfillment = validBookingInput().fulfillment) 
     alertBody: "Jordan · Standard Clean · Mail-In",
     items: [{ brand: null, model: null, description: null, material: null, serviceIds: ["premium"], estimate: Money.fromCents(4000), requiresQuote: true, photos: [] }],
   });
-  return { orders, order, notifications, deps: { orders, notifications, now: () => FIXED_NOW } };
+  return { orders, order, notifications, deps: { orders, notifications, settings: { load: async () => DEFAULT_SITE_SETTINGS }, now: () => FIXED_NOW } };
 }
 
 describe("addOrderNote audit", () => {

@@ -76,7 +76,7 @@ export function EditServiceForm({ service, closeHref }: { service: ServiceRecord
           <span>
             <strong>Active</strong>
             <br />
-            <span className="sv-muted">Active in the admin catalog</span>
+            <span className="sv-muted">Shown on the site and bookable</span>
           </span>
         </label>
 
@@ -114,7 +114,7 @@ export function EditServiceForm({ service, closeHref }: { service: ServiceRecord
       {confirmingDelete && (
         <div className="sv-confirm" role="alertdialog" aria-label="Confirm delete service">
           <p>
-            <strong>Delete {service.name}?</strong> This deactivates it in the admin catalog. It stays on past orders. The booking page doesn&apos;t use these settings yet. It can be
+            <strong>Delete {service.name}?</strong> This removes it from the site and booking. It stays on past orders. It can be
             reactivated later from its Active toggle.
           </p>
           {deactivateState.error && (

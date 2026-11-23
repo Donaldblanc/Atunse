@@ -10,7 +10,10 @@ import { PrismaSettingsRepository } from "./repositories/prisma-settings-reposit
 export function buildSettingsDeps() {
   return {
     settings: new PrismaSettingsRepository(prisma),
-    storage: getFileStorage(),
+    /** Built on first use: it throws StorageNotConfiguredError when misconfigured. */
+    get storage() {
+      return getFileStorage();
+    },
     accounts: new PrismaAccountRepository(prisma),
     // Per-account budget for current-password checks (Account Settings).
     allowPasswordAttempt: async (accountId: string) =>

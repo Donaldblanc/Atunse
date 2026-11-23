@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewItemInput, NewOrderInput } from "@/features/orders/repositories/order-repository";
@@ -75,7 +76,7 @@ describe("getPendingPayments", () => {
     const cancelled = await book(orders, "2026-09-26T14:00:00Z");
     cancelled.items[0]!.status = "CANCELLED";
 
-    const rows = await getPendingPayments({ orders }, ADMIN);
+    const rows = await getPendingPayments({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN);
 
     expect(rows).toEqual([
       { paymentId: zelle.payments[0]!.id, kind: "DEPOSIT", orderId: zelle.id, reference: `ATU-${zelle.number}`, customerName: "Zoe Zelle", method: "ZELLE", methodLabel: "Zelle", amount: "$15", bookedOn: "Sep 28, 2026" },
@@ -91,14 +92,14 @@ describe("getPendingPayments", () => {
     ready.items[0]!.price = Money.fromCents(4000);
     ready.payments.push({ id: "pay_balance", kind: "BALANCE", method: "CASH", amount: Money.fromCents(2500), status: "PENDING", receivedAt: null, createdAt: new Date() });
 
-    const rows = await getPendingPayments({ orders }, ADMIN);
+    const rows = await getPendingPayments({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN);
 
     expect(rows).toEqual([expect.objectContaining({ paymentId: "pay_balance", kind: "BALANCE", method: "CASH", amount: "$25" })]);
     expect(await orders.summarizeAwaitingPayments()).toMatchObject({ payments: 1, amount: Money.fromCents(2500), byMethod: { CASH: 1 } });
   });
 
   it("is admin-only", async () => {
-    await expect(getPendingPayments({ orders: new InMemoryOrderRepository() }, { accountId: null, role: "GUEST" })).rejects.toThrow(UnauthorizedError);
+    await expect(getPendingPayments({ orders: new InMemoryOrderRepository(), catalog: { load: async () => DEFAULT_CATALOG } }, { accountId: null, role: "GUEST" })).rejects.toThrow(UnauthorizedError);
   });
 });
 
@@ -110,7 +111,7 @@ describe("getReadyToReturn", () => {
     ready.items[1]!.status = "READY_FOR_PICKUP_SHIPPING";
     await book(orders, "2026-09-27T14:00:00Z"); // still REQUEST_SUBMITTED
 
-    const rows = await getReadyToReturn({ orders }, ADMIN);
+    const rows = await getReadyToReturn({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN);
 
     expect(rows).toEqual([
       { orderId: ready.id, reference: `ATU-${ready.number}`, customerName: "Jordan Smith", pairsReady: 2, fulfillment: "Mail-In", bookedOn: "Sep 28, 2026", returnVisit: { kind: "none" } },
@@ -126,10 +127,10 @@ describe("getReadyToReturn", () => {
     );
     local.items[0]!.status = "READY_FOR_PICKUP_SHIPPING";
 
-    expect((await getReadyToReturn({ orders }, ADMIN))[0]!.returnVisit).toEqual({ kind: "bookable" });
+    expect((await getReadyToReturn({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN))[0]!.returnVisit).toEqual({ kind: "bookable" });
 
     const { appointment } = await orders.bookReturnAppointment({ orderId: local.id, startsAt: new Date("2026-10-08T14:00:00Z"), endsAt: new Date("2026-10-08T14:30:00Z") });
-    expect((await getReadyToReturn({ orders }, ADMIN))[0]!.returnVisit).toEqual({ kind: "booked", appointmentId: appointment.id, when: "Thu, Oct 8, 10:00 AM" });
+    expect((await getReadyToReturn({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN))[0]!.returnVisit).toEqual({ kind: "booked", appointmentId: appointment.id, when: "Thu, Oct 8, 10:00 AM" });
   });
 });
 
@@ -141,7 +142,7 @@ describe("getNeedsQuote", () => {
     booked.items[3]!.status = "UNDER_REVIEW"; // a cleaning-only pair needs no quote: not listed, not counted
     booked.items[2]!.status = "QUOTE_SENT"; // already quoted: not listed
 
-    const rows = await getNeedsQuote({ orders }, ADMIN);
+    const rows = await getNeedsQuote({ orders, catalog: { load: async () => DEFAULT_CATALOG } }, ADMIN);
 
     expect(rows.map((row) => [row.itemId, row.pair])).toEqual([
       [booked.items[0]!.id, "Nike Air Max 90"],

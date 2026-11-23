@@ -1,13 +1,20 @@
 import "@/styles/landing-theme.css";
 import { SiteNav } from "@/features/landing/site-nav";
+import { pageMetadata } from "@/shared/site/page-metadata";
 import { SiteFooter } from "@/features/landing/site-footer";
 import { MobileTabBar } from "@/features/landing/mobile-tabbar";
 import { MobileBookBar } from "@/features/landing/mobile-book-bar";
 import { BookRestorationCta } from "@/features/landing/book-restoration-cta";
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: "About — Atunṣe",
-};
+  description:
+    "The story behind Atunṣe and RestoredByDJ: sneaker cleaning and restoration in New York, done by hand.",
+  path: "/about",
+});
+
+// A safety net: an admin save revalidates the site at once; this catches anything that changed another way.
+export const revalidate = 3600;
 
 export default function AboutPage() {
   return (

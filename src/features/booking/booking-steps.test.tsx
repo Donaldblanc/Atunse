@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { Sparkles } from "lucide-react";
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG, DEFAULT_SITE_SETTINGS } from "@/features/orders/default-catalog";
 import { BOOKING_ACKNOWLEDGMENTS } from "@/features/orders/booking-terms";
 import { PRIVACY_POLICY, TERMS_AGREEMENT } from "@/shared/legal-documents";
 import { EMPTY_ADDRESS, EMPTY_CONTACT, EMPTY_PAIR } from "./booking-types";
@@ -8,12 +9,14 @@ import { CancelNotice } from "./cancel-notice";
 import { ConfirmationStep } from "./confirmation-step";
 import { ContactStep } from "./contact-step";
 import { ReviewStep } from "./review-step";
+import { SiteDataProvider } from "./site-data-context";
 import type { SubmitOrderResponse } from "./submit-booking";
 
 const CANCEL = "Need to cancel your booking or close your account?";
 
 function review(cancelEmail: string | null) {
   return renderToStaticMarkup(
+    <SiteDataProvider catalog={DEFAULT_CATALOG} settings={DEFAULT_SITE_SETTINGS}>
     <ReviewStep
       isBundle={false}
       bundlePairServices=""
@@ -31,7 +34,8 @@ function review(cancelEmail: string | null) {
       onEditPair={() => {}}
       onConfirm={async () => {}}
       cancelEmail={cancelEmail}
-    />,
+    />
+    </SiteDataProvider>,
   );
 }
 
