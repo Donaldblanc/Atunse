@@ -88,6 +88,8 @@ export interface UpdateBundleInput {
   priceCents: number;
   perks: string[];
   active: boolean;
+  /** The promotion's last instant (exclusive); null clears it. */
+  endsAt: Date | null;
   internalNotes: string | null;
   expectedUpdatedAt: Date;
 }
@@ -102,7 +104,7 @@ export async function updateBundle(deps: CatalogWriteDeps, actingUser: ActingUse
   const internalNotes = input.internalNotes?.trim() || null;
   if (internalNotes && internalNotes.length > NOTES_MAX) throw new CatalogValidationError(`Notes must be at most ${NOTES_MAX} characters.`);
 
-  const patch: BundleUpdate = { name, priceCents: input.priceCents, perks, active: input.active, internalNotes };
+  const patch: BundleUpdate = { name, priceCents: input.priceCents, perks, active: input.active, endsAt: input.endsAt, internalNotes };
   const updated = await deps.catalog.updateBundle(input.bundleId, patch, input.expectedUpdatedAt);
   if (!updated) throw new BundleNotFoundError(input.bundleId);
   return updated;

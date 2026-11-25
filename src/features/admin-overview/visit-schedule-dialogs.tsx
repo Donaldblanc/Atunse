@@ -2,6 +2,7 @@ import { CalendarPlusIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
 import type { ActingUser } from "@/features/accounts/authz";
 import { calendarDateInShopTime } from "@/features/orders/calendar-date";
+import { loadSiteSettings } from "@/features/settings/site-settings";
 import { AdminDialog } from "@/shared/ui/admin-dialog";
 import { overviewHref, rangeSearchParams, type OverviewSelection } from "./overview-range";
 import { getReturnBooking, type ReturnVisitSummary } from "./return-booking";
@@ -21,7 +22,7 @@ function rangeFields(selection: OverviewSelection): Record<string, string> {
  * visit. `calendarMonth` is set when the visit was opened from the Calendar
  * screen, so "Back"/close and the saved redirect return there.
  */
-export function RescheduleDialog({
+export async function RescheduleDialog({
   visit,
   selection,
   now,
@@ -48,6 +49,7 @@ export function RescheduleDialog({
       </AdminDialog>
     );
   }
+  const { hours } = await loadSiteSettings();
   const today = calendarDateInShopTime(now);
   const visitDay = calendarDateInShopTime(visit.startsAt);
   return (
@@ -62,6 +64,7 @@ export function RescheduleDialog({
         now={now.toISOString()}
         initialDate={visitDay < today ? today : visitDay}
         currentStartsAt={visit.startsAt.toISOString()}
+        hours={hours}
         cancelHref={backHref}
       />
     </AdminDialog>
@@ -122,6 +125,7 @@ export async function ReturnBookingDialog({ orderId, selection, actingUser, now 
         customer={booking.customer}
         now={now.toISOString()}
         initialDate={calendarDateInShopTime(now)}
+        hours={(await loadSiteSettings()).hours}
         cancelHref={backHref}
       />
     </AdminDialog>

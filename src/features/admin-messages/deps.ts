@@ -5,6 +5,7 @@ import { photoUrlOrNull } from "@/features/admin-overview/deps";
 import type { OrderDetailDeps } from "@/features/admin-overview/order-detail";
 import { PrismaAccountRepository } from "@/features/accounts/repositories/prisma-account-repository";
 import type { CustomerDetailDeps } from "@/features/admin-customers/customer-detail";
+import { loadCatalog } from "@/features/services/site-catalog";
 import { buildMessageDeps } from "@/features/messages/deps";
 
 // The real (Prisma-backed) implementations behind the Messages screen's page
@@ -15,6 +16,7 @@ export function buildAdminMessagesDeps(): ReturnType<typeof buildMessageDeps> & 
     ...buildMessageDeps(),
     orders: new PrismaOrderRepository(prisma),
     accounts: new PrismaAccountRepository(prisma),
+    catalog: { load: loadCatalog },
     photoUrl: async (key) => photoUrlOrNull(() => (storage ??= getFileStorage()), key),
   };
 }

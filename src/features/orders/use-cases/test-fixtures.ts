@@ -7,6 +7,7 @@ import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-rep
 import { InMemoryFileStorage } from "@/shared/storage/in-memory-file-storage";
 import { InMemoryOrderRepository } from "../repositories/in-memory-order-repository";
 import type { PairInput, SubmitOrderDeps, SubmitOrderInput } from "./submit-order";
+import { DEFAULT_CATALOG, DEFAULT_SITE_SETTINGS } from "../default-catalog";
 import { BOOKING_ACKNOWLEDGMENTS } from "../booking-terms";
 import { TERMS_AGREEMENT } from "@/shared/legal-documents";
 
@@ -40,6 +41,8 @@ export function bookingDeps<O extends Partial<SubmitOrderDeps> = object>(overrid
     paymentInstructions: { zelle: { recipient: "pay@restoredbydj.com", name: "RestoredByDJ" } } as PaymentInstructions,
     customerSignInEnabled: false, // the production default
     ownerInbox: null as string | null, // tests of the owner's email set it
+    catalog: { load: async () => DEFAULT_CATALOG },
+    settings: { load: async () => DEFAULT_SITE_SETTINGS },
     now: () => FIXED_NOW,
   };
   // Keep the concrete test doubles' types (e.g. `.sent`) unless overridden.

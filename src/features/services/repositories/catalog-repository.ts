@@ -26,6 +26,8 @@ export interface ServiceRecord {
   isMinimum: boolean;
   suedeFeeCents: number;
   minimumLabel: string | null;
+  /** Other published "from" prices for parts of the Service (display only). */
+  alsoFrom: { label: string; cents: number }[];
   internalNotes: string | null;
   active: boolean;
   position: number;
@@ -39,6 +41,10 @@ export interface BundleRecord {
   name: string;
   priceCents: number;
   perks: string[];
+  /** The Services every pair of the Bundle gets. */
+  pairServiceIds: string[];
+  /** A promotion's last instant (exclusive); null for an always-on Bundle. */
+  endsAt: Date | null;
   internalNotes: string | null;
   active: boolean;
   position: number;
@@ -63,6 +69,7 @@ export interface BundleUpdate {
   priceCents?: number;
   perks?: string[];
   active?: boolean;
+  endsAt?: Date | null;
   internalNotes?: string | null;
 }
 
@@ -71,6 +78,8 @@ export interface NewBundleInput {
   name: string;
   priceCents: number;
   perks: string[];
+  /** Defaults to ["premium"]. */
+  pairServiceIds?: string[];
   internalNotes?: string | null;
   position: number;
 }

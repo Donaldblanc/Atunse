@@ -7,7 +7,7 @@
 import { z } from "zod";
 import { orderNumber, type Order } from "../domain";
 import type { PaymentInstructions } from "../payment-instructions";
-import { BUNDLE_PAIRS, findBundle } from "../service-catalog";
+import { BUNDLE_PAIRS, bundleName, type Catalog } from "../service-catalog";
 import type { SubmitOrderInput } from "../use-cases/submit-order";
 
 const text = (max: number) => z.string().max(max);
@@ -82,7 +82,7 @@ export function parseSubmitOrderRequest(body: unknown, idempotencyKey: string | 
 }
 
 /** What the booking confirmation needs: no internal ids beyond the order's own. */
-export function toSubmitOrderResponse(order: Order, paymentInstructions: PaymentInstructions) {
+export function toSubmitOrderResponse(order: Order, paymentInstructions: PaymentInstructions, catalog: Catalog) {
   return {
     order: {
       id: order.id,
@@ -93,7 +93,7 @@ export function toSubmitOrderResponse(order: Order, paymentInstructions: Payment
       depositCents: order.deposit.cents,
       pairCount: order.items.length,
       /** The Bundle's name, or null for a single pair. */
-      bundleName: findBundle(order.bundleId)?.name ?? null,
+      bundleName: order.bundleId === null ? null : bundleName(catalog, order.bundleId),
     },
     paymentInstructions,
   };

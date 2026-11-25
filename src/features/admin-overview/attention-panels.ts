@@ -2,7 +2,7 @@ import type { ActingUser } from "@/features/accounts/authz";
 import { requireRole } from "@/features/accounts/authz";
 import { SHOP_TIMEZONE } from "@/features/orders/calendar-date";
 import { FULFILLMENT_LABELS, orderNumber, PAYMENT_METHOD_LABELS, type PaymentMethod } from "@/features/orders/domain";
-import { itemRequiresQuote } from "@/features/orders/service-catalog";
+import { itemRequiresQuote, type CatalogSource } from "@/features/orders/service-catalog";
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import { bookedDay, servicesSummary } from "./get-admin-overview";
 import { summarizeReturnVisit, type ReturnVisitSummary } from "./return-booking";
@@ -18,7 +18,7 @@ export function parseAttentionPanel(value: string | string[] | undefined): Atten
   return ATTENTION_PANELS.find((id) => id === value) ?? null;
 }
 
-export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingPayments" | "listWithItemsIn"> };
+export type AttentionPanelDeps = { orders: Pick<OrderRepository, "listAwaitingPayments" | "listWithItemsIn">; catalog: CatalogSource };
 
 export interface PendingPaymentRow {
   paymentId: string;
@@ -91,17 +91,18 @@ export interface NeedsQuoteRow {
 /** Pairs waiting on the owner's review or quote (the Overview's Needs a Quote count), oldest booking first. */
 export async function getNeedsQuote(deps: AttentionPanelDeps, actingUser: ActingUser): Promise<NeedsQuoteRow[]> {
   requireRole(actingUser, "ADMIN");
+  const catalog = await deps.catalog.load();
   const orders = await deps.orders.listWithItemsIn(["REQUEST_SUBMITTED", "UNDER_REVIEW"]);
   return orders.flatMap((order) =>
     order.items
-      .filter((item) => (item.status === "REQUEST_SUBMITTED" || item.status === "UNDER_REVIEW") && itemRequiresQuote(item.serviceIds))
+      .filter((item) => (item.status === "REQUEST_SUBMITTED" || item.status === "UNDER_REVIEW") && itemRequiresQuote(catalog, item.serviceIds))
       .map((item) => ({
         itemId: item.id,
         orderId: order.id,
         reference: orderNumber(order.number),
         customerName: order.contactName,
         pair: [item.brand, item.model].filter(Boolean).join(" ") || "Sneakers",
-        services: servicesSummary([item.serviceIds]),
+        services: servicesSummary(catalog, [item.serviceIds]),
         bookedOn: bookedDay.format(order.createdAt),
       })),
   );

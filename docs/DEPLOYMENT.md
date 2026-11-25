@@ -25,6 +25,8 @@ what replaces it later.
    | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | only needed if you run `prisma:seed` manually — not read at runtime | — |
    | `RESEND_API_KEY` / `EMAIL_FROM` | Resend API key and a sender on a verified domain; without both, emails (booking confirmations, sign-in codes) are only logged | unset, or a test key |
    | `CONTACT_EMAIL` | a **monitored** inbox for the `/contact` form (the Privacy Policy sends privacy requests there too); needs Resend configured to actually deliver. Unset: the form answers "unavailable" | unset (messages are only logged), or a test inbox |
+   | `SITE_URL` | the public origin once a custom domain exists (e.g. `https://example.com`): used for canonical URLs, Open Graph and the sitemap. Unset: Vercel's production hostname | unset |
+   | `CSP_REPORT_ONLY` | unset (the CSP is enforced); `true` only as a temporary fallback | unset |
    | `FEATURE_CUSTOMER_SIGN_IN_ENABLED` | `false` until Resend is live, then `true` (ADR-0014) | same |
    | `STORAGE_DRIVER` | `s3` (the default in production; `local` is refused) | `s3` |
    | `S3_BUCKET` | the photo bucket (Neon storage: `atunse-images`) | a separate preview bucket, or the same one |
@@ -129,9 +131,10 @@ characters or a placeholder: check the Vercel value first
    - Timing: compare the median of ~10 known-email and ~10 unknown-email
      wrong-password attempts. They should be within noise. This is an
      observation, not a CI assertion.
-3. **CSP:** browse landing, services, booking (with a photo upload) and
-   admin with the console open, and note any
-   `Content-Security-Policy-Report-Only` violations.
+3. **CSP:** it is enforced. Browse landing, services, booking (with a photo
+   upload) and admin with the console open; anything blocked shows as a
+   `Content-Security-Policy` error. Set `CSP_REPORT_ONLY=true` to fall back
+   to report-only while fixing it.
 4. **Normal flows:** admin sign-in, a single-pair and a Bundle booking with
    photos, customer email-code sign-in (if enabled), and sign-out.
 5. **Production.** Then monitor the logs for a day:

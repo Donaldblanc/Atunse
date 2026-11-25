@@ -58,3 +58,11 @@ The Service catalog was code (`src/features/orders/service-catalog.ts`), so the 
 - Tax and a Local Drop-Off fee are stored but never computed: whether, when and how they apply is an open question (CONTEXT.md).
 - Messaging moves into the MVP as an inbox (Conversations per customer, usually about an Order), replacing "messages inside Item detail only".
 - Not modeled yet (no design detail): Settings' Notifications, Payments, Shipping & Pickup, Email & Templates, Team and Billing tabs. Integrations (Stripe, email, SMS) stay environment configuration (ADR-0009, SPEC: feature toggles are env-only), shown as connected or not.
+
+## Amendment (2026-11-17): step 2 is done
+- Booking, `submitOrder`, the Services page, the homepage and every admin read take the catalog from the `services`/`bundles` tables (`loadCatalog`) and hours and Fulfillment Methods from Settings (`loadSiteSettings`). The pricing and slot functions are pure and take them as arguments.
+- Migration `20261117120000_catalog_site_fields` carries what lived only in code: `bundles.pairServiceIds`, `bundles.endsAt` and a non-null `services.alsoFrom`. Both parity tests are gone.
+- The Suede Fee is per Service (`suedeFeeCents`): a Suede pair is charged the largest fee among its Services, once. The Rush fee and the 50% Deposit stay code constants.
+- An inactive Service or Bundle can't be booked but still names past Items; an id missing from the catalog shows as the raw id.
+- Customer pages stay cached: an admin save calls `revalidatePath("/", "layout")`, and each page also revalidates hourly.
+- Settings' business name and contact details show in the footer and on the Contact page when set.

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { UnauthorizedError } from "@/features/accounts/authz";
 import { orderNumber, pairsPhrase } from "../domain";
-import { BUNDLE_PAIR_SERVICE_IDS } from "../service-catalog";
+import { DEFAULT_CATALOG, DEFAULT_SITE_SETTINGS } from "../default-catalog";
 import {
   BookingValidationError,
+  FulfillmentMethodUnavailableError,
   PolicyNotAcceptedError,
+  SlotOutsideHoursError,
   SignInRequiredError,
   SubmissionConflictError,
   submitOrder,
@@ -653,7 +655,7 @@ describe("submitOrder", () => {
       expect(a).toEqual(["premium"]);
       expect(a).not.toBe(b);
       expect(b).not.toBe(c);
-      expect(a).not.toBe(BUNDLE_PAIR_SERVICE_IDS);
+      expect(a).not.toBe(DEFAULT_CATALOG.bundles.find((bundle) => bundle.id === "revival")!.pairServiceIds);
     });
 
     it("never has more than 10 storage calls in flight for a 30-photo Bundle", async () => {
@@ -755,6 +757,83 @@ describe("submitOrder", () => {
       await submitOrder(deps, guest, validBookingInput());
       expect(deps.notifications.sent.map((m) => m.to)).toEqual(["customer@example.com"]);
       expect(deps.orders.notifications).toHaveLength(1);
+    });
+  });
+
+  describe("the catalog and Settings come from the database (ADR-0016)", () => {
+    const withCatalog = (change: (catalog: typeof DEFAULT_CATALOG) => typeof DEFAULT_CATALOG) => bookingDeps({ catalog: { load: async () => change(DEFAULT_CATALOG) } });
+    const withSettings = (change: (settings: typeof DEFAULT_SITE_SETTINGS) => typeof DEFAULT_SITE_SETTINGS) =>
+      bookingDeps({ settings: { load: async () => change(DEFAULT_SITE_SETTINGS) } });
+    const mailIn = { method: "MAIL_IN" as const, address: mailInAddress, preferredDate: null };
+
+    it("prices from the loaded catalog, not from the code defaults", async () => {
+      const deps = withCatalog((c) => ({ ...c, services: c.services.map((service) => (service.id === "standard" ? { ...service, baseCents: 3600 } : service)) }));
+      const order = await submitOrder(deps, guest, validBookingInput());
+      expect(order.items[0]?.estimate.cents).toBe(3600);
+    });
+
+    it("charges the largest Suede Fee among the pair's Services, once", async () => {
+      const deps = withCatalog((c) => ({
+        ...c,
+        services: c.services.map((service) => (service.id === "standard" ? { ...service, suedeFeeCents: 1500 } : service.id === "painting" ? { ...service, suedeFeeCents: 2500 } : service)),
+      }));
+      const order = await submitOrder(deps, guest, validBookingInput({ items: [validPair({ material: "Suede", serviceIds: ["standard", "painting"] })] }));
+      expect(order.items[0]?.estimate.cents).toBe(3000 + 4000 + 2500);
+    });
+
+    it("refuses an inactive Service, and one that no longer exists", async () => {
+      const deps = withCatalog((c) => ({ ...c, services: c.services.map((service) => (service.id === "standard" ? { ...service, active: false } : service)) }));
+      await expect(submitOrder(deps, guest, validBookingInput())).rejects.toThrow("Standard Clean isn't available any more.");
+      await expect(submitOrder(bookingDeps(), guest, validBookingInput({ items: [validPair({ serviceIds: ["nope"] })] }))).rejects.toThrow("Unknown service: nope");
+    });
+
+    it("refuses an inactive Add-on on a Bundle pair, and an inactive Bundle", async () => {
+      const noLaces = withCatalog((c) => ({ ...c, services: c.services.map((service) => (service.id === "laces" ? { ...service, active: false } : service)) }));
+      const input = validBundleInput("revival", { fulfillment: mailIn });
+      input.items[0] = { ...input.items[0]!, serviceIds: ["laces"] };
+      await expect(submitOrder(noLaces, guest, input)).rejects.toThrow("Lace Replacement isn't available any more.");
+
+      const noRevival = withCatalog((c) => ({ ...c, bundles: c.bundles.map((bundle) => (bundle.id === "revival" ? { ...bundle, active: false } : bundle)) }));
+      await expect(submitOrder(noRevival, guest, validBundleInput("revival", { fulfillment: mailIn }))).rejects.toThrow("The Revival Pack isn't available any more.");
+    });
+
+    it("gives a Bundle's pairs the Services the database says it has", async () => {
+      const deps = withCatalog((c) => ({ ...c, bundles: c.bundles.map((bundle) => (bundle.id === "revival" ? { ...bundle, pairServiceIds: ["standard"] } : bundle)) }));
+      const order = await submitOrder(deps, guest, validBundleInput("revival", { fulfillment: mailIn }));
+      expect(order.items.map((item) => item.serviceIds)).toEqual([["standard"], ["standard"], ["standard"]]);
+    });
+
+    it("refuses a Fulfillment Method Settings has switched off", async () => {
+      const noDropOff = withSettings((settings) => ({ ...settings, allowLocalDropOff: false }));
+      await expect(submitOrder(noDropOff, guest, validBookingInput())).rejects.toThrow("Local Drop-Off isn't available right now. Choose Mail-In instead.");
+      await expect(submitOrder(noDropOff, guest, validBookingInput({ fulfillment: mailIn }))).resolves.toBeDefined();
+
+      const noMailIn = withSettings((settings) => ({ ...settings, allowMailIn: false }));
+      await expect(submitOrder(noMailIn, guest, validBookingInput({ fulfillment: mailIn }))).rejects.toThrow("Mail-In isn't available right now. Choose Local Drop-Off instead.");
+
+      const neither = withSettings((settings) => ({ ...settings, allowLocalDropOff: false, allowMailIn: false }));
+      await expect(submitOrder(neither, guest, validBookingInput())).rejects.toThrow(FulfillmentMethodUnavailableError);
+      await expect(submitOrder(neither, guest, validBookingInput({ fulfillment: mailIn }))).rejects.toThrow("We're not taking online bookings right now.");
+    });
+
+    // 2026-10-03 is a Saturday (weekday 6).
+    const hoursOnSaturday = (row: Partial<(typeof DEFAULT_SITE_SETTINGS.hours)[number]>) =>
+      withSettings((settings) => ({ ...settings, hours: settings.hours.map((h) => (h.weekday === 6 ? { ...h, ...row } : h)) }));
+
+    it("refuses a slot outside that weekday's hours", async () => {
+      const deps = hoursOnSaturday({ opensAt: 9 * 60, closesAt: 16 * 60 });
+      await expect(submitOrder(deps, guest, validBookingInput())).rejects.toThrow(SlotOutsideHoursError);
+      await expect(submitOrder(deps, guest, validBookingInput())).rejects.toThrow("Choose a collection time from 9:00 AM – 4:00 PM.");
+      const address = { line1: "123 Main St", line2: null, city: "New York", state: "NY", zip: "10001" };
+      const inside = validBookingInput({ fulfillment: { method: "PICKUP", address, date: "2026-10-03", slot: "9:00 AM – 9:30 AM" } });
+      await expect(submitOrder(deps, guest, inside)).resolves.toBeDefined();
+    });
+
+    it("refuses a collection on a closed day, but not a Mail-In preferred date", async () => {
+      const deps = hoursOnSaturday({ isOpen: false });
+      await expect(submitOrder(deps, guest, validBookingInput())).rejects.toThrow("We're closed for collections on that day. Choose another date.");
+      const closedMailIn = validBookingInput({ fulfillment: { ...mailIn, preferredDate: "2026-10-03" } });
+      await expect(submitOrder(deps, guest, closedMailIn)).resolves.toBeDefined();
     });
   });
 });

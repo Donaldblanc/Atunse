@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
+import { lastShopDayBefore } from "@/features/orders/calendar-date";
 import type { BundleRecord } from "./repositories/catalog-repository";
 import { addBundleImageAction, removeBundleImageAction, requestBundleImageUploadAction, setBundleActiveAction, updateBundleAction, type CatalogFormState } from "./catalog-actions";
 import { CatalogImageUploader } from "./catalog-image-uploader";
@@ -37,12 +38,18 @@ export function EditBundleForm({ bundle, closeHref }: { bundle: BundleRecord; cl
           <textarea id="sv-bundle-perks" name="perks" defaultValue={bundle.perks.join("\n")} rows={4} className="sv-textarea" />
         </label>
 
+        <label className="sv-field" htmlFor="sv-bundle-ends">
+          <span className="sv-label">Offer ends (optional)</span>
+          <input id="sv-bundle-ends" name="endsOn" type="date" defaultValue={bundle.endsAt ? lastShopDayBefore(bundle.endsAt) : ""} className="sv-input" />
+          <span className="sv-muted">Last day customers can book it (New York time). Leave empty for no end date.</span>
+        </label>
+
         <label className="sv-toggle">
           <input type="checkbox" name="active" defaultChecked={bundle.active} />
           <span>
             <strong>Active</strong>
             <br />
-            <span className="sv-muted">Active in the admin catalog</span>
+            <span className="sv-muted">Shown on the site and bookable</span>
           </span>
         </label>
 
@@ -80,7 +87,7 @@ export function EditBundleForm({ bundle, closeHref }: { bundle: BundleRecord; cl
       {confirmingDelete && (
         <div className="sv-confirm" role="alertdialog" aria-label="Confirm delete bundle">
           <p>
-            <strong>Delete {bundle.name}?</strong> This deactivates it in the admin catalog. It stays on past orders. The booking page doesn&apos;t use these settings yet. It can be
+            <strong>Delete {bundle.name}?</strong> This removes it from the site and booking. It stays on past orders. It can be
             reactivated later from its Active toggle.
           </p>
           {deactivateState.error && (

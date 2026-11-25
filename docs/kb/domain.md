@@ -46,7 +46,7 @@ Never write "pickup" in customer-facing copy (`copy-rules.test.ts` enforces this
 - `confirmPayment(paymentId, method)` marks a Deposit or Balance received (Zelle or Cash, the owner may change the method).
 - Refund Payment (admin Payments screen, `refundBlock` in `payment-repository.ts`): Zelle/Cash only (card waits on Stripe); a Deposit or Balance only once every pair is cancelled. Record Payment saves kind `FULL`. The Failed/Refunded stat leaves out FAILED Balances (they mean cancelled).
 - Tax and the Local Drop-Off fee are stored but never computed (open question).
-- Prices come from `service-catalog.ts` on the server. The client's prices are ignored.
+- Prices come from the `services`/`bundles` tables, loaded on the server (`loadCatalog`) and priced by `service-catalog.ts`. The client's prices are ignored; an inactive Service or Bundle can't be booked but still names past Items.
 
 ## Order numbers
 `ATU-<number>` from a DB sequence starting at 1001. The sequence never resets, so gaps are normal.

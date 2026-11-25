@@ -96,7 +96,7 @@ export function SettingsForm({ business, hours, idempotencyKey }: { business: Bu
 
       <section id="operating-hours" className="ov-card st-card">
         <h2 className="ov-card-title">Operating Hours</h2>
-        <p className="st-hint">These hours are saved but booking doesn&apos;t use them yet — /booking still reads its own schedule.</p>
+        <p className="st-hint">These hours decide which collection times customers can book for Local Drop-Off. A closed day has none. Mail-In isn&apos;t limited by them.</p>
         <div className="st-hours-grid">
           {hours.map((row, index) => {
             const hv = hoursValues[index];
@@ -125,8 +125,7 @@ export function SettingsForm({ business, hours, idempotencyKey }: { business: Bu
       <section className="ov-card st-card">
         <h2 className="ov-card-title">Booking Settings</h2>
         <p className="st-hint">
-          These choose which Fulfillment Methods the booking flow offers once it reads Settings — it still reads its own schedule today, so a change here
-          doesn&apos;t yet change what customers see on /booking.
+          These choose which Fulfillment Methods customers can book. If both are off, the booking page asks them to contact you instead.
         </p>
         <label className="st-toggle">
           <input type="checkbox" name="allowLocalDropOff" checked={values.allowLocalDropOff} onChange={(event) => setValues({ ...values, allowLocalDropOff: event.target.checked })} />

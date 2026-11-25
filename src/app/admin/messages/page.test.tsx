@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActingUser } from "@/features/accounts/authz";
 import { InMemoryAccounts } from "@/features/accounts/repositories/in-memory-repositories";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { InMemoryMessageRepository } from "@/features/messages/repositories/in-memory-message-repository";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
 import type { NewOrderInput } from "@/features/orders/repositories/order-repository";
@@ -15,7 +16,7 @@ const messages = new InMemoryMessageRepository();
 const accounts = new InMemoryAccounts();
 const orders = new InMemoryOrderRepository();
 vi.mock("@/features/admin-messages/deps", () => ({
-  buildAdminMessagesDeps: () => ({ messages, accounts, orders, notifications: { sendEmail: async () => {} }, now: () => new Date("2026-10-11T12:00:00Z"), photoUrl: async () => null }),
+  buildAdminMessagesDeps: () => ({ messages, accounts, orders, notifications: { sendEmail: async () => {} }, catalog: { load: async () => DEFAULT_CATALOG }, now: () => new Date("2026-10-11T12:00:00Z"), photoUrl: async () => null }),
 }));
 
 const { default: AdminMessagesPage } = await import("./page");

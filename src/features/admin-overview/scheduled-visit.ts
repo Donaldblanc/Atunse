@@ -5,11 +5,13 @@ import { liveEstimate, livePairs, orderNumber, planVisitMoves, type Address, typ
 import type { OrderRepository } from "@/features/orders/repositories/order-repository";
 import type { Money } from "@/shared/money/money";
 import { servicesSummary, visitTime, type AdminOverviewDeps } from "./get-admin-overview";
+import { quoteCheck, type CatalogSource } from "@/features/orders/service-catalog";
 import { pairPhoto, type PairPhoto } from "./pair-photo";
 
 export interface ScheduledVisitDeps {
   orders: Pick<OrderRepository, "findAppointment">;
   photoUrl: AdminOverviewDeps["photoUrl"];
+  catalog: CatalogSource;
 }
 
 /** Everything the Schedule Item dialog shows about one Appointment (design: "Schedule Item"). */
@@ -81,6 +83,7 @@ export async function getScheduledVisit(
   const found = await deps.orders.findAppointment(appointmentId);
   if (!found) return null;
   const { appointment, order } = found;
+  const catalog = await deps.catalog.load();
 
   // Like Recent Orders: the live pairs, or, for a fully cancelled Order, every pair.
   const live = livePairs(order);
@@ -98,7 +101,7 @@ export async function getScheduledVisit(
     date: visitDate.format(calendarDateToUtcMidnight(calendarDateInShopTime(appointment.startsAt))),
     notes: appointment.notes?.trim() || null,
     pairLabels: Object.fromEntries(order.items.map((item, index) => [item.id, pairLabel(order, index)])),
-    plan: appointment.status === "SCHEDULED" ? planVisitMoves(appointment.kind, order) : { moves: [], stays: [] },
+    plan: appointment.status === "SCHEDULED" ? planVisitMoves(quoteCheck(catalog), appointment.kind, order) : { moves: [], stays: [] },
     customer: { name: order.contactName, phone: order.contactPhone, email: order.contactEmail, address: formatAddress(order.fulfillment.address) },
     order: {
       id: order.id,
@@ -108,7 +111,7 @@ export async function getScheduledVisit(
       pairCount: pairs.length,
       estimate: live.length > 0 ? liveEstimate(order) : order.estimate,
       estimateIsMinimum: order.estimateIsMinimum,
-      services: servicesSummary(pairs.map((item) => item.serviceIds)),
+      services: servicesSummary(catalog, pairs.map((item) => item.serviceIds)),
     },
   };
 }

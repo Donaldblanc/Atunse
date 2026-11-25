@@ -76,7 +76,7 @@ export function BeforeAfterCarousel({ images }: { images: BeforeAfterImage[] }) 
                 </div>
               )}
               <div className="landing-ba-caption">{image.caption}</div>
-              <div className="landing-ba-service-line">{image.serviceLine}</div>
+              {image.serviceLine && <div className="landing-ba-service-line">{image.serviceLine}</div>}
             </div>
           );
         })}

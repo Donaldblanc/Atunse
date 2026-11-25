@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_CATALOG } from "@/features/orders/default-catalog";
 import { UnauthorizedError, type ActingUser } from "@/features/accounts/authz";
 import { ITEM_STATUSES } from "@/features/orders/domain";
 import { InMemoryOrderRepository } from "@/features/orders/repositories/in-memory-order-repository";
@@ -74,6 +75,7 @@ function setup() {
   return {
     orders,
     photoUrl: async (key: string) => `https://photos.test/${key}`,
+    catalog: { load: async () => DEFAULT_CATALOG },
   };
 }
 

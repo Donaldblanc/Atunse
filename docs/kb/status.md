@@ -1,4 +1,4 @@
-# Build status (as of 2026-10-02: Release 0.5.0 plus the actionable Overview)
+# Build status (as of 2026-11-17: `feature/admin-inventory`, PR against develop; main is Release 0.7.1)
 
 Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md`.
 
@@ -37,20 +37,34 @@ Full detail: `docs/SPEC.md` ("Where the build stands"). Open work: `docs/TODO.md
 - **Admin Calendar** (`/admin/calendar`): a month grid of scheduled visits, built on `getAdminCalendar` (same `listAppointmentsBetween` query and live-visit filter as Today's Schedule). A visit opens the Overview's Schedule Item dialog (`/admin?visit=`) for its details, Reschedule and Mark as Completed.
 - **Orders list** (`/admin/orders`): search, status tabs, day/service filters and paging, reusing the Overview's All-orders logic. Rows link to `/admin/orders/[id]`.
 - **Quote gate scoped to Restoration/Custom-Work** (ADR-0017, supersedes ADR-0001): a Cleaning/Add-on-only Item is created already Approved at its estimate (no Under Review, no Quote). Only a Restoration/Custom-Work Item goes through Send Quote/Customer approved.
+  Admin never shows or offers Under Review, Quote Sent or Approved for a pair that needs no quote: it reads Request Submitted (#157).
+- **Order detail extras:** per-Service prices, Suede fee and Bundle price (#149); an Order-level audit log for contact edits, notes and reschedules (#150).
+- **Payments** (`/admin/payments`, #161): list with method/status breakdown, Record Payment, manual (Zelle/Cash) refunds. A Deposit/Balance can't be refunded while the Order has live pairs; card refunds wait on Stripe.
+- **Services & Pricing** (`/admin/services`, #162): Services and Bundles tables with edit panels, images, deactivate (never delete), stale-form check, and a Bundle's "Offer ends" date. **The site and booking read these tables** (ADR-0016 step 2): a save shows on the customer pages at once.
+- **Inventory** (`/admin/inventory`): stat cards, filters (search, category, status, supplier), paged table, item panel (Details edit + Adjust stock + images, Stock History, Supplier + Add supplier), Add Item dialog. No delete (Deactivate/Reactivate; status is derived from stock); no "vs last month" trends, column sorting or Related tab.
+- **Messages** (`/admin/messages`, #163): inbox with search, status tabs, channel filter, paging, thread view with Mark read and email reply, New Message (emails the customer), archive.
+- **Settings** (`/admin/settings`, #164): Business Profile (details, logo, hours, Local Drop-Off/Mail-In switches) and the admin's own account. **Read by the customer site:** collection slots come from each weekday's hours, a switched-off Fulfillment Method isn't offered (and is refused by `submitOrder`), and the footer and Contact page show the business name and contact details.
+- **Admin security hardening** (#168): revocable sessions (`Account.sessionVersion`), `__Host-` cookies, scrypt N=2^17 with rehash on login, email change needs the password, rate-limited password checks, Origin/JSON guards on admin API routes (ADR-0014 amendment, `gotchas.md`).
+- **Booking age check and cancellation** (#167): birth month/year on Your Info, 18+ enforced server-side and stored on the Order; "Need to cancel? Email us at `CONTACT_EMAIL`" on Review, Confirmation and the confirmation email.
+- **Copyright Policy** (`/copyright`, #165): DMCA notice and counter-notice page, hidden (404, no footer link) until `DMCA_AGENT_*` are set.
+- **Accessibility** (#166): reviews carousel Pause/Resume, marquee stops on reduced motion, `aria-current` on the tab bar; no accessibility overlay, by decision (TODO, Accessibility).
+
+- **Admin controls the front end** (ADR-0016 step 2): `loadCatalog()` (`features/services/site-catalog.ts`) and `loadSiteSettings()` (`features/settings/site-settings.ts`) feed the pages, the booking flow (`booking/site-data-context.tsx`) and `submitOrder`. The pricing and slot functions take the catalog and hours as arguments; `orders/default-catalog.ts` is for tests only. Admin saves call `revalidatePath("/", "layout")`; customer pages also revalidate hourly.
+- **My bookings** (`/account`, behind `FEATURE_CUSTOMER_SIGN_IN_ENABLED`): a signed-in customer's own Orders (pairs, status, visit, Deposit/Balance, photos), read-only; signed-out visitors get the email-code sign-in inline.
+- **SEO and launch polish:** per-page titles, descriptions, canonical and Open Graph tags (`shared/site/page-metadata.ts`), `robots.txt`, `sitemap.xml`, a favicon (`app/icon.svg`, placeholder mark), a custom 404, WebP hero images, noindex outside production. `SITE_URL` sets the public origin.
+- **CSP enforced** (`next.config.mjs`); `CSP_REPORT_ONLY=true` falls back to report-only. Scripts still allow `'unsafe-inline'` (nonces would make every page dynamic).
+- **Indexes** for the Overview schedule, a customer's Orders, an Order's pairs, pair status and the Payments list.
+- **Bell notifications** for received payments and low stock (written in the same transaction as the change); the Low Stock dialog links to Inventory.
 
 ## Not built (admin screens in SPEC's inventory)
-Services & Pricing, Inventory, Payments, Messages, Settings. Unbuilt screens
-show "Soon" in the sidebar (`src/app/admin/admin-screens.ts`). Until they
-exist, the Overview's dialogs cover the day-to-day actions.
+None: every sidebar entry is built.
 
 ## Top open items (see TODO.md for the rest)
-- **Launch blocker:** set `CONTACT_EMAIL` and Resend (`RESEND_API_KEY`, `EMAIL_FROM`) in production. Without them, no owner email for new bookings and no message replies go out (the bell still works).
-- **Launch blocker:** sales tax decision. Set `ZELLE_RECIPIENT`/`ZELLE_NAME` and Resend in Vercel.
-- Customer "My bookings" page. Customers have no self-serve cancellation or rescheduling.
-- Booking still prices from `service-catalog.ts`. ADR-0016 step 2 moves it to the DB tables.
-- `develop`'s `package.json` says 0.2.1 while `main` is 0.5.0: release back-merges never landed (TODO, Housekeeping).
+- **Launch blockers (owner):** Privacy Policy PDF must mention birth month/year; sales tax decision; set `CONTACT_EMAIL`, Resend (`RESEND_API_KEY`, `EMAIL_FROM`, monitored) and `ZELLE_RECIPIENT`/`ZELLE_NAME` in Vercel; register the DMCA agent.
+- Customers can't cancel or reschedule themselves (My bookings is read-only; they email `CONTACT_EMAIL`).
+- Preview deploys run `prisma migrate deploy` (the `build` script): give Preview its own database so unmerged migrations never reach a shared one.
 
 ## Overview follow-ups (TODO, Admin Overview)
 - Per-chart ranges: kept as one page-wide range on purpose.
-- Other notification kinds (messages, payments, low stock, reviews).
+- Other notification kinds (customer messages, reviews): nothing writes them until customers can send either from the site.
 - How reviews arrive (Request Review after Completed, or imports).

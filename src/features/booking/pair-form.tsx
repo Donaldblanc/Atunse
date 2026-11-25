@@ -7,7 +7,7 @@ import { catalogService, formatServicePrice, MATERIALS } from "@/features/orders
 import { PHOTO_ACCEPT, selectPhotos, skippedMessage } from "./photo-selection";
 import type { PairDetails } from "./booking-types";
 import { ServiceRow } from "./service-row";
-import { BOOKING_ADD_ONS } from "./services-data";
+import { useSiteData } from "./site-data-context";
 
 // Shared brand/material/notes/photos/add-ons form, used by DetailsStep for
 // both a single pair and each tab of a 3-pair bundle, so each pair picks
@@ -26,6 +26,7 @@ export function PairForm({
   details: PairDetails;
   onChange: (details: PairDetails) => void;
 }) {
+  const { catalog, addOns } = useSiteData();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [skipped, setSkipped] = useState<string | null>(null);
@@ -146,13 +147,13 @@ export function PairForm({
       <div className="booking-page-addons">
         <p className="booking-page-service-group-label">Additional services (optional)</p>
         <div className="booking-page-service-list">
-          {BOOKING_ADD_ONS.map((addOn) => (
+          {addOns.map((addOn) => (
             <ServiceRow
               key={addOn.id}
               Icon={addOn.icon}
               name={addOn.name}
               subtitle={addOn.description}
-              price={formatServicePrice(catalogService(addOn.id))}
+              price={formatServicePrice(catalogService(catalog, addOn.id))}
               shape="checkbox"
               isActive={details.addOnIds.includes(addOn.id)}
               onClick={() => toggleAddOn(addOn.id)}

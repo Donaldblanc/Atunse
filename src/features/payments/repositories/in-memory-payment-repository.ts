@@ -2,7 +2,7 @@
 // one's rules, for use-case tests (ADR-0011).
 
 import type { ItemStatus, PaymentKind, PaymentMethod } from "@/features/orders/domain";
-import { PAYMENT_METHOD_LABELS } from "@/features/orders/domain";
+import { PAYMENT_METHOD_LABELS, paymentReceivedNotification } from "@/features/orders/domain";
 import { Money } from "@/shared/money/money";
 import {
   OrderNotFoundError,
@@ -49,6 +49,8 @@ const fakeId = (prefix: string) => `${prefix}_${++seq}`;
 export class InMemoryPaymentRepository implements PaymentRepository {
   readonly orders = new Map<string, InMemoryOrderSeed>();
   readonly payments: InMemoryPaymentSeed[] = [];
+  /** Bell notifications written when a Payment becomes RECEIVED (kind PAYMENT_RECEIVED, linked to the Order). */
+  readonly notifications: { kind: "PAYMENT_RECEIVED"; title: string; body: string; orderId: string }[] = [];
   private readonly auditKeys = new Set<string>(); // `${orderId}:${idempotencyKey}`
 
   addOrder(order: InMemoryOrderSeed): void {
@@ -173,6 +175,11 @@ export class InMemoryPaymentRepository implements PaymentRepository {
       reference: params.reference,
       createdAt: new Date(),
       receivedAt: new Date(),
+    });
+    this.notifications.push({
+      kind: "PAYMENT_RECEIVED",
+      orderId: order.id,
+      ...paymentReceivedNotification({ orderNumber: order.number, kind: "FULL", amountCents: params.amountCents, method: params.method }),
     });
     return "recorded";
   }

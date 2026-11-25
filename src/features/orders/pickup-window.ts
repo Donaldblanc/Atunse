@@ -2,28 +2,23 @@
 // booking UI (pickup-date-picker.tsx, schedule-step.tsx) imports them, so
 // the two can't disagree about which slots or states exist. They live in
 // features/orders, next to service-catalog.ts, so a UI refactor can't
-// silently change server validation. Pure: no React.
+// silently change server validation. Pure: no React. The collection hours
+// are Settings' operating hours, passed in by the caller (ADR-0016).
 
-import { shopClock, shopTime, type CalendarDate } from "./calendar-date";
+import type { OperatingHoursRow } from "@/features/settings/repositories/settings-repository";
+import { dayOfWeek, shopClock, shopTime, type CalendarDate } from "./calendar-date";
 
 /** CONTEXT.md: Pickup is local to the NY/NJ/CT Tri-State area only. */
 export const PICKUP_STATES = ["NY", "NJ", "CT"] as const;
 
-// Pickup window: 8:00 AM - 10:00 PM in 30-minute slots, every day. The
-// operating_hours table (Settings) is seeded to match; a parity test
-// keeps them in step until booking reads the table.
-const WINDOW_START_MINUTES = 8 * 60;
-const WINDOW_END_MINUTES = 22 * 60;
-
-/** The daily collection window in minutes past midnight, shop time. */
-export const PICKUP_WINDOW_MINUTES = { opensAt: WINDOW_START_MINUTES, closesAt: WINDOW_END_MINUTES } as const;
+const SLOT_MINUTES = 30;
 
 function formatClock(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   const period = h >= 12 ? "PM" : "AM";
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${h12}:${m === 0 ? "00" : m} ${period}`;
+  return `${h12}:${m === 0 ? "00" : String(m).padStart(2, "0")} ${period}`;
 }
 
 /**
@@ -35,31 +30,62 @@ export const PICKUP_LEAD_MINUTES = 2 * 60;
 
 type PickupSlot = { label: string; startMinutes: number };
 
-function buildTimeSlots(): PickupSlot[] {
+/** The 30-minute slots of `date`'s weekday, from opening up to closing; none on a closed day. */
+function slotsFor(date: CalendarDate, hours: OperatingHoursRow[]): PickupSlot[] {
+  const row = hours.find((h) => h.weekday === dayOfWeek(date));
+  if (!row || !row.isOpen) return [];
   const slots: PickupSlot[] = [];
-  for (let start = WINDOW_START_MINUTES; start < WINDOW_END_MINUTES; start += 30) {
-    slots.push({ label: `${formatClock(start)} – ${formatClock(start + 30)}`, startMinutes: start });
+  for (let start = row.opensAt; start + SLOT_MINUTES <= row.closesAt; start += SLOT_MINUTES) {
+    slots.push({ label: `${formatClock(start)} – ${formatClock(start + SLOT_MINUTES)}`, startMinutes: start });
   }
   return slots;
 }
 
-const SLOTS = buildTimeSlots();
+/** Every slot on `date` per the operating hours, bookable or not. */
+export function daySlots(date: CalendarDate, hours: OperatingHoursRow[]): string[] {
+  return slotsFor(date, hours).map((slot) => slot.label);
+}
 
-/** The daily window as customers read it, e.g. "8:00 AM – 10:00 PM". */
-export const PICKUP_WINDOW_LABEL = `${formatClock(WINDOW_START_MINUTES)} – ${formatClock(WINDOW_END_MINUTES)}`;
+/** A weekday's hours as customers read them, e.g. "8:00 AM – 10:00 PM", or "Closed". */
+export function windowLabel(hours: OperatingHoursRow[], weekday: number): string {
+  const row = hours.find((h) => h.weekday === weekday);
+  if (!row || !row.isOpen || row.closesAt <= row.opensAt) return "Closed";
+  return `${formatClock(row.opensAt)} – ${formatClock(row.closesAt)}`;
+}
 
-/** Every slot in the daily window, bookable or not. */
-export const PICKUP_TIME_SLOTS: readonly string[] = SLOTS.map((slot) => slot.label);
+/**
+ * The collection hours when every open weekday has the same ("8:00 AM – 10:00 PM"),
+ * so the booking page can state them once; null when they differ by day or the shop is closed all week.
+ */
+export function windowSummary(hours: OperatingHoursRow[]): string | null {
+  const labels = new Set(hours.filter((h) => h.isOpen).map((h) => windowLabel(hours, h.weekday)));
+  return labels.size === 1 ? [...labels][0]! : null;
+}
+
+function parseClock(text: string): number | null {
+  const match = /^(\d{1,2}):(\d{2}) (AM|PM)$/.exec(text);
+  if (!match) return null;
+  const hour12 = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour12 < 1 || hour12 > 12 || minute > 59) return null;
+  return (hour12 % 12) * 60 + (match[3] === "PM" ? 12 * 60 : 0) + minute;
+}
 
 /**
  * When a booked collection slot starts and ends, as instants: the
- * Calendar's COLLECTION Appointment. Throws for a slot that isn't one of
- * PICKUP_TIME_SLOTS (submitOrder has already validated it).
+ * Calendar's COLLECTION Appointment. Parsed from the slot label itself, so
+ * it never depends on the current hours (a booked slot stays readable after
+ * the shop changes them). Throws for a label that isn't a 30-minute slot
+ * (submitOrder has already validated it).
  */
 export function collectionTimes(date: CalendarDate, slot: string): { startsAt: Date; endsAt: Date } {
-  const match = SLOTS.find((s) => s.label === slot);
-  if (!match) throw new Error(`Unknown collection slot: ${slot}`);
-  return { startsAt: shopTime(date, match.startMinutes), endsAt: shopTime(date, match.startMinutes + 30) };
+  const [from, to, ...rest] = slot.split(" – ");
+  const start = from === undefined ? null : parseClock(from);
+  const end = to === undefined ? null : parseClock(to);
+  if (rest.length > 0 || start === null || end === null || end - start !== SLOT_MINUTES) {
+    throw new Error(`Unknown collection slot: ${slot}`);
+  }
+  return { startsAt: shopTime(date, start), endsAt: shopTime(date, end) };
 }
 
 /**
@@ -68,34 +94,37 @@ export function collectionTimes(date: CalendarDate, slot: string): { startsAt: D
  * a past date, all for a future one, and on today only those starting at
  * least PICKUP_LEAD_MINUTES from now.
  */
-export function availablePickupSlots(date: CalendarDate, now: Date): string[] {
+export function availablePickupSlots(date: CalendarDate, now: Date, hours: OperatingHoursRow[]): string[] {
   const clock = shopClock(now);
   if (date < clock.date) return [];
-  if (date > clock.date) return SLOTS.map((slot) => slot.label);
-  return SLOTS.filter((slot) => slot.startMinutes >= clock.minutes + PICKUP_LEAD_MINUTES).map((slot) => slot.label);
+  const slots = slotsFor(date, hours);
+  if (date > clock.date) return slots.map((slot) => slot.label);
+  return slots.filter((slot) => slot.startMinutes >= clock.minutes + PICKUP_LEAD_MINUTES).map((slot) => slot.label);
 }
 
 /**
  * The slots the owner can book a visit into on `date`, at instant `now`
- * (rescheduling a Collection, booking a Return). The same window and slot
+ * (rescheduling a Collection, booking a Return). The same hours and slot
  * grid as customers get, but WITHOUT the customer lead time: the lead time
  * exists so the owner can plan a route around a booking, and here the owner
  * is the one planning. A slot that has already started is still refused,
  * so today offers the slots from now on.
  */
-export function adminVisitSlots(date: CalendarDate, now: Date): string[] {
+export function adminVisitSlots(date: CalendarDate, now: Date, hours: OperatingHoursRow[]): string[] {
   const clock = shopClock(now);
   if (date < clock.date) return [];
-  if (date > clock.date) return SLOTS.map((slot) => slot.label);
-  return SLOTS.filter((slot) => slot.startMinutes >= clock.minutes).map((slot) => slot.label);
+  const slots = slotsFor(date, hours);
+  if (date > clock.date) return slots.map((slot) => slot.label);
+  return slots.filter((slot) => slot.startMinutes >= clock.minutes).map((slot) => slot.label);
 }
 
 /**
  * Whether a calendar day can be picked: from the shop's today onward, and
- * for Pickup only while that day still has a bookable slot.
+ * for Pickup only while that day still has a bookable slot. Mail-In days
+ * aren't limited by the operating hours.
  */
-export function isBookableDay(date: CalendarDate, method: "PICKUP" | "MAIL_IN", now: Date): boolean {
-  if (method === "PICKUP") return availablePickupSlots(date, now).length > 0;
+export function isBookableDay(date: CalendarDate, method: "PICKUP" | "MAIL_IN", now: Date, hours: OperatingHoursRow[]): boolean {
+  if (method === "PICKUP") return availablePickupSlots(date, now, hours).length > 0;
   return date >= shopClock(now).date;
 }
 
